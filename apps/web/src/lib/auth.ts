@@ -24,10 +24,14 @@ function resolveAuthBaseUrl(): string {
   return "http://localhost:3000";
 }
 
-/** Origins allowed for CSRF / Origin checks (prod previews + explicit env + local dev). */
-function resolveTrustedOrigins(): string[] {
+/**
+ * Static origin allowlist (env + defaults).
+ * On Vercel, browser Origin often matches `x-forwarded-host`, which may differ from BETTER_AUTH_URL
+ * (preview URL vs production alias, custom domain vs *.vercel.app). Per-request origins are merged below.
+ */
+function resolveTrustedOriginsStatic(): string[] {
   const origins = new Set<string>();
-  const add = (value?: string | null) => {
+  const addUrl = (value?: string | null) => {
     const v = value?.trim();
     if (!v) return;
     try {
@@ -37,12 +41,37 @@ function resolveTrustedOrigins(): string[] {
       /* ignore invalid */
     }
   };
-  add(resolveAuthBaseUrl());
-  add(process.env.BETTER_AUTH_URL);
-  add(process.env.NEXT_PUBLIC_APP_URL);
-  if (process.env.VERCEL_URL) add(`https://${process.env.VERCEL_URL}`);
-  if (origins.size === 0) add("http://localhost:3000");
+  addUrl(resolveAuthBaseUrl());
+  addUrl(process.env.BETTER_AUTH_URL);
+  addUrl(process.env.NEXT_PUBLIC_APP_URL);
+  if (process.env.VERCEL_URL) addUrl(`https://${process.env.VERCEL_URL}`);
+  if (origins.size === 0) addUrl("http://localhost:3000");
+  // Host wildcard — matches any *.vercel.app deployment (previews + production hostname mismatches).
+  if (process.env.VERCEL) origins.add("*.vercel.app");
   return [...origins];
+}
+
+async function resolveTrustedOrigins(request?: Request): Promise<string[]> {
+  const list = resolveTrustedOriginsStatic();
+  if (!request) return list;
+
+  const extra = new Set<string>();
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const proto =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+
+  if (forwardedHost) {
+    const host = forwardedHost.split(",")[0]?.trim();
+    if (host) {
+      try {
+        extra.add(new URL(`${proto}://${host}`).origin);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  return [...new Set([...list, ...extra])];
 }
 
 const authBaseUrl = resolveAuthBaseUrl();
@@ -55,7 +84,7 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
   baseURL: authBaseUrl,
-  trustedOrigins: resolveTrustedOrigins(),
+  trustedOrigins: resolveTrustedOrigins,
   plugins: [
     jwt(),
     nextCookies(),
