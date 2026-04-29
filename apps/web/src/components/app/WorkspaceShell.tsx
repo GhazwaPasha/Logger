@@ -24,7 +24,7 @@ export function WorkspaceShell({
   useEffect(() => {
     if (!token || orgs.length === 0) return;
     if (!orgs.some((o) => o.id === workspaceId)) {
-      router.replace("/app/workspaces");
+      router.replace(`/app/w/${orgs[0].id}/dashboard`);
     }
   }, [token, orgs, workspaceId, router]);
 
@@ -33,7 +33,7 @@ export function WorkspaceShell({
       <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
         <AppHeader theme={theme} onThemeChange={setTheme} />
         <div className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:items-stretch">
-          <WorkspaceSidebar workspaceId={workspaceId} workspaces={orgs} />
+          <WorkspaceSidebar workspaceId={workspaceId} />
           <main className="min-h-0 min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>

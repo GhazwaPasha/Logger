@@ -15,12 +15,13 @@ export default function WorkItemDetailPage() {
   const workspaceId = params.workspaceId as string;
   const taskId = params.taskId as string;
   const { token } = useApiSession();
-  const { depts, reload: reloadOrg } = useWorkspaceData();
+  const { depts, lists, reload: reloadOrg } = useWorkspaceData();
   const { detail, error, setError, reload } = useTaskDetail(token, taskId);
   const [logBody, setLogBody] = useState('{"message":"Acknowledged."}');
   const [logType, setLogType] = useState<"ack" | "note" | "status_change">("note");
   const [rescheduleAt, setRescheduleAt] = useState("");
   const [rescheduleReason, setRescheduleReason] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -30,10 +31,8 @@ export default function WorkItemDetailPage() {
     if (detail?.task.dueAt) setRescheduleAt(detail.task.dueAt.slice(0, 16));
   }, [detail?.task.dueAt, detail?.task.id]);
 
-  const deptName =
-    detail && depts.length
-      ? depts.find((x) => x.id === detail.task.departmentId)?.name ?? detail.task.departmentId
-      : "";
+  const currentList = detail ? lists.find((x) => x.id === detail.task.listId) : null;
+  const deptName = currentList && depts.length ? depts.find((x) => x.id === currentList.departmentId)?.name ?? currentList.departmentId : "";
 
   async function appendLog() {
     if (!token) return;
@@ -76,7 +75,7 @@ export default function WorkItemDetailPage() {
 
   async function archive() {
     if (!token) return;
-    if (!confirm("Archive this work item? (assigner only — soft delete)")) return;
+    if (!confirm("Archive this task? (assigner only — soft delete)")) return;
     setError(null);
     try {
       await apiJson(`/tasks/${taskId}/archive`, { method: "POST", token });
@@ -105,13 +104,44 @@ export default function WorkItemDetailPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function createSubtask() {
+    if (!token || !newSubtaskTitle.trim()) return;
+    setError(null);
+    try {
+      await apiJson(`/tasks/${taskId}/subtasks`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ title: newSubtaskTitle.trim() }),
+      });
+      setNewSubtaskTitle("");
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create subtask");
+    }
+  }
+
+  async function setSubtaskDone(subtaskId: string, done: boolean) {
+    if (!token) return;
+    setError(null);
+    try {
+      await apiJson(`/tasks/${taskId}/subtasks/${subtaskId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ done }),
+      });
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update subtask");
+    }
+  }
+
   if (!detail) {
     return (
       <div className="mx-auto w-full max-w-screen-2xl space-y-4">
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-        <p className="text-sm text-[var(--muted)]">{error ? "Could not load this work item." : "Loading…"}</p>
+        <p className="text-sm text-[var(--muted)]">{error ? "Could not load this task." : "Loading…"}</p>
         <Link href={`/app/w/${workspaceId}/work`} className="btn-secondary inline-flex rounded-xl">
-          ← Back to work items
+          ← Back to tasks
         </Link>
       </div>
     );
@@ -122,13 +152,14 @@ export default function WorkItemDetailPage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <nav className="text-xs text-[var(--muted)]">
         <Link href={`/app/w/${workspaceId}/work`} className="hover:text-[var(--fg)]">
-          ← Work items
+          ← Tasks
         </Link>
       </nav>
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">{detail.task.title}</h1>
         <p className="font-mono-ledger text-xs text-[var(--muted)]">
           {detail.task.id} · {deptName}
+          {currentList ? ` · ${currentList.name}` : ""}
         </p>
         <div className="flex flex-wrap gap-2 pt-2">
           {detail.capabilities.canDeleteTask && (
@@ -170,6 +201,38 @@ export default function WorkItemDetailPage() {
           </button>
         </section>
       )}
+      <section className="surface-elevated space-y-3 rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+        <h2 className="text-sm font-semibold">Subtasks</h2>
+        <div className="flex gap-2">
+          <input
+            className="input rounded-xl"
+            placeholder="Add subtask"
+            value={newSubtaskTitle}
+            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void createSubtask();
+              }
+            }}
+          />
+          <button type="button" className="btn-primary rounded-xl px-4" onClick={() => void createSubtask()}>
+            Add
+          </button>
+        </div>
+        {detail.subtasks.length === 0 ? (
+          <p className="text-xs text-[var(--muted)]">No subtasks yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {detail.subtasks.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={s.done} onChange={(e) => void setSubtaskDone(s.id, e.target.checked)} />
+                <span className={s.done ? "text-[var(--muted)] line-through" : ""}>{s.title}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <section>
         <h2 className="mb-4 text-sm font-semibold text-[var(--muted)]">Reason log</h2>
         <ul className="space-y-3">

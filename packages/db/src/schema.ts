@@ -136,8 +136,8 @@ export const organizationMembers = pgTable(
   ],
 );
 
-export const tasks = pgTable(
-  "tasks",
+export const lists = pgTable(
+  "lists",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     organizationId: uuid("organization_id")
@@ -146,6 +146,29 @@ export const tasks = pgTable(
     departmentId: uuid("department_id")
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("lists_org_idx").on(t.organizationId),
+    index("lists_department_idx").on(t.departmentId),
+  ],
+);
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
     assignerId: text("assigner_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -161,9 +184,27 @@ export const tasks = pgTable(
   },
   (t) => [
     index("tasks_org_idx").on(t.organizationId),
-    index("tasks_department_idx").on(t.departmentId),
+    index("tasks_list_idx").on(t.listId),
     index("tasks_assigner_idx").on(t.assignerId),
   ],
+);
+
+export const subtasks = pgTable(
+  "subtasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    done: boolean("done").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("subtasks_task_idx").on(t.taskId)],
 );
 
 export const taskAssignees = pgTable(
@@ -225,6 +266,7 @@ export const accountsRelations = relations(account, ({ one }) => ({
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   members: many(organizationMembers),
   departments: many(departments),
+  lists: many(lists),
   tasks: many(tasks),
 }));
 
@@ -241,6 +283,18 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
     fields: [departments.organizationId],
     references: [organizations.id],
   }),
+  lists: many(lists),
+}));
+
+export const listsRelations = relations(lists, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [lists.organizationId],
+    references: [organizations.id],
+  }),
+  department: one(departments, {
+    fields: [lists.departmentId],
+    references: [departments.id],
+  }),
   tasks: many(tasks),
 }));
 
@@ -249,12 +303,13 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     fields: [tasks.organizationId],
     references: [organizations.id],
   }),
-  department: one(departments, {
-    fields: [tasks.departmentId],
-    references: [departments.id],
+  list: one(lists, {
+    fields: [tasks.listId],
+    references: [lists.id],
   }),
   assigner: one(user, { fields: [tasks.assignerId], references: [user.id] }),
   assignees: many(taskAssignees),
+  subtasks: many(subtasks),
   ledgerEntries: many(activityLedger),
 }));
 
@@ -266,6 +321,10 @@ export const taskAssigneesRelations = relations(taskAssignees, ({ one }) => ({
 export const activityLedgerRelations = relations(activityLedger, ({ one }) => ({
   task: one(tasks, { fields: [activityLedger.taskId], references: [tasks.id] }),
   actor: one(user, { fields: [activityLedger.actorId], references: [user.id] }),
+}));
+
+export const subtasksRelations = relations(subtasks, ({ one }) => ({
+  task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));
 
 export const authSchema = {
@@ -283,13 +342,17 @@ export const appSchema = {
   organizations,
   organizationMembers,
   departments,
+  lists,
   tasks,
+  subtasks,
   taskAssignees,
   activityLedger,
   organizationsRelations,
   organizationMembersRelations,
   departmentsRelations,
+  listsRelations,
   tasksRelations,
+  subtasksRelations,
   taskAssigneesRelations,
   activityLedgerRelations,
 };

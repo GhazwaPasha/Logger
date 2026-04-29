@@ -5,6 +5,7 @@ import { AuthModule } from "./auth/auth.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { DbModule } from "./db/db.module";
 import { DepartmentsModule } from "./departments/departments.module";
+import { ListsModule } from "./lists/lists.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { HealthController } from "./health.controller";
@@ -24,6 +25,7 @@ import { HealthController } from "./health.controller";
     AuthModule,
     OrganizationsModule,
     DepartmentsModule,
+    ListsModule,
     TasksModule,
   ],
   controllers: [HealthController],

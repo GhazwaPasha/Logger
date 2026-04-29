@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { organizationMembers, taskAssignees, tasks } from "@work-ledger/db";
+import { lists, organizationMembers, taskAssignees, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 
@@ -37,6 +37,9 @@ export class AuthorizationService {
     const taskRows = await this.db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
     if (taskRows.length === 0) throw new NotFoundException("Task not found");
     const task = taskRows[0]!;
+    const listRows = await this.db.select().from(lists).where(eq(lists.id, task.listId)).limit(1);
+    if (listRows.length === 0) throw new NotFoundException("Task list not found");
+    const list = listRows[0]!;
 
     const [assigneeRows, memberRows] = await Promise.all([
       this.db
@@ -60,7 +63,7 @@ export class AuthorizationService {
 
     const isOwner = membership?.role === "owner";
     const isDeptManager =
-      membership?.role === "manager" && membership.departmentId === task.departmentId;
+      membership?.role === "manager" && membership.departmentId === list.departmentId;
 
     const canParticipate = isOwner || isDeptManager || isAssignee;
     if (!canParticipate) {
@@ -134,13 +137,26 @@ export class AuthorizationService {
     }
 
     if (m?.role === "manager" && m.departmentId) {
+      const managerLists = await this.db
+        .select()
+        .from(lists)
+        .where(
+          and(
+            eq(lists.organizationId, organizationId),
+            eq(lists.departmentId, m.departmentId),
+          ),
+        );
+      if (managerLists.length === 0) return [];
       return this.db
         .select()
         .from(tasks)
         .where(
           and(
             eq(tasks.organizationId, organizationId),
-            eq(tasks.departmentId, m.departmentId),
+            inArray(
+              tasks.listId,
+              managerLists.map((x) => x.id),
+            ),
             isNull(tasks.deletedAt),
           ),
         );

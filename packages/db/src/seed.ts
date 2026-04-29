@@ -16,6 +16,7 @@ import { createDb } from "./index.js";
 import {
   activityLedger,
   departments,
+  lists,
   organizationMembers,
   organizations,
   taskAssignees,
@@ -109,7 +110,16 @@ async function main() {
     .insert(tasks)
     .values({
       organizationId: orgId,
-      departmentId: deptId,
+      listId: (
+        await db
+          .insert(lists)
+          .values({
+            organizationId: orgId,
+            departmentId: deptId,
+            name: "General",
+          })
+          .returning()
+      )[0]!.id,
       assignerId: owner.id,
       title: "Sample audit task",
       status: "open",

@@ -2,14 +2,17 @@ import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { and, desc, eq } from "drizzle-orm";
 import {
   appendLedgerSchema,
+  createSubtaskSchema,
   createTaskSchema,
   rescheduleTaskSchema,
+  updateSubtaskSchema,
+  updateTaskStatusSchema,
 } from "@work-ledger/contracts";
-import { activityLedger, taskAssignees, tasks } from "@work-ledger/db";
+import { activityLedger, subtasks, taskAssignees, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
-import { DepartmentsService } from "../departments/departments.service";
+import { ListsService } from "../lists/lists.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 
 @Injectable()
@@ -17,7 +20,7 @@ export class TasksService {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
-    private readonly departments: DepartmentsService,
+    private readonly lists: ListsService,
   ) {}
 
   async list(userId: string, organizationId: string) {
@@ -27,13 +30,13 @@ export class TasksService {
   async create(userId: string, organizationId: string, body: unknown) {
     await this.authz.assertOrgMember(userId, organizationId);
     const parsed = createTaskSchema.parse(body);
-    await this.departments.assertDeptInOrg(organizationId, parsed.departmentId);
+    await this.lists.assertListInOrg(organizationId, parsed.listId);
 
     const [task] = await this.db
       .insert(tasks)
       .values({
         organizationId,
-        departmentId: parsed.departmentId,
+        listId: parsed.listId,
         assignerId: userId,
         title: parsed.title,
         dueAt: parsed.dueAt ? new Date(parsed.dueAt) : null,
@@ -65,7 +68,7 @@ export class TasksService {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
 
-    const [assignees, ledger] = await Promise.all([
+    const [assignees, ledger, taskSubtasks] = await Promise.all([
       this.db
         .select({ userId: taskAssignees.userId })
         .from(taskAssignees)
@@ -75,14 +78,54 @@ export class TasksService {
         .from(activityLedger)
         .where(eq(activityLedger.taskId, taskId))
         .orderBy(desc(activityLedger.createdAt)),
+      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt)),
     ]);
 
     return {
       task: access.task,
       capabilities: caps,
       assigneeUserIds: assignees.map((a) => a.userId),
+      subtasks: taskSubtasks,
       ledger,
     };
+  }
+
+  async listSubtasks(userId: string, taskId: string) {
+    await this.authz.getTaskAccess(userId, taskId);
+    return this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt));
+  }
+
+  async createSubtask(userId: string, taskId: string, body: unknown) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot create subtask");
+    const parsed = createSubtaskSchema.parse(body);
+    const [row] = await this.db
+      .insert(subtasks)
+      .values({
+        taskId,
+        title: parsed.title,
+      })
+      .returning();
+    return row!;
+  }
+
+  async patchSubtask(userId: string, taskId: string, subtaskId: string, body: unknown) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update subtask");
+    const parsed = updateSubtaskSchema.parse(body);
+    const [row] = await this.db
+      .update(subtasks)
+      .set({
+        ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+        ...(parsed.done !== undefined ? { done: parsed.done } : {}),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
+      .returning();
+    if (!row) throw new ForbiddenException("Subtask not found");
+    return row;
   }
 
   async appendLedger(userId: string, taskId: string, body: unknown) {
@@ -165,6 +208,37 @@ export class TasksService {
         actorId: userId,
         type: "archive",
         payload: { archivedAt: now.toISOString() },
+      });
+    });
+
+    return this.getDetail(userId, taskId);
+  }
+
+  async updateStatus(userId: string, taskId: string, body: unknown) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update status");
+
+    const parsed = updateTaskStatusSchema.parse(body);
+    const oldStatus = access.task.status;
+    if (oldStatus === parsed.status) {
+      return this.getDetail(userId, taskId);
+    }
+
+    const now = new Date();
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(tasks)
+        .set({ status: parsed.status, updatedAt: now })
+        .where(eq(tasks.id, taskId));
+      await tx.insert(activityLedger).values({
+        taskId,
+        actorId: userId,
+        type: "status_change",
+        payload: {
+          oldStatus,
+          newStatus: parsed.status,
+        },
       });
     });
 

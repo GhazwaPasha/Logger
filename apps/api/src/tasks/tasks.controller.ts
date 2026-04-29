@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Header,
+  Patch,
   Param,
   Post,
   Res,
@@ -61,6 +62,39 @@ export class TasksByIdController {
     @Body() body: unknown,
   ) {
     return this.tasks.reschedule(user.id, taskId, body);
+  }
+
+  @Post(":taskId/status")
+  updateStatus(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @Body() body: unknown,
+  ) {
+    return this.tasks.updateStatus(user.id, taskId, body);
+  }
+
+  @Get(":taskId/subtasks")
+  listSubtasks(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
+    return this.tasks.listSubtasks(user.id, taskId);
+  }
+
+  @Post(":taskId/subtasks")
+  createSubtask(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @Body() body: unknown,
+  ) {
+    return this.tasks.createSubtask(user.id, taskId, body);
+  }
+
+  @Patch(":taskId/subtasks/:subtaskId")
+  patchSubtask(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @Param("subtaskId") subtaskId: string,
+    @Body() body: unknown,
+  ) {
+    return this.tasks.patchSubtask(user.id, taskId, subtaskId, body);
   }
 
   @Post(":taskId/archive")

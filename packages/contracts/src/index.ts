@@ -40,9 +40,18 @@ export const updateDepartmentSchema = z.object({
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(512),
-  departmentId: z.string().uuid(),
+  listId: z.string().uuid(),
   assigneeUserIds: z.array(z.string().min(1)).optional().default([]),
   dueAt: z.string().datetime().optional().nullable(),
+});
+
+export const createListSchema = z.object({
+  name: z.string().min(1).max(256),
+  departmentId: z.string().uuid(),
+});
+
+export const updateListSchema = z.object({
+  name: z.string().min(1).max(256),
 });
 
 export const appendLedgerSchema = z.object({
@@ -54,6 +63,19 @@ export const appendLedgerSchema = z.object({
 export const rescheduleTaskSchema = z.object({
   newDueAt: z.string().datetime(),
   reason: z.string().min(1).max(4000),
+});
+
+export const updateTaskStatusSchema = z.object({
+  status: taskStatusSchema,
+});
+
+export const createSubtaskSchema = z.object({
+  title: z.string().min(1).max(512),
+});
+
+export const updateSubtaskSchema = z.object({
+  title: z.string().min(1).max(512).optional(),
+  done: z.boolean().optional(),
 });
 
 export const taskCapabilitiesSchema = z.object({

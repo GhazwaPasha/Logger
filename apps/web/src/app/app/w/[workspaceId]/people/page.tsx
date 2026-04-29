@@ -52,7 +52,7 @@ export default function PeoplePage() {
     <div className="mx-auto w-full max-w-screen-2xl space-y-8">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">People</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Who can access this {NODE_LABELS.workspace.toLowerCase()} and, for managers, which {NODE_LABELS.level.toLowerCase()} they cover.
         </p>

@@ -13,12 +13,12 @@ export function middleware(request: NextRequest) {
   const sub = m[2];
 
   if (!id) {
-    url.pathname = "/app/workspaces";
+    url.pathname = "/app";
     return NextResponse.redirect(url);
   }
 
   if (!sub) {
-    url.pathname = `/app/w/${id}/overview`;
+    url.pathname = `/app/w/${id}/dashboard`;
     return NextResponse.redirect(url);
   }
 
@@ -34,11 +34,11 @@ export function middleware(request: NextRequest) {
   }
 
   if (sub === "structure" || sub.startsWith("structure/")) {
-    url.pathname = `/app/w/${id}/levels`;
+    url.pathname = `/app/w/${id}/work`;
     return NextResponse.redirect(url);
   }
 
-  url.pathname = `/app/w/${id}/overview`;
+  url.pathname = `/app/w/${id}/dashboard`;
   return NextResponse.redirect(url);
 }
 

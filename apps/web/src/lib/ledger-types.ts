@@ -1,5 +1,11 @@
 export type Org = { id: string; name: string };
 export type Dept = { id: string; name: string; organizationId: string };
+export type ListRow = {
+  id: string;
+  name: string;
+  organizationId: string;
+  departmentId: string;
+};
 export type MemberRow = {
   userId: string;
   role: string;
@@ -12,9 +18,17 @@ export type TaskRow = {
   title: string;
   status: string;
   dueAt: string | null;
-  departmentId: string;
+  listId: string;
   assignerId: string;
   deletedAt: string | null;
+};
+export type SubtaskRow = {
+  id: string;
+  taskId: string;
+  title: string;
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 export type LedgerRow = {
   id: string;
@@ -28,5 +42,6 @@ export type TaskDetail = {
   task: TaskRow;
   capabilities: { canDeleteTask: boolean; canReschedule: boolean; canAppendLedger: boolean };
   assigneeUserIds: string[];
+  subtasks: SubtaskRow[];
   ledger: LedgerRow[];
 };

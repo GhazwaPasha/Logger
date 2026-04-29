@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import type { ThemePref } from "@/hooks/useThemePreference";
 
@@ -13,8 +12,6 @@ export function AppHeader({
   onThemeChange: (t: ThemePref) => void;
 }) {
   const { data: session } = authClient.useSession();
-  const pathname = usePathname();
-  const inApp = pathname.startsWith("/app");
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)]/85 backdrop-blur-md">
@@ -26,14 +23,6 @@ export function AppHeader({
             </span>
             <span className="hidden sm:inline">Work Ledger</span>
           </Link>
-          {inApp && (
-            <Link
-              href="/app/workspaces"
-              className="md:hidden rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] hover:border-[var(--accent)]/40 hover:text-[var(--fg)]"
-            >
-              Spaces
-            </Link>
-          )}
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {session?.user && (

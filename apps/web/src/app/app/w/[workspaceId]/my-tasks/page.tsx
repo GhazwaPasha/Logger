@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export default function LevelsPage() {
+export default function MyTasksPage() {
   const params = useParams();
   const router = useRouter();
   const workspaceId = params.workspaceId as string;
@@ -12,5 +12,5 @@ export default function LevelsPage() {
     router.replace(`/app/w/${workspaceId}/work`);
   }, [router, workspaceId]);
 
-  return <div className="p-8 text-sm text-[var(--muted)]">Opening tasks…</div>;
+  return <div className="p-8 text-sm text-[var(--muted)]">Opening your tasks…</div>;
 }
