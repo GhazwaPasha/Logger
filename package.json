@@ -1,0 +1,23 @@
+{
+  "name": "work-ledger",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -ws --if-present",
+    "dev": "echo Use npm run dev:api and npm run dev:web in separate terminals",
+    "dev:api": "npm run dev -w @work-ledger/api",
+    "dev:web": "npm run dev -w @work-ledger/web",
+    "dev:mobile": "npm run start -w @work-ledger/mobile",
+    "db:generate": "npm run generate -w @work-ledger/db",
+    "db:migrate": "npm run migrate -w @work-ledger/db",
+    "db:studio": "npm run studio -w @work-ledger/db",
+    "db:seed": "npm run seed -w @work-ledger/db",
+    "lint": "npm run lint -ws --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

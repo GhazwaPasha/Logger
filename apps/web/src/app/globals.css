@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --border: #000000;
+  --accent: #007aff;
+  --muted: #525252;
+}
+
+html[data-theme="dark"] {
+  --bg: #0a0a0b;
+  --fg: #fafafa;
+  --border: #222222;
+  --accent: #007aff;
+  --muted: #a3a3a3;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] {
+    --bg: #0a0a0b;
+    --fg: #fafafa;
+    --border: #222222;
+    --accent: #007aff;
+    --muted: #a3a3a3;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] {
+    --bg: #ffffff;
+    --fg: #0a0a0a;
+    --border: #000000;
+    --accent: #007aff;
+    --muted: #525252;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-mono-ledger {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.btn {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.input {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@work-ledger/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "prebuild": "npm run build -w @work-ledger/db && npm run build -w @work-ledger/contracts",
+    "predev": "npm run build -w @work-ledger/db && npm run build -w @work-ledger/contracts",
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.0",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/platform-express": "^11.0.12",
+    "@work-ledger/contracts": "*",
+    "@work-ledger/db": "*",
+    "drizzle-orm": "^0.45.0",
+    "jose": "^5.10.0",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.14.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.5",
+    "@nestjs/schematics": "^11.0.2",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3"
+  }
+}
