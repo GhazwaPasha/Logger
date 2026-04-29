@@ -86,7 +86,14 @@ export const auth = betterAuth({
   baseURL: authBaseUrl,
   trustedOrigins: resolveTrustedOrigins,
   plugins: [
-    jwt(),
+    jwt({
+      jwks: {
+        // Default encrypts JWKS private keys with BETTER_AUTH_SECRET; changing the secret without DB cleanup
+        // causes "Failed to decrypt private key" and 500s on get-session. Storing the key material unencrypted
+        // in Postgres (still protected by DB access) avoids deploy/env secret mismatches with Neon.
+        disablePrivateKeyEncryption: true,
+      },
+    }),
     nextCookies(),
     dash({
       // Required for Better Auth Infra / dashboard “connect your app” validation
