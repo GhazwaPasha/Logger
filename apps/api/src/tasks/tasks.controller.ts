@@ -3,8 +3,8 @@ import {
   Controller,
   Get,
   Header,
-  Patch,
   Param,
+  Patch,
   Post,
   Res,
   UseGuards,
@@ -40,6 +40,15 @@ export class TasksController {
 @Controller("tasks")
 export class TasksByIdController {
   constructor(private readonly tasks: TasksService) {}
+
+  @Patch(":taskId")
+  patchTask(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @Body() body: unknown,
+  ) {
+    return this.tasks.patchTask(user.id, taskId, body);
+  }
 
   @Get(":taskId")
   getOne(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {

@@ -9,6 +9,15 @@ import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import {
+  KANBAN_STATUS_ORDER,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  type BoardTaskStatus,
+  type TaskPriority,
+  normalizeTaskStatus,
+  taskPriority,
+} from "@/lib/task-board";
 
 export default function WorkItemDetailPage() {
   const params = useParams();
@@ -104,6 +113,22 @@ export default function WorkItemDetailPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function patchTaskFields(patch: { status?: BoardTaskStatus; priority?: TaskPriority }) {
+    if (!token) return;
+    setError(null);
+    try {
+      await apiJson(`/tasks/${taskId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(patch),
+      });
+      await reload();
+      await reloadOrg();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update task");
+    }
+  }
+
   async function createSubtask() {
     if (!token || !newSubtaskTitle.trim()) return;
     setError(null);
@@ -171,6 +196,38 @@ export default function WorkItemDetailPage() {
             Export PDF
           </button>
         </div>
+        {detail.capabilities.canAppendLedger && (
+          <div className="flex flex-wrap items-end gap-4 pt-4">
+            <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+              Status
+              <select
+                className="input h-10 rounded-xl text-sm"
+                value={normalizeTaskStatus(detail.task.status)}
+                onChange={(e) => void patchTaskFields({ status: e.target.value as BoardTaskStatus })}
+              >
+                {KANBAN_STATUS_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--muted)]">
+              Priority
+              <select
+                className="input h-10 rounded-xl text-sm"
+                value={taskPriority(detail.task)}
+                onChange={(e) => void patchTaskFields({ priority: e.target.value as TaskPriority })}
+              >
+                {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                  <option key={k} value={k}>
+                    {PRIORITY_LABELS[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
       </header>
       {detail.capabilities.canReschedule && (
         <section className="surface-elevated space-y-3 rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">

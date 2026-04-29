@@ -17,6 +17,7 @@ export type TaskRow = {
   id: string;
   title: string;
   status: string;
+  priority?: string;
   dueAt: string | null;
   listId: string;
   assignerId: string;

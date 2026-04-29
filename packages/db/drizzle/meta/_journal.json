@@ -15,6 +15,13 @@
       "when": 1777428600000,
       "tag": "0001_lists_subtasks",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0002_task_status_priority",
+      "breakpoints": true
     }
   ]
 }

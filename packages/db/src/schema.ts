@@ -92,7 +92,16 @@ export const jwks = pgTable("jwks", {
 });
 
 export const orgRoleEnum = pgEnum("org_role", ["owner", "manager", "member"]);
-export const taskStatusEnum = pgEnum("task_status", ["open", "in_progress", "done"]);
+export const taskStatusEnum = pgEnum("task_status", [
+  "open",
+  "pending",
+  "assigned",
+  "in_progress",
+  "done",
+  "late",
+  "cancelled",
+]);
+export const taskPriorityEnum = pgEnum("task_priority", ["high", "medium", "low"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -173,7 +182,8 @@ export const tasks = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     title: text("title").notNull(),
-    status: taskStatusEnum("status").notNull().default("open"),
+    status: taskStatusEnum("status").notNull().default("pending"),
+    priority: taskPriorityEnum("priority").notNull().default("medium"),
     dueAt: timestamp("due_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

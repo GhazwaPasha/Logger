@@ -4,6 +4,7 @@ import {
   appendLedgerSchema,
   createSubtaskSchema,
   createTaskSchema,
+  patchTaskSchema,
   rescheduleTaskSchema,
   updateSubtaskSchema,
   updateTaskStatusSchema,
@@ -40,6 +41,8 @@ export class TasksService {
         assignerId: userId,
         title: parsed.title,
         dueAt: parsed.dueAt ? new Date(parsed.dueAt) : null,
+        ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+        ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
       })
       .returning();
 
@@ -215,13 +218,24 @@ export class TasksService {
   }
 
   async updateStatus(userId: string, taskId: string, body: unknown) {
+    const parsed = updateTaskStatusSchema.parse(body);
+    return this.patchTask(userId, taskId, { status: parsed.status });
+  }
+
+  async patchTask(userId: string, taskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update status");
+    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update task");
 
-    const parsed = updateTaskStatusSchema.parse(body);
+    const parsed = patchTaskSchema.parse(body);
     const oldStatus = access.task.status;
-    if (oldStatus === parsed.status) {
+    const oldPriority = access.task.priority;
+    const nextStatus = parsed.status !== undefined ? parsed.status : oldStatus;
+    const nextPriority = parsed.priority !== undefined ? parsed.priority : oldPriority;
+    const statusChanged = parsed.status !== undefined && parsed.status !== oldStatus;
+    const priorityChanged = parsed.priority !== undefined && parsed.priority !== oldPriority;
+
+    if (!statusChanged && !priorityChanged) {
       return this.getDetail(userId, taskId);
     }
 
@@ -229,17 +243,23 @@ export class TasksService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(tasks)
-        .set({ status: parsed.status, updatedAt: now })
+        .set({
+          status: nextStatus,
+          priority: nextPriority,
+          updatedAt: now,
+        })
         .where(eq(tasks.id, taskId));
-      await tx.insert(activityLedger).values({
-        taskId,
-        actorId: userId,
-        type: "status_change",
-        payload: {
-          oldStatus,
-          newStatus: parsed.status,
-        },
-      });
+      if (statusChanged) {
+        await tx.insert(activityLedger).values({
+          taskId,
+          actorId: userId,
+          type: "status_change",
+          payload: {
+            oldStatus,
+            newStatus: parsed.status,
+          },
+        });
+      }
     });
 
     return this.getDetail(userId, taskId);

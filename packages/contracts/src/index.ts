@@ -1,7 +1,21 @@
 import { z } from "zod";
 
 export const orgRoleSchema = z.enum(["owner", "manager", "member"]);
-export const taskStatusSchema = z.enum(["open", "in_progress", "done"]);
+export const taskStatusSchema = z.enum([
+  "pending",
+  "assigned",
+  "in_progress",
+  "done",
+  "late",
+  "cancelled",
+]);
+
+/** Accept legacy `open` from older clients and map to `pending`. */
+export const taskStatusInputSchema = z
+  .union([taskStatusSchema, z.literal("open")])
+  .transform((s) => (s === "open" ? "pending" : s));
+
+export const taskPrioritySchema = z.enum(["high", "medium", "low"]);
 export const ledgerTypeSchema = z.enum(["ack", "note", "reschedule", "status_change", "archive"]);
 export const appendableLedgerTypeSchema = z.enum(["ack", "note", "status_change"]);
 
@@ -43,6 +57,8 @@ export const createTaskSchema = z.object({
   listId: z.string().uuid(),
   assigneeUserIds: z.array(z.string().min(1)).optional().default([]),
   dueAt: z.string().datetime().optional().nullable(),
+  status: taskStatusSchema.optional(),
+  priority: taskPrioritySchema.optional(),
 });
 
 export const createListSchema = z.object({
@@ -66,8 +82,17 @@ export const rescheduleTaskSchema = z.object({
 });
 
 export const updateTaskStatusSchema = z.object({
-  status: taskStatusSchema,
+  status: taskStatusInputSchema,
 });
+
+export const patchTaskSchema = z
+  .object({
+    status: taskStatusInputSchema.optional(),
+    priority: taskPrioritySchema.optional(),
+  })
+  .refine((d) => d.status !== undefined || d.priority !== undefined, {
+    message: "Provide status and/or priority",
+  });
 
 export const createSubtaskSchema = z.object({
   title: z.string().min(1).max(512),

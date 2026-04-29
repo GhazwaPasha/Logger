@@ -122,7 +122,8 @@ async function main() {
       )[0]!.id,
       assignerId: owner.id,
       title: "Sample audit task",
-      status: "open",
+      status: "pending",
+      priority: "high",
       dueAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     })
     .returning();

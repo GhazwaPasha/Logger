@@ -252,28 +252,31 @@ export function WorkspaceSidebar({
                   const levelLists = listsByLevel.get(d.id) ?? [];
                   return (
                     <li key={d.id} className="select-none">
-                      <button
-                        type="button"
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--surface-hover)]"
-                        aria-expanded={open}
-                        aria-label={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
-                        onClick={() => toggleLevel(d.id)}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--fg)]">{d.name}</p>
-                        </div>
-                        <span className="shrink-0 text-xs font-normal text-[var(--muted)] tabular-nums">
-                          {levelLists.length}
-                        </span>
-                        <Chevron open={open} />
-                      </button>
+                      <div className="flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+                        <Link
+                          href={`${base}/work?level=${encodeURIComponent(d.id)}`}
+                          className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
+                          title={`Open ${d.name}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-[var(--fg)]">{d.name}</p>
+                          </div>
+                          <span className="shrink-0 text-xs font-normal text-[var(--muted)] tabular-nums">
+                            {levelLists.length}
+                          </span>
+                        </Link>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                          aria-expanded={open}
+                          aria-label={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
+                          onClick={() => toggleLevel(d.id)}
+                        >
+                          <Chevron open={open} />
+                        </button>
+                      </div>
                       {open && (
                         <ul className="ml-4 border-l border-[var(--border-subtle)] pl-2">
-                          <li className="py-0.5 pl-1">
-                            <Link href={`${base}/work?level=${encodeURIComponent(d.id)}`} className="text-xs text-[var(--muted)] hover:text-[var(--fg)]">
-                              Open level tasks
-                            </Link>
-                          </li>
                           {levelLists.length === 0 ? (
                             <li className="py-1 pl-1 text-xs text-[var(--muted)]">Empty</li>
                           ) : (
