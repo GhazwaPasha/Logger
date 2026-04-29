@@ -15,6 +15,38 @@ if (!connectionString) {
 const pool = new Pool({ connectionString });
 export const authDb = createDbFromPool(pool);
 
+/** Canonical site URL for Better Auth (must match browser origin on each deployment). */
+function resolveAuthBaseUrl(): string {
+  const explicit = process.env.BETTER_AUTH_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (process.env.VERCEL_URL)
+    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
+  return "http://localhost:3000";
+}
+
+/** Origins allowed for CSRF / Origin checks (prod previews + explicit env + local dev). */
+function resolveTrustedOrigins(): string[] {
+  const origins = new Set<string>();
+  const add = (value?: string | null) => {
+    const v = value?.trim();
+    if (!v) return;
+    try {
+      const withProto = v.includes("://") ? v : `https://${v}`;
+      origins.add(new URL(withProto).origin);
+    } catch {
+      /* ignore invalid */
+    }
+  };
+  add(resolveAuthBaseUrl());
+  add(process.env.BETTER_AUTH_URL);
+  add(process.env.NEXT_PUBLIC_APP_URL);
+  if (process.env.VERCEL_URL) add(`https://${process.env.VERCEL_URL}`);
+  if (origins.size === 0) add("http://localhost:3000");
+  return [...origins];
+}
+
+const authBaseUrl = resolveAuthBaseUrl();
+
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
     provider: "pg",
@@ -22,11 +54,8 @@ export const auth = betterAuth({
   }),
   emailAndPassword: { enabled: true },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  ],
+  baseURL: authBaseUrl,
+  trustedOrigins: resolveTrustedOrigins(),
   plugins: [
     jwt(),
     nextCookies(),

@@ -4,8 +4,14 @@ import dotenv from "dotenv";
 import { and, eq } from "drizzle-orm";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
-dotenv.config({ path: path.resolve(__dirname, "../../.env.local") });
+dotenv.config({
+  path: path.resolve(__dirname, "../../.env"),
+  override: true,
+});
+dotenv.config({
+  path: path.resolve(__dirname, "../../.env.local"),
+  override: true,
+});
 import { createDb } from "./index.js";
 import {
   activityLedger,

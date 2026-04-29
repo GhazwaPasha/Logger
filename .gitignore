@@ -6,6 +6,7 @@ dist
 *.log
 .env
 .env.local
+test-credentials.local.txt
 .DS_Store
 coverage
 *.tsbuildinfo
