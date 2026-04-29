@@ -27,5 +27,18 @@ export const auth = betterAuth({
     process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ],
-  plugins: [jwt(), nextCookies(), dash()],
+  plugins: [
+    jwt(),
+    nextCookies(),
+    dash({
+      // Required for Better Auth Infra / dashboard “connect your app” validation
+      apiKey: process.env.BETTER_AUTH_API_KEY,
+      ...(process.env.BETTER_AUTH_API_URL && {
+        apiUrl: process.env.BETTER_AUTH_API_URL,
+      }),
+      ...(process.env.BETTER_AUTH_KV_URL && {
+        kvUrl: process.env.BETTER_AUTH_KV_URL,
+      }),
+    }),
+  ],
 });
