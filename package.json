@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "build:web": "npm run build -w @work-ledger/db && npm run build -w @work-ledger/contracts && npm run build -w @work-ledger/web",
     "build": "npm run build -ws --if-present",
     "dev": "echo Use npm run dev:api and npm run dev:web in separate terminals",
     "dev:api": "npm run dev -w @work-ledger/api",
