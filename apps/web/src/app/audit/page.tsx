@@ -1,5 +1,5 @@
-import { AuditConsole } from "@/components/AuditConsole";
+import { redirect } from "next/navigation";
 
-export default function AuditPage() {
-  return <AuditConsole />;
+export default function AuditLegacyPage() {
+  redirect("/app/workspaces");
 }

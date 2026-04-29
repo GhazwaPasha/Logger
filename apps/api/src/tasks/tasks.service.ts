@@ -65,16 +65,17 @@ export class TasksService {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
 
-    const assignees = await this.db
-      .select({ userId: taskAssignees.userId })
-      .from(taskAssignees)
-      .where(eq(taskAssignees.taskId, taskId));
-
-    const ledger = await this.db
-      .select()
-      .from(activityLedger)
-      .where(eq(activityLedger.taskId, taskId))
-      .orderBy(desc(activityLedger.createdAt));
+    const [assignees, ledger] = await Promise.all([
+      this.db
+        .select({ userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(eq(taskAssignees.taskId, taskId)),
+      this.db
+        .select()
+        .from(activityLedger)
+        .where(eq(activityLedger.taskId, taskId))
+        .orderBy(desc(activityLedger.createdAt)),
+    ]);
 
     return {
       task: access.task,

@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
-import { createDepartmentSchema } from "@work-ledger/contracts";
+import { createDepartmentSchema, updateDepartmentSchema } from "@work-ledger/contracts";
 import { departments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
@@ -32,6 +32,21 @@ export class DepartmentsService {
       .values({ organizationId, name: parsed.name })
       .returning();
     return dept;
+  }
+
+  async patch(userId: string, organizationId: string, departmentId: string, body: unknown) {
+    const m = await this.authz.assertOrgMember(userId, organizationId);
+    if (m.role !== "owner") {
+      throw new ForbiddenException("Only owners can rename levels");
+    }
+    await this.assertDeptInOrg(organizationId, departmentId);
+    const parsed = updateDepartmentSchema.parse(body);
+    const [dept] = await this.db
+      .update(departments)
+      .set({ name: parsed.name })
+      .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)))
+      .returning();
+    return dept!;
   }
 
   async assertDeptInOrg(organizationId: string, departmentId: string) {

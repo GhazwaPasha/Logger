@@ -1,16 +1,22 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, inArray } from "drizzle-orm";
-import { createOrganizationSchema } from "@work-ledger/contracts";
-import { organizationMembers, organizations } from "@work-ledger/db";
+import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, inArray, sql } from "drizzle-orm";
+import {
+  createOrganizationSchema,
+  updateOrganizationSchema,
+  upsertOrganizationMemberSchema,
+} from "@work-ledger/contracts";
+import { organizationMembers, organizations, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { DepartmentsService } from "../departments/departments.service";
 
 @Injectable()
 export class OrganizationsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
+    private readonly departments: DepartmentsService,
   ) {}
 
   async listForUser(userId: string) {
@@ -36,5 +42,76 @@ export class OrganizationsService {
     const org = rows[0];
     if (!org) throw new NotFoundException("Organization not found");
     return org;
+  }
+
+  async patch(userId: string, organizationId: string, body: unknown) {
+    const membership = await this.authz.assertOrgMember(userId, organizationId);
+    if (membership.role !== "owner") {
+      throw new ForbiddenException("Only owners can rename this workspace");
+    }
+    const parsed = updateOrganizationSchema.parse(body);
+    const [row] = await this.db
+      .update(organizations)
+      .set({ name: parsed.name })
+      .where(eq(organizations.id, organizationId))
+      .returning();
+    if (!row) throw new NotFoundException("Organization not found");
+    return row;
+  }
+
+  async listMembers(requesterId: string, organizationId: string) {
+    await this.authz.assertOrgMember(requesterId, organizationId);
+    return this.db
+      .select({
+        userId: organizationMembers.userId,
+        role: organizationMembers.role,
+        departmentId: organizationMembers.departmentId,
+        email: user.email,
+        name: user.name,
+      })
+      .from(organizationMembers)
+      .innerJoin(user, eq(organizationMembers.userId, user.id))
+      .where(eq(organizationMembers.organizationId, organizationId));
+  }
+
+  async upsertMemberByEmail(requesterId: string, organizationId: string, body: unknown) {
+    const membership = await this.authz.assertOrgMember(requesterId, organizationId);
+    if (membership.role !== "owner") {
+      throw new ForbiddenException("Only owners can add or update members");
+    }
+    const parsed = upsertOrganizationMemberSchema.parse(body);
+    const emailLower = parsed.email.trim().toLowerCase();
+
+    const targetRows = await this.db
+      .select()
+      .from(user)
+      .where(sql`lower(${user.email}) = ${emailLower}`)
+      .limit(1);
+    const targetUser = targetRows[0];
+    if (!targetUser) throw new NotFoundException("No user registered with that email");
+
+    if (parsed.role === "manager") {
+      await this.departments.assertDeptInOrg(organizationId, parsed.departmentId!);
+    }
+
+    const deptId = parsed.role === "manager" ? parsed.departmentId! : null;
+
+    await this.db
+      .insert(organizationMembers)
+      .values({
+        organizationId,
+        userId: targetUser.id,
+        role: parsed.role,
+        departmentId: deptId,
+      })
+      .onConflictDoUpdate({
+        target: [organizationMembers.organizationId, organizationMembers.userId],
+        set: {
+          role: parsed.role,
+          departmentId: deptId,
+        },
+      });
+
+    return this.listMembers(requesterId, organizationId);
   }
 }

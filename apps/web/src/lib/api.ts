@@ -10,7 +10,11 @@ export async function apiFetch(
   if (!headers.has("Content-Type") && rest.body) {
     headers.set("Content-Type", "application/json");
   }
-  return fetch(`${apiBase()}${path}`, { ...rest, headers });
+  return fetch(`${apiBase()}${path}`, {
+    ...rest,
+    headers,
+    cache: rest.cache ?? "no-store",
+  });
 }
 
 export async function apiJson<T>(

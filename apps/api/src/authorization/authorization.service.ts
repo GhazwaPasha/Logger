@@ -38,23 +38,24 @@ export class AuthorizationService {
     if (taskRows.length === 0) throw new NotFoundException("Task not found");
     const task = taskRows[0]!;
 
-    const assigneeRows = await this.db
-      .select()
-      .from(taskAssignees)
-      .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)))
-      .limit(1);
+    const [assigneeRows, memberRows] = await Promise.all([
+      this.db
+        .select()
+        .from(taskAssignees)
+        .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)))
+        .limit(1),
+      this.db
+        .select()
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, task.organizationId),
+            eq(organizationMembers.userId, userId),
+          ),
+        )
+        .limit(1),
+    ]);
     const isAssignee = assigneeRows.length > 0;
-
-    const memberRows = await this.db
-      .select()
-      .from(organizationMembers)
-      .where(
-        and(
-          eq(organizationMembers.organizationId, task.organizationId),
-          eq(organizationMembers.userId, userId),
-        ),
-      )
-      .limit(1);
     const membership = memberRows[0];
 
     const isOwner = membership?.role === "owner";
@@ -89,16 +90,17 @@ export class AuthorizationService {
   }
 
   async listOrganizationIdsForUser(userId: string): Promise<string[]> {
-    const fromMembers = await this.db
-      .selectDistinct({ id: organizationMembers.organizationId })
-      .from(organizationMembers)
-      .where(eq(organizationMembers.userId, userId));
-
-    const fromAssignees = await this.db
-      .selectDistinct({ id: tasks.organizationId })
-      .from(taskAssignees)
-      .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-      .where(eq(taskAssignees.userId, userId));
+    const [fromMembers, fromAssignees] = await Promise.all([
+      this.db
+        .selectDistinct({ id: organizationMembers.organizationId })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.userId, userId)),
+      this.db
+        .selectDistinct({ id: tasks.organizationId })
+        .from(taskAssignees)
+        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+        .where(eq(taskAssignees.userId, userId)),
+    ]);
 
     const set = new Set<string>();
     for (const r of fromMembers) set.add(r.id);

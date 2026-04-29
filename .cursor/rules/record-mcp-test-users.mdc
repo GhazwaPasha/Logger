@@ -1,0 +1,15 @@
+---
+description: When creating test users via MCP or browser automation, append their credentials to test-credentials.local.txt
+alwaysApply: true
+---
+
+# Test users created via MCP
+
+Whenever you create or register **new test users** using MCP tools (e.g. Chrome DevTools sign-up), **before finishing the task**:
+
+1. Append a clearly delimited block to `test-credentials.local.txt` at the repo root (file is gitignored).
+2. For each account record at minimum: **name**, **email**, **password**, **date** (ISO or human), and **context** (e.g. org name, role, environment: local vs prod).
+3. If the same password pattern as the primary dev user was used, state that explicitly instead of inventing a new secret.
+4. Never commit real production secrets; keep production lines only if the user already uses that file for prod notes.
+
+This file is the single source of truth for hand-created QA accounts the team can reuse locally.

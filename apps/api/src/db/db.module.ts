@@ -8,21 +8,17 @@ import { Pool } from "pg";
 @Module({
   providers: [
     {
-      provide: DRIZZLE,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const url = config.getOrThrow<string>("DATABASE_URL");
-        const pool = new Pool({ connectionString: url });
-        return createDbFromPool(pool);
-      },
-    },
-    {
       provide: "PG_POOL",
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const url = config.getOrThrow<string>("DATABASE_URL");
         return new Pool({ connectionString: url });
       },
+    },
+    {
+      provide: DRIZZLE,
+      inject: ["PG_POOL"],
+      useFactory: (pool: Pool) => createDbFromPool(pool),
     },
   ],
   exports: [DRIZZLE, "PG_POOL"],

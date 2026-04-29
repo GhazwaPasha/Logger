@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { DepartmentsService } from "./departments.service";
@@ -22,5 +22,15 @@ export class DepartmentsController {
     @Body() body: unknown,
   ) {
     return this.departments.create(user.id, organizationId, body);
+  }
+
+  @Patch(":departmentId")
+  patch(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Param("departmentId") departmentId: string,
+    @Body() body: unknown,
+  ) {
+    return this.departments.patch(user.id, organizationId, departmentId, body);
   }
 }

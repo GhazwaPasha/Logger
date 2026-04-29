@@ -9,7 +9,32 @@ export const createOrganizationSchema = z.object({
   name: z.string().min(1).max(256),
 });
 
+export const updateOrganizationSchema = z.object({
+  name: z.string().min(1).max(256),
+});
+
+/** Invite or upsert membership by email (owner-only). */
+export const upsertOrganizationMemberSchema = z
+  .object({
+    email: z.string().email(),
+    role: orgRoleSchema,
+    departmentId: z.string().uuid().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === "manager" && !data.departmentId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Managers must have a departmentId",
+        path: ["departmentId"],
+      });
+    }
+  });
+
 export const createDepartmentSchema = z.object({
+  name: z.string().min(1).max(256),
+});
+
+export const updateDepartmentSchema = z.object({
   name: z.string().min(1).max(256),
 });
 
