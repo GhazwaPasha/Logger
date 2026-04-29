@@ -13,6 +13,7 @@
     "@types/pg": "^8.20.0",
     "@work-ledger/db": "^0.0.1",
     "better-auth": "^1.6.9",
+    "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.2",
     "next": "15.2.4",
     "pg": "^8.20.0",

@@ -1,3 +1,4 @@
+import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
@@ -10,7 +11,14 @@ import { HealthController } from "./health.controller";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      // Compiled to apps/api/dist → three levels up is monorepo root
+      envFilePath: [
+        join(__dirname, "..", "..", "..", ".env"),
+        join(__dirname, "..", "..", "..", ".env.local"),
+      ],
+    }),
     DbModule,
     AuthorizationModule,
     AuthModule,
