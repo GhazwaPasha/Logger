@@ -6,7 +6,6 @@ import { AppHeader } from "./AppHeader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
-import { useAppPreferences } from "./AppPreferencesContext";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 
 export function WorkspaceShell({
@@ -19,7 +18,6 @@ export function WorkspaceShell({
   const router = useRouter();
   const { token } = useApiSession();
   const { orgs } = useOrganizationsState();
-  const { theme, setTheme } = useAppPreferences();
 
   useEffect(() => {
     if (!token || orgs.length === 0) return;
@@ -31,7 +29,7 @@ export function WorkspaceShell({
   return (
     <WorkspaceDataProvider workspaceId={workspaceId}>
       <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
-        <AppHeader theme={theme} onThemeChange={setTheme} />
+        <AppHeader workspaceId={workspaceId} />
         <div className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:items-stretch">
           <WorkspaceSidebar workspaceId={workspaceId} />
           <main className="min-h-0 min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>

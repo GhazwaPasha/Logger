@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
-import { useAppPreferences } from "@/components/app/AppPreferencesContext";
 import { AppHeader } from "@/components/app/AppHeader";
+import { useAppPreferences } from "@/components/app/AppPreferencesContext";
+import type { ThemePref } from "@/hooks/useThemePreference";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { apiJson } from "@/lib/api";
 import type { Org } from "@/lib/ledger-types";
@@ -51,7 +52,7 @@ export default function AppEntryPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
-      <AppHeader theme={theme} onThemeChange={setTheme} />
+      <AppHeader workspaceId={orgs[0]?.id} />
       <div className="mx-auto flex w-full max-w-2xl flex-1 items-center px-4 py-10 sm:px-6">
         {orgs.length > 0 ? (
           <div className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-6 text-center">
@@ -85,6 +86,21 @@ export default function AppEntryPage() {
               >
                 {isCreating ? "Creating..." : "Create workspace"}
               </button>
+            </div>
+            <div className="mt-6 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-5 sm:flex-row sm:items-center">
+              <label className="text-xs font-medium text-[var(--muted)] sm:min-w-[4.5rem]" htmlFor="onboarding-theme">
+                Theme
+              </label>
+              <select
+                id="onboarding-theme"
+                className="input max-w-xs rounded-xl text-sm"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as ThemePref)}
+              >
+                <option value="system">System</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
             </div>
           </section>
         )}

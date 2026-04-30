@@ -106,6 +106,7 @@ export function WorkspaceSidebar({
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
   const activePeople = pathname.startsWith(`${base}/people`);
   const activeOrganizationSettings = pathname.startsWith(`${base}/organization-settings`);
+  const activeUserSettings = pathname.startsWith(`${base}/settings`);
   const activeAddOrganization = pathname.startsWith(`${base}/add-organization`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
   /** Work page with full board scope (no level/list filters in URL). */
@@ -123,7 +124,15 @@ export function WorkspaceSidebar({
       return;
     }
     const tail = pathname.replace(/^\/app\/w\/[^/]+/, "");
-    const allowedTails = new Set(["/dashboard", "/my-tasks", "/people", "/work", "/add-organization", "/organization-settings"]);
+    const allowedTails = new Set([
+      "/dashboard",
+      "/my-tasks",
+      "/people",
+      "/work",
+      "/add-organization",
+      "/organization-settings",
+      "/settings",
+    ]);
     const nextTail = allowedTails.has(tail) ? tail : "/dashboard";
     setLastWorkspaceId(nextId);
     setWorkspacePickerOpen(false);
@@ -389,6 +398,9 @@ export function WorkspaceSidebar({
                 <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">
                   <Link href={`${base}/people`} className={`${rowBase(activePeople)} pl-2`}>
                     Team
+                  </Link>
+                  <Link href={`${base}/settings`} className={`${rowBase(activeUserSettings)} pl-2`}>
+                    Your settings
                   </Link>
                   <Link href={`${base}/organization-settings`} className={`${rowBase(activeOrganizationSettings)} pl-2`}>
                     Organization settings

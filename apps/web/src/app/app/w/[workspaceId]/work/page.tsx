@@ -224,6 +224,25 @@ const LIST_BADGE_CLASS =
 const LEVEL_BADGE_CLASS =
   "inline-flex max-w-[min(100%,11rem)] shrink-0 items-center justify-center truncate rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-center text-xs font-medium tabular-nums leading-none text-[var(--muted)]";
 
+/** Create/edit panel: same pills as list row title badges (`ListTaskCard`). */
+function TaskPanelScopeBadges({ level, list }: { level: string | null; list: string | null }) {
+  if (!level && !list) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {level ? (
+        <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${level}`}>
+          {level}
+        </span>
+      ) : null}
+      {list ? (
+        <span className={LIST_BADGE_CLASS} title={`List: ${list}`}>
+          {list}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** Same box for every workflow stage (label length varies; aligns with list row `h-8` tiles). */
 const STATUS_PILL_LAYOUT =
   "relative inline-flex h-8 w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] shrink-0 items-center justify-between gap-1 px-2";
@@ -920,6 +939,24 @@ function WorkItemsInner() {
     const dept = depts.find((d) => d.id === list.departmentId);
     return dept?.name ?? null;
   }
+
+  const createTaskScopeBadges = useMemo(() => {
+    if (!listId) return { level: null as string | null, list: null as string | null };
+    const row = lists.find((l) => l.id === listId);
+    if (!row) return { level: null as string | null, list: null as string | null };
+    return {
+      level: depts.find((d) => d.id === row.departmentId)?.name ?? null,
+      list: row.name,
+    };
+  }, [listId, lists, depts]);
+
+  const editTaskScopeBadges = useMemo(() => {
+    if (!editDetail) return { level: null as string | null, list: null as string | null };
+    return {
+      level: taskLevelBadge(editDetail.task),
+      list: taskListName(editDetail.task),
+    };
+  }, [editDetail, lists, depts]);
 
   const kanbanSubtaskPrefetchKey = useMemo(
     () => filteredTasks.map((t) => t.id).sort().join(","),
@@ -1775,6 +1812,7 @@ function WorkItemsInner() {
                       </div>
                     </div>
                     <div className="space-y-3">
+                      <TaskPanelScopeBadges level={editTaskScopeBadges.level} list={editTaskScopeBadges.list} />
                       <input
                         className="input rounded-xl text-base"
                         value={editTitle}
@@ -1863,17 +1901,6 @@ function WorkItemsInner() {
                         onToggleAssignee={toggleEditAssignee}
                       />
                     )}
-                    <div>
-                      <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
-                      <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--fg)]">
-                        {(() => {
-                          const row = lists.find((l) => l.id === editDetail.task.listId);
-                          if (!row) return "—";
-                          const dn = depts.find((d) => d.id === row.departmentId)?.name ?? "";
-                          return dn ? `${dn} · ${row.name}` : row.name;
-                        })()}
-                      </p>
-                    </div>
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
@@ -1942,6 +1969,7 @@ function WorkItemsInner() {
               </div>
             </div>
             <div className="space-y-3">
+              <TaskPanelScopeBadges level={createTaskScopeBadges.level} list={createTaskScopeBadges.list} />
               <input
                 className="input rounded-xl text-base"
                 value={title}
@@ -2018,16 +2046,6 @@ function WorkItemsInner() {
                 onToggleAssignee={toggleAssignee}
               />
             )}
-            <div>
-              <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
-              <select className="input rounded-xl" value={listId} onChange={(e) => setListId(e.target.value)}>
-                {levelLists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {depts.find((d) => d.id === l.departmentId)?.name ?? "Unknown"} · {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-secondary rounded-xl px-4" onClick={() => setCreateModalOpen(false)}>
                 Cancel
