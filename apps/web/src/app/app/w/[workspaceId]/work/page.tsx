@@ -137,15 +137,23 @@ function dueAtToLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function firstAssigneeLabel(task: TaskRow, memberRows: MemberRow[]): string | null {
+  const ids = task.assigneeUserIds ?? [];
+  if (ids.length === 0) return null;
+  const member = memberRows.find((row) => row.userId === ids[0]);
+  const raw = (member?.name?.trim() || member?.email || "").trim();
+  if (!raw) return "Unknown";
+  const firstToken = raw.split(/\s+/)[0];
+  if (firstToken) return firstToken;
+  return raw;
+}
+
 /** Max subtasks shown on kanban cards before “+ more”. */
 const KANBAN_CARD_SUBTASK_PREVIEW = 8;
 
 /** List row assignee / due / priority — identical footprint every badge (fixed box); subtle corners */
 const LIST_ROW_BADGE_TILE =
   "box-border inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5";
-/** Assignee column when at least one assignee: same row height, flexible width for name(s) */
-const LIST_ROW_ASSIGNEE_NAME_TILE =
-  "box-border inline-flex h-8 max-w-[min(14rem,calc(100vw-12rem))] min-h-[2rem] max-h-[2rem] min-w-0 shrink items-center justify-center overflow-hidden rounded-sm border px-2 py-0.5";
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
 
@@ -294,7 +302,6 @@ function WorkItemsInner() {
   const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDeadline, setShowDeadline] = useState(false);
-  const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly" | "yearly">("none");
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -672,7 +679,6 @@ function WorkItemsInner() {
       setSubtaskItems([]);
       setShowAssignees(false);
       setShowDeadline(false);
-      setRepeat("none");
       setCreateModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
@@ -914,6 +920,7 @@ function WorkItemsInner() {
     const listBadge = taskListName(task);
     const levelBadge = taskLevelBadge(task);
     const assigneeNames = assigneeNamesForTask(task, members);
+    const assigneeFirstName = firstAssigneeLabel(task, members);
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-4 py-3">
@@ -957,18 +964,16 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "assignees")}
-                  className={`${
-                    assigneeNames ? LIST_ROW_ASSIGNEE_NAME_TILE : LIST_ROW_BADGE_TILE
-                  } transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
+                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
                   title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
                   aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
                 >
-                  {assigneeNames ? (
+                  {assigneeFirstName ? (
                     <span
                       className="pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-tight text-[var(--fg)]"
-                      title={assigneeNames}
+                      title={assigneeNames ?? assigneeFirstName}
                     >
-                      {assigneeNames}
+                      {assigneeFirstName}
                     </span>
                   ) : (
                     <IconUserPlus className="size-[18px] shrink-0 text-[var(--muted)] opacity-90" aria-hidden />
@@ -1128,6 +1133,7 @@ function WorkItemsInner() {
         : 0;
     const listBadge = taskListName(task);
     const levelBadge = taskLevelBadge(task);
+    const assigneeFirstName = firstAssigneeLabel(task, members);
 
     return (
       <li
@@ -1191,13 +1197,13 @@ function WorkItemsInner() {
               onClick={() => openEditTask(task.id, "assignees")}
               title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
               aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
-              className={`flex min-w-0 max-w-full items-center py-0.5 text-left ${
-                assigneeNames ? "" : "inline-flex min-h-[1.75rem] min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg hover:bg-[var(--surface-hover)]"
+              className={`inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5 text-left transition-colors hover:opacity-95 ${
+                assigneeNames ? dueDatePillClass(false) : "border-[var(--border-subtle)] bg-[var(--surface-muted)]"
               }`}
             >
-              {assigneeNames ? (
-                <span className="min-w-0 truncate text-[13px] font-medium text-[var(--fg)] hover:underline">
-                  {assigneeNames}
+              {assigneeFirstName ? (
+                <span className="pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-tight text-[var(--fg)]">
+                  {assigneeFirstName}
                 </span>
               ) : (
                 <IconUserPlus className="size-4 shrink-0 opacity-65" aria-hidden />
@@ -1878,19 +1884,10 @@ function WorkItemsInner() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-xs text-[var(--muted)]">Repeat</label>
-                    <select className="input rounded-xl" value={repeat} onChange={(e) => setRepeat(e.target.value as typeof repeat)}>
-                      <option value="none">Does not repeat</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                    <p className="input rounded-xl px-3 py-2 text-sm text-[var(--muted)]">
+                      Repeat schedules are not available yet.
+                    </p>
                   </div>
-                </div>
-              )}
-              {showDeadline && repeat !== "none" && (
-                <div className="sm:col-span-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-xs text-[var(--muted)]">
-                  Repeat preference is set to {repeat}.
                 </div>
               )}
               {showAssignees && members.length > 0 && (

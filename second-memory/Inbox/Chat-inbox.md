@@ -4,6 +4,20 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-04-30 — Tasks assignee badge: fixed width + first name
+
+- **Context:** Tasks board assignee chips expanded with long names/emails and reduced scan consistency.
+- **What we did:** Updated task assignee badges in list + kanban cards to use fixed-width tiles and render only the first assignee first-name token (fallback to `Unknown` when unresolved).
+- **Takeaway / follow-ups:** Display remains compact and aligned; full assignee list still available in hover/aria metadata.
+- **Code / repo:** `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`.
+
+### 2026-04-30 — MCP QA: team users, due dates, repeat gap
+
+- **Context:** End-to-end MCP run requested for tasks due dates + repeat schedule, multi-user creation, assignment, and recurrence verification.
+- **What we did:** Logged in as `ghazwairshad@gmail.com`, recovered local run by restarting `dev:web` and `dev:api`, created MCP users (`john@test.com`, `maria@test.com`, `alex@test.com`) via auth UI, added them to the same org in Team page, and created 3 tasks assigned to different users with valid due dates (via authenticated API calls from browser context): `Daily Reconciliation [daily]`, `Weekly Inventory Review [weekly]`, `Monthly Audit Prep [monthly]`.
+- **Takeaway / follow-ups:** UI exposes repeat selection in create modal, but backend contract/schema/service has no recurrence field/engine; repeat values are not persisted and no follow-up tasks are generated automatically. Also observed slow auth/session endpoints causing periodic long waits and temporary “Please wait…” login hang while API was down.
+- **Code / repo:** `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`, `apps/api/src/tasks/tasks.service.ts`, `packages/contracts/src/index.ts`, `packages/db/src/schema.ts`, `test-credentials.local.txt`.
+
 ### 2026-04-30 — Prod 401 token mismatch (issuer/audience drift)
 
 - **Context:** API returned `401 Invalid or expired token` on `/organizations` even though login session existed.
