@@ -4,6 +4,20 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-04-30 — Postgres sslmode warning hardening
+
+- **Context:** Runtime warning from `pg`/`pg-connection-string` about legacy `sslmode=require|prefer|verify-ca` semantics changing in upcoming major versions.
+- **What we did:** Added central `normalizeDatabaseUrl()` in `@work-ledger/db` to auto-upgrade legacy sslmode values to `sslmode=verify-full` unless `uselibpqcompat=true` is explicitly set. Wired this into API pool creation, Better Auth pool creation, and shared DB factory.
+- **Takeaway / follow-ups:** Current strict TLS behavior is preserved and warning is silenced without requiring immediate env edits. If libpq compatibility is desired later, set `uselibpqcompat=true`.
+- **Code / repo:** `packages/db/src/index.ts`, `apps/api/src/db/db.module.ts`, `apps/web/src/lib/auth.ts`.
+
+### 2026-04-30 — Prod blocker: org API routed to web origin
+
+- **Context:** Production app loaded, but creating the first workspace failed; local worked.
+- **What we did:** Reproduced with MCP browser flow and confirmed `POST /organizations` returned 404 from Vercel web app (not API). Updated web API base resolver to treat blank `NEXT_PUBLIC_API_URL` as unset and fall back to `http://localhost:4000` only when no non-empty value exists; also normalized trailing slash handling.
+- **Takeaway / follow-ups:** Ensure production has non-empty `NEXT_PUBLIC_API_URL` set to API origin (e.g. `https://<api-domain>`). Blank env values are now safely ignored.
+- **Code / repo:** `apps/web/src/lib/api.ts`.
+
 ### 2026-04-30 — Edit task modal: instant open via list row placeholder
 
 - **Context:** Edit modal waited on `GET /tasks/:id` and showed “Loading…”, so it felt slow.

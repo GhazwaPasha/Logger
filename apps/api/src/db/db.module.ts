@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { DRIZZLE } from "./drizzle.constants";
-import { createDbFromPool } from "@work-ledger/db";
+import { createDbFromPool, normalizeDatabaseUrl } from "@work-ledger/db";
 import { Pool } from "pg";
 
 @Global()
@@ -12,7 +12,7 @@ import { Pool } from "pg";
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const url = config.getOrThrow<string>("DATABASE_URL");
-        return new Pool({ connectionString: url });
+        return new Pool({ connectionString: normalizeDatabaseUrl(url) });
       },
     },
     {

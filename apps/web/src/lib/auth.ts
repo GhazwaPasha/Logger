@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { jwt } from "better-auth/plugins";
-import { createDbFromPool } from "@work-ledger/db";
+import { createDbFromPool, normalizeDatabaseUrl } from "@work-ledger/db";
 import { account, jwks, session, user, verification } from "@work-ledger/db/schema";
 import { Pool } from "pg";
 
@@ -12,7 +12,7 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is required for Better Auth");
 }
 
-const pool = new Pool({ connectionString });
+const pool = new Pool({ connectionString: normalizeDatabaseUrl(connectionString) });
 export const authDb = createDbFromPool(pool);
 
 /** Canonical site URL for Better Auth (must match browser origin on each deployment). */
