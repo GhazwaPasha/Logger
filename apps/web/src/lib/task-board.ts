@@ -113,7 +113,7 @@ export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolea
   if (preset === "no_due") return due === null;
   if (preset === "overdue") {
     if (!due || st === "done" || st === "cancelled") return false;
-    return due < startOfLocalDay(new Date());
+    return due.getTime() < Date.now();
   }
   if (preset === "this_week") {
     if (!due) return false;

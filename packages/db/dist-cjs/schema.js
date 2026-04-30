@@ -145,6 +145,8 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     status: (0, exports.taskStatusEnum)("status").notNull().default("pending"),
     priority: (0, exports.taskPriorityEnum)("priority").notNull().default("medium"),
     dueAt: (0, pg_core_1.timestamp)("due_at", { withTimezone: true }),
+    /** `daily` | `weekly` | `monthly` | `yearly`; null = none. */
+    dueRepeat: (0, pg_core_1.text)("due_repeat"),
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })

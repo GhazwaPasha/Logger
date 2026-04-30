@@ -185,6 +185,8 @@ export const tasks = pgTable(
     status: taskStatusEnum("status").notNull().default("pending"),
     priority: taskPriorityEnum("priority").notNull().default("medium"),
     dueAt: timestamp("due_at", { withTimezone: true }),
+    /** `daily` | `weekly` | `monthly` | `yearly`; null = none. */
+    dueRepeat: text("due_repeat"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

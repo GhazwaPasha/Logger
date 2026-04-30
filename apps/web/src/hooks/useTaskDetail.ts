@@ -6,7 +6,7 @@ import { apiJson } from "@/lib/api";
 import { taskKeys } from "@/lib/query-keys";
 import type { TaskDetail, TaskRow } from "@/lib/ledger-types";
 
-/** Lets the edit modal render from workspace list data before GET /tasks/:id finishes. */
+/** Lets the edit panel render from workspace list data before GET /tasks/:id finishes. */
 function taskRowToPlaceholderDetail(row: TaskRow): TaskDetail {
   return {
     task: row,

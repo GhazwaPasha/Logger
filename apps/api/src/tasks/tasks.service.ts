@@ -33,6 +33,9 @@ export class TasksService {
     const parsed = createTaskSchema.parse(body);
     await this.lists.assertListInOrg(organizationId, parsed.listId);
 
+    const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
+    const dueRepeat = dueAt ? (parsed.dueRepeat ?? null) : null;
+
     const [task] = await this.db
       .insert(tasks)
       .values({
@@ -40,7 +43,8 @@ export class TasksService {
         listId: parsed.listId,
         assignerId: userId,
         title: parsed.title,
-        dueAt: parsed.dueAt ? new Date(parsed.dueAt) : null,
+        dueAt,
+        dueRepeat,
         ...(parsed.status !== undefined ? { status: parsed.status } : {}),
         ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
       })
@@ -247,6 +251,20 @@ export class TasksService {
     const titleChanged = parsed.title !== undefined && parsed.title !== task.title;
     const assigneesChanged = parsed.assigneeUserIds !== undefined;
 
+    const oldDueIso = task.dueAt?.toISOString() ?? null;
+    const nextDueIso: string | null | undefined =
+      parsed.dueAt === undefined ? undefined : parsed.dueAt === null ? null : new Date(parsed.dueAt).toISOString();
+    const dueChanged =
+      parsed.dueAt !== undefined &&
+      (nextDueIso === undefined ? false : oldDueIso !== nextDueIso);
+
+    const dueCleared = parsed.dueAt !== undefined && parsed.dueAt === null;
+    const nextRepeat =
+      dueCleared ? null : parsed.dueRepeat !== undefined ? (parsed.dueRepeat ?? null) : (task.dueRepeat ?? null);
+    const repeatChanged = (task.dueRepeat ?? null) !== nextRepeat;
+
+    if (dueChanged && !caps.canReschedule) throw new ForbiddenException("Cannot update due date");
+
     if (assigneesChanged && parsed.assigneeUserIds && parsed.assigneeUserIds.length > 0) {
       const ids = [...new Set(parsed.assigneeUserIds)];
       const rows = await this.db
@@ -258,7 +276,7 @@ export class TasksService {
       }
     }
 
-    if (!statusChanged && !priorityChanged && !titleChanged && !assigneesChanged) {
+    if (!statusChanged && !priorityChanged && !titleChanged && !assigneesChanged && !dueChanged && !repeatChanged) {
       return this.getDetail(userId, taskId);
     }
 
@@ -270,6 +288,8 @@ export class TasksService {
           ...(parsed.status !== undefined ? { status: nextStatus } : {}),
           ...(parsed.priority !== undefined ? { priority: nextPriority } : {}),
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+          ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
+          ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
           updatedAt: now,
         })
         .where(eq(tasks.id, taskId));
@@ -283,6 +303,19 @@ export class TasksService {
             .values(ids.map((uid) => ({ taskId, userId: uid })))
             .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
         }
+      }
+
+      if (dueChanged) {
+        await tx.insert(activityLedger).values({
+          taskId,
+          actorId: userId,
+          type: "reschedule",
+          payload: {
+            oldDueAt: oldDueIso,
+            newDueAt: nextDueIso!,
+            reason: "Due updated via task edit",
+          },
+        });
       }
 
       if (statusChanged) {
@@ -328,6 +361,9 @@ export class TasksService {
     line(`Task ID: ${detail.task.id}`, 10, true);
     line(`Status: ${detail.task.status}`, 10);
     line(`Due: ${detail.task.dueAt?.toISOString() ?? "—"}`, 10, true);
+    if (detail.task.dueRepeat) {
+      line(`Repeat: ${detail.task.dueRepeat}`, 10);
+    }
     line(`Assigner: ${detail.task.assignerId}`, 10, true);
     line("", 8);
     line("Activity ledger (newest last in file = we print oldest first)", 10);

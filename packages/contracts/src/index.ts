@@ -16,6 +16,9 @@ export const taskStatusInputSchema = z
   .transform((s) => (s === "open" ? "pending" : s));
 
 export const taskPrioritySchema = z.enum(["high", "medium", "low"]);
+/** Optional cadence after the due instant (no recurrence engine yet; stored for UX / future use). */
+export const taskDueRepeatSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
+export type TaskDueRepeat = z.infer<typeof taskDueRepeatSchema>;
 export const ledgerTypeSchema = z.enum(["ack", "note", "reschedule", "status_change", "archive"]);
 export const appendableLedgerTypeSchema = z.enum(["ack", "note", "status_change"]);
 
@@ -57,6 +60,8 @@ export const createTaskSchema = z.object({
   listId: z.string().uuid(),
   assigneeUserIds: z.array(z.string().min(1)).optional().default([]),
   dueAt: z.string().datetime().optional().nullable(),
+  /** Only meaningful when `dueAt` is set; ignored otherwise. */
+  dueRepeat: taskDueRepeatSchema.nullable().optional(),
   status: taskStatusSchema.optional(),
   priority: taskPrioritySchema.optional(),
 });
@@ -92,13 +97,18 @@ export const patchTaskSchema = z
     priority: taskPrioritySchema.optional(),
     title: z.string().min(1).max(512).optional(),
     assigneeUserIds: z.array(z.string().min(1)).optional(),
+    /** Same instant semantics as `POST …/reschedule`: ISO datetime or `null` to clear. Requires reschedule capability when changed. */
+    dueAt: z.union([z.string().datetime(), z.null()]).optional(),
+    dueRepeat: taskDueRepeatSchema.nullable().optional(),
   })
   .refine(
     (d) =>
       d.status !== undefined ||
       d.priority !== undefined ||
       d.title !== undefined ||
-      d.assigneeUserIds !== undefined,
+      d.assigneeUserIds !== undefined ||
+      d.dueAt !== undefined ||
+      d.dueRepeat !== undefined,
     { message: "Provide at least one field to update" },
   );
 

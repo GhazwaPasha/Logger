@@ -16,9 +16,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
+import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
+import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
-import type { MemberRow, SubtaskRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
+import { parseTaskDueRepeat, type MemberRow, type SubtaskRow, type TaskDetail, type TaskDueRepeat, type TaskRow } from "@/lib/ledger-types";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
@@ -111,11 +113,37 @@ function IconChevronMiniDown({ className }: { className?: string }) {
   );
 }
 
+function IconEllipsisVertical({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="12" cy="5" r="1.5" />
+      <circle cx="12" cy="12" r="1.5" />
+      <circle cx="12" cy="19" r="1.5" />
+    </svg>
+  );
+}
+
+/** Panel header: title left; status, priority, Close grouped on the right (stacked on narrow viewports) */
+const TASK_PANEL_HEADER_ROW =
+  "-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 pt-0 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-0";
+
+const TASK_PANEL_HEADER_TITLE =
+  "min-w-0 truncate text-sm font-semibold leading-tight tracking-tight text-[var(--fg)] sm:min-w-[6rem] sm:flex-1";
+
+const TASK_PANEL_HEADER_RIGHT =
+  "flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:flex-nowrap sm:gap-2";
+
+const TASK_PANEL_HEADER_SELECT =
+  "input-compact h-8 max-w-full shrink-0 cursor-pointer rounded-md py-0 pl-2 pr-7 text-xs leading-tight text-[var(--fg)] shadow-none";
+
+const TASK_PANEL_HEADER_CLOSE_BTN =
+  "btn-secondary shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium leading-none";
+
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "priority_desc", label: "Priority · high first" },
   { value: "priority_asc", label: "Priority · low first" },
-  { value: "due_asc", label: "Due date · soonest" },
-  { value: "due_desc", label: "Due date · latest" },
+  { value: "due_asc", label: "Due · soonest" },
+  { value: "due_desc", label: "Due · latest" },
 ];
 
 const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
@@ -148,6 +176,33 @@ function firstAssigneeLabel(task: TaskRow, memberRows: MemberRow[]): string | nu
   return raw;
 }
 
+/** Task panel assignee toggle: summary label or “Add assignee”. */
+function assigneeToggleLabel(ids: string[], members: MemberRow[]): string {
+  if (ids.length === 0) return "Add assignee";
+  const labels = ids.map((id) => {
+    const m = members.find((row) => row.userId === id);
+    const raw = (m?.name ?? "").trim() || (m?.email ?? "").trim();
+    return raw || "Unknown";
+  });
+  if (labels.length === 1) return labels[0]!;
+  if (labels.length === 2) return `${labels[0]!}, ${labels[1]!}`;
+  return `${labels[0]!} +${labels.length - 1}`;
+}
+
+function assigneeToggleTitle(ids: string[], members: MemberRow[]): string | undefined {
+  if (ids.length === 0) return undefined;
+  return ids
+    .map((id) => {
+      const m = members.find((row) => row.userId === id);
+      const raw = (m?.name ?? "").trim() || (m?.email ?? "").trim();
+      return raw || "Unknown";
+    })
+    .join(", ");
+}
+
+const TASK_PANEL_ASSIGNEE_TOGGLE =
+  "btn-secondary min-w-0 max-w-[min(100%,18rem)] rounded-lg px-3 py-1.5 text-left text-xs font-medium";
+
 /** Max subtasks shown on kanban cards before “+ more”. */
 const KANBAN_CARD_SUBTASK_PREVIEW = 8;
 
@@ -156,6 +211,10 @@ const LIST_ROW_BADGE_TILE =
   "box-border inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5";
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
+
+/** List / kanban: overflow control to open task edit panel (matches list badge row height). */
+const TASK_ROW_OVERFLOW_MENU_BTN =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]";
 
 /** List name — outlined ghost pill (shared: task rows, kanban, filter scope). */
 const LIST_BADGE_CLASS =
@@ -295,23 +354,25 @@ function WorkItemsInner() {
   const [title, setTitle] = useState("");
   const [listId, setListId] = useState("");
   const [due, setDue] = useState("");
+  const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [newTaskStatus, setNewTaskStatus] = useState<BoardTaskStatus>("pending");
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
   const [showAssignees, setShowAssignees] = useState(false);
-  const [showDeadline, setShowDeadline] = useState(false);
+  const [showDuePanel, setShowDuePanel] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
+  const [editDueRepeat, setEditDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
   const [editStatus, setEditStatus] = useState<BoardTaskStatus>("pending");
   const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
   const [editShowAssignees, setEditShowAssignees] = useState(false);
-  const [editShowDeadline, setEditShowDeadline] = useState(false);
+  const [editShowDuePanel, setEditShowDuePanel] = useState(false);
   const [editSubtaskDraft, setEditSubtaskDraft] = useState("");
   const [editNewSubtasks, setEditNewSubtasks] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -458,18 +519,65 @@ function WorkItemsInner() {
     setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  useEffect(() => {
+    if (!editTaskId) setEditShowDuePanel(false);
+  }, [editTaskId]);
+
+  useEffect(() => {
+    if (!editTaskId) setEditShowAssignees(false);
+  }, [editTaskId]);
+
+  useEffect(() => {
+    if (!createModalOpen) setShowDuePanel(false);
+  }, [createModalOpen]);
+
+  useEffect(() => {
+    if (!createModalOpen) setShowAssignees(false);
+  }, [createModalOpen]);
+
+  useEffect(() => {
+    if (!due.trim()) setDueRepeat(null);
+  }, [due]);
+
+  useEffect(() => {
+    if (!editDue.trim()) setEditDueRepeat(null);
+  }, [editDue]);
+
+  const taskPanelOpen = createModalOpen || editTaskId != null;
+
+  useEffect(() => {
+    if (!taskPanelOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [taskPanelOpen]);
+
+  useEffect(() => {
+    if (!taskPanelOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setCreateModalOpen(false);
+        setEditTaskId(null);
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [taskPanelOpen]);
+
   const openEditTask = useCallback((taskId: string, focus?: "assignees" | "due") => {
     setCreateModalOpen(false);
     setEditTaskId(taskId);
     if (focus === "assignees") {
       setEditShowAssignees(true);
-      setEditShowDeadline(false);
+      setEditShowDuePanel(false);
     } else if (focus === "due") {
-      setEditShowDeadline(true);
+      setEditShowDuePanel(true);
       setEditShowAssignees(false);
     } else {
       setEditShowAssignees(false);
-      setEditShowDeadline(false);
+      setEditShowDuePanel(false);
     }
   }, []);
 
@@ -492,6 +600,7 @@ function WorkItemsInner() {
     setEditTitle(editDetail.task.title);
     setEditAssigneeIds([...editDetail.assigneeUserIds]);
     setEditDue(dueAtToLocalInput(editDetail.task.dueAt));
+    setEditDueRepeat(parseTaskDueRepeat(editDetail.task.dueRepeat));
     setEditStatus(normalizeTaskStatus(editDetail.task.status));
     setEditPriority(taskPriority(editDetail.task));
     setEditNewSubtasks([]);
@@ -659,7 +768,7 @@ function WorkItemsInner() {
           assigneeUserIds: assigneeIds,
           status: newTaskStatus,
           priority: newTaskPriority,
-          ...(dueIso ? { dueAt: dueIso } : {}),
+          ...(dueIso ? { dueAt: dueIso, dueRepeat: dueRepeat ?? null } : {}),
         }),
       });
       const createdTaskId = created.task.id;
@@ -672,13 +781,14 @@ function WorkItemsInner() {
       }
       setTitle("");
       setDue("");
+      setDueRepeat(null);
       setAssigneeIds([]);
       setNewTaskStatus("pending");
       setNewTaskPriority("medium");
       setSubtaskDraft("");
       setSubtaskItems([]);
       setShowAssignees(false);
-      setShowDeadline(false);
+      setShowDuePanel(false);
       setCreateModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
@@ -696,6 +806,9 @@ function WorkItemsInner() {
     setEditSaving(true);
     setError(null);
     try {
+      const prevIso = editDetail.task.dueAt ? new Date(editDetail.task.dueAt).toISOString() : null;
+      const nextIso = editDue.trim() ? new Date(editDue).toISOString() : null;
+      const duePatch = prevIso !== nextIso ? { dueAt: nextIso === null ? null : nextIso } : {};
       await apiJson<TaskDetail>(`/tasks/${editTaskId}`, {
         method: "PATCH",
         token,
@@ -704,20 +817,10 @@ function WorkItemsInner() {
           status: editStatus,
           priority: editPriority,
           assigneeUserIds: editAssigneeIds,
+          dueRepeat: editDueRepeat,
+          ...duePatch,
         }),
       });
-      const prevIso = editDetail.task.dueAt ? new Date(editDetail.task.dueAt).toISOString() : null;
-      const nextIso = editDue.trim() ? new Date(editDue).toISOString() : null;
-      if (prevIso !== nextIso) {
-        await apiJson<TaskDetail>(`/tasks/${editTaskId}/reschedule`, {
-          method: "POST",
-          token,
-          body: JSON.stringify({
-            newDueAt: editDue.trim() ? new Date(editDue).toISOString() : null,
-            reason: "Updated from task panel",
-          }),
-        });
-      }
       for (const st of editNewSubtasks) {
         const line = st.trim();
         if (!line) continue;
@@ -905,12 +1008,14 @@ function WorkItemsInner() {
     return new Intl.DateTimeFormat(undefined, {
       month: "short",
       day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
       ...(sameYear ? {} : { year: "numeric" }),
     }).format(d);
   }
 
   function ListTaskCard({ task }: { task: TaskRow }) {
-    const dueText = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : null;
+    const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const p = taskPriority(task);
     const busy = updatingTaskId === task.id;
     const expanded = listRowExpanded.has(task.id);
@@ -983,8 +1088,8 @@ function WorkItemsInner() {
                   type="button"
                   onClick={() => openEditTask(task.id, "due")}
                   className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
-                  title={dueText ? `Due ${dueText}` : "Due date"}
-                  aria-label={dueText ? `Due date ${formatDueForListPill(task.dueAt!)}` : "Edit due date"}
+                  title={dueSummary ? `Due ${dueSummary}` : "Due (date & time)"}
+                  aria-label={dueSummary ? `Due ${dueSummary}` : "Edit due date and time"}
                 >
                   <span className={`${LIST_ROW_BADGE_LABEL} ${task.dueAt ? "" : "uppercase"}`}>
                     {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
@@ -1008,6 +1113,16 @@ function WorkItemsInner() {
                   </select>
                   <span className={`${LIST_ROW_BADGE_LABEL} uppercase`}>{priorityLabelShort(p)}</span>
                 </div>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => openEditTask(task.id)}
+                  className={TASK_ROW_OVERFLOW_MENU_BTN}
+                  title="Edit task"
+                  aria-label={`More options — edit: ${task.title}`}
+                >
+                  <IconEllipsisVertical className="opacity-90" />
+                </button>
               </div>
             </div>
         </div>
@@ -1174,7 +1289,18 @@ function WorkItemsInner() {
               onMouseDown={(e) => e.stopPropagation()}
             >
               <KanbanStatusPill task={task} />
-              <KanbanPriorityPill task={task} />
+              <div className="flex items-center gap-1">
+                <KanbanPriorityPill task={task} />
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id)}
+                  className={TASK_ROW_OVERFLOW_MENU_BTN}
+                  title="Edit task"
+                  aria-label={`More options — edit: ${task.title}`}
+                >
+                  <IconEllipsisVertical className="opacity-90" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1184,7 +1310,9 @@ function WorkItemsInner() {
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => openEditTask(task.id, "due")}
               className={`inline-flex min-h-[1.75rem] max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${dueDatePillClass(Boolean(task.dueAt))}`}
-              title={task.dueAt ? `Due ${new Date(task.dueAt).toISOString().slice(0, 10)}` : "No due date — edit"}
+              title={
+                task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"
+              }
             >
               <IconCalendarDays className="size-3.5 shrink-0 opacity-80" aria-hidden />
               <span className="min-w-0 font-medium tabular-nums text-[var(--fg)]">
@@ -1577,37 +1705,75 @@ function WorkItemsInner() {
         )}
       </section>
 
-      {(createModalOpen || editTaskId) && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={editTaskId ? "Edit task" : "Create task"}
-          onClick={() => {
-            setCreateModalOpen(false);
-            setEditTaskId(null);
-          }}
-        >
+      {taskPanelOpen && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/40"
+            aria-hidden
+            onClick={() => {
+              setCreateModalOpen(false);
+              setEditTaskId(null);
+            }}
+          />
           <section
-            className="surface-elevated w-full max-w-xl space-y-4 rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editTaskId ? "Edit task" : "Create task"}
+            className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col space-y-4 overflow-y-auto border-l border-[var(--border-subtle)] p-6 shadow-[0_0_40px_rgba(0,0,0,0.12)]"
             onClick={(e) => e.stopPropagation()}
           >
             {editTaskId ? (
               <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold">Edit task</h2>
-                  <button
-                    type="button"
-                    className="btn-secondary rounded-lg px-3 py-1 text-xs"
-                    onClick={() => setEditTaskId(null)}
-                  >
-                    Close
-                  </button>
-                </div>
                 {editDetailLoading && !editDetail ? (
-                  <p className="text-sm text-[var(--muted)]">Loading…</p>
+                  <>
+                    <div className={TASK_PANEL_HEADER_ROW}>
+                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
+                      <div className={TASK_PANEL_HEADER_RIGHT}>
+                        <button
+                          type="button"
+                          className={TASK_PANEL_HEADER_CLOSE_BTN}
+                          onClick={() => setEditTaskId(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-[var(--muted)]">Loading…</p>
+                  </>
                 ) : editDetail ? (
                   <>
+                    <div className={TASK_PANEL_HEADER_ROW}>
+                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
+                      <div className={TASK_PANEL_HEADER_RIGHT}>
+                        <select
+                          aria-label="Status"
+                          className={`${TASK_PANEL_HEADER_SELECT} w-[6.5rem] sm:w-[7.25rem]`}
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value as BoardTaskStatus)}
+                        >
+                          {KANBAN_STATUS_ORDER.map((s) => (
+                            <option key={s} value={s}>
+                              {STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="Priority"
+                          className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                        >
+                          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                            <option key={k} value={k}>
+                              {PRIORITY_LABELS[k]}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setEditTaskId(null)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
                     <div className="space-y-3">
                       <input
                         className="input rounded-xl text-base"
@@ -1665,88 +1831,48 @@ function WorkItemsInner() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
+                        className={TASK_PANEL_ASSIGNEE_TOGGLE}
+                        title={assigneeToggleTitle(editAssigneeIds, members)}
+                        aria-expanded={editShowAssignees}
+                        aria-label={
+                          editAssigneeIds.length > 0
+                            ? `Assignees: ${assigneeToggleTitle(editAssigneeIds, members) ?? ""}`
+                            : "Choose assignees"
+                        }
                         onClick={() => setEditShowAssignees((v) => !v)}
                       >
-                        {editShowAssignees ? "Hide assignee" : "Add assignee"}
+                        <span className="block truncate">{assigneeToggleLabel(editAssigneeIds, members)}</span>
                       </button>
-                      <button
-                        type="button"
-                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
-                        onClick={() => setEditShowDeadline((v) => !v)}
-                      >
-                        {editShowDeadline ? "Hide deadline" : "Add deadline"}
-                      </button>
+                      <DueDateTimePopover
+                        open={editShowDuePanel}
+                        onOpenChange={setEditShowDuePanel}
+                        value={editDue}
+                        onChange={setEditDue}
+                        onClear={() => {
+                          setEditDue("");
+                          setEditDueRepeat(null);
+                        }}
+                        dueRepeat={editDueRepeat}
+                        onDueRepeatChange={setEditDueRepeat}
+                      />
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1.5 block text-xs text-[var(--muted)]">Status</label>
-                        <select
-                          className="input rounded-xl text-sm"
-                          value={editStatus}
-                          onChange={(e) => setEditStatus(e.target.value as BoardTaskStatus)}
-                        >
-                          {KANBAN_STATUS_ORDER.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs text-[var(--muted)]">Priority</label>
-                        <select
-                          className="input rounded-xl text-sm"
-                          value={editPriority}
-                          onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
-                        >
-                          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                            <option key={k} value={k}>
-                              {PRIORITY_LABELS[k]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
-                        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--fg)]">
-                          {(() => {
-                            const row = lists.find((l) => l.id === editDetail.task.listId);
-                            if (!row) return "—";
-                            const dn = depts.find((d) => d.id === row.departmentId)?.name ?? "";
-                            return dn ? `${dn} · ${row.name}` : row.name;
-                          })()}
-                        </p>
-                      </div>
-                      {editShowDeadline && (
-                        <div className="sm:col-span-2">
-                          <label className="mb-1.5 block text-xs text-[var(--muted)]">Deadline (optional)</label>
-                          <input
-                            className="input rounded-xl"
-                            type="datetime-local"
-                            value={editDue}
-                            onChange={(e) => setEditDue(e.target.value)}
-                          />
-                          <p className="mt-1 text-[11px] text-[var(--muted)]">Clear the field and save to remove the due date.</p>
-                        </div>
-                      )}
-                      {editShowAssignees && members.length > 0 && (
-                        <div className="sm:col-span-2">
-                          <p className="mb-2 text-xs font-medium text-[var(--muted)]">Assignees</p>
-                          <div className="flex flex-wrap gap-3">
-                            {members.map((m) => (
-                              <label key={m.userId} className="flex cursor-pointer items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={editAssigneeIds.includes(m.userId)}
-                                  onChange={() => toggleEditAssignee(m.userId)}
-                                />
-                                <span>{m.email}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {editShowAssignees && (
+                      <AssigneeSearchField
+                        members={members}
+                        assigneeIds={editAssigneeIds}
+                        onToggleAssignee={toggleEditAssignee}
+                      />
+                    )}
+                    <div>
+                      <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
+                      <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--fg)]">
+                        {(() => {
+                          const row = lists.find((l) => l.id === editDetail.task.listId);
+                          if (!row) return "—";
+                          const dn = depts.find((d) => d.id === row.departmentId)?.name ?? "";
+                          return dn ? `${dn} · ${row.name}` : row.name;
+                        })()}
+                      </p>
                     </div>
                     <div className="flex justify-end gap-2">
                       <button
@@ -1768,16 +1894,52 @@ function WorkItemsInner() {
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-[var(--muted)]">Could not load this task.</p>
+                  <>
+                    <div className={TASK_PANEL_HEADER_ROW}>
+                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
+                      <div className={TASK_PANEL_HEADER_RIGHT}>
+                        <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setEditTaskId(null)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-[var(--muted)]">Could not load this task.</p>
+                  </>
                 )}
               </>
             ) : (
               <>
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">New task</h2>
-              <button type="button" className="btn-secondary rounded-lg px-3 py-1 text-xs" onClick={() => setCreateModalOpen(false)}>
-                Close
-              </button>
+            <div className={TASK_PANEL_HEADER_ROW}>
+              <h2 className={TASK_PANEL_HEADER_TITLE}>New task</h2>
+              <div className={TASK_PANEL_HEADER_RIGHT}>
+                <select
+                  aria-label="Status"
+                  className={`${TASK_PANEL_HEADER_SELECT} w-[6.5rem] sm:w-[7.25rem]`}
+                  value={newTaskStatus}
+                  onChange={(e) => setNewTaskStatus(e.target.value as BoardTaskStatus)}
+                >
+                  {KANBAN_STATUS_ORDER.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABELS[s]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Priority"
+                  className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
+                  value={newTaskPriority}
+                  onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
+                >
+                  {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                    <option key={k} value={k}>
+                      {PRIORITY_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setCreateModalOpen(false)}>
+                  Close
+                </button>
+              </div>
             </div>
             <div className="space-y-3">
               <input
@@ -1824,85 +1986,47 @@ function WorkItemsInner() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
+                className={TASK_PANEL_ASSIGNEE_TOGGLE}
+                title={assigneeToggleTitle(assigneeIds, members)}
+                aria-expanded={showAssignees}
+                aria-label={
+                  assigneeIds.length > 0
+                    ? `Assignees: ${assigneeToggleTitle(assigneeIds, members) ?? ""}`
+                    : "Choose assignees"
+                }
                 onClick={() => setShowAssignees((v) => !v)}
               >
-                {showAssignees ? "Hide assignee" : "Add assignee"}
+                <span className="block truncate">{assigneeToggleLabel(assigneeIds, members)}</span>
               </button>
-              <button
-                type="button"
-                className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
-                onClick={() => setShowDeadline((v) => !v)}
-              >
-                {showDeadline ? "Hide deadline" : "Add deadline"}
-              </button>
+              <DueDateTimePopover
+                open={showDuePanel}
+                onOpenChange={setShowDuePanel}
+                value={due}
+                onChange={setDue}
+                onClear={() => {
+                  setDue("");
+                  setDueRepeat(null);
+                }}
+                dueRepeat={dueRepeat}
+                onDueRepeatChange={setDueRepeat}
+              />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs text-[var(--muted)]">Status</label>
-                <select
-                  className="input rounded-xl text-sm"
-                  value={newTaskStatus}
-                  onChange={(e) => setNewTaskStatus(e.target.value as BoardTaskStatus)}
-                >
-                  {KANBAN_STATUS_ORDER.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs text-[var(--muted)]">Priority</label>
-                <select
-                  className="input rounded-xl text-sm"
-                  value={newTaskPriority}
-                  onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                >
-                  {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                    <option key={k} value={k}>
-                      {PRIORITY_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
-                <select className="input rounded-xl" value={listId} onChange={(e) => setListId(e.target.value)}>
-                  {levelLists.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {depts.find((d) => d.id === l.departmentId)?.name ?? "Unknown"} · {l.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {showDeadline && (
-                <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-xs text-[var(--muted)]">Deadline (optional)</label>
-                    <input className="input rounded-xl" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs text-[var(--muted)]">Repeat</label>
-                    <p className="input rounded-xl px-3 py-2 text-sm text-[var(--muted)]">
-                      Repeat schedules are not available yet.
-                    </p>
-                  </div>
-                </div>
-              )}
-              {showAssignees && members.length > 0 && (
-                <div className="sm:col-span-2">
-                  <p className="mb-2 text-xs font-medium text-[var(--muted)]">Assignees</p>
-                  <div className="flex flex-wrap gap-3">
-                    {members.map((m) => (
-                      <label key={m.userId} className="flex cursor-pointer items-center gap-2 text-sm">
-                        <input type="checkbox" checked={assigneeIds.includes(m.userId)} onChange={() => toggleAssignee(m.userId)} />
-                        <span>{m.email}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+            {showAssignees && (
+              <AssigneeSearchField
+                members={members}
+                assigneeIds={assigneeIds}
+                onToggleAssignee={toggleAssignee}
+              />
+            )}
+            <div>
+              <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
+              <select className="input rounded-xl" value={listId} onChange={(e) => setListId(e.target.value)}>
+                {levelLists.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {depts.find((d) => d.id === l.departmentId)?.name ?? "Unknown"} · {l.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-secondary rounded-xl px-4" onClick={() => setCreateModalOpen(false)}>

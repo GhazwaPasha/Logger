@@ -23,7 +23,19 @@ type TaskRow = {
   title: string;
   status: string;
   dueAt: string | null;
+  dueRepeat?: string | null;
 };
+
+function formatDueCompact(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(d);
+}
 
 async function flushOutbox(token: string) {
   const rows = listOutbox();
@@ -223,7 +235,7 @@ export default function App() {
             <Text style={styles.rowTitle}>{item.title}</Text>
             <Text style={styles.rowMeta}>
               {item.status}
-              {item.dueAt ? ` · ${item.dueAt.slice(0, 10)}` : ""}
+              {item.dueAt ? ` · ${formatDueCompact(item.dueAt)}` : ""}
             </Text>
           </Pressable>
         )}

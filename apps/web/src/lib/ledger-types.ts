@@ -21,12 +21,25 @@ export type SubtaskRow = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type TaskDueRepeat = "daily" | "weekly" | "monthly" | "yearly";
+
+export function parseTaskDueRepeat(v: unknown): TaskDueRepeat | null {
+  if (v == null || v === "") return null;
+  const s = String(v);
+  if (s === "daily" || s === "weekly" || s === "monthly" || s === "yearly") return s;
+  return null;
+}
+
 export type TaskRow = {
   id: string;
   title: string;
   status: string;
   priority?: string;
+  /** Single due instant (ISO 8601); includes time; `null` if unset. */
   dueAt: string | null;
+  /** Cadence after due; `null` / omitted = none. */
+  dueRepeat?: TaskDueRepeat | null;
   listId: string;
   assignerId: string;
   deletedAt: string | null;
