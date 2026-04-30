@@ -29,7 +29,8 @@ export function middleware(request: NextRequest) {
 
   const taskDeep = sub.match(/^tasks\/(.+)$/);
   if (taskDeep) {
-    url.pathname = `/app/w/${id}/work/${taskDeep[1]}`;
+    url.pathname = `/app/w/${id}/work`;
+    url.searchParams.set("task", taskDeep[1]);
     return NextResponse.redirect(url);
   }
 

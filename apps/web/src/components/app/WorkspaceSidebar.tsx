@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -42,6 +42,7 @@ export function WorkspaceSidebar({
   workspaceId: string;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { token } = useApiSession();
   const { data: session } = authClient.useSession();
@@ -105,9 +106,13 @@ export function WorkspaceSidebar({
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
   const activePeople = pathname.startsWith(`${base}/people`);
   const activeOrganizationSettings = pathname.startsWith(`${base}/organization-settings`);
-  const activeWorkList = pathname === `${base}/work`;
   const activeAddOrganization = pathname.startsWith(`${base}/add-organization`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
+  /** Work page with full board scope (no level/list filters in URL). */
+  const activeAllWorkspaceTasks =
+    pathname === `${base}/work` &&
+    !searchParams.get("level") &&
+    !searchParams.get("list");
 
   const userLabel = session?.user?.name?.trim() || session?.user?.email || "Account";
   const userSubLabel = session?.user?.email && session.user.name ? session.user.email : null;
@@ -221,28 +226,30 @@ export function WorkspaceSidebar({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
-          <button
-            type="button"
-            className="mb-1 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--surface-hover)]"
-            onClick={() => setOrgTreeOpen((v) => !v)}
-            aria-expanded={orgTreeOpen}
-            aria-label="Toggle organization tree"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[var(--fg)]">
+          <div className="mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+            <Link
+              href={`${base}/work`}
+              className={`${rowBase(activeAllWorkspaceTasks)} flex min-w-0 flex-1 items-center pl-2`}
+              title={`All ${NODE_LABELS.workItem.toLowerCase()}s in this workspace`}
+              aria-current={activeAllWorkspaceTasks ? "page" : undefined}
+            >
+              <span className="truncate text-sm font-semibold text-[var(--fg)]">
                 {selectedOrg?.name ?? NODE_LABELS.workspace}
-              </p>
-            </div>
-            <Chevron open={orgTreeOpen} />
-          </button>
+              </span>
+            </Link>
+            <button
+              type="button"
+              className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+              aria-expanded={orgTreeOpen}
+              aria-label={orgTreeOpen ? "Collapse levels and lists" : "Expand levels and lists"}
+              onClick={() => setOrgTreeOpen((v) => !v)}
+            >
+              <Chevron open={orgTreeOpen} />
+            </button>
+          </div>
           {orgTreeOpen &&
             (
               <div className="space-y-2">
-                <div className="space-y-0.5">
-                  <Link href={`${base}/work`} className={`${rowBase(activeWorkList)} pl-2`}>
-                    All {NODE_LABELS.workItem}s
-                  </Link>
-                </div>
                 {depts.length === 0 ? (
                   <p className="px-2 text-xs leading-relaxed text-[var(--muted)]">No levels yet.</p>
                 ) : (

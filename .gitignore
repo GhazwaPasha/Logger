@@ -10,3 +10,6 @@ test-credentials.local.txt
 .DS_Store
 coverage
 *.tsbuildinfo
+
+# Cursor stop-hook audit (one line per agent completion)
+second-memory/Inbox/_session-log.txt

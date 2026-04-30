@@ -77,7 +77,8 @@ export const appendLedgerSchema = z.object({
 });
 
 export const rescheduleTaskSchema = z.object({
-  newDueAt: z.string().datetime(),
+  /** ISO datetime or `null` to clear the due date. */
+  newDueAt: z.union([z.string().datetime(), z.null()]),
   reason: z.string().min(1).max(4000),
 });
 
@@ -89,10 +90,17 @@ export const patchTaskSchema = z
   .object({
     status: taskStatusInputSchema.optional(),
     priority: taskPrioritySchema.optional(),
+    title: z.string().min(1).max(512).optional(),
+    assigneeUserIds: z.array(z.string().min(1)).optional(),
   })
-  .refine((d) => d.status !== undefined || d.priority !== undefined, {
-    message: "Provide status and/or priority",
-  });
+  .refine(
+    (d) =>
+      d.status !== undefined ||
+      d.priority !== undefined ||
+      d.title !== undefined ||
+      d.assigneeUserIds !== undefined,
+    { message: "Provide at least one field to update" },
+  );
 
 export const createSubtaskSchema = z.object({
   title: z.string().min(1).max(512),

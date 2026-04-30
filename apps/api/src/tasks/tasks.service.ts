@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   appendLedgerSchema,
   createSubtaskSchema,
@@ -9,7 +9,7 @@ import {
   updateSubtaskSchema,
   updateTaskStatusSchema,
 } from "@work-ledger/contracts";
-import { activityLedger, subtasks, taskAssignees, tasks } from "@work-ledger/db";
+import { activityLedger, organizationMembers, subtasks, taskAssignees, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
@@ -174,8 +174,15 @@ export class TasksService {
     if (!caps.canReschedule) throw new ForbiddenException("Cannot reschedule");
 
     const parsed = rescheduleTaskSchema.parse(body);
-    const newDue = new Date(parsed.newDueAt);
     const oldDue = access.task.dueAt;
+    const oldIso = oldDue?.toISOString() ?? null;
+    const newDue =
+      parsed.newDueAt === null ? null : new Date(parsed.newDueAt);
+    const newIso = newDue?.toISOString() ?? null;
+
+    if (oldIso === newIso) {
+      return this.getDetail(userId, taskId);
+    }
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -187,8 +194,8 @@ export class TasksService {
         actorId: userId,
         type: "reschedule",
         payload: {
-          oldDueAt: oldDue?.toISOString() ?? null,
-          newDueAt: newDue.toISOString(),
+          oldDueAt: oldIso,
+          newDueAt: newIso,
           reason: parsed.reason,
         },
       });
@@ -228,14 +235,30 @@ export class TasksService {
     if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update task");
 
     const parsed = patchTaskSchema.parse(body);
-    const oldStatus = access.task.status;
-    const oldPriority = access.task.priority;
+    const task = access.task;
+    const orgId = task.organizationId;
+
+    const oldStatus = task.status;
+    const oldPriority = task.priority;
     const nextStatus = parsed.status !== undefined ? parsed.status : oldStatus;
     const nextPriority = parsed.priority !== undefined ? parsed.priority : oldPriority;
     const statusChanged = parsed.status !== undefined && parsed.status !== oldStatus;
     const priorityChanged = parsed.priority !== undefined && parsed.priority !== oldPriority;
+    const titleChanged = parsed.title !== undefined && parsed.title !== task.title;
+    const assigneesChanged = parsed.assigneeUserIds !== undefined;
 
-    if (!statusChanged && !priorityChanged) {
+    if (assigneesChanged && parsed.assigneeUserIds && parsed.assigneeUserIds.length > 0) {
+      const ids = [...new Set(parsed.assigneeUserIds)];
+      const rows = await this.db
+        .select({ userId: organizationMembers.userId })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.organizationId, orgId), inArray(organizationMembers.userId, ids)));
+      if (rows.length !== ids.length) {
+        throw new ForbiddenException("Invalid assignee selection");
+      }
+    }
+
+    if (!statusChanged && !priorityChanged && !titleChanged && !assigneesChanged) {
       return this.getDetail(userId, taskId);
     }
 
@@ -244,11 +267,24 @@ export class TasksService {
       await tx
         .update(tasks)
         .set({
-          status: nextStatus,
-          priority: nextPriority,
+          ...(parsed.status !== undefined ? { status: nextStatus } : {}),
+          ...(parsed.priority !== undefined ? { priority: nextPriority } : {}),
+          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
           updatedAt: now,
         })
         .where(eq(tasks.id, taskId));
+
+      if (assigneesChanged) {
+        await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
+        const ids = parsed.assigneeUserIds!;
+        if (ids.length > 0) {
+          await tx
+            .insert(taskAssignees)
+            .values(ids.map((uid) => ({ taskId, userId: uid })))
+            .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
+        }
+      }
+
       if (statusChanged) {
         await tx.insert(activityLedger).values({
           taskId,

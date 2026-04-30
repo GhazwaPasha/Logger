@@ -1,0 +1,50 @@
+---
+description: Document substantive work in second-memory; workspace basic info layer for future sessions; never write secrets
+alwaysApply: true
+---
+
+# Second memory (Obsidian vault)
+
+The folder **`second-memory/`** at the repo root is the **shared basic info layer** for this workspace: a lightweight log of what we did, decided, and learned, so **future chats and new work in this repo** can start from something better than a blank model context. Open **`second-memory`** as the vault root in Obsidian (File → Open folder as vault).
+
+## Default behavior (agents)
+
+**Documenting here is the default** for substantive work—treat it like a required wrap-up, not an extra.
+
+- **Before finishing a task** that meaningfully changes code, configuration, or team understanding, add or update the vault (see below).
+- **At the start of related work**, skim **`Inbox/Chat-inbox.md`** and relevant **`Topics/`** notes when they might apply; use or @-reference them in Cursor so the session builds on this layer.
+
+## What to capture
+
+Cover **any task** that a future you or teammate would need to re-derive from the diff alone. Non-exhaustive:
+
+- **What we did / where:** user-visible or structural changes; key file paths; new or changed commands, scripts, or env **names** (never values).
+- **Infrastructure & runtime:** services, ports, deploy, DB/auth boundaries, CI/CD, integrations.
+- **Decisions & tradeoffs:** what we picked, what we skipped, and why.
+- **Debugging & incidents:** root cause, fix, and gotchas.
+- **Domain & product rules** reflected in code.
+- **Conventions** and “how we do X in this repo.”
+
+## Where to write
+
+1. **`second-memory/Inbox/Chat-inbox.md`** — Primary log. Append a **new entry at the top** (directly under `# Chat inbox`) using:
+
+### YYYY-MM-DD — short title
+
+- **Context:** what we were doing / why.
+- **What we did:** concise bullets (enough to orient someone new to the change).
+- **Takeaway / follow-ups:** decisions, risks, or open questions for later sessions.
+- **Code / repo:** backtick paths (e.g. `apps/api/...`). No secrets.
+- **Links:** `[[Other note]]` wikilinks in this vault when useful.
+
+2. **Spillover:** For a large or recurring theme, add or update a note under **`second-memory/Topics/`** and link it from the inbox.
+
+3. **Secrets:** Never paste API keys, passwords, tokens, or full connection strings. Use env var **names** or redacted placeholders only.
+
+## When to skip (narrow)
+
+- **Trivial-only** edits: spelling in comments, obvious formatting, one-line lints with no lesson—**no** new entry; **update** an existing entry if you already opened one for this thread.
+- **Already recorded** for this thread in **`Chat-inbox.md`**—**edit** that block instead of duplicating.
+- **Pure brain-storming** with no code or no conclusion yet—wait until something concrete lands, then document.
+
+If unsure, **prefer a short entry** over silence; future sessions can use it as the basic info layer. Keep entries skimmable (tight bullets, real paths).

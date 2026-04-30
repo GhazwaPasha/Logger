@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   Suspense,
@@ -19,9 +18,10 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
-import type { ListRow, MemberRow, SubtaskRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
+import type { MemberRow, SubtaskRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
-import { workspaceKeys } from "@/lib/query-keys";
+import { taskKeys, workspaceKeys } from "@/lib/query-keys";
+import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import {
   KANBAN_STATUS_ORDER,
@@ -129,14 +129,41 @@ const SORT_PANEL_MIN_W = 224;
 const DATE_PANEL_MIN_W = 288;
 const MENU_VIEWPORT_GUTTER = 12;
 
+function dueAtToLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** Max subtasks shown on kanban cards before “+ more”. */
 const KANBAN_CARD_SUBTASK_PREVIEW = 8;
 
 /** List row assignee / due / priority — identical footprint every badge (fixed box); subtle corners */
 const LIST_ROW_BADGE_TILE =
   "box-border inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5";
+/** Assignee column when at least one assignee: same row height, flexible width for name(s) */
+const LIST_ROW_ASSIGNEE_NAME_TILE =
+  "box-border inline-flex h-8 max-w-[min(14rem,calc(100vw-12rem))] min-h-[2rem] max-h-[2rem] min-w-0 shrink items-center justify-center overflow-hidden rounded-sm border px-2 py-0.5";
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
+
+/** List name — outlined ghost pill (shared: task rows, kanban, filter scope). */
+const LIST_BADGE_CLASS =
+  "inline-flex max-w-[min(100%,11rem)] shrink-0 items-center justify-center truncate rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-center text-xs font-medium tabular-nums leading-none text-[var(--fg)]";
+
+/** Level / department — same shell, quieter label color. */
+const LEVEL_BADGE_CLASS =
+  "inline-flex max-w-[min(100%,11rem)] shrink-0 items-center justify-center truncate rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-center text-xs font-medium tabular-nums leading-none text-[var(--muted)]";
+
+/** Same box for every workflow stage (label length varies; aligns with list row `h-8` tiles). */
+const STATUS_PILL_LAYOUT =
+  "relative inline-flex h-8 w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] shrink-0 items-center justify-between gap-1 px-2";
+
+/** Expanded list subtasks: align tree under title (pill + row `gap-x-1` / `sm:gap-x-3` + chevron `size-11`). */
+const LIST_ROW_SUBTASK_TREE_MARGIN =
+  "ml-[calc(9.5rem+0.25rem+2.75rem+0.25rem)] sm:ml-[calc(9.5rem+0.75rem+2.75rem+0.75rem)]";
 
 function priorityLabelShort(p: TaskPriority): string {
   if (p === "high") return "HIGH";
@@ -153,8 +180,103 @@ function tasksToolbarIconButtonClasses(active: boolean) {
   ].join(" ");
 }
 
+/** Same background + text hues as status dropdowns on task cards (`KanbanStatusPill`). */
+function statusPillPalette(st: BoardTaskStatus): string {
+  if (st === "pending") return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+  if (st === "assigned") return "bg-sky-500/15 text-sky-800 dark:text-sky-200";
+  if (st === "in_progress") return "bg-violet-500/15 text-violet-800 dark:text-violet-200";
+  if (st === "late") return "bg-orange-500/15 text-orange-800 dark:text-orange-200";
+  if (st === "done") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
+  return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
+}
+
+const BOARD_STATS_SEGMENTS: { status: BoardTaskStatus; label: string; title: string }[] = [
+  { status: "pending", label: "Pending", title: STATUS_LABELS.pending },
+  { status: "assigned", label: "Assigned", title: STATUS_LABELS.assigned },
+  { status: "in_progress", label: "In progress", title: STATUS_LABELS.in_progress },
+  { status: "late", label: "Late", title: STATUS_LABELS.late },
+  { status: "done", label: "Done", title: STATUS_LABELS.done },
+];
+
+const PIPELINE_BADGE_FRAME =
+  "inline-flex min-w-[1.75rem] items-center justify-center rounded-sm border border-[var(--border-subtle)] px-2 py-0.5 text-xs font-semibold tabular-nums leading-none";
+
+function WorkBoardStatsCard({
+  counts,
+  total,
+}: {
+  total: number;
+  counts: Record<BoardTaskStatus, number>;
+}) {
+  const cancelled = counts.cancelled;
+  return (
+    <aside
+      className="min-w-0 w-full shrink-0 lg:col-span-1 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:justify-self-stretch lg:self-start"
+      aria-live="polite"
+      aria-label="Task counts by workflow stage"
+    >
+      <div className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_1px_0_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--accent)_45%,transparent)] to-transparent opacity-90"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.4]"
+          style={{
+            background:
+              "radial-gradient(100% 140% at 100% -20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 48%)",
+          }}
+        />
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 sm:px-4">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Pipeline</span>
+              <span className="hidden text-[10px] text-[var(--muted)] sm:inline" aria-hidden>
+                ·
+              </span>
+              <span className="hidden truncate text-[10px] text-[var(--muted)]/90 sm:inline">Live · current scope</span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-xs font-medium text-[var(--muted)]">Total</span>
+              <span
+                className={`${PIPELINE_BADGE_FRAME} min-w-[2rem] bg-[var(--surface-muted)] px-2.5 text-sm text-[var(--fg)]`}
+              >
+                {total}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-3 pb-2.5 pt-0 sm:gap-x-5 sm:px-4 sm:pb-2.5 lg:justify-between">
+            {BOARD_STATS_SEGMENTS.map(({ status, label, title }) => (
+              <div
+                key={status}
+                className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
+                role="group"
+                aria-label={`${title}: ${counts[status]}`}
+              >
+                <span className="truncate text-xs font-medium text-[var(--fg)]">{label}</span>
+                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette(status)}`}>{counts[status]}</span>
+              </div>
+            ))}
+            <div
+              className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
+              role="group"
+              aria-label={`${STATUS_LABELS.cancelled}: ${cancelled}`}
+            >
+              <span className="truncate text-xs font-medium text-[var(--fg)]">{STATUS_LABELS.cancelled}</span>
+              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette("cancelled")}`}>{cancelled}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 function WorkItemsInner() {
   const params = useParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const workspaceId = params.workspaceId as string;
   const levelPref = searchParams.get("level");
@@ -175,10 +297,27 @@ function WorkItemsInner() {
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "monthly" | "yearly">("none");
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [listSectionsOpen, setListSectionsOpen] = useState<Record<BoardTaskStatus, boolean>>(() =>
-    Object.fromEntries(KANBAN_STATUS_ORDER.map((k) => [k, true])) as Record<BoardTaskStatus, boolean>,
+  const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDue, setEditDue] = useState("");
+  const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
+  const [editStatus, setEditStatus] = useState<BoardTaskStatus>("pending");
+  const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
+  const [editShowAssignees, setEditShowAssignees] = useState(false);
+  const [editShowDeadline, setEditShowDeadline] = useState(false);
+  const [editSubtaskDraft, setEditSubtaskDraft] = useState("");
+  const [editNewSubtasks, setEditNewSubtasks] = useState<string[]>([]);
+  const [editSaving, setEditSaving] = useState(false);
+  const editTaskFromList = useMemo(
+    () => (editTaskId ? tasks.find((t) => t.id === editTaskId) ?? null : null),
+    [editTaskId, tasks],
   );
+  const { detail: editDetail, isLoading: editDetailLoading } = useTaskDetail(
+    token,
+    editTaskId,
+    editTaskFromList,
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [listRowExpanded, setListRowExpanded] = useState<Set<string>>(() => new Set());
   const [subtasksByTaskId, setSubtasksByTaskId] = useState<Record<string, SubtaskRow[] | "loading">>({});
   const [subtaskUpdatingId, setSubtaskUpdatingId] = useState<string | null>(null);
@@ -312,6 +451,45 @@ function WorkItemsInner() {
     setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  const openEditTask = useCallback((taskId: string, focus?: "assignees" | "due") => {
+    setCreateModalOpen(false);
+    setEditTaskId(taskId);
+    if (focus === "assignees") {
+      setEditShowAssignees(true);
+      setEditShowDeadline(false);
+    } else if (focus === "due") {
+      setEditShowDeadline(true);
+      setEditShowAssignees(false);
+    } else {
+      setEditShowAssignees(false);
+      setEditShowDeadline(false);
+    }
+  }, []);
+
+  function toggleEditAssignee(id: string) {
+    setEditAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  useEffect(() => {
+    const tid = searchParams.get("task");
+    if (!tid) return;
+    openEditTask(tid);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("task");
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router, openEditTask]);
+
+  useEffect(() => {
+    if (!editTaskId || !editDetail || editDetail.task.id !== editTaskId) return;
+    setEditTitle(editDetail.task.title);
+    setEditAssigneeIds([...editDetail.assigneeUserIds]);
+    setEditDue(dueAtToLocalInput(editDetail.task.dueAt));
+    setEditStatus(normalizeTaskStatus(editDetail.task.status));
+    setEditPriority(taskPriority(editDetail.task));
+    setEditNewSubtasks([]);
+  }, [editTaskId, editDetail?.task.id]);
+
   const patchTaskMutation = useMutation({
     mutationFn: async ({
       taskId,
@@ -355,7 +533,7 @@ function WorkItemsInner() {
             return {
               ...t,
               ...detail.task,
-              assigneeUserIds: t.assigneeUserIds,
+              assigneeUserIds: detail.assigneeUserIds ?? t.assigneeUserIds,
               subtasks: detail.subtasks.length ? detail.subtasks : t.subtasks,
             };
           }),
@@ -502,17 +680,113 @@ function WorkItemsInner() {
     }
   }
 
-  const activeTasks = tasks.filter((t) => !t.deletedAt);
+  async function saveEditTask() {
+    if (!token || !editTaskId || !editDetail) return;
+    const titleTrim = editTitle.trim();
+    if (!titleTrim) {
+      setError("Title is required");
+      return;
+    }
+    setEditSaving(true);
+    setError(null);
+    try {
+      await apiJson<TaskDetail>(`/tasks/${editTaskId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({
+          title: titleTrim,
+          status: editStatus,
+          priority: editPriority,
+          assigneeUserIds: editAssigneeIds,
+        }),
+      });
+      const prevIso = editDetail.task.dueAt ? new Date(editDetail.task.dueAt).toISOString() : null;
+      const nextIso = editDue.trim() ? new Date(editDue).toISOString() : null;
+      if (prevIso !== nextIso) {
+        await apiJson<TaskDetail>(`/tasks/${editTaskId}/reschedule`, {
+          method: "POST",
+          token,
+          body: JSON.stringify({
+            newDueAt: editDue.trim() ? new Date(editDue).toISOString() : null,
+            reason: "Updated from task panel",
+          }),
+        });
+      }
+      for (const st of editNewSubtasks) {
+        const line = st.trim();
+        if (!line) continue;
+        await apiJson(`/tasks/${editTaskId}/subtasks`, {
+          method: "POST",
+          token,
+          body: JSON.stringify({ title: line }),
+        });
+      }
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      await queryClient.invalidateQueries({ queryKey: taskKeys.detail(editTaskId) });
+      setEditTaskId(null);
+      setEditNewSubtasks([]);
+      setEditSubtaskDraft("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save task");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  const activeTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks]);
   const selectedLevel = levelPref && depts.some((d) => d.id === levelPref) ? levelPref : null;
   const selectedLevelName = selectedLevel ? depts.find((d) => d.id === selectedLevel)?.name ?? null : null;
   const levelLists = selectedLevel ? lists.filter((l) => l.departmentId === selectedLevel) : lists;
   const selectedList = listPref && levelLists.some((l) => l.id === listPref) ? listPref : null;
   const selectedListName = selectedList ? levelLists.find((l) => l.id === selectedList)?.name ?? null : null;
-  const visibleTasks = selectedList
-    ? activeTasks.filter((t) => t.listId === selectedList)
-    : selectedLevel
-      ? activeTasks.filter((t) => levelLists.some((l) => l.id === t.listId))
-      : activeTasks;
+
+  /** Header scope badges (same styles as task cards): level + list when applicable. */
+  const filterScopeSegments = useMemo((): { kind: "level" | "list"; label: string }[] => {
+    if (selectedListName && selectedLevelName) {
+      return [
+        { kind: "level", label: selectedLevelName },
+        { kind: "list", label: selectedListName },
+      ];
+    }
+    if (selectedListName && selectedList) {
+      const listRow = lists.find((l) => l.id === selectedList);
+      const deptName = listRow ? depts.find((d) => d.id === listRow.departmentId)?.name : null;
+      if (deptName) {
+        return [
+          { kind: "level", label: deptName },
+          { kind: "list", label: selectedListName },
+        ];
+      }
+      return [{ kind: "list", label: selectedListName }];
+    }
+    if (selectedLevelName) return [{ kind: "level", label: selectedLevelName }];
+    return [];
+  }, [selectedListName, selectedLevelName, selectedList, lists, depts]);
+
+  const visibleTasks = useMemo(() => {
+    if (selectedList) return activeTasks.filter((t) => t.listId === selectedList);
+    if (selectedLevel) return activeTasks.filter((t) => levelLists.some((l) => l.id === t.listId));
+    return activeTasks;
+  }, [activeTasks, selectedList, selectedLevel, levelLists]);
+
+  const boardStatusCounts = useMemo(() => {
+    const counts: Record<BoardTaskStatus, number> = {
+      pending: 0,
+      assigned: 0,
+      in_progress: 0,
+      late: 0,
+      done: 0,
+      cancelled: 0,
+    };
+    for (const t of visibleTasks) {
+      counts[normalizeTaskStatus(t.status)]++;
+    }
+    return counts;
+  }, [visibleTasks]);
+
+  /** Badges on cards: all tasks → list + level; level filter only → list; single list filter → none */
+  const showTaskListBadge = !selectedList;
+  const showTaskLevelBadge = !selectedList && !selectedLevel;
 
   const filteredTasks = useMemo(() => {
     return visibleTasks.filter((t) => {
@@ -527,12 +801,16 @@ function WorkItemsInner() {
 
   const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortMode), [filteredTasks, sortMode]);
 
-  const tasksByList = sortedTasks.reduce<Map<string, TaskRow[]>>((map, task) => {
-    const arr = map.get(task.listId) ?? [];
-    arr.push(task);
-    map.set(task.listId, arr);
-    return map;
-  }, new Map());
+  function taskListName(task: TaskRow): string | null {
+    return lists.find((l) => l.id === task.listId)?.name ?? null;
+  }
+
+  function taskLevelBadge(task: TaskRow): string | null {
+    const list = lists.find((l) => l.id === task.listId);
+    if (!list) return null;
+    const dept = depts.find((d) => d.id === list.departmentId);
+    return dept?.name ?? null;
+  }
 
   const kanbanSubtaskPrefetchKey = useMemo(
     () => filteredTasks.map((t) => t.id).sort().join(","),
@@ -585,11 +863,17 @@ function WorkItemsInner() {
     }
   }, [viewMode, token, kanbanSubtaskPrefetchKey, setError, filteredTasks]);
 
-  function formatKanbanAssignees(task: TaskRow, memberRows: MemberRow[]): string {
+  /** `null` when unassigned; otherwise comma-separated display names (or `"Unknown"` if IDs present but not resolved). */
+  function assigneeNamesForTask(task: TaskRow, memberRows: MemberRow[]): string | null {
     const ids = task.assigneeUserIds ?? [];
-    if (ids.length === 0) return "Unassigned";
+    if (ids.length === 0) return null;
     const names = ids
-      .map((id) => memberRows.find((m) => m.userId === id)?.name)
+      .map((id) => {
+        const m = memberRows.find((row) => row.userId === id);
+        if (!m) return null;
+        const label = (m.name?.trim() || m.email || "").trim();
+        return label || null;
+      })
       .filter((n): n is string => Boolean(n));
     return names.length > 0 ? names.join(", ") : "Unknown";
   }
@@ -598,15 +882,6 @@ function WorkItemsInner() {
     if (p === "high") return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
     if (p === "low") return "bg-slate-500/15 text-slate-600 dark:text-slate-300";
     return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
-  }
-
-  function statusPillClass(st: BoardTaskStatus) {
-    if (st === "pending") return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
-    if (st === "assigned") return "bg-sky-500/15 text-sky-800 dark:text-sky-200";
-    if (st === "in_progress") return "bg-violet-500/15 text-violet-800 dark:text-violet-200";
-    if (st === "late") return "bg-orange-500/15 text-orange-800 dark:text-orange-200";
-    if (st === "done") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
-    return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
   }
 
   function dueDatePillClass(hasDue: boolean) {
@@ -628,48 +903,24 @@ function WorkItemsInner() {
     }).format(d);
   }
 
-  function ListTaskRow({ task }: { task: TaskRow }) {
+  function ListTaskCard({ task }: { task: TaskRow }) {
     const dueText = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : null;
-    const st = normalizeTaskStatus(task.status);
     const p = taskPriority(task);
     const busy = updatingTaskId === task.id;
-    const canComplete = st !== "done" && st !== "cancelled";
     const expanded = listRowExpanded.has(task.id);
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
-    const taskDetailHref = `/app/w/${workspaceId}/work/${task.id}`;
-
+    const listBadge = taskListName(task);
+    const levelBadge = taskLevelBadge(task);
+    const assigneeNames = assigneeNamesForTask(task, members);
     return (
-      <>
-        <tr className="group border-b border-[var(--border-subtle)]/80 transition-colors last:border-b-0 hover:bg-[var(--surface-hover)]/80">
-          <td className="bg-[var(--surface-base)] px-4 py-3 align-middle group-hover:bg-[var(--surface-hover)]/80">
-            <div className="flex min-w-0 items-center gap-1 sm:gap-3">
-              <button
-                type="button"
-                disabled={busy || !canComplete}
-                onClick={() => canComplete && void patchTask(task.id, { status: "done" })}
-                className={`flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                  busy ? "cursor-wait opacity-60" : canComplete ? "cursor-pointer" : "cursor-default"
-                }`}
-                aria-label={st === "done" ? "Completed" : "Mark complete"}
-              >
-                <span
-                  className={`flex size-[18px] items-center justify-center rounded-full border-2 transition-colors ${
-                    st === "done"
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                      : st === "cancelled"
-                        ? "border-[var(--border-subtle)] opacity-50"
-                        : "border-[var(--border-subtle)] text-transparent hover:border-[var(--accent)]"
-                  }`}
-                >
-                  {st === "done" ? (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  ) : null}
-                </span>
-              </button>
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm transition-colors hover:bg-[var(--surface-hover)]/80">
+        <div className="px-4 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 sm:gap-x-3">
+              <div className="shrink-0 self-center" onMouseDown={(e) => e.stopPropagation()}>
+                <KanbanStatusPill task={task} />
+              </div>
               <button
                 type="button"
                 className="flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
@@ -679,31 +930,61 @@ function WorkItemsInner() {
               >
                 <IconChevron open={expanded} className="opacity-80" />
               </button>
-              <Link
-                href={taskDetailHref}
-                className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--fg)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-              >
-                {task.title}
-              </Link>
-              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-                <Link
-                  href={taskDetailHref}
-                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
-                  title="Assignees — set on task page"
-                  aria-label="Assignees — open task"
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id)}
+                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-[var(--fg)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
                 >
-                  <IconUserPlus className="size-[18px] shrink-0 text-[var(--muted)] opacity-90" aria-hidden />
-                </Link>
-                <Link
-                  href={taskDetailHref}
+                  {task.title}
+                </button>
+                {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {showTaskLevelBadge && levelBadge ? (
+                      <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
+                        {levelBadge}
+                      </span>
+                    ) : null}
+                    {showTaskListBadge && listBadge ? (
+                      <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
+                        {listBadge}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:gap-1 sm:ml-auto">
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id, "assignees")}
+                  className={`${
+                    assigneeNames ? LIST_ROW_ASSIGNEE_NAME_TILE : LIST_ROW_BADGE_TILE
+                  } transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
+                  title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
+                  aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
+                >
+                  {assigneeNames ? (
+                    <span
+                      className="pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-tight text-[var(--fg)]"
+                      title={assigneeNames}
+                    >
+                      {assigneeNames}
+                    </span>
+                  ) : (
+                    <IconUserPlus className="size-[18px] shrink-0 text-[var(--muted)] opacity-90" aria-hidden />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id, "due")}
                   className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
-                  title={dueText ? `Due ${dueText}` : "Due date — set on task page"}
-                  aria-label={dueText ? `Due date ${formatDueForListPill(task.dueAt!)}` : "Due date — open task"}
+                  title={dueText ? `Due ${dueText}` : "Due date"}
+                  aria-label={dueText ? `Due date ${formatDueForListPill(task.dueAt!)}` : "Edit due date"}
                 >
                   <span className={`${LIST_ROW_BADGE_LABEL} ${task.dueAt ? "" : "uppercase"}`}>
                     {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
                   </span>
-                </Link>
+                </button>
                 <div
                   className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-base)]`}
                 >
@@ -724,19 +1005,21 @@ function WorkItemsInner() {
                 </div>
               </div>
             </div>
-          </td>
-        </tr>
+        </div>
         {expanded && (
-          <tr className="border-b border-[var(--border-subtle)]/80 last:border-b-0">
-            <td className="bg-[var(--surface-base)] px-4 pb-3 pt-0">
-              <div className="ml-[calc(1.125rem+0.875rem+0.5rem)] border-l border-[var(--border-subtle)] pl-4 sm:ml-[calc(1.125rem+1.75rem+0.75rem)]">
+          <div className="border-t border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-4 pb-3 pt-2">
+              <div className={`${LIST_ROW_SUBTASK_TREE_MARGIN} border-l border-[var(--border-subtle)] pl-4`}>
                 {subtasksState === "loading" && <p className="py-2 text-xs text-[var(--muted)]">Loading subtasks…</p>}
                 {Array.isArray(subtasksState) && subtasksState.length === 0 && (
                   <p className="py-2 text-xs text-[var(--muted)]">
                     No subtasks.{" "}
-                    <Link href={`/app/w/${workspaceId}/work/${task.id}`} className="text-[var(--accent)] hover:underline">
-                      Add on task page
-                    </Link>
+                    <button
+                      type="button"
+                      className="font-medium text-[var(--accent)] hover:underline"
+                      onClick={() => openEditTask(task.id)}
+                    >
+                      Add in task
+                    </button>
                   </p>
                 )}
                 {Array.isArray(subtasksState) && subtasksState.length > 0 && (
@@ -769,10 +1052,9 @@ function WorkItemsInner() {
                   </ul>
                 )}
               </div>
-            </td>
-          </tr>
+          </div>
         )}
-      </>
+      </div>
     );
   }
 
@@ -782,10 +1064,10 @@ function WorkItemsInner() {
     const allowed = kanbanAllowedTransitions(st);
     return (
       <div
-        className={`relative inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 shadow-sm ${statusPillClass(st)}`}
+        className={`${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPalette(st)}`}
       >
         <select
-          className="absolute inset-0 cursor-pointer opacity-0"
+          className="absolute inset-0 z-[1] cursor-pointer opacity-0"
           value={st}
           disabled={busy}
           onChange={(e) => void patchTask(task.id, { status: e.target.value as BoardTaskStatus })}
@@ -797,8 +1079,10 @@ function WorkItemsInner() {
             </option>
           ))}
         </select>
-        <span className="pointer-events-none truncate text-[11px] font-semibold tracking-tight">{STATUS_LABELS[st]}</span>
-        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" />
+        <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
+          {STATUS_LABELS[st]}
+        </span>
+        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" aria-hidden />
       </div>
     );
   }
@@ -808,7 +1092,7 @@ function WorkItemsInner() {
     const busy = updatingTaskId === task.id;
     return (
       <div
-        className={`relative inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 shadow-sm ${priorityClass(p)}`}
+        className={`relative inline-flex shrink-0 items-center gap-1 rounded-sm border border-[var(--border-subtle)] px-2 py-1 ${priorityClass(p)}`}
       >
         <select
           className="absolute inset-0 cursor-pointer opacity-0"
@@ -833,8 +1117,7 @@ function WorkItemsInner() {
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
-    const assigneeLine = formatKanbanAssignees(task, members);
-    const taskHref = `/app/w/${workspaceId}/work/${task.id}`;
+    const assigneeNames = assigneeNamesForTask(task, members);
     const subtasksPreview =
       Array.isArray(subtasksState) && subtasksState.length > 0
         ? subtasksState.slice(0, KANBAN_CARD_SUBTASK_PREVIEW)
@@ -843,6 +1126,8 @@ function WorkItemsInner() {
       Array.isArray(subtasksState) && subtasksState.length > KANBAN_CARD_SUBTASK_PREVIEW
         ? subtasksState.length - KANBAN_CARD_SUBTASK_PREVIEW
         : 0;
+    const listBadge = taskListName(task);
+    const levelBadge = taskLevelBadge(task);
 
     return (
       <li
@@ -855,13 +1140,28 @@ function WorkItemsInner() {
       >
         <div className="flex flex-col gap-0">
           <div className="flex gap-3 border-b border-[var(--border-subtle)]/70 px-4 pb-3 pt-4">
-            <div className="min-w-0 flex-1">
-              <Link
-                href={taskHref}
-                className="line-clamp-3 text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => openEditTask(task.id)}
+                className="line-clamp-3 w-full text-left text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
               >
                 {task.title}
-              </Link>
+              </button>
+              {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
+                <span className="flex w-fit max-w-full flex-wrap items-center gap-1.5">
+                  {showTaskLevelBadge && levelBadge ? (
+                    <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
+                      {levelBadge}
+                    </span>
+                  ) : null}
+                  {showTaskListBadge && listBadge ? (
+                    <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
+                      {listBadge}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
             </div>
             <div
               className="flex shrink-0 flex-col items-end gap-1.5"
@@ -873,19 +1173,36 @@ function WorkItemsInner() {
           </div>
 
           <div className="flex flex-wrap gap-x-4 gap-y-2.5 px-4 pb-3 pt-3 text-xs leading-snug">
-            <div
-              className={`inline-flex min-h-[1.75rem] max-w-full items-center gap-1.5 rounded-lg px-2 py-1 ${dueDatePillClass(Boolean(task.dueAt))}`}
-              title={task.dueAt ? `Due ${new Date(task.dueAt).toISOString().slice(0, 10)}` : "No due date"}
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => openEditTask(task.id, "due")}
+              className={`inline-flex min-h-[1.75rem] max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${dueDatePillClass(Boolean(task.dueAt))}`}
+              title={task.dueAt ? `Due ${new Date(task.dueAt).toISOString().slice(0, 10)}` : "No due date — edit"}
             >
               <IconCalendarDays className="size-3.5 shrink-0 opacity-80" aria-hidden />
               <span className="min-w-0 font-medium tabular-nums text-[var(--fg)]">
                 {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
               </span>
-            </div>
-            <div className="flex min-w-0 max-w-full items-start gap-1.5 py-0.5">
-              <IconUserPlus className="mt-0.5 size-3.5 shrink-0 opacity-65" aria-hidden />
-              <span className="min-w-0 break-words text-[13px] text-[var(--fg)]">{assigneeLine}</span>
-            </div>
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => openEditTask(task.id, "assignees")}
+              title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
+              aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
+              className={`flex min-w-0 max-w-full items-center py-0.5 text-left ${
+                assigneeNames ? "" : "inline-flex min-h-[1.75rem] min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg hover:bg-[var(--surface-hover)]"
+              }`}
+            >
+              {assigneeNames ? (
+                <span className="min-w-0 truncate text-[13px] font-medium text-[var(--fg)] hover:underline">
+                  {assigneeNames}
+                </span>
+              ) : (
+                <IconUserPlus className="size-4 shrink-0 opacity-65" aria-hidden />
+              )}
+            </button>
           </div>
 
           {subtasksState === "loading" && (
@@ -894,7 +1211,7 @@ function WorkItemsInner() {
           {subtasksPreview.length > 0 && (
             <div className="border-t border-[var(--border-subtle)]/60 px-4 pb-4 pt-2">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Checklist</p>
-              <ul className="space-y-2 rounded-xl bg-[var(--surface-muted)]/80 px-2.5 py-2.5 dark:bg-[var(--surface-muted)]/50">
+              <ul className="space-y-2">
                 {subtasksPreview.map((s) => {
                   const stBusy = subtaskUpdatingId === s.id;
                   return (
@@ -924,10 +1241,15 @@ function WorkItemsInner() {
                 })}
                 {subtasksOverflow > 0 && (
                   <li className="pt-0.5 text-[11px] text-[var(--muted)]">
-                    +{subtasksOverflow} more on{" "}
-                    <Link href={taskHref} className="font-medium text-[var(--accent)] hover:underline">
-                      task page
-                    </Link>
+                    +{subtasksOverflow} more —{" "}
+                    <button
+                      type="button"
+                      className="font-medium text-[var(--accent)] hover:underline"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={() => openEditTask(task.id)}
+                    >
+                      open task
+                    </button>
                   </li>
                 )}
               </ul>
@@ -938,56 +1260,25 @@ function WorkItemsInner() {
     );
   }
 
-  function StatusSections({ rows }: { rows: TaskRow[] }) {
+  function ListViewCards({ rows }: { rows: TaskRow[] }) {
     return (
-      <div className="space-y-6">
-        {KANBAN_STATUS_ORDER.map((statusKey) => {
-          const sectionRows = rows.filter((t) => normalizeTaskStatus(t.status) === statusKey);
-          if (sectionRows.length === 0) return null;
-          const open = listSectionsOpen[statusKey] !== false;
-          return (
-            <div
-              key={statusKey}
-              className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm"
-            >
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 border-b border-[var(--border-subtle)]/90 bg-[var(--surface-elevated)]/40 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)]/50"
-                onClick={() => setListSectionsOpen((prev) => ({ ...prev, [statusKey]: !open }))}
-                aria-expanded={open}
-              >
-                <IconChevron open={open} className="text-[var(--muted)]" />
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--fg)]">{STATUS_LABELS[statusKey]}</span>
-                <span className="rounded-md bg-[var(--accent-muted)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--fg)]">
-                  {sectionRows.length}
-                </span>
-              </button>
-              {open && (
-                <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-                  <table className="w-full border-collapse text-left">
-                    <tbody>{sectionRows.map((task) => (
-                      <ListTaskRow key={task.id} task={task} />
-                    ))}</tbody>
-                  </table>
-                </div>
-              )}
-              {open && (
-                <div className="border-t border-[var(--border-subtle)]/80 px-4 py-2">
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-                    onClick={() => {
-                      setNewTaskStatus(statusKey);
-                      setCreateModalOpen(true);
-                    }}
-                  >
-                    + Add task
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="space-y-2">
+        {rows.map((task) => (
+          <ListTaskCard key={task.id} task={task} />
+        ))}
+        <div className="border-t border-transparent pt-2">
+          <button
+            type="button"
+            className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            onClick={() => {
+              setEditTaskId(null);
+              setNewTaskStatus("pending");
+              setCreateModalOpen(true);
+            }}
+          >
+            + Add task
+          </button>
+        </div>
       </div>
     );
   }
@@ -1046,93 +1337,98 @@ function WorkItemsInner() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl space-y-8">
+    <div className="mx-auto w-full max-w-screen-2xl space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      <header className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">{NODE_LABELS.workItem}s</h1>
-          <p className="mt-1 hidden text-sm text-[var(--muted)] sm:block">Switch layout, sort, and filter by due date.</p>
-        </div>
-        <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 sm:w-auto sm:justify-end">
-          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-            <div
-              className="inline-flex items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0.5 shadow-sm"
-              role="group"
-              aria-label="Board layout"
-            >
-              <button
-                type="button"
-                className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                  viewMode === "list"
-                    ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                    : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                }`}
-                onClick={() => setViewMode("list")}
-                aria-label="List view"
-                aria-pressed={viewMode === "list"}
+      <header className="pb-1">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-6 xl:gap-x-10 lg:gap-y-2">
+          <h1 className="min-w-0 text-2xl font-semibold leading-none tracking-tight lg:col-start-1 lg:row-start-1 lg:pt-0.5">
+            {NODE_LABELS.workItem}s
+          </h1>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+              <div
+                className="inline-flex items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
+                role="group"
+                aria-label="Board layout"
               >
-                <IconLayoutList className="block" />
+                <button
+                  type="button"
+                  className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                    viewMode === "list"
+                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                  }`}
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                  aria-pressed={viewMode === "list"}
+                >
+                  <IconLayoutList className="block" />
+                </button>
+                <button
+                  type="button"
+                  className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                    viewMode === "kanban"
+                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                  }`}
+                  onClick={() => setViewMode("kanban")}
+                  aria-label="Kanban view"
+                  aria-pressed={viewMode === "kanban"}
+                >
+                  <IconLayoutKanban className="block" />
+                </button>
+              </div>
+              <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
+              <button
+                ref={sortTriggerRef}
+                type="button"
+                className={tasksToolbarIconButtonClasses(sortMenuOpen)}
+                title={SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Sort"}
+                onClick={() => {
+                  setSortMenuOpen((o) => !o);
+                  setDateMenuOpen(false);
+                }}
+                aria-expanded={sortMenuOpen}
+                aria-haspopup="menu"
+                aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
+              >
+                <IconArrowUpDown className="pointer-events-none block" />
               </button>
               <button
+                ref={dateTriggerRef}
                 type="button"
-                className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                  viewMode === "kanban"
-                    ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                    : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                }`}
-                onClick={() => setViewMode("kanban")}
-                aria-label="Kanban view"
-                aria-pressed={viewMode === "kanban"}
+                className={`relative ${tasksToolbarIconButtonClasses(dateMenuOpen)}`}
+                title="Due date filter"
+                onClick={() => {
+                  setDateMenuOpen((o) => !o);
+                  setSortMenuOpen(false);
+                }}
+                aria-expanded={dateMenuOpen}
+                aria-haspopup="dialog"
+                aria-label={
+                  datePreset !== "all" || dueFrom || dueTo
+                    ? "Due date filter, filters active"
+                    : "Due date filter"
+                }
               >
-                <IconLayoutKanban className="block" />
+                <IconCalendarDays className="pointer-events-none block" />
+                {(datePreset !== "all" || dueFrom || dueTo) && (
+                  <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
+                )}
               </button>
             </div>
-            <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
             <button
-              ref={sortTriggerRef}
               type="button"
-              className={tasksToolbarIconButtonClasses(sortMenuOpen)}
-              title={SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Sort"}
+              className="btn-primary !h-8 shrink-0 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
               onClick={() => {
-                setSortMenuOpen((o) => !o);
-                setDateMenuOpen(false);
+                setEditTaskId(null);
+                setCreateModalOpen(true);
               }}
-              aria-expanded={sortMenuOpen}
-              aria-haspopup="menu"
-              aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
             >
-              <IconArrowUpDown className="pointer-events-none block" />
-            </button>
-            <button
-              ref={dateTriggerRef}
-              type="button"
-              className={`relative ${tasksToolbarIconButtonClasses(dateMenuOpen)}`}
-              title="Due date filter"
-              onClick={() => {
-                setDateMenuOpen((o) => !o);
-                setSortMenuOpen(false);
-              }}
-              aria-expanded={dateMenuOpen}
-              aria-haspopup="dialog"
-              aria-label={
-                datePreset !== "all" || dueFrom || dueTo
-                  ? "Due date filter, filters active"
-                  : "Due date filter"
-              }
-            >
-              <IconCalendarDays className="pointer-events-none block" />
-              {(datePreset !== "all" || dueFrom || dueTo) && (
-                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
-              )}
+              + New task
             </button>
           </div>
-          <button
-            type="button"
-            className="btn-primary min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-            onClick={() => setCreateModalOpen(true)}
-          >
-            + New task
-          </button>
+          <WorkBoardStatsCard counts={boardStatusCounts} total={visibleTasks.length} />
         </div>
       </header>
 
@@ -1236,15 +1532,27 @@ function WorkItemsInner() {
         )}
 
       <section>
-        {selectedLevelName && (
-          <p className="mb-3 text-xs text-[var(--muted)]">
-            Showing tasks for {NODE_LABELS.level}: <span className="font-medium text-[var(--fg)]">{selectedLevelName}</span>
-          </p>
-        )}
-        {selectedListName && (
-          <p className="mb-3 text-xs text-[var(--muted)]">
-            Showing list: <span className="font-medium text-[var(--fg)]">{selectedListName}</span>
-          </p>
+        {filterScopeSegments.length > 0 && (
+          <div
+            className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1.5"
+            aria-label={filterScopeSegments.map((s) => s.label).join(" then ")}
+          >
+            {filterScopeSegments.map((seg, i) => (
+              <span key={`${seg.kind}-${seg.label}-${i}`} className="inline-flex items-center gap-1.5">
+                {i > 0 ? (
+                  <span className="select-none text-[11px] font-medium text-[var(--muted)]" aria-hidden>
+                    {" > "}
+                  </span>
+                ) : null}
+                <span
+                  className={seg.kind === "level" ? LEVEL_BADGE_CLASS : LIST_BADGE_CLASS}
+                  title={seg.kind === "level" ? `${NODE_LABELS.level}: ${seg.label}` : `List: ${seg.label}`}
+                >
+                  {seg.label}
+                </span>
+              </span>
+            ))}
+          </div>
         )}
         {sortedTasks.length === 0 ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
@@ -1256,40 +1564,209 @@ function WorkItemsInner() {
                   : "No tasks yet."
               : "No tasks match the current filters."}
           </p>
-        ) : selectedList ? (
-          viewMode === "list" ? (
-            <StatusSections rows={sortedTasks} />
-          ) : (
-            <KanbanBoard rows={sortedTasks} />
-          )
+        ) : viewMode === "list" ? (
+          <ListViewCards rows={sortedTasks} />
         ) : (
-          <div className="space-y-8">
-            {levelLists.map((list: ListRow) => {
-              const rows = tasksByList.get(list.id) ?? [];
-              if (rows.length === 0) return null;
-              return (
-                <section key={list.id} className="space-y-3">
-                  <h3 className="text-sm font-semibold">{list.name}</h3>
-                  {viewMode === "list" ? <StatusSections rows={rows} /> : <KanbanBoard rows={rows} />}
-                </section>
-              );
-            })}
-          </div>
+          <KanbanBoard rows={sortedTasks} />
         )}
       </section>
 
-      {createModalOpen && (
+      {(createModalOpen || editTaskId) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Create task"
-          onClick={() => setCreateModalOpen(false)}
+          aria-label={editTaskId ? "Edit task" : "Create task"}
+          onClick={() => {
+            setCreateModalOpen(false);
+            setEditTaskId(null);
+          }}
         >
           <section
             className="surface-elevated w-full max-w-xl space-y-4 rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm"
             onClick={(e) => e.stopPropagation()}
           >
+            {editTaskId ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-semibold">Edit task</h2>
+                  <button
+                    type="button"
+                    className="btn-secondary rounded-lg px-3 py-1 text-xs"
+                    onClick={() => setEditTaskId(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+                {editDetailLoading && !editDetail ? (
+                  <p className="text-sm text-[var(--muted)]">Loading…</p>
+                ) : editDetail ? (
+                  <>
+                    <div className="space-y-3">
+                      <input
+                        className="input rounded-xl text-base"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Task title"
+                      />
+                      <div className="rounded-xl border border-[var(--border-subtle)]">
+                        {editDetail.subtasks.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
+                          >
+                            <span className="text-[var(--muted)]">{item.done ? "✓" : "○"}</span>
+                            <span className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : ""}`}>{item.title}</span>
+                          </div>
+                        ))}
+                        {editNewSubtasks.map((item, idx) => (
+                          <div
+                            key={`new-${item}-${idx}`}
+                            className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
+                          >
+                            <span className="text-[var(--muted)]">+</span>
+                            <span className="flex-1 text-sm">{item}</span>
+                            <button
+                              type="button"
+                              className="text-xs text-[var(--muted)] hover:text-[var(--fg)]"
+                              onClick={() => setEditNewSubtasks((prev) => prev.filter((_, i) => i !== idx))}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <span className="text-[var(--muted)]">+</span>
+                          <input
+                            className="w-full bg-transparent text-sm outline-none"
+                            value={editSubtaskDraft}
+                            onChange={(e) => setEditSubtaskDraft(e.target.value)}
+                            placeholder="Add subtask"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                const v = editSubtaskDraft.trim();
+                                if (v) {
+                                  setEditNewSubtasks((prev) => [...prev, v]);
+                                  setEditSubtaskDraft("");
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
+                        onClick={() => setEditShowAssignees((v) => !v)}
+                      >
+                        {editShowAssignees ? "Hide assignee" : "Add assignee"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary rounded-lg px-3 py-1.5 text-xs"
+                        onClick={() => setEditShowDeadline((v) => !v)}
+                      >
+                        {editShowDeadline ? "Hide deadline" : "Add deadline"}
+                      </button>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1.5 block text-xs text-[var(--muted)]">Status</label>
+                        <select
+                          className="input rounded-xl text-sm"
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value as BoardTaskStatus)}
+                        >
+                          {KANBAN_STATUS_ORDER.map((s) => (
+                            <option key={s} value={s}>
+                              {STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-xs text-[var(--muted)]">Priority</label>
+                        <select
+                          className="input rounded-xl text-sm"
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                        >
+                          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                            <option key={k} value={k}>
+                              {PRIORITY_LABELS[k]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="mb-1.5 block text-xs text-[var(--muted)]">List</label>
+                        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] px-3 py-2 text-sm text-[var(--fg)]">
+                          {(() => {
+                            const row = lists.find((l) => l.id === editDetail.task.listId);
+                            if (!row) return "—";
+                            const dn = depts.find((d) => d.id === row.departmentId)?.name ?? "";
+                            return dn ? `${dn} · ${row.name}` : row.name;
+                          })()}
+                        </p>
+                      </div>
+                      {editShowDeadline && (
+                        <div className="sm:col-span-2">
+                          <label className="mb-1.5 block text-xs text-[var(--muted)]">Deadline (optional)</label>
+                          <input
+                            className="input rounded-xl"
+                            type="datetime-local"
+                            value={editDue}
+                            onChange={(e) => setEditDue(e.target.value)}
+                          />
+                          <p className="mt-1 text-[11px] text-[var(--muted)]">Clear the field and save to remove the due date.</p>
+                        </div>
+                      )}
+                      {editShowAssignees && members.length > 0 && (
+                        <div className="sm:col-span-2">
+                          <p className="mb-2 text-xs font-medium text-[var(--muted)]">Assignees</p>
+                          <div className="flex flex-wrap gap-3">
+                            {members.map((m) => (
+                              <label key={m.userId} className="flex cursor-pointer items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={editAssigneeIds.includes(m.userId)}
+                                  onChange={() => toggleEditAssignee(m.userId)}
+                                />
+                                <span>{m.email}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="btn-secondary rounded-xl px-4"
+                        onClick={() => setEditTaskId(null)}
+                        disabled={editSaving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary rounded-xl px-4"
+                        disabled={editSaving}
+                        onClick={() => void saveEditTask()}
+                      >
+                        {editSaving ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-[var(--muted)]">Could not load this task.</p>
+                )}
+              </>
+            ) : (
+              <>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold">New task</h2>
               <button type="button" className="btn-secondary rounded-lg px-3 py-1 text-xs" onClick={() => setCreateModalOpen(false)}>
@@ -1438,6 +1915,8 @@ function WorkItemsInner() {
                 Create
               </button>
             </div>
+              </>
+            )}
           </section>
         </div>
       )}
