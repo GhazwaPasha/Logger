@@ -9,20 +9,20 @@ import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 
 export function AppWorkspaceGate({ children }: { children: React.ReactNode }) {
-  const { session, isPending } = useApiSession();
+  const { session, isSessionPending } = useApiSession();
   const { theme, setTheme } = useThemePreference();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (isPending || session?.user) return;
+    if (isSessionPending || session?.user) return;
     const candidate = pathname + (searchParams.toString() ? `?${searchParams}` : "");
     const next = safeReturnPath(candidate);
     router.replace(`/login?next=${encodeURIComponent(next)}`);
-  }, [isPending, session, router, pathname, searchParams]);
+  }, [isSessionPending, session, router, pathname, searchParams]);
 
-  if (isPending) {
+  if (isSessionPending) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--surface-base)]">
         <div className="text-sm text-[var(--muted)]">Loading…</div>

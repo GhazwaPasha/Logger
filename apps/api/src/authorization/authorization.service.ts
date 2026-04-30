@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { lists, organizationMembers, taskAssignees, tasks } from "@work-ledger/db";
+import { lists, organizationMembers, subtasks, taskAssignees, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 
@@ -130,10 +130,11 @@ export class AuthorizationService {
     const m = memberRow[0];
 
     if (m?.role === "owner") {
-      return this.db
+      const ownerRows = await this.db
         .select()
         .from(tasks)
         .where(and(eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
+      return this.attachSubtasks(await this.attachAssigneeUserIds(ownerRows));
     }
 
     if (m?.role === "manager" && m.departmentId) {
@@ -147,7 +148,7 @@ export class AuthorizationService {
           ),
         );
       if (managerLists.length === 0) return [];
-      return this.db
+      const managerRows = await this.db
         .select()
         .from(tasks)
         .where(
@@ -160,6 +161,7 @@ export class AuthorizationService {
             isNull(tasks.deletedAt),
           ),
         );
+      return this.attachSubtasks(await this.attachAssigneeUserIds(managerRows));
     }
 
     const assignedTaskIds = await this.db
@@ -177,9 +179,53 @@ export class AuthorizationService {
     const ids = assignedTaskIds.map((r) => r.taskId);
     if (ids.length === 0) return [];
 
-    return this.db
+    const assigneeOnlyRows = await this.db
       .select()
       .from(tasks)
       .where(and(eq(tasks.organizationId, organizationId), inArray(tasks.id, ids)));
+    return this.attachSubtasks(await this.attachAssigneeUserIds(assigneeOnlyRows));
+  }
+
+  /** Adds assigneeUserIds to each task for list/board views (names resolved client-side from members). */
+  private async attachAssigneeUserIds(taskRows: (typeof tasks.$inferSelect)[]) {
+    if (taskRows.length === 0) return [];
+    const ids = taskRows.map((t) => t.id);
+    const assignRows = await this.db
+      .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(inArray(taskAssignees.taskId, ids));
+    const map = new Map<string, string[]>();
+    for (const r of assignRows) {
+      const prev = map.get(r.taskId);
+      if (prev) prev.push(r.userId);
+      else map.set(r.taskId, [r.userId]);
+    }
+    return taskRows.map((t) => ({
+      ...t,
+      assigneeUserIds: map.get(t.id) ?? [],
+    }));
+  }
+
+  /** Batches subtasks for list/board views (newest first per task, same as listSubtasks). */
+  private async attachSubtasks<T extends { id: string }>(taskRows: T[]) {
+    if (taskRows.length === 0) return [];
+    const ids = taskRows.map((t) => t.id);
+    const subRows = await this.db
+      .select()
+      .from(subtasks)
+      .where(inArray(subtasks.taskId, ids));
+    const map = new Map<string, (typeof subtasks.$inferSelect)[]>();
+    for (const r of subRows) {
+      const arr = map.get(r.taskId);
+      if (arr) arr.push(r);
+      else map.set(r.taskId, [r]);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    }
+    return taskRows.map((t) => ({
+      ...t,
+      subtasks: map.get(t.id) ?? [],
+    }));
   }
 }

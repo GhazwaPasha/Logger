@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { taskKeys, workspaceKeys } from "@/lib/query-keys";
+import type { TaskDetail } from "@/lib/ledger-types";
 import {
   KANBAN_STATUS_ORDER,
   PRIORITY_LABELS,
@@ -24,7 +27,8 @@ export default function WorkItemDetailPage() {
   const workspaceId = params.workspaceId as string;
   const taskId = params.taskId as string;
   const { token } = useApiSession();
-  const { depts, lists, reload: reloadOrg } = useWorkspaceData();
+  const queryClient = useQueryClient();
+  const { depts, lists } = useWorkspaceData();
   const { detail, error, setError, reload } = useTaskDetail(token, taskId);
   const [logBody, setLogBody] = useState('{"message":"Acknowledged."}');
   const [logType, setLogType] = useState<"ack" | "note" | "status_change">("note");
@@ -69,14 +73,14 @@ export default function WorkItemDetailPage() {
     setError(null);
     try {
       const iso = rescheduleAt ? new Date(rescheduleAt).toISOString() : new Date().toISOString();
-      await apiJson(`/tasks/${taskId}/reschedule`, {
+      const next = await apiJson<TaskDetail>(`/tasks/${taskId}/reschedule`, {
         method: "POST",
         token,
         body: JSON.stringify({ newDueAt: iso, reason: rescheduleReason }),
       });
       setRescheduleReason("");
-      await reload();
-      await reloadOrg();
+      queryClient.setQueryData(taskKeys.detail(taskId), next);
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reschedule failed");
     }
@@ -87,9 +91,9 @@ export default function WorkItemDetailPage() {
     if (!confirm("Archive this task? (assigner only — soft delete)")) return;
     setError(null);
     try {
-      await apiJson(`/tasks/${taskId}/archive`, { method: "POST", token });
-      await reload();
-      await reloadOrg();
+      const next = await apiJson<TaskDetail>(`/tasks/${taskId}/archive`, { method: "POST", token });
+      queryClient.setQueryData(taskKeys.detail(taskId), next);
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Archive failed");
     }
@@ -117,13 +121,13 @@ export default function WorkItemDetailPage() {
     if (!token) return;
     setError(null);
     try {
-      await apiJson(`/tasks/${taskId}`, {
+      const next = await apiJson<TaskDetail>(`/tasks/${taskId}`, {
         method: "PATCH",
         token,
         body: JSON.stringify(patch),
       });
-      await reload();
-      await reloadOrg();
+      queryClient.setQueryData(taskKeys.detail(taskId), next);
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update task");
     }

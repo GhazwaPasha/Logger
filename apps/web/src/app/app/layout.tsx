@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import { ApiSessionProvider } from "@/components/app/ApiSessionProvider";
 import { AppWorkspaceGate } from "@/components/app/AppWorkspaceGate";
+import { QueryProvider } from "@/components/app/QueryProvider";
 
 export default function AppSectionLayout({ children }: { children: React.ReactNode }) {
   return (
     <ApiSessionProvider>
+      <QueryProvider>
       <Suspense
         fallback={
           <div className="flex min-h-screen items-center justify-center bg-[var(--surface-base)]">
@@ -14,6 +16,7 @@ export default function AppSectionLayout({ children }: { children: React.ReactNo
       >
         <AppWorkspaceGate>{children}</AppWorkspaceGate>
       </Suspense>
+      </QueryProvider>
     </ApiSessionProvider>
   );
 }

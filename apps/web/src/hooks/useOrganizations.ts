@@ -1,30 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
+import { orgKeys } from "@/lib/query-keys";
 import type { Org } from "@/lib/ledger-types";
 
 export function useOrganizations(token: string | null) {
-  const [orgs, setOrgs] = useState<Org[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [manualError, setManualError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!token) {
-      setOrgs([]);
-      return;
-    }
-    setError(null);
-    try {
-      const data = await apiJson<Org[]>("/organizations", { token });
-      setOrgs(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load organizations");
-    }
-  }, [token]);
+  const q = useQuery({
+    queryKey: orgKeys.all,
+    queryFn: async () => apiJson<Org[]>("/organizations", { token }),
+    enabled: Boolean(token),
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const error = manualError ?? (q.error ? (q.error as Error).message : null);
 
-  return { orgs, error, setError, reload: load };
+  const reload = useCallback(async () => {
+    setManualError(null);
+    await queryClient.invalidateQueries({ queryKey: orgKeys.all });
+  }, [queryClient]);
+
+  const setError = useCallback((msg: string | null) => {
+    setManualError(msg);
+  }, []);
+
+  const orgs = useMemo(() => q.data ?? [], [q.data]);
+
+  return { orgs, error, setError, reload, isLoading: q.isPending && Boolean(token) };
 }

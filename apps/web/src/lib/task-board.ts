@@ -34,6 +34,37 @@ export function normalizeTaskStatus(raw: string): BoardTaskStatus {
   return "pending";
 }
 
+/**
+ * Statuses allowed from the kanban card control and drag-drop: move **one step**
+ * along {@link KANBAN_STATUS_ORDER}, cancel active work, or reopen from terminal states.
+ * Prevents skipping stages (e.g. jumping straight to Done).
+ */
+export function kanbanAllowedTransitions(current: BoardTaskStatus): BoardTaskStatus[] {
+  const allowed = new Set<BoardTaskStatus>([current]);
+  const i = KANBAN_STATUS_ORDER.indexOf(current);
+
+  if (current === "cancelled") {
+    allowed.add("pending");
+    return ["cancelled", "pending"];
+  }
+
+  if (current === "done") {
+    allowed.add("late");
+    allowed.add("cancelled");
+    return KANBAN_STATUS_ORDER.filter((k) => allowed.has(k));
+  }
+
+  if (i > 0) allowed.add(KANBAN_STATUS_ORDER[i - 1]!);
+  if (i < KANBAN_STATUS_ORDER.length - 1) allowed.add(KANBAN_STATUS_ORDER[i + 1]!);
+  allowed.add("cancelled");
+
+  return KANBAN_STATUS_ORDER.filter((k) => allowed.has(k));
+}
+
+export function kanbanTransitionAllowed(from: BoardTaskStatus, to: BoardTaskStatus): boolean {
+  return kanbanAllowedTransitions(from).includes(to);
+}
+
 export function taskPriority(task: TaskRow): TaskPriority {
   const p = task.priority;
   if (p === "high" || p === "low") return p;

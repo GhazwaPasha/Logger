@@ -2,13 +2,26 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
-import type { ListRow, SubtaskRow, TaskRow } from "@/lib/ledger-types";
+import type { ListRow, MemberRow, SubtaskRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
+import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
+import { workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import {
   KANBAN_STATUS_ORDER,
@@ -18,6 +31,8 @@ import {
   type DatePreset,
   type SortMode,
   type TaskPriority,
+  kanbanAllowedTransitions,
+  kanbanTransitionAllowed,
   normalizeTaskStatus,
   sortTasks,
   taskMatchesDatePreset,
@@ -33,24 +48,6 @@ function IconUserPlus({ className }: { className?: string }) {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M19 8v6M22 11h-6" />
-    </svg>
-  );
-}
-
-function IconCalendarPlus({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-      <path d="M12 14v6M9 17h6" />
-    </svg>
-  );
-}
-
-function IconFlag({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-      <path d="M4 22v-7" />
     </svg>
   );
 }
@@ -72,6 +69,90 @@ function IconChevron({ className, open }: { className?: string; open: boolean })
   );
 }
 
+function IconLayoutList({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </svg>
+  );
+}
+
+function IconLayoutKanban({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <rect x="4" y="4" width="5" height="16" rx="1" />
+      <rect x="14" y="4" width="5" height="10" rx="1" />
+    </svg>
+  );
+}
+
+function IconArrowUpDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
+    </svg>
+  );
+}
+
+function IconCalendarDays({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+    </svg>
+  );
+}
+
+function IconChevronMiniDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: "priority_desc", label: "Priority · high first" },
+  { value: "priority_asc", label: "Priority · low first" },
+  { value: "due_asc", label: "Due date · soonest" },
+  { value: "due_desc", label: "Due date · latest" },
+];
+
+const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
+  { value: "all", label: "All dates" },
+  { value: "overdue", label: "Overdue" },
+  { value: "this_week", label: "Due this week" },
+  { value: "no_due", label: "No due date" },
+];
+
+const SORT_PANEL_MIN_W = 224;
+const DATE_PANEL_MIN_W = 288;
+const MENU_VIEWPORT_GUTTER = 12;
+
+/** Max subtasks shown on kanban cards before “+ more”. */
+const KANBAN_CARD_SUBTASK_PREVIEW = 8;
+
+/** List row assignee / due / priority — identical footprint every badge (fixed box); subtle corners */
+const LIST_ROW_BADGE_TILE =
+  "box-border inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5";
+const LIST_ROW_BADGE_LABEL =
+  "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
+
+function priorityLabelShort(p: TaskPriority): string {
+  if (p === "high") return "HIGH";
+  if (p === "low") return "LOW";
+  return "MED";
+}
+
+function tasksToolbarIconButtonClasses(active: boolean) {
+  return [
+    "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors",
+    "hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]",
+    active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--muted)]",
+  ].join(" ");
+}
+
 function WorkItemsInner() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -79,7 +160,8 @@ function WorkItemsInner() {
   const levelPref = searchParams.get("level");
   const listPref = searchParams.get("list");
   const { token } = useApiSession();
-  const { tasks, lists, members, depts, error, setError, reload } = useWorkspaceData();
+  const queryClient = useQueryClient();
+  const { tasks, lists, members, depts, error, setError } = useWorkspaceData();
   const [title, setTitle] = useState("");
   const [listId, setListId] = useState("");
   const [due, setDue] = useState("");
@@ -104,10 +186,114 @@ function WorkItemsInner() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [toolbarMenusMounted, setToolbarMenusMounted] = useState(false);
+  const [sortPanelStyle, setSortPanelStyle] = useState<CSSProperties>({});
+  const [datePanelStyle, setDatePanelStyle] = useState<CSSProperties>({});
+  const sortTriggerRef = useRef<HTMLButtonElement>(null);
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
+  const sortPanelRef = useRef<HTMLDivElement>(null);
+  const datePanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
+
+  useEffect(() => {
+    setToolbarMenusMounted(true);
+  }, []);
+
+  function computePopoverStyle(trigger: HTMLElement, panelWidth: number, maxPanelHeight: number): CSSProperties {
+    const r = trigger.getBoundingClientRect();
+    const gap = 8;
+    let left = r.right - panelWidth;
+    left = Math.max(
+      MENU_VIEWPORT_GUTTER,
+      Math.min(left, window.innerWidth - panelWidth - MENU_VIEWPORT_GUTTER),
+    );
+    const spaceBelow = window.innerHeight - r.bottom - gap;
+    const spaceAbove = r.top - gap;
+    const openDown = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+    const maxH = Math.min(maxPanelHeight, (openDown ? spaceBelow : spaceAbove) - MENU_VIEWPORT_GUTTER);
+    if (openDown) {
+      return {
+        position: "fixed",
+        top: r.bottom + gap,
+        left,
+        width: panelWidth,
+        maxHeight: Math.max(120, maxH),
+        zIndex: 45,
+      };
+    }
+    return {
+      position: "fixed",
+      left,
+      width: panelWidth,
+      bottom: window.innerHeight - r.top + gap,
+      maxHeight: Math.max(120, maxH),
+      zIndex: 45,
+    };
+  }
+
+  useLayoutEffect(() => {
+    if (!sortMenuOpen || !sortTriggerRef.current) return;
+    const update = () => {
+      const el = sortTriggerRef.current;
+      if (!el) return;
+      setSortPanelStyle(computePopoverStyle(el, SORT_PANEL_MIN_W, 320));
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [sortMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!dateMenuOpen || !dateTriggerRef.current) return;
+    const update = () => {
+      const el = dateTriggerRef.current;
+      if (!el) return;
+      setDatePanelStyle(computePopoverStyle(el, DATE_PANEL_MIN_W, 420));
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [dateMenuOpen]);
+
+  useEffect(() => {
+    if (!sortMenuOpen && !dateMenuOpen) return;
+    function handlePointerDown(e: PointerEvent) {
+      const t = e.target as Node;
+      const inSortTrigger = sortTriggerRef.current?.contains(t);
+      const inSortPanel = sortPanelRef.current?.contains(t);
+      const inDateTrigger = dateTriggerRef.current?.contains(t);
+      const inDatePanel = datePanelRef.current?.contains(t);
+      if (sortMenuOpen && !inSortTrigger && !inSortPanel) setSortMenuOpen(false);
+      if (dateMenuOpen && !inDateTrigger && !inDatePanel) setDateMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [sortMenuOpen, dateMenuOpen]);
+
+  useEffect(() => {
+    if (!sortMenuOpen && !dateMenuOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSortMenuOpen(false);
+        setDateMenuOpen(false);
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [sortMenuOpen, dateMenuOpen]);
 
   useEffect(() => {
     const levelLists = levelPref ? lists.filter((l) => l.departmentId === levelPref) : lists;
@@ -126,29 +312,72 @@ function WorkItemsInner() {
     setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  const patchTask = useCallback(
-    async (taskId: string, patch: { status?: BoardTaskStatus; priority?: TaskPriority }) => {
+  const patchTaskMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      patch,
+    }: {
+      taskId: string;
+      patch: { status?: BoardTaskStatus; priority?: TaskPriority };
+    }) =>
+      apiJson<TaskDetail>(`/tasks/${taskId}`, {
+        method: "PATCH",
+        token: token!,
+        body: JSON.stringify(patch),
+      }),
+    onMutate: async ({ taskId, patch }) => {
       if (!token) return;
       setError(null);
       setUpdatingTaskId(taskId);
-      try {
-        await apiJson(`/tasks/${taskId}`, {
-          method: "PATCH",
-          token,
-          body: JSON.stringify(patch),
+      await queryClient.cancelQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      const previous = queryClient.getQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId));
+      if (previous) {
+        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), {
+          ...previous,
+          tasks: previous.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)),
         });
-        await reload();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not update task");
-      } finally {
-        setUpdatingTaskId(null);
       }
+      return { previous };
     },
-    [token, reload, setError],
+    onError: (err, _v, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(workspaceKeys.workspace(workspaceId), ctx.previous);
+      }
+      setError(err instanceof Error ? err.message : "Could not update task");
+    },
+    onSuccess: (detail, { taskId }) => {
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks.map((t) => {
+            if (t.id !== taskId) return t;
+            return {
+              ...t,
+              ...detail.task,
+              assigneeUserIds: t.assigneeUserIds,
+              subtasks: detail.subtasks.length ? detail.subtasks : t.subtasks,
+            };
+          }),
+        };
+      });
+    },
+    onSettled: () => setUpdatingTaskId(null),
+  });
+
+  const patchTask = useCallback(
+    (taskId: string, patch: { status?: BoardTaskStatus; priority?: TaskPriority }) => {
+      if (!token) return;
+      patchTaskMutation.mutate({ taskId, patch });
+    },
+    [token, patchTaskMutation],
   );
 
   const toggleListRowExpand = useCallback(
     (taskId: string) => {
+      const task = tasks.find((t) => t.id === taskId);
+      const embedded = task?.subtasks;
+
       setListRowExpanded((prev) => {
         const next = new Set(prev);
         if (next.has(taskId)) {
@@ -158,6 +387,11 @@ function WorkItemsInner() {
         next.add(taskId);
         return next;
       });
+
+      if (embedded !== undefined) {
+        setSubtasksByTaskId((c) => ({ ...c, [taskId]: embedded }));
+        return;
+      }
 
       setSubtasksByTaskId((c) => {
         if (c[taskId] !== undefined) return c;
@@ -182,7 +416,7 @@ function WorkItemsInner() {
         return { ...c, [taskId]: "loading" };
       });
     },
-    [token, setError],
+    [token, setError, tasks],
   );
 
   const patchListSubtaskDone = useCallback(
@@ -204,13 +438,26 @@ function WorkItemsInner() {
             [taskId]: cur.map((s) => (s.id === subtaskId ? { ...s, done } : s)),
           };
         });
+        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            tasks: old.tasks.map((t) => {
+              if (t.id !== taskId || t.subtasks === undefined) return t;
+              return {
+                ...t,
+                subtasks: t.subtasks.map((s) => (s.id === subtaskId ? { ...s, done } : s)),
+              };
+            }),
+          };
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not update subtask");
       } finally {
         setSubtaskUpdatingId(null);
       }
     },
-    [token, setError],
+    [token, setError, queryClient, workspaceId],
   );
 
   async function createTask() {
@@ -249,7 +496,7 @@ function WorkItemsInner() {
       setShowDeadline(false);
       setRepeat("none");
       setCreateModalOpen(false);
-      await reload();
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create task");
     }
@@ -287,44 +534,64 @@ function WorkItemsInner() {
     return map;
   }, new Map());
 
-  function StatusSelect({ task, selectClassName }: { task: TaskRow; selectClassName?: string }) {
-    const st = normalizeTaskStatus(task.status);
-    const busy = updatingTaskId === task.id;
-    return (
-      <select
-        className={selectClassName ?? "input h-8 max-w-[9.5rem] rounded-lg py-0 text-xs"}
-        value={st}
-        disabled={busy}
-        onChange={(e) => void patchTask(task.id, { status: e.target.value as BoardTaskStatus })}
-        aria-label="Task status"
-      >
-        {KANBAN_STATUS_ORDER.map((s) => (
-          <option key={s} value={s}>
-            {STATUS_LABELS[s]}
-          </option>
-        ))}
-      </select>
-    );
-  }
+  const kanbanSubtaskPrefetchKey = useMemo(
+    () => filteredTasks.map((t) => t.id).sort().join(","),
+    [filteredTasks],
+  );
 
-  function PrioritySelect({ task, selectClassName }: { task: TaskRow; selectClassName?: string }) {
-    const p = taskPriority(task);
-    const busy = updatingTaskId === task.id;
-    return (
-      <select
-        className={selectClassName ?? "input h-8 max-w-[7rem] rounded-lg py-0 text-xs"}
-        value={p}
-        disabled={busy}
-        onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
-        aria-label="Task priority"
-      >
-        {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-          <option key={k} value={k}>
-            {PRIORITY_LABELS[k]}
-          </option>
-        ))}
-      </select>
-    );
+  useEffect(() => {
+    setSubtasksByTaskId((c) => {
+      let changed = false;
+      const next = { ...c };
+      for (const t of filteredTasks) {
+        if (t.subtasks !== undefined && next[t.id] === undefined) {
+          next[t.id] = t.subtasks;
+          changed = true;
+        }
+      }
+      return changed ? next : c;
+    });
+  }, [filteredTasks]);
+
+  useEffect(() => {
+    if (viewMode !== "kanban" || !token) return;
+    const ids = kanbanSubtaskPrefetchKey.split(",").filter(Boolean);
+    const toFetch: string[] = [];
+    setSubtasksByTaskId((c) => {
+      const next = { ...c };
+      for (const taskId of ids) {
+        const task = filteredTasks.find((t) => t.id === taskId);
+        if (task?.subtasks !== undefined) continue;
+        if (next[taskId] === undefined) {
+          next[taskId] = "loading";
+          toFetch.push(taskId);
+        }
+      }
+      return toFetch.length ? next : c;
+    });
+    for (const taskId of toFetch) {
+      void (async () => {
+        try {
+          const rows = await apiJson<SubtaskRow[]>(`/tasks/${taskId}/subtasks`, { token });
+          setSubtasksByTaskId((x) => ({ ...x, [taskId]: rows }));
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not load subtasks");
+          setSubtasksByTaskId((x) => {
+            const { [taskId]: _, ...rest } = x;
+            return rest;
+          });
+        }
+      })();
+    }
+  }, [viewMode, token, kanbanSubtaskPrefetchKey, setError, filteredTasks]);
+
+  function formatKanbanAssignees(task: TaskRow, memberRows: MemberRow[]): string {
+    const ids = task.assigneeUserIds ?? [];
+    if (ids.length === 0) return "Unassigned";
+    const names = ids
+      .map((id) => memberRows.find((m) => m.userId === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    return names.length > 0 ? names.join(", ") : "Unknown";
   }
 
   function priorityClass(p: TaskPriority) {
@@ -333,8 +600,33 @@ function WorkItemsInner() {
     return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
   }
 
-  const listTableSelect =
-    "input h-8 w-full min-w-0 rounded-md border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-0 pl-2 pr-7 text-[11px] text-[var(--fg)] shadow-none";
+  function statusPillClass(st: BoardTaskStatus) {
+    if (st === "pending") return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+    if (st === "assigned") return "bg-sky-500/15 text-sky-800 dark:text-sky-200";
+    if (st === "in_progress") return "bg-violet-500/15 text-violet-800 dark:text-violet-200";
+    if (st === "late") return "bg-orange-500/15 text-orange-800 dark:text-orange-200";
+    if (st === "done") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
+    return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
+  }
+
+  function dueDatePillClass(hasDue: boolean) {
+    if (hasDue) {
+      return "border border-[var(--accent)]/25 bg-[var(--accent-muted)] text-[var(--accent-hover)] shadow-sm dark:text-[var(--accent)]";
+    }
+    return "border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]";
+  }
+
+  function formatDueForListPill(dueAt: string) {
+    const d = new Date(dueAt);
+    if (Number.isNaN(d.getTime())) return "—";
+    const now = new Date();
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" }),
+    }).format(d);
+  }
 
   function ListTaskRow({ task }: { task: TaskRow }) {
     const dueText = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : null;
@@ -343,70 +635,100 @@ function WorkItemsInner() {
     const busy = updatingTaskId === task.id;
     const canComplete = st !== "done" && st !== "cancelled";
     const expanded = listRowExpanded.has(task.id);
-    const subtasksState = subtasksByTaskId[task.id];
+    const sid = subtasksByTaskId[task.id];
+    const subtasksState =
+      sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
+    const taskDetailHref = `/app/w/${workspaceId}/work/${task.id}`;
 
     return (
       <>
-        <tr className="border-b border-[var(--border-subtle)]/80 transition-colors last:border-b-0 hover:bg-[var(--surface-hover)]/80">
-          <td className="min-w-0 px-4 py-3 align-middle">
-            <div className="flex items-center gap-2 sm:gap-3">
+        <tr className="group border-b border-[var(--border-subtle)]/80 transition-colors last:border-b-0 hover:bg-[var(--surface-hover)]/80">
+          <td className="bg-[var(--surface-base)] px-4 py-3 align-middle group-hover:bg-[var(--surface-hover)]/80">
+            <div className="flex min-w-0 items-center gap-1 sm:gap-3">
               <button
                 type="button"
                 disabled={busy || !canComplete}
                 onClick={() => canComplete && void patchTask(task.id, { status: "done" })}
-                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  st === "done"
-                    ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                    : st === "cancelled"
-                      ? "border-[var(--border-subtle)] opacity-50"
-                      : "border-[var(--border-subtle)] text-transparent hover:border-[var(--accent)]"
-                } ${busy ? "cursor-wait opacity-60" : canComplete ? "cursor-pointer" : "cursor-default"}`}
+                className={`flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                  busy ? "cursor-wait opacity-60" : canComplete ? "cursor-pointer" : "cursor-default"
+                }`}
                 aria-label={st === "done" ? "Completed" : "Mark complete"}
               >
-                {st === "done" ? (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                ) : null}
+                <span
+                  className={`flex size-[18px] items-center justify-center rounded-full border-2 transition-colors ${
+                    st === "done"
+                      ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                      : st === "cancelled"
+                        ? "border-[var(--border-subtle)] opacity-50"
+                        : "border-[var(--border-subtle)] text-transparent hover:border-[var(--accent)]"
+                  }`}
+                >
+                  {st === "done" ? (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : null}
+                </span>
               </button>
               <button
                 type="button"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                className="flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
                 aria-expanded={expanded}
                 aria-label={expanded ? "Hide subtasks" : "Show subtasks"}
                 onClick={() => toggleListRowExpand(task.id)}
               >
                 <IconChevron open={expanded} className="opacity-80" />
               </button>
-              <Link href={`/app/w/${workspaceId}/work/${task.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--fg)] hover:underline">
+              <Link
+                href={taskDetailHref}
+                className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--fg)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+              >
                 {task.title}
               </Link>
-            </div>
-          </td>
-          <td className="hidden w-[8.5rem] px-3 py-3 align-middle sm:table-cell">
-            <div className="flex items-center justify-center text-[var(--muted)]" title="Assignees (set when creating or on task page)">
-              <IconUserPlus className="opacity-70" />
-            </div>
-          </td>
-          <td className="w-[7.5rem] min-w-[7rem] px-3 py-3 align-middle text-center sm:w-[8.5rem]">
-            {dueText ? (
-              <span className="text-xs tabular-nums text-[var(--fg)]">{dueText}</span>
-            ) : (
-              <div className="flex justify-center text-[var(--muted)]">
-                <IconCalendarPlus className="opacity-60" />
+              <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+                <Link
+                  href={taskDetailHref}
+                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
+                  title="Assignees — set on task page"
+                  aria-label="Assignees — open task"
+                >
+                  <IconUserPlus className="size-[18px] shrink-0 text-[var(--muted)] opacity-90" aria-hidden />
+                </Link>
+                <Link
+                  href={taskDetailHref}
+                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
+                  title={dueText ? `Due ${dueText}` : "Due date — set on task page"}
+                  aria-label={dueText ? `Due date ${formatDueForListPill(task.dueAt!)}` : "Due date — open task"}
+                >
+                  <span className={`${LIST_ROW_BADGE_LABEL} ${task.dueAt ? "" : "uppercase"}`}>
+                    {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
+                  </span>
+                </Link>
+                <div
+                  className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-base)]`}
+                >
+                  <select
+                    className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
+                    value={p}
+                    disabled={busy}
+                    onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
+                    aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
+                  >
+                    {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                      <option key={k} value={k}>
+                        {PRIORITY_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={`${LIST_ROW_BADGE_LABEL} uppercase`}>{priorityLabelShort(p)}</span>
+                </div>
               </div>
-            )}
-          </td>
-          <td className="w-[6.5rem] min-w-[6rem] px-3 py-3 align-middle">
-            <div className="flex items-center gap-1.5">
-              <IconFlag className={`hidden shrink-0 sm:block ${p === "high" ? "text-rose-400" : p === "low" ? "text-[var(--muted)]" : "text-amber-400/90"}`} />
-              <PrioritySelect task={task} selectClassName={listTableSelect} />
             </div>
           </td>
         </tr>
         {expanded && (
           <tr className="border-b border-[var(--border-subtle)]/80 last:border-b-0">
-            <td colSpan={4} className="bg-[var(--surface-base)] px-4 pb-3 pt-0">
+            <td className="bg-[var(--surface-base)] px-4 pb-3 pt-0">
               <div className="ml-[calc(1.125rem+0.875rem+0.5rem)] border-l border-[var(--border-subtle)] pl-4 sm:ml-[calc(1.125rem+1.75rem+0.75rem)]">
                 {subtasksState === "loading" && <p className="py-2 text-xs text-[var(--muted)]">Loading subtasks…</p>}
                 {Array.isArray(subtasksState) && subtasksState.length === 0 && (
@@ -454,43 +776,162 @@ function WorkItemsInner() {
     );
   }
 
-  function TaskCard({ task }: { task: TaskRow }) {
-    const dueText = task.dueAt ? new Date(task.dueAt).toISOString().slice(0, 10) : null;
+  function KanbanStatusPill({ task }: { task: TaskRow }) {
     const st = normalizeTaskStatus(task.status);
+    const busy = updatingTaskId === task.id;
+    const allowed = kanbanAllowedTransitions(st);
+    return (
+      <div
+        className={`relative inline-flex max-w-full shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 shadow-sm ${statusPillClass(st)}`}
+      >
+        <select
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={st}
+          disabled={busy}
+          onChange={(e) => void patchTask(task.id, { status: e.target.value as BoardTaskStatus })}
+          aria-label="Task stage (one step on the pipeline)"
+        >
+          {allowed.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none truncate text-[11px] font-semibold tracking-tight">{STATUS_LABELS[st]}</span>
+        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" />
+      </div>
+    );
+  }
+
+  function KanbanPriorityPill({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
     const busy = updatingTaskId === task.id;
     return (
+      <div
+        className={`relative inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-1 shadow-sm ${priorityClass(p)}`}
+      >
+        <select
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={p}
+          disabled={busy}
+          onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
+          aria-label="Task priority"
+        >
+          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+            <option key={k} value={k}>
+              {PRIORITY_LABELS[k]}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none text-[11px] font-semibold uppercase tracking-wide">{PRIORITY_LABELS[p]}</span>
+        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" />
+      </div>
+    );
+  }
+
+  function TaskCard({ task }: { task: TaskRow }) {
+    const sid = subtasksByTaskId[task.id];
+    const subtasksState =
+      sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
+    const assigneeLine = formatKanbanAssignees(task, members);
+    const taskHref = `/app/w/${workspaceId}/work/${task.id}`;
+    const subtasksPreview =
+      Array.isArray(subtasksState) && subtasksState.length > 0
+        ? subtasksState.slice(0, KANBAN_CARD_SUBTASK_PREVIEW)
+        : [];
+    const subtasksOverflow =
+      Array.isArray(subtasksState) && subtasksState.length > KANBAN_CARD_SUBTASK_PREVIEW
+        ? subtasksState.length - KANBAN_CARD_SUBTASK_PREVIEW
+        : 0;
+
+    return (
       <li
-        draggable={viewMode === "kanban"}
+        draggable
         onDragStart={(e) => {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
         }}
-        className="surface-elevated space-y-2 rounded-xl border border-[var(--border-subtle)] px-3 py-3 shadow-sm"
+        className="surface-elevated cursor-grab touch-manipulation rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-sm transition-[box-shadow,border-color] hover:border-[var(--border)] hover:shadow-md active:cursor-grabbing dark:hover:shadow-lg dark:hover:shadow-black/20"
       >
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <Link href={`/app/w/${workspaceId}/work/${task.id}`} className="text-sm font-medium hover:underline">
-              {task.title}
-            </Link>
-            {dueText && <p className="mt-0.5 text-xs text-[var(--muted)]">Due {dueText}</p>}
-          </div>
-          <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase ${priorityClass(p)}`}>
-            {PRIORITY_LABELS[p]}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusSelect task={task} />
-          <PrioritySelect task={task} />
-          {st !== "done" && st !== "cancelled" && (
-            <button
-              type="button"
-              className="btn-secondary rounded-lg px-2 py-1 text-[10px]"
-              disabled={busy}
-              onClick={() => void patchTask(task.id, { status: "done" })}
+        <div className="flex flex-col gap-0">
+          <div className="flex gap-3 border-b border-[var(--border-subtle)]/70 px-4 pb-3 pt-4">
+            <div className="min-w-0 flex-1">
+              <Link
+                href={taskHref}
+                className="line-clamp-3 text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
+              >
+                {task.title}
+              </Link>
+            </div>
+            <div
+              className="flex shrink-0 flex-col items-end gap-1.5"
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              Mark done
-            </button>
+              <KanbanStatusPill task={task} />
+              <KanbanPriorityPill task={task} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-x-4 gap-y-2.5 px-4 pb-3 pt-3 text-xs leading-snug">
+            <div
+              className={`inline-flex min-h-[1.75rem] max-w-full items-center gap-1.5 rounded-lg px-2 py-1 ${dueDatePillClass(Boolean(task.dueAt))}`}
+              title={task.dueAt ? `Due ${new Date(task.dueAt).toISOString().slice(0, 10)}` : "No due date"}
+            >
+              <IconCalendarDays className="size-3.5 shrink-0 opacity-80" aria-hidden />
+              <span className="min-w-0 font-medium tabular-nums text-[var(--fg)]">
+                {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
+              </span>
+            </div>
+            <div className="flex min-w-0 max-w-full items-start gap-1.5 py-0.5">
+              <IconUserPlus className="mt-0.5 size-3.5 shrink-0 opacity-65" aria-hidden />
+              <span className="min-w-0 break-words text-[13px] text-[var(--fg)]">{assigneeLine}</span>
+            </div>
+          </div>
+
+          {subtasksState === "loading" && (
+            <p className="border-t border-[var(--border-subtle)]/60 px-4 py-2.5 text-xs text-[var(--muted)]">Loading subtasks…</p>
+          )}
+          {subtasksPreview.length > 0 && (
+            <div className="border-t border-[var(--border-subtle)]/60 px-4 pb-4 pt-2">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Checklist</p>
+              <ul className="space-y-2 rounded-xl bg-[var(--surface-muted)]/80 px-2.5 py-2.5 dark:bg-[var(--surface-muted)]/50">
+                {subtasksPreview.map((s) => {
+                  const stBusy = subtaskUpdatingId === s.id;
+                  return (
+                    <li key={s.id} className="flex items-start gap-2.5 text-[13px] leading-snug">
+                      <button
+                        type="button"
+                        disabled={stBusy}
+                        onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
+                        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
+                          s.done
+                            ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                        } ${stBusy ? "cursor-wait opacity-50" : ""}`}
+                        aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
+                      >
+                        {s.done ? (
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        ) : null}
+                      </button>
+                      <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80" : "text-[var(--fg)]"}`}>
+                        {s.title}
+                      </span>
+                    </li>
+                  );
+                })}
+                {subtasksOverflow > 0 && (
+                  <li className="pt-0.5 text-[11px] text-[var(--muted)]">
+                    +{subtasksOverflow} more on{" "}
+                    <Link href={taskHref} className="font-medium text-[var(--accent)] hover:underline">
+                      task page
+                    </Link>
+                  </li>
+                )}
+              </ul>
+            </div>
           )}
         </div>
       </li>
@@ -522,16 +963,8 @@ function WorkItemsInner() {
                 </span>
               </button>
               {open && (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[32rem] border-collapse text-left">
-                    <thead>
-                      <tr className="border-b border-[var(--border-subtle)] text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-                        <th className="px-4 py-2.5 font-medium">Name</th>
-                        <th className="hidden w-[8.5rem] px-3 py-2.5 font-medium sm:table-cell">Assignee</th>
-                        <th className="w-[7.5rem] px-3 py-2.5 font-medium sm:w-[8.5rem]">Due date</th>
-                        <th className="w-[6.5rem] px-3 py-2.5 font-medium">Priority</th>
-                      </tr>
-                    </thead>
+                <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+                  <table className="w-full border-collapse text-left">
                     <tbody>{sectionRows.map((task) => (
                       <ListTaskRow key={task.id} task={task} />
                     ))}</tbody>
@@ -561,36 +994,53 @@ function WorkItemsInner() {
 
   function KanbanBoard({ rows }: { rows: TaskRow[] }) {
     return (
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {KANBAN_STATUS_ORDER.map((col) => {
-          const colTasks = rows.filter((t) => normalizeTaskStatus(t.status) === col);
-          return (
-            <div
-              key={col}
-              className="flex w-64 min-w-[14rem] shrink-0 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)]"
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                const id = e.dataTransfer.getData("taskId");
-                if (!id) return;
-                void patchTask(id, { status: col });
-              }}
-            >
-              <div className="border-b border-[var(--border-subtle)] px-3 py-2">
-                <h3 className="text-xs font-semibold text-[var(--fg)]">{STATUS_LABELS[col]}</h3>
-                <p className="text-[10px] text-[var(--muted)]">{colTasks.length} tasks</p>
-              </div>
-              <ul className="max-h-[min(70vh,36rem)] flex-1 space-y-2 overflow-y-auto p-2">
-                {colTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </ul>
-            </div>
-          );
-        })}
+      <div>
+        <p className="mb-3 max-w-2xl text-[11px] leading-relaxed text-[var(--muted)]">
+          Stages follow the workflow left to right. Drag a card to the next column, or change stage from the card — moves are limited to{" "}
+          <span className="text-[var(--fg)]/90">one step at a time</span> (no skipping ahead).
+        </p>
+        <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+          <div
+            className="flex min-h-[min(72vh,38rem)] gap-4 md:min-h-[min(78vh,42rem)]"
+            style={{ minWidth: "min(100%, 92rem)" }}
+          >
+            {KANBAN_STATUS_ORDER.map((col) => {
+              const colTasks = rows.filter((t) => normalizeTaskStatus(t.status) === col);
+              const label = STATUS_LABELS[col];
+              return (
+                <div
+                  key={col}
+                  role="region"
+                  aria-label={`${label}, ${colTasks.length} tasks`}
+                  className="flex min-h-0 min-w-[17rem] flex-1 flex-col gap-3 sm:min-w-[18rem]"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = e.dataTransfer.getData("taskId");
+                  if (!id) return;
+                  const task = rows.find((t) => t.id === id);
+                  if (!task) return;
+                  const from = normalizeTaskStatus(task.status);
+                  if (!kanbanTransitionAllowed(from, col)) {
+                    setError("Move tasks one stage at a time along the pipeline.");
+                    return;
+                  }
+                  void patchTask(id, { status: col });
+                }}
+                >
+                  <ul className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto">
+                    {colTasks.map((task) => (
+                      <TaskCard key={task.id} task={task} />
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -598,83 +1048,194 @@ function WorkItemsInner() {
   return (
     <div className="mx-auto w-full max-w-screen-2xl space-y-8">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{NODE_LABELS.workItem}s</h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">List or Kanban view, priorities, statuses, and due-date filters.</p>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-[var(--muted)]">View</span>
-          <div className="inline-flex rounded-lg border border-[var(--border-subtle)] p-0.5">
-            <button
-              type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-medium ${viewMode === "list" ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"}`}
-              onClick={() => setViewMode("list")}
+      <header className="flex flex-col gap-4 border-b border-[var(--border-subtle)] pb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">{NODE_LABELS.workItem}s</h1>
+          <p className="mt-1 hidden text-sm text-[var(--muted)] sm:block">Switch layout, sort, and filter by due date.</p>
+        </div>
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 sm:w-auto sm:justify-end">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+            <div
+              className="inline-flex items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-0.5 shadow-sm"
+              role="group"
+              aria-label="Board layout"
             >
-              List
+              <button
+                type="button"
+                className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                  viewMode === "list"
+                    ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                    : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                }`}
+                onClick={() => setViewMode("list")}
+                aria-label="List view"
+                aria-pressed={viewMode === "list"}
+              >
+                <IconLayoutList className="block" />
+              </button>
+              <button
+                type="button"
+                className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                  viewMode === "kanban"
+                    ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                    : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                }`}
+                onClick={() => setViewMode("kanban")}
+                aria-label="Kanban view"
+                aria-pressed={viewMode === "kanban"}
+              >
+                <IconLayoutKanban className="block" />
+              </button>
+            </div>
+            <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
+            <button
+              ref={sortTriggerRef}
+              type="button"
+              className={tasksToolbarIconButtonClasses(sortMenuOpen)}
+              title={SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Sort"}
+              onClick={() => {
+                setSortMenuOpen((o) => !o);
+                setDateMenuOpen(false);
+              }}
+              aria-expanded={sortMenuOpen}
+              aria-haspopup="menu"
+              aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
+            >
+              <IconArrowUpDown className="pointer-events-none block" />
             </button>
             <button
+              ref={dateTriggerRef}
               type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-medium ${viewMode === "kanban" ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"}`}
-              onClick={() => setViewMode("kanban")}
+              className={`relative ${tasksToolbarIconButtonClasses(dateMenuOpen)}`}
+              title="Due date filter"
+              onClick={() => {
+                setDateMenuOpen((o) => !o);
+                setSortMenuOpen(false);
+              }}
+              aria-expanded={dateMenuOpen}
+              aria-haspopup="dialog"
+              aria-label={
+                datePreset !== "all" || dueFrom || dueTo
+                  ? "Due date filter, filters active"
+                  : "Due date filter"
+              }
             >
-              Kanban
+              <IconCalendarDays className="pointer-events-none block" />
+              {(datePreset !== "all" || dueFrom || dueTo) && (
+                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
+              )}
             </button>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-            Sort
-            <select
-              className="input h-9 rounded-lg py-0 text-xs"
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-            >
-              <option value="priority_desc">Priority · high first</option>
-              <option value="priority_asc">Priority · low first</option>
-              <option value="due_asc">Due date · soonest</option>
-              <option value="due_desc">Due date · latest</option>
-            </select>
-          </label>
-        </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-[14rem]">
-          <span className="text-xs font-medium text-[var(--muted)]">Due date</span>
-          <select
-            className="input h-9 rounded-lg text-xs"
-            value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+          <button
+            type="button"
+            className="btn-primary min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+            onClick={() => setCreateModalOpen(true)}
           >
-            <option value="all">All dates</option>
-            <option value="overdue">Overdue</option>
-            <option value="this_week">Due this week</option>
-            <option value="no_due">No due date</option>
-          </select>
-          <div className="flex flex-wrap gap-2">
-            <input
-              type="date"
-              className="input h-9 flex-1 min-w-[8rem] rounded-lg text-xs"
-              value={dueFrom}
-              onChange={(e) => setDueFrom(e.target.value)}
-              aria-label="Due from"
-            />
-            <input
-              type="date"
-              className="input h-9 flex-1 min-w-[8rem] rounded-lg text-xs"
-              value={dueTo}
-              onChange={(e) => setDueTo(e.target.value)}
-              aria-label="Due to"
-            />
-          </div>
-          <p className="text-[10px] leading-snug text-[var(--muted)]">Optional range narrows tasks that have a due date.</p>
+            + New task
+          </button>
         </div>
-        <button type="button" className="btn-primary shrink-0 rounded-xl px-5 sm:self-center" onClick={() => setCreateModalOpen(true)}>
-          + New task
-        </button>
-      </div>
+      </header>
+
+      {toolbarMenusMounted &&
+        sortMenuOpen &&
+        createPortal(
+          <div
+            ref={sortPanelRef}
+            style={sortPanelStyle}
+            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2 shadow-lg"
+            role="menu"
+            aria-label="Sort options"
+          >
+            <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Sort by</p>
+            <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
+              {SORT_OPTIONS.map((opt) => (
+                <li key={opt.value}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`w-full rounded-lg px-2.5 py-2.5 text-left text-sm leading-snug ${
+                      sortMode === opt.value
+                        ? "bg-[var(--accent-muted)] font-medium text-[var(--fg)]"
+                        : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                    }`}
+                    onClick={() => {
+                      setSortMode(opt.value);
+                      setSortMenuOpen(false);
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>,
+          document.body,
+        )}
+
+      {toolbarMenusMounted &&
+        dateMenuOpen &&
+        createPortal(
+          <div
+            ref={datePanelRef}
+            style={datePanelStyle}
+            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-lg"
+            role="dialog"
+            aria-label="Due date filter"
+          >
+            <div className="max-h-[min(420px,85vh)] overflow-y-auto p-3">
+              <div className="flex items-start justify-between gap-2">
+                <label className="block min-w-0 flex-1">
+                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Preset</span>
+                  <select
+                    className="input h-10 w-full rounded-lg text-sm"
+                    value={datePreset}
+                    onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+                  >
+                    {DATE_PRESET_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Due date range</p>
+              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="date"
+                  className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
+                  value={dueFrom}
+                  onChange={(e) => setDueFrom(e.target.value)}
+                  aria-label="Due from"
+                />
+                <input
+                  type="date"
+                  className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
+                  value={dueTo}
+                  onChange={(e) => setDueTo(e.target.value)}
+                  aria-label="Due to"
+                />
+              </div>
+              <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]">Optional range narrows tasks that have a due date.</p>
+              {(datePreset !== "all" || dueFrom || dueTo) && (
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] py-2 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                  onClick={() => {
+                    setDatePreset("all");
+                    setDueFrom("");
+                    setDueTo("");
+                  }}
+                >
+                  Clear date filters
+                </button>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-[var(--muted)]">{viewMode === "list" ? "List" : "Kanban"}</h2>
         {selectedLevelName && (
           <p className="mb-3 text-xs text-[var(--muted)]">
             Showing tasks for {NODE_LABELS.level}: <span className="font-medium text-[var(--fg)]">{selectedLevelName}</span>

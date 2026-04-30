@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
+    "migrate": "tsx src/migrate-cli.ts",
+    "migrate:kit": "drizzle-kit migrate",
     "studio": "drizzle-kit studio",
     "seed": "tsx src/seed.ts",
     "lint": "echo ok"

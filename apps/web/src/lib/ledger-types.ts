@@ -13,6 +13,14 @@ export type MemberRow = {
   email: string;
   name: string;
 };
+export type SubtaskRow = {
+  id: string;
+  taskId: string;
+  title: string;
+  done: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
 export type TaskRow = {
   id: string;
   title: string;
@@ -22,14 +30,10 @@ export type TaskRow = {
   listId: string;
   assignerId: string;
   deletedAt: string | null;
-};
-export type SubtaskRow = {
-  id: string;
-  taskId: string;
-  title: string;
-  done: boolean;
-  createdAt: string;
-  updatedAt: string;
+  /** Present on organization task list responses; resolved from task assignees. */
+  assigneeUserIds?: string[];
+  /** Present on organization task list responses; avoids per-task subtask fetches. */
+  subtasks?: SubtaskRow[];
 };
 export type LedgerRow = {
   id: string;

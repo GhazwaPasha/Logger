@@ -5,6 +5,9 @@ import { authClient } from "@/lib/auth-client";
 
 type ApiSessionContextValue = {
   session: ReturnType<typeof authClient.useSession>["data"];
+  /** True while Better Auth session is loading (block routes that need login state). */
+  isSessionPending: boolean;
+  /** True while session is loading or JWT is still resolving for a logged-in user (safe for API calls). */
   isPending: boolean;
   token: string | null;
   refreshToken: () => Promise<void>;
@@ -47,16 +50,18 @@ export function ApiSessionProvider({ children }: { children: ReactNode }) {
     };
   }, [sessionUserId]);
 
+  const isSessionPending = sessionPending;
   const isPending = sessionPending || (Boolean(sessionUserId) && !tokenResolved);
 
   const value = useMemo<ApiSessionContextValue>(
     () => ({
       session,
+      isSessionPending,
       isPending,
       token,
       refreshToken,
     }),
-    [session, isPending, token, refreshToken],
+    [session, isSessionPending, isPending, token, refreshToken],
   );
 
   return <ApiSessionContext.Provider value={value}>{children}</ApiSessionContext.Provider>;
