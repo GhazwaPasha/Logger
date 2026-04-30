@@ -16,9 +16,33 @@ export class AuthService {
     return this.jwks;
   }
 
+  private getIssuerAndAudience(): { issuer: string | string[]; audience: string | string[] } {
+    const parseList = (value?: string): string[] =>
+      (value ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+    const authIssuers = parseList(this.config.get<string>("AUTH_ISSUER"));
+    const fallbackIssuers = parseList(this.config.get<string>("NEXT_PUBLIC_APP_URL"));
+    const issuers = authIssuers.length > 0 ? authIssuers : fallbackIssuers;
+
+    const authAudiences = parseList(this.config.get<string>("AUTH_AUDIENCE"));
+    const fallbackAudiences = parseList(this.config.get<string>("NEXT_PUBLIC_APP_URL"));
+    const audiences = authAudiences.length > 0 ? authAudiences : fallbackAudiences;
+
+    if (issuers.length === 0 || audiences.length === 0) {
+      throw new UnauthorizedException("Server auth config missing issuer/audience");
+    }
+
+    return {
+      issuer: issuers.length === 1 ? issuers[0]! : issuers,
+      audience: audiences.length === 1 ? audiences[0]! : audiences,
+    };
+  }
+
   async verifyBearerJwt(token: string): Promise<JWTPayload> {
-    const issuer = this.config.getOrThrow<string>("AUTH_ISSUER");
-    const audience = this.config.getOrThrow<string>("AUTH_AUDIENCE");
+    const { issuer, audience } = this.getIssuerAndAudience();
     try {
       const { payload } = await jwtVerify(token, this.getJwks(), {
         issuer,

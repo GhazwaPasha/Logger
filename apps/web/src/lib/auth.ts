@@ -19,6 +19,8 @@ export const authDb = createDbFromPool(pool);
 function resolveAuthBaseUrl(): string {
   const explicit = process.env.BETTER_AUTH_URL?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
+  const publicApp = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (publicApp) return publicApp.replace(/\/$/, "");
   if (process.env.VERCEL_URL)
     return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
   return "http://localhost:3000";

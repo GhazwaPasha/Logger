@@ -4,6 +4,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-04-30 — Prod 401 token mismatch (issuer/audience drift)
+
+- **Context:** API returned `401 Invalid or expired token` on `/organizations` even though login session existed.
+- **What we did:** Confirmed browser bearer token had `iss/aud` on a Vercel deployment hostname, not the stable app domain. Updated Better Auth base URL resolution to prefer `NEXT_PUBLIC_APP_URL` before `VERCEL_URL`, so prod tokens use stable issuer when explicit `BETTER_AUTH_URL` is absent. Also hardened API auth config to accept comma-separated issuer/audience lists and fallback to `NEXT_PUBLIC_APP_URL` when `AUTH_ISSUER`/`AUTH_AUDIENCE` are missing.
+- **Takeaway / follow-ups:** Set explicit stable values in production (`BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`) and re-login users after deploy to mint fresh tokens.
+- **Code / repo:** `apps/web/src/lib/auth.ts`, `apps/api/src/auth/auth.service.ts`.
+
 ### 2026-04-30 — Fix Vercel API crash: CJS requiring ESM contracts package
 
 - **Context:** After fixing `@work-ledger/db`, API still crashed in prod with `ERR_REQUIRE_ESM` when requiring `@work-ledger/contracts`.
