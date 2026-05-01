@@ -1,24 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { AppHeader } from "@/components/app/AppHeader";
-import { useAppPreferences } from "@/components/app/AppPreferencesContext";
-import type { ThemePref } from "@/hooks/useThemePreference";
-import { ErrorBanner } from "@/components/ui/ErrorBanner";
-import { apiJson } from "@/lib/api";
-import type { Org } from "@/lib/ledger-types";
-import { setLastWorkspaceId, getLastWorkspaceId } from "@/lib/workspace-storage";
+import { AppEntryAccountSidebar } from "@/components/app/AppEntryAccountSidebar";
+import { AddWorkspacePanel } from "@/components/app/AddWorkspacePanel";
+import { getLastWorkspaceId, setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export default function AppEntryPage() {
   const router = useRouter();
   const { token, isPending } = useApiSession();
-  const { orgs, error, setError, reload } = useOrganizationsState();
-  const { theme, setTheme } = useAppPreferences();
-  const [name, setName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
+  const { orgs, isLoading: orgsLoading } = useOrganizationsState();
 
   useEffect(() => {
     if (isPending || !token) return;
@@ -29,82 +23,29 @@ export default function AppEntryPage() {
     router.replace(`/app/w/${target.id}/dashboard`);
   }, [isPending, token, orgs, router]);
 
-  async function createWorkspace() {
-    if (!token || !name.trim() || isCreating) return;
-    setError(null);
-    setIsCreating(true);
-    try {
-      const org = await apiJson<Org>("/organizations", {
-        method: "POST",
-        token,
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      setLastWorkspaceId(org.id);
-      setName("");
-      await reload();
-      router.replace(`/app/w/${org.id}/dashboard`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create workspace");
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
-      <AppHeader workspaceId={orgs[0]?.id} />
-      <div className="mx-auto flex w-full max-w-2xl flex-1 items-center px-4 py-10 sm:px-6">
-        {orgs.length > 0 ? (
-          <div className="w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-6 text-center">
+      <AppHeader />
+      {orgsLoading ? (
+        <div className="flex flex-1 items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-6 text-center">
+            <p className="text-sm text-[var(--muted)]">Loading…</p>
+          </div>
+        </div>
+      ) : orgs.length > 0 ? (
+        <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-6 text-center">
             <p className="text-sm text-[var(--muted)]">Opening your workspace…</p>
           </div>
-        ) : (
-          <section className="surface-elevated w-full rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
-            <h1 className="text-2xl font-semibold tracking-tight">Create your first workspace</h1>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Once this is created, you can switch workspaces from the sidebar user menu.
-            </p>
-            {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <label className="mb-1.5 block text-xs font-medium text-[var(--muted)]" htmlFor="ws-name">
-                  Name
-                </label>
-                <input
-                  id="ws-name"
-                  className="input rounded-xl"
-                  placeholder="e.g. Work Ledger HQ"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="btn-primary shrink-0 rounded-xl px-6"
-                onClick={() => void createWorkspace()}
-                disabled={!name.trim() || isCreating}
-              >
-                {isCreating ? "Creating..." : "Create workspace"}
-              </button>
-            </div>
-            <div className="mt-6 flex flex-col gap-2 border-t border-[var(--border-subtle)] pt-5 sm:flex-row sm:items-center">
-              <label className="text-xs font-medium text-[var(--muted)] sm:min-w-[4.5rem]" htmlFor="onboarding-theme">
-                Theme
-              </label>
-              <select
-                id="onboarding-theme"
-                className="input max-w-xs rounded-xl text-sm"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value as ThemePref)}
-              >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </div>
-          </section>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:items-stretch">
+          <AppEntryAccountSidebar />
+          <main className="min-h-0 min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+            <AddWorkspacePanel variant="standalone" />
+          </main>
+        </div>
+      )}
     </div>
   );
 }

@@ -111,7 +111,13 @@ export class AuthorizationService {
     return [...set];
   }
 
-  async listTasksForUser(userId: string, organizationId: string) {
+  async listTasksForUser(
+    userId: string,
+    organizationId: string,
+    opts?: { includeSubtasks?: boolean },
+  ) {
+    const includeSubtasks = opts?.includeSubtasks !== false;
+
     const orgIds = await this.listOrganizationIdsForUser(userId);
     if (!orgIds.includes(organizationId)) {
       throw new ForbiddenException("No access to this organization");
@@ -134,7 +140,7 @@ export class AuthorizationService {
         .select()
         .from(tasks)
         .where(and(eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
-      return this.attachSubtasks(await this.attachAssigneeUserIds(ownerRows));
+      return this.finalizeTaskList(ownerRows, includeSubtasks);
     }
 
     if (m?.role === "manager" && m.departmentId) {
@@ -161,7 +167,7 @@ export class AuthorizationService {
             isNull(tasks.deletedAt),
           ),
         );
-      return this.attachSubtasks(await this.attachAssigneeUserIds(managerRows));
+      return this.finalizeTaskList(managerRows, includeSubtasks);
     }
 
     const assignedTaskIds = await this.db
@@ -183,7 +189,14 @@ export class AuthorizationService {
       .select()
       .from(tasks)
       .where(and(eq(tasks.organizationId, organizationId), inArray(tasks.id, ids)));
-    return this.attachSubtasks(await this.attachAssigneeUserIds(assigneeOnlyRows));
+    return this.finalizeTaskList(assigneeOnlyRows, includeSubtasks);
+  }
+
+  /** Assignees always attached; subtasks loaded only when needed (saves a batched subtask query). */
+  private async finalizeTaskList(taskRows: (typeof tasks.$inferSelect)[], includeSubtasks: boolean) {
+    const withAssignees = await this.attachAssigneeUserIds(taskRows);
+    if (!includeSubtasks) return withAssignees;
+    return this.attachSubtasks(withAssignees);
   }
 
   /** Adds assigneeUserIds to each task for list/board views (names resolved client-side from members). */

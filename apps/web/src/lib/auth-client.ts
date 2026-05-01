@@ -1,3 +1,4 @@
+import "@/lib/auth-session-jwt-capture";
 import { sentinelClient } from "@better-auth/infra/client";
 import { createAuthClient } from "better-auth/react";
 import { jwtClient } from "better-auth/client/plugins";

@@ -12,6 +12,15 @@ loadEnv({ path: path.join(repoRoot, ".env.local"), override: true });
 const nextConfig = {
   transpilePackages: ["@work-ledger/db"],
   serverExternalPackages: ["pg"],
+  async redirects() {
+    return [
+      {
+        source: "/app/w/:workspaceId/add-organization",
+        destination: "/app/w/:workspaceId/add-workspace",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

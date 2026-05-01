@@ -8,6 +8,8 @@ type DueDateTimePanelProps = {
   value: string;
   onChange: (localValue: string) => void;
   onClear: () => void;
+  /** Compact popover: closes panel without clearing (values already live on parent). */
+  onSave?: () => void;
   /** Tighter layout for popover. */
   compact?: boolean;
   /** Shown below time when set; omit to hide repeat controls. */
@@ -44,8 +46,13 @@ function mergeCalendarDayWithTime(day: Date, hour: number, minute: number): Date
 /** Same native `type="date"` shell as the task page due filter toolbar. */
 const DUE_DATE_INPUT_CLASS = "input h-10 min-w-0 w-full flex-1 rounded-lg text-sm";
 
+/** Popover header actions (no global `.btn-*` — padding matches). */
+const COMPACT_DUE_ACTION_BASE =
+  "box-border inline-flex h-6 items-center justify-center rounded-md border border-solid px-1.5 text-[10px] font-medium leading-none transition-colors";
+const COMPACT_DUE_ACTION_GRID_CELL = `${COMPACT_DUE_ACTION_BASE} w-full min-w-0`;
+
 /** Single due: native date + time (matches task filter date inputs). */
-export function DueDateTimePanel({ value, onChange, onClear, compact, dueRepeat, onDueRepeatChange }: DueDateTimePanelProps) {
+export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, dueRepeat, onDueRepeatChange }: DueDateTimePanelProps) {
   const selected = useMemo(() => parseDueLocalValue(value), [value]);
 
   const dateInputValue = useMemo(() => {
@@ -97,23 +104,52 @@ export function DueDateTimePanel({ value, onChange, onClear, compact, dueRepeat,
 
   return (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
-      <div className="flex items-center justify-between gap-2">
-        <span className={`font-medium text-[var(--muted)] ${compact ? "text-[10px] uppercase tracking-wide" : "text-xs"}`}>
-          {compact ? "Pick due" : "Due (date & time)"}
-        </span>
-        <button
-          type="button"
-          className={`btn-secondary shrink-0 rounded-md text-[var(--muted)] hover:text-[var(--fg)] ${compact ? "px-2 py-0.5 text-[10px]" : "rounded-lg px-2.5 py-1 text-[11px]"}`}
-          disabled={!value.trim()}
-          onClick={() => onClear()}
-        >
-          Clear
-        </button>
-      </div>
+      {compact ? (
+        onSave ? (
+          <div className="grid grid-cols-2 gap-0.5">
+            <button
+              type="button"
+              className={`${COMPACT_DUE_ACTION_GRID_CELL} border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--muted)] hover:border-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] disabled:pointer-events-none disabled:opacity-45`}
+              disabled={!value.trim()}
+              onClick={() => onClear()}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className={`${COMPACT_DUE_ACTION_GRID_CELL} surface-glass-primary border-solid`}
+              onClick={() => onSave()}
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className={`${COMPACT_DUE_ACTION_BASE} shrink-0 px-3 border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--muted)] hover:border-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] disabled:pointer-events-none disabled:opacity-45`}
+              disabled={!value.trim()}
+              onClick={() => onClear()}
+            >
+              Clear
+            </button>
+          </div>
+        )
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-[var(--muted)]">Due (date & time)</span>
+          <button
+            type="button"
+            className="btn-secondary shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--fg)]"
+            disabled={!value.trim()}
+            onClick={() => onClear()}
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
-      <div
-        className={`overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-base)] ${compact ? "p-2" : "p-2 sm:p-3"}`}
-      >
+      <div className={compact ? "space-y-1" : "space-y-2 p-2 sm:p-3"}>
         <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Due date</p>
         <input
           type="date"
@@ -139,7 +175,7 @@ export function DueDateTimePanel({ value, onChange, onClear, compact, dueRepeat,
           />
         </div>
 
-        {onDueRepeatChange && selected ? (
+        {onDueRepeatChange && selected && !compact ? (
           <div className={`border-t border-[var(--border-subtle)] ${compact ? "mt-2 space-y-1.5 pt-2" : "mt-3 space-y-2 pt-3"}`}>
             <span className={labelClass}>Repeat</span>
             <div className={`grid ${compact ? "grid-cols-2 gap-1" : "grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2"}`}>

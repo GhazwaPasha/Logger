@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { DueDateTimePanel } from "./DueDateTimePanel";
-import type { TaskDueRepeat } from "@/lib/ledger-types";
 
 function formatDueTriggerLabel(value: string): string {
   const t = value.trim();
@@ -34,8 +33,6 @@ type DueDateTimePopoverProps = {
   value: string;
   onChange: (localValue: string) => void;
   onClear: () => void;
-  dueRepeat?: TaskDueRepeat | null;
-  onDueRepeatChange?: (next: TaskDueRepeat | null) => void;
 };
 
 export function DueDateTimePopover({
@@ -44,8 +41,6 @@ export function DueDateTimePopover({
   value,
   onChange,
   onClear,
-  dueRepeat,
-  onDueRepeatChange,
 }: DueDateTimePopoverProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -145,8 +140,7 @@ export function DueDateTimePopover({
               value={value}
               onChange={onChange}
               onClear={handleClear}
-              dueRepeat={dueRepeat}
-              onDueRepeatChange={onDueRepeatChange}
+              onSave={() => onOpenChange(false)}
             />
           </div>,
           document.body,

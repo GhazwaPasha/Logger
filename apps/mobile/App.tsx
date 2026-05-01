@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -11,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useColorScheme,
   View,
 } from "react-native";
 import { apiFetch, apiJson } from "./src/api";
@@ -55,7 +57,11 @@ async function flushOutbox(token: string) {
   }
 }
 
+const logoLight = require("./assets/logbase-light.png");
+const logoDark = require("./assets/logbase-dark.png");
+
 export default function App() {
+  const colorScheme = useColorScheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -181,7 +187,15 @@ export default function App() {
         style={styles.screen}
       >
         <StatusBar style="dark" />
-        <Text style={styles.title}>Work Ledger</Text>
+        <View style={styles.brandRow}>
+          <Image
+            source={colorScheme === "dark" ? logoDark : logoLight}
+            style={styles.brandMark}
+            resizeMode="contain"
+            accessible={false}
+          />
+          <Text style={styles.title}>LogBase</Text>
+        </View>
         <Text style={styles.hint}>Sign in (same account as web)</Text>
         <TextInput
           style={styles.input}
@@ -268,6 +282,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fafafa", padding: 16, paddingTop: 48 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  brandMark: { width: 32, height: 32 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 22, fontWeight: "600" },
   sub: { fontSize: 14, color: "#666", marginTop: 4 },

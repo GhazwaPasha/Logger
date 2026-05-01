@@ -11,7 +11,7 @@ import { setLastWorkspaceId } from "@/lib/workspace-storage";
 export default function WorkspaceDashboardPage() {
   const params = useParams();
   const workspaceId = params.workspaceId as string;
-  const { depts, tasks, members, error, setError } = useWorkspaceData();
+  const { depts, tasks, members, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -31,15 +31,21 @@ export default function WorkspaceDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{depts.length}</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">
+            {workspaceLoading ? "…" : depts.length}
+          </p>
         </div>
         <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Open tasks</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{tasks.filter((t) => !t.deletedAt).length}</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">
+            {workspaceLoading ? "…" : tasks.filter((t) => !t.deletedAt).length}
+          </p>
         </div>
         <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team members</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{members.length}</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">
+            {workspaceLoading ? "…" : members.length}
+          </p>
         </div>
       </div>
       <div className="flex flex-wrap gap-3">

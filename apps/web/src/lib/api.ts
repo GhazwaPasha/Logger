@@ -28,6 +28,9 @@ export async function apiJson<T>(
   options: RequestInit & { token?: string | null } = {},
 ): Promise<T> {
   const res = await apiFetch(path, options);
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("wl:auth-expired"));
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || res.statusText);

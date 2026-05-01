@@ -18,6 +18,7 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
+import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
 import { parseTaskDueRepeat, type MemberRow, type SubtaskRow, type TaskDetail, type TaskDueRepeat, type TaskRow } from "@/lib/ledger-types";
@@ -206,9 +207,16 @@ const TASK_PANEL_ASSIGNEE_TOGGLE =
 /** Max subtasks shown on kanban cards before “+ more”. */
 const KANBAN_CARD_SUBTASK_PREVIEW = 8;
 
-/** List row assignee / due / priority — identical footprint every badge (fixed box); subtle corners */
+/** List row assignee / priority — identical footprint (fixed box); subtle corners */
 const LIST_ROW_BADGE_TILE =
   "box-border inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5";
+/** Due chip — `min-w` only floors “No due” to ~a short date + time line; `w-max` sizes to content above that (long locales grow); `h-8` matches assignee/priority tiles; icon + label centered in the box. */
+const TASK_DUE_CHIP_CLASS =
+  "box-border inline-flex h-8 min-h-8 max-h-8 min-w-[8.75rem] w-max max-w-full shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-xs font-medium leading-none tabular-nums";
+/** Label inherits chip text color (`dueDatePillClass`). Icon uses currentColor + opacity. */
+const TASK_DUE_CHIP_LABEL_CLASS = "min-w-0 shrink";
+const TASK_DUE_CHIP_ICON_CLASS =
+  "size-3.5 shrink-0 block opacity-80 [stroke-linecap:round] [stroke-linejoin:round]";
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
 
@@ -290,11 +298,14 @@ const PIPELINE_BADGE_FRAME =
 function WorkBoardStatsCard({
   counts,
   total,
+  loading = false,
 }: {
   total: number;
   counts: Record<BoardTaskStatus, number>;
+  loading?: boolean;
 }) {
   const cancelled = counts.cancelled;
+  const n = (v: number) => (loading ? "…" : v);
   return (
     <aside
       className="min-w-0 w-full shrink-0 lg:col-span-1 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:justify-self-stretch lg:self-start"
@@ -327,7 +338,7 @@ function WorkBoardStatsCard({
               <span
                 className={`${PIPELINE_BADGE_FRAME} min-w-[2rem] bg-[var(--surface-muted)] px-2.5 text-sm text-[var(--fg)]`}
               >
-                {total}
+                {n(total)}
               </span>
             </div>
           </div>
@@ -338,19 +349,19 @@ function WorkBoardStatsCard({
                 key={status}
                 className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
                 role="group"
-                aria-label={`${title}: ${counts[status]}`}
+                aria-label={`${title}: ${loading ? "loading" : counts[status]}`}
               >
                 <span className="truncate text-xs font-medium text-[var(--fg)]">{label}</span>
-                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette(status)}`}>{counts[status]}</span>
+                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette(status)}`}>{n(counts[status])}</span>
               </div>
             ))}
             <div
               className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
               role="group"
-              aria-label={`${STATUS_LABELS.cancelled}: ${cancelled}`}
+              aria-label={`${STATUS_LABELS.cancelled}: ${loading ? "loading" : cancelled}`}
             >
               <span className="truncate text-xs font-medium text-[var(--fg)]">{STATUS_LABELS.cancelled}</span>
-              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette("cancelled")}`}>{cancelled}</span>
+              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette("cancelled")}`}>{n(cancelled)}</span>
             </div>
           </div>
         </div>
@@ -369,7 +380,7 @@ function WorkItemsInner() {
   const listPref = searchParams.get("list");
   const { token } = useApiSession();
   const queryClient = useQueryClient();
-  const { tasks, lists, members, depts, error, setError } = useWorkspaceData();
+  const { tasks, lists, members, depts, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [title, setTitle] = useState("");
   const [listId, setListId] = useState("");
   const [due, setDue] = useState("");
@@ -381,6 +392,7 @@ function WorkItemsInner() {
   const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
+  const [showRepeatPanel, setShowRepeatPanel] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
@@ -392,6 +404,7 @@ function WorkItemsInner() {
   const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
   const [editShowAssignees, setEditShowAssignees] = useState(false);
   const [editShowDuePanel, setEditShowDuePanel] = useState(false);
+  const [editShowRepeatPanel, setEditShowRepeatPanel] = useState(false);
   const [editSubtaskDraft, setEditSubtaskDraft] = useState("");
   const [editNewSubtasks, setEditNewSubtasks] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
@@ -539,7 +552,10 @@ function WorkItemsInner() {
   }
 
   useEffect(() => {
-    if (!editTaskId) setEditShowDuePanel(false);
+    if (!editTaskId) {
+      setEditShowDuePanel(false);
+      setEditShowRepeatPanel(false);
+    }
   }, [editTaskId]);
 
   useEffect(() => {
@@ -547,7 +563,10 @@ function WorkItemsInner() {
   }, [editTaskId]);
 
   useEffect(() => {
-    if (!createModalOpen) setShowDuePanel(false);
+    if (!createModalOpen) {
+      setShowDuePanel(false);
+      setShowRepeatPanel(false);
+    }
   }, [createModalOpen]);
 
   useEffect(() => {
@@ -591,12 +610,15 @@ function WorkItemsInner() {
     if (focus === "assignees") {
       setEditShowAssignees(true);
       setEditShowDuePanel(false);
+      setEditShowRepeatPanel(false);
     } else if (focus === "due") {
       setEditShowDuePanel(true);
       setEditShowAssignees(false);
+      setEditShowRepeatPanel(false);
     } else {
       setEditShowAssignees(false);
       setEditShowDuePanel(false);
+      setEditShowRepeatPanel(false);
     }
   }, []);
 
@@ -808,6 +830,7 @@ function WorkItemsInner() {
       setSubtaskItems([]);
       setShowAssignees(false);
       setShowDuePanel(false);
+      setShowRepeatPanel(false);
       setCreateModalOpen(false);
       await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
@@ -1124,11 +1147,12 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "due")}
-                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
+                  className={`${TASK_DUE_CHIP_CLASS} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
                   title={dueSummary ? `Due ${dueSummary}` : "Due (date & time)"}
                   aria-label={dueSummary ? `Due ${dueSummary}` : "Edit due date and time"}
                 >
-                  <span className={`${LIST_ROW_BADGE_LABEL} ${task.dueAt ? "" : "uppercase"}`}>
+                  <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
+                  <span className={TASK_DUE_CHIP_LABEL_CLASS}>
                     {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
                   </span>
                 </button>
@@ -1191,7 +1215,7 @@ function WorkItemsInner() {
                             onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               s.done
-                                ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                                ? "surface-glass-primary border-solid"
                                 : "border-[var(--border-subtle)] hover:border-[var(--accent)]"
                             } ${stBusy ? "cursor-wait opacity-50" : ""}`}
                             aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
@@ -1215,10 +1239,21 @@ function WorkItemsInner() {
     );
   }
 
-  function KanbanStatusPill({ task }: { task: TaskRow }) {
-    const st = normalizeTaskStatus(task.status);
-    const busy = updatingTaskId === task.id;
-    const allowed = kanbanAllowedTransitions(st);
+  /** Same chrome as list-row {@link KanbanStatusPill}; options list is caller-defined (full pipeline vs one-step). */
+  function StatusPillSelect({
+    "aria-label": ariaLabel,
+    value,
+    onChange,
+    options,
+    disabled,
+  }: {
+    "aria-label": string;
+    value: BoardTaskStatus;
+    onChange: (next: BoardTaskStatus) => void;
+    options: readonly BoardTaskStatus[];
+    disabled?: boolean;
+  }) {
+    const st = normalizeTaskStatus(value as string);
     return (
       <div
         className={`${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPalette(st)}`}
@@ -1226,11 +1261,11 @@ function WorkItemsInner() {
         <select
           className="absolute inset-0 z-[1] cursor-pointer opacity-0"
           value={st}
-          disabled={busy}
-          onChange={(e) => void patchTask(task.id, { status: e.target.value as BoardTaskStatus })}
-          aria-label="Task stage (one step on the pipeline)"
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value as BoardTaskStatus)}
+          aria-label={ariaLabel}
         >
-          {allowed.map((s) => (
+          {options.map((s) => (
             <option key={s} value={s}>
               {STATUS_LABELS[s]}
             </option>
@@ -1241,6 +1276,21 @@ function WorkItemsInner() {
         </span>
         <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" aria-hidden />
       </div>
+    );
+  }
+
+  function KanbanStatusPill({ task }: { task: TaskRow }) {
+    const st = normalizeTaskStatus(task.status);
+    const busy = updatingTaskId === task.id;
+    const allowed = kanbanAllowedTransitions(st);
+    return (
+      <StatusPillSelect
+        aria-label="Task stage (one step on the pipeline)"
+        value={st}
+        onChange={(v) => void patchTask(task.id, { status: v })}
+        options={allowed}
+        disabled={busy}
+      />
     );
   }
 
@@ -1346,13 +1396,13 @@ function WorkItemsInner() {
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
               onClick={() => openEditTask(task.id, "due")}
-              className={`inline-flex min-h-[1.75rem] max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left ${dueDatePillClass(Boolean(task.dueAt))}`}
+              className={`${TASK_DUE_CHIP_CLASS} ${dueDatePillClass(Boolean(task.dueAt))}`}
               title={
                 task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"
               }
             >
-              <IconCalendarDays className="size-3.5 shrink-0 opacity-80" aria-hidden />
-              <span className="min-w-0 font-medium tabular-nums text-[var(--fg)]">
+              <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
+              <span className={TASK_DUE_CHIP_LABEL_CLASS}>
                 {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
               </span>
             </button>
@@ -1393,7 +1443,7 @@ function WorkItemsInner() {
                         onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
                         className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
                           s.done
-                            ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                            ? "surface-glass-primary border-solid"
                             : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
                         } ${stBusy ? "cursor-wait opacity-50" : ""}`}
                         aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
@@ -1599,7 +1649,11 @@ function WorkItemsInner() {
               + New task
             </button>
           </div>
-          <WorkBoardStatsCard counts={boardStatusCounts} total={visibleTasks.length} />
+          <WorkBoardStatsCard
+            counts={boardStatusCounts}
+            total={visibleTasks.length}
+            loading={workspaceLoading}
+          />
         </div>
       </header>
 
@@ -1725,7 +1779,11 @@ function WorkItemsInner() {
             ))}
           </div>
         )}
-        {sortedTasks.length === 0 ? (
+        {workspaceLoading ? (
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
+            Loading tasks…
+          </p>
+        ) : sortedTasks.length === 0 ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
             {visibleTasks.length === 0
               ? selectedListName
@@ -1782,18 +1840,12 @@ function WorkItemsInner() {
                     <div className={TASK_PANEL_HEADER_ROW}>
                       <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
                       <div className={TASK_PANEL_HEADER_RIGHT}>
-                        <select
+                        <StatusPillSelect
                           aria-label="Status"
-                          className={`${TASK_PANEL_HEADER_SELECT} w-[6.5rem] sm:w-[7.25rem]`}
                           value={editStatus}
-                          onChange={(e) => setEditStatus(e.target.value as BoardTaskStatus)}
-                        >
-                          {KANBAN_STATUS_ORDER.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={setEditStatus}
+                          options={KANBAN_STATUS_ORDER}
+                        />
                         <select
                           aria-label="Priority"
                           className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
@@ -1883,15 +1935,26 @@ function WorkItemsInner() {
                       </button>
                       <DueDateTimePopover
                         open={editShowDuePanel}
-                        onOpenChange={setEditShowDuePanel}
+                        onOpenChange={(o) => {
+                          setEditShowDuePanel(o);
+                          if (o) setEditShowRepeatPanel(false);
+                        }}
                         value={editDue}
                         onChange={setEditDue}
                         onClear={() => {
                           setEditDue("");
                           setEditDueRepeat(null);
                         }}
-                        dueRepeat={editDueRepeat}
-                        onDueRepeatChange={setEditDueRepeat}
+                      />
+                      <DueRepeatPopover
+                        open={editShowRepeatPanel}
+                        onOpenChange={(o) => {
+                          setEditShowRepeatPanel(o);
+                          if (o) setEditShowDuePanel(false);
+                        }}
+                        dueLocalValue={editDue}
+                        value={editDueRepeat}
+                        onChange={setEditDueRepeat}
                       />
                     </div>
                     {editShowAssignees && (
@@ -1939,18 +2002,12 @@ function WorkItemsInner() {
             <div className={TASK_PANEL_HEADER_ROW}>
               <h2 className={TASK_PANEL_HEADER_TITLE}>New task</h2>
               <div className={TASK_PANEL_HEADER_RIGHT}>
-                <select
+                <StatusPillSelect
                   aria-label="Status"
-                  className={`${TASK_PANEL_HEADER_SELECT} w-[6.5rem] sm:w-[7.25rem]`}
                   value={newTaskStatus}
-                  onChange={(e) => setNewTaskStatus(e.target.value as BoardTaskStatus)}
-                >
-                  {KANBAN_STATUS_ORDER.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABELS[s]}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setNewTaskStatus}
+                  options={KANBAN_STATUS_ORDER}
+                />
                 <select
                   aria-label="Priority"
                   className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
@@ -2028,15 +2085,26 @@ function WorkItemsInner() {
               </button>
               <DueDateTimePopover
                 open={showDuePanel}
-                onOpenChange={setShowDuePanel}
+                onOpenChange={(o) => {
+                  setShowDuePanel(o);
+                  if (o) setShowRepeatPanel(false);
+                }}
                 value={due}
                 onChange={setDue}
                 onClear={() => {
                   setDue("");
                   setDueRepeat(null);
                 }}
-                dueRepeat={dueRepeat}
-                onDueRepeatChange={setDueRepeat}
+              />
+              <DueRepeatPopover
+                open={showRepeatPanel}
+                onOpenChange={(o) => {
+                  setShowRepeatPanel(o);
+                  if (o) setShowDuePanel(false);
+                }}
+                dueLocalValue={due}
+                value={dueRepeat}
+                onChange={setDueRepeat}
               />
             </div>
             {showAssignees && (

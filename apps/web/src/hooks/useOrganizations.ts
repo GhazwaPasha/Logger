@@ -14,7 +14,8 @@ export function useOrganizations(token: string | null) {
     queryKey: orgKeys.all,
     queryFn: async () => apiJson<Org[]>("/organizations", { token }),
     enabled: Boolean(token),
-    staleTime: 30_000,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
   });
 
   const error = manualError ?? (q.error ? (q.error as Error).message : null);

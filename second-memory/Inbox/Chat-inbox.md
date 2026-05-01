@@ -4,6 +4,119 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-01 — Perf follow-ups: persisted queries, auth timing logs, lean bootstrap tasks
+
+- **Context:** Complete remaining items after the first perf pass.
+- **What we did:**
+  - **Persisted React Query:** **`@tanstack/react-query-persist-client`** + **`@tanstack/query-sync-storage-persister`**; **`QueryProvider`** wraps **`PersistQueryClientProvider`** with **`localStorage`** key **`wl_rq_${QUERY_CACHE_VERSION}_${userId|guest}`**, **`Fragment` key** per user, **`QUERY_CACHE_VERSION`** in **`lib/query-cache-version.ts`** (bump **`3`** when cache breaks). Dehydrates **`organizations`** + **`workspace`** only when logged in. **`QueryAuthListeners`** drops those caches on **`wl:auth-expired`**; **`apiJson`** dispatches that event on **401**.
+  - **Auth timing:** **`apps/web/src/app/api/auth/[...all]/route.ts`** wraps Better Auth handler; logs **`get-session`**, **`token`**, **`sign-in`** when **`AUTH_TIMING_LOG`** unset in dev, **`AUTH_TIMING_LOG=1`** in prod, **`0`**/`false` to silence (**`auth-api-timing.ts`**).
+  - **Bootstrap tasks without subtasks:** **`AuthorizationService.listTasksForUser`** accepts **`includeSubtasks`** (default **true**); **`finalizeTaskList`** skips batched subtask query when **false**. **`workspaceBootstrap`** passes **`includeSubtasks: false`**. **`GET .../tasks?includeSubtasks=false`** for clients that want the same trim.
+- **Code / repo:** `apps/api/src/authorization/authorization.service.ts`, `tasks.service.ts`, `tasks.controller.ts`, `organizations.service.ts`, `apps/web/src/components/app/QueryProvider.tsx`, `lib/api.ts`, `lib/query-cache-version.ts`, `lib/auth-api-timing.ts`, `app/api/auth/[...all]/route.ts`, `package.json` (web).
+
+### 2026-05-01 — Brand mark from `Logo/` (designer light/dark PNGs)
+
+- **Context:** User supplies separate **`Logo/Logbase light theme.png`** and **`Logo/Logbase darktheme.png`** (no generated variants).
+- **What we did:** Canonical static copies under **`apps/web/public/Logos/logbase-light.png`** + **`logbase-dark.png`**; **`LogBaseMark`** stacks two **`img`** tags with existing **`data-theme`** / **system** CSS. **`apps/mobile/assets/`** holds the same files; sign-in uses **`useColorScheme`** to pick asset. Removed **`generate-brand-logos.mjs`**, **`generate:logos`**, and **sharp** devDependency.
+- **Follow-up:** **`LogBaseMark`** **`variant`** presets (**`chrome`** 26px, **`marketing`** 32px, **`footer`** 24px, **`auth`** 28px) + tighter gaps / **`min-h`** tap rows on nav links; mobile sign-in mark **32×32**.
+- **Code / repo:** `LogBaseMark.tsx`, `globals.css`, `apps/mobile/App.tsx`, `apps/web/package.json`.
+
+### 2026-05-01 — Work task panel: status control matches list row pill
+
+- **Context:** Create/edit task panel used compact `<select>` chrome for status; list view uses colored **`KanbanStatusPill`** (`STATUS_PILL_LAYOUT` + **`statusPillPalette`**).
+- **What we did:** Extracted **`StatusPillSelect`** (shared shell + invisible overlay select); **`KanbanStatusPill`** delegates to it with **`kanbanAllowedTransitions`**; edit/new panels use it with full **`KANBAN_STATUS_ORDER`**.
+- **Code / repo:** `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`.
+
+### 2026-05-01 — Web UI: neutral accent, solid primary (no glass)
+
+- **Context:** User wanted to drop the glassy accent look on buttons and surfaces and replace the blue accent with a neutral palette.
+- **What we did:** **`globals.css`** — zinc-style **`--accent` / `--accent-hover`**, added **`--on-accent`**, removed glass/blur tokens; **`.btn-primary`**, **`.brand-mark`**, **`.surface-glass-primary`** are solid fills + **`--shadow-primary`**; **`--bg-header`** solid. **`page.tsx`** — opaque surfaces, no backdrop blur on marketing cards/CTA; **`AppHeader`** — no **`backdrop-blur`**. Updated **`[[web-ui-styling]]`** topic.
+- **Code / repo:** `apps/web/src/app/globals.css`, `apps/web/src/app/page.tsx`, `apps/web/src/components/app/AppHeader.tsx`, `second-memory/Topics/Design/web-ui-styling.md`.
+
+### 2026-05-01 — Perf plan implemented (bootstrap API, JWT capture, loading UX)
+
+- **Context:** Deliver the roadmap after the MCP perf analysis: fewer round trips, skip redundant `/token` when possible, clearer loading states, gentler React Query refetch.
+- **What we did:**
+  - **API:** `GET /organizations/:organizationId/workspace` returns `{ departments, lists, tasks, members }` via `Promise.all` in `OrganizationsService.workspaceBootstrap`; **`TasksModule`** now **`exports: [TasksService]`**; **`OrganizationsModule`** imports **`ListsModule`** + **`TasksModule`**.
+  - **Web:** **`useOrgWorkspace`** calls the bootstrap route (one HTTP call). **`auth-session-jwt-capture`** patches **`fetch`** to read **`set-auth-jwt`** from **`/api/auth/get-session`**; **`ApiSessionProvider`** uses captured JWT before **`authClient.token()`**; clears capture on sign-out.
+  - **React Query:** default **`refetchOnWindowFocus: false`**; workspace **`staleTime` 60s**; org list **`staleTime` 120s** (both **`refetchOnWindowFocus: false`**).
+  - **UX:** Sidebar **Loading levels…**; dashboard **…** placeholders; work page **Loading tasks…** + pipeline **…**. **`WorkspaceSidebar`** uses **`session`** from **`useApiSession`** only.
+- **Follow-ups:** (Done later in **Perf follow-ups: persisted queries…**.) Server-side DB tuning for **`get-session`** remains an ops exercise if latency stays high.
+- **Code / repo:** `apps/api/src/organizations/*`, `tasks.module.ts`, `apps/web/src/lib/auth-session-jwt-capture.ts`, `auth-client.ts`, `ApiSessionProvider.tsx`, `useOrgWorkspace.ts`, `useOrganizations.ts`, `query-client.ts`, `WorkspaceSidebar.tsx`, `dashboard/page.tsx`, `work/page.tsx`.
+
+### 2026-05-01 — Second memory: full architecture & logic-brain documentation
+
+- **Context:** User asked for end-to-end documentation of architecture, infrastructure, maps, and domain logic in the **`second-memory`** Obsidian vault.
+- **What we did:** Expanded [[00-map-overview]] with a Mermaid flowchart and hub links. Replaced placeholder [[apps-api]] / [[apps-web]] with concrete notes; added [[apps-mobile]], [[packages-and-data-layer]], [[auth-jwt-and-env]], and [[domain-authorization-and-tasks]] (roles, task visibility, ledger, capabilities). Updated [[Topics/README]] index. Follow-up: added [[web-ui-styling]] (Tailwind v4, CSS variables, glass primary, theme `data-theme`, component classes in `globals.css`) and linked from [[apps-web]] + overview.
+- **Takeaway / follow-ups:** Treat **`00-map-overview`** as the entry point; keep **`Chat-inbox`** for time-ordered incidents (401s, deploy fixes). When routes or auth env change, update the relevant Topic note in the same PR as code.
+- **Code / repo:** `second-memory/Topics/Infrastructure/*.md`, `second-memory/Topics/Domain/domain-authorization-and-tasks.md`, `second-memory/Topics/README.md`.
+
+### 2026-05-01 — Web auth & data perf analysis (MCP, no code)
+
+- **Context:** User asked for a **read-only** report: auth/data speed, API calls, refresh behavior, persistence, efficiency, and improvement ideas (no implementation in that turn).
+- **What we did:** Exercised **LogBase** in Chrome via **user-chrome-devtools** MCP: sign-in (`localhost:3000`), hard reload on `/app/w/.../dashboard`, client navigation to **Tasks** (`/work`). Measured **Resource Timing** in-page (`performance.getEntriesByType('resource')`) for `/api/auth/*` and **`NEXT_PUBLIC_API_URL`** (`localhost:4000`). Cross-checked code: **`ApiSessionProvider`**, **`useOrgWorkspace`**, **`QueryProvider`** / **`makeQueryClient`**, **`workspace-storage`**, **`apiFetch`** (`cache: no-store`).
+- **Takeaway / follow-ups:** **`get-session`** dominated refresh latency (~**3.9s** in this run); **`/api/auth/token`** ~**0.95s** after it; API bundle (orgs + depts/lists/tasks/members in parallel) ~**3.9–4.9s** each — sequential waterfall **session → JWT → API**. **`kv.better-auth.com/identify`** seen on login-related loads. In-session route changes reused React Query (only Next **\_rsc** fetches). Sidebar/dashboard treat **`depts.length === 0`** as “no levels” without distinguishing **loading**, causing misleading empty UI until data arrives.
+- **Code / repo:** `apps/web/src/components/app/ApiSessionProvider.tsx`, `useOrgWorkspace.ts`, `useOrganizations.ts`, `lib/query-client.ts`, `WorkspaceSidebar.tsx`, `dashboard/page.tsx`.
+
+### 2026-05-01 — Product rename: Work Ledger → LogBase
+
+- **Context:** User-facing app name change.
+- **What we did:** Replaced **Work Ledger** with **LogBase** in web metadata, landing/login/header, workspace placeholder, mobile shell title, and PDF task report title; logo initials **WL → LB**. Left **`@work-ledger/*`** package scope and mobile **`work-ledger.db`** filename unchanged (technical identifiers).
+- **Code / repo:** `apps/web/src/app/layout.tsx`, `page.tsx`, `login/LoginForm.tsx`, `AppHeader.tsx`, `AddWorkspacePanel.tsx`, `apps/mobile/App.tsx`, `apps/api/src/tasks/tasks.service.ts`.
+
+### 2026-05-01 — Commercial landing page (`/`)
+
+- **Context:** Marketing homepage tuned for **commercial-ready** UX and copy.
+- **What we did:** Full **`/`** restructure: sticky-style **nav** (anchors **Capabilities** / **How it works**, **Log in**, **Get started**); centered **hero** + dual CTAs + micro-line; **trust strip**; **4-card capabilities** grid with icons; **3-step how it works**; glass-style **closing CTA** band; **footer** columns + copyright. Smaller header wordmark vs earlier hero-only giant lockup. **`layout.tsx`** meta description aligned with positioning.
+- **Code / repo:** `apps/web/src/app/page.tsx`, `apps/web/src/app/layout.tsx`.
+
+### 2026-05-01 — Home page copy for LogBase
+
+- **Context:** Align marketing **`/`** with new product name after rename.
+- **What we did:** (Superseded by commercial landing pass above.) Earlier iterations: eyebrow/hero/footer CTAs, **Outfit** wordmark experiments.
+- **Code / repo:** `apps/web/src/app/page.tsx`.
+
+### 2026-05-01 — Glassy primary actions & brand mark (LB)
+
+- **Context:** Solid blue primary CTAs and the logo tile clashed with the app’s neutral elevated aesthetic; user wanted a **glassy** look.
+- **What we did:** Added **`--glass-blur`** / **`--glass-primary-*`** / **`--glass-brand-*`** in **`globals.css`** (**`color-mix`** frosted fills, accent-tinted borders, accent-forward label color, soft inset + outer shadow). Rebuilt **`.btn-primary`** with blur + glass surfaces; **`.brand-mark`** for the logo tile; **`.surface-glass-primary`** for compact primary surfaces (due popover **Save**, subtask “done” boxes). Wired **LB** in **`AppHeader`** + landing **`page`**; updated **`DueDateTimePanel`** + **`work/page.tsx`** checkboxes.
+- **Code / repo:** `apps/web/src/app/globals.css`, `apps/web/src/components/app/AppHeader.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/components/tasks/DueDateTimePanel.tsx`, `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`.
+
+### 2026-05-01 — List view due chip matches kanban
+
+- **Context:** List due control was briefly a **13.5rem** fixed tile — too wide; user wanted the **kanban** due chip footprint; then tighter **icon vs label** alignment.
+- **What we did:** **`TASK_DUE_CHIP_CLASS`** — **`inline-flex`** / **`rounded-lg px-2`** on **`ListTaskCard`** + **`TaskCard`**. **`leading-none`**, **`font-medium`**, **`tabular-nums`**; **`h-8`** + **`min-w-[8.75rem] w-max`** (was **11rem**, too much dead space) so **No due** isn’t tiny but dated chips hug content; long locales still grow via **`w-max`**. SVG **`block`** (**`TASK_DUE_CHIP_ICON_CLASS`**); label inherits **`dueDatePillClass`**.
+- **Code / repo:** `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`.
+
+### 2026-05-01 — Task panel: repeat chip next to due; own popover
+
+- **Context:** Create/edit side panel should show **repeat** beside the **due** trigger; label reflects **Daily** / **Weekly** / etc.; repeat picker not inside the due datetime popover.
+- **What we did:** New **`DueRepeatPopover`** (portal, click-outside, Escape) with trigger matching assignee/due row (`btn-secondary`, max width). Shows **Repeat** until a due is set (then disabled); with repeat stored, shows **Daily** etc. **Compact** **`DueDateTimePanel`** no longer renders the repeat grid (**`!compact`** guard). **`DueDateTimePopover`** no longer takes **`dueRepeat`**. Work page: **`showRepeatPanel` / `editShowRepeatPanel`**, mutual close with due popover, clear with modal/task lifecycle.
+- **Code / repo:** `apps/web/src/components/tasks/DueRepeatPopover.tsx`, `DueDateTimePopover.tsx`, `DueDateTimePanel.tsx`, `apps/web/src/app/app/w/[workspaceId]/work/page.tsx`.
+
+### 2026-05-01 — Due popover: drop nested black strip behind date picker
+
+- **Context:** Edit/create task side panel **Due** popover showed an extra dark **`surface-base`** band around the native date area vs the popover **`surface-elevated`**; user also wanted no inner box outline; compact header UX (**Pick due** removed, smaller **Clear**, **Save** closes popover).
+- **What we did:** Removed **`bg-[var(--surface-base)]`** from the inner wrapper; removed inner **`border` / `rounded-lg` / `overflow-hidden`** (popover already borders the shell). **Compact** mode uses **`p-0`** spacing-only inner wrapper so padding isn’t doubled with the popover’s **`p-2`**. **Compact** header: no **Pick due** label; **`Clear`** / **`Save`** in **`grid grid-cols-2`** with shared **`h-6`** / **`text-[10px]`** + **`w-full min-w-0`** per cell so widths match; **`onSave`** → **`onOpenChange(false)`** from **`DueDateTimePopover`**.
+- **Code / repo:** `apps/web/src/components/tasks/DueDateTimePanel.tsx`, `DueDateTimePopover.tsx`.
+
+### 2026-05-01 — Remove AppWorkspaceGate; `/app` empty org copy
+
+- **Context:** User wanted the old **workspace gate** removed and the **main `/app` page** to show **“No organization”** when the user has no orgs.
+- **What we did:** Renamed/replaced **`AppWorkspaceGate`** with **`AppAuthenticatedProviders`** (same behavior: unauthenticated → **`/login`**, then **`AppPreferencesProvider`** + **`OrganizationsProvider`**). Empty-org **`/app`** UX was refined again (see next inbox entry). Users with orgs still auto-navigate to **`/app/w/.../dashboard`**.
+- **Code / repo:** `apps/web/src/components/app/AppAuthenticatedProviders.tsx` (new), deleted `AppWorkspaceGate.tsx`, `apps/web/src/app/app/layout.tsx`, `apps/web/src/app/app/page.tsx`.
+
+### 2026-05-01 — Add workspace naming (was Add organization)
+
+- **Context:** Product copy and routes use **workspace** for the add/create flow.
+- **What we did:** **`AddWorkspacePanel`** (replaces **`AddOrganizationPanel`**), route **`/app/w/[id]/add-workspace`**, sidebar **+ Add workspace**, **`next.config.mjs`** **301** from **`.../add-organization`** → **`.../add-workspace`**.
+- **Code / repo:** `apps/web/src/components/app/AddWorkspacePanel.tsx`, `AppEntryAccountSidebar.tsx`, `WorkspaceSidebar.tsx`, `apps/web/src/app/app/w/[workspaceId]/add-workspace/page.tsx`, `next.config.mjs`.
+
+### 2026-05-01 — No-org `/app`: account sidebar + add-workspace main
+
+- **Context:** With no organization, user should see **only** the **sidebar account row** (email/name) expanding to **Add workspace**, and the **main area** should match the add-workspace page (not a separate “no org” card).
+- **What we did:** **`AppEntryAccountSidebar`**: same pattern as workspace picker (chevron), dropdown contains only **+ Add workspace** → **`/app`**. **`AddWorkspacePanel`**: shared form + standalone **Theme** row; used by **`/app`** (`variant="standalone"`) and **`/app/w/[workspaceId]/add-workspace`**. **`WorkspaceShell`**: if org list loaded and empty, **`replace('/app')`** so stale **`/app/w/...`** URLs don’t stick.
+- **Code / repo:** `apps/web/src/components/app/AppEntryAccountSidebar.tsx`, `AddWorkspacePanel.tsx`, `apps/web/src/app/app/page.tsx`, `apps/web/src/app/app/w/[workspaceId]/add-workspace/page.tsx`, `WorkspaceShell.tsx`.
+
 ### 2026-05-01 — User settings page + header profile / gear
 
 - **Context:** User wanted a **settings** page, a **settings icon** beside **Sign out**, and a **profile control** instead of showing **email** in the header.

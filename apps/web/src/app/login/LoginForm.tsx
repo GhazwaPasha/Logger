@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { safeReturnPath } from "@/lib/safe-return-path";
 
@@ -44,8 +45,13 @@ export function LoginForm() {
   return (
     <div className="auth-shell">
       <div className="auth-card surface-elevated">
-        <div className="mb-8 space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent)]">Work Ledger</p>
+        <div className="mb-8 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <LogBaseMark variant="auth" decorative />
+            <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+              LogBase
+            </p>
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>

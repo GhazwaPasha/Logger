@@ -13,8 +13,8 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Work Ledger",
-  description: "Accountability-first work ledger",
+  title: "LogBase",
+  description: "Structure tasks and capture durable activity across your organization—export the trail when stakeholders need proof.",
 };
 
 export default function RootLayout({

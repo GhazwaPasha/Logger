@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 
 function userInitials(name: string | null | undefined, email: string | null | undefined) {
@@ -78,14 +79,15 @@ export function AppHeader({
   }, [accountMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)]/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)]">
       <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <Link href="/" className="group flex items-center gap-2 text-sm font-semibold tracking-tight text-[var(--fg)]">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-xs font-bold text-white">
-              WL
-            </span>
-            <span className="hidden sm:inline">Work Ledger</span>
+          <Link
+            href="/"
+            className="group flex min-h-9 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--fg)]"
+          >
+            <LogBaseMark variant="chrome" decorative />
+            <span className="hidden leading-none sm:inline">LogBase</span>
           </Link>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">

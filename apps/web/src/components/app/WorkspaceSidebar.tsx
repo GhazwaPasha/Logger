@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
-import { authClient } from "@/lib/auth-client";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import type { ListRow, TaskRow } from "@/lib/ledger-types";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -44,10 +43,9 @@ export function WorkspaceSidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { token } = useApiSession();
-  const { data: session } = authClient.useSession();
+  const { token, session } = useApiSession();
   const { orgs } = useOrganizationsState();
-  const { depts, lists, tasks, setError, reload } = useWorkspaceData();
+  const { depts, lists, tasks, setError, reload, isLoading: workspaceLoading } = useWorkspaceData();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const [orgTreeOpen, setOrgTreeOpen] = useState(true);
@@ -107,7 +105,7 @@ export function WorkspaceSidebar({
   const activePeople = pathname.startsWith(`${base}/people`);
   const activeOrganizationSettings = pathname.startsWith(`${base}/organization-settings`);
   const activeUserSettings = pathname.startsWith(`${base}/settings`);
-  const activeAddOrganization = pathname.startsWith(`${base}/add-organization`);
+  const activeAddWorkspace = pathname.startsWith(`${base}/add-workspace`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
   /** Work page with full board scope (no level/list filters in URL). */
   const activeAllWorkspaceTasks =
@@ -129,7 +127,7 @@ export function WorkspaceSidebar({
       "/my-tasks",
       "/people",
       "/work",
-      "/add-organization",
+      "/add-workspace",
       "/organization-settings",
       "/settings",
     ]);
@@ -216,11 +214,11 @@ export function WorkspaceSidebar({
                 })}
               </ul>
               <Link
-                href={`${base}/add-organization`}
-                className={`${rowBase(activeAddOrganization)} mt-1 block border-t border-[var(--border-subtle)] pl-2 pt-2`}
+                href={`${base}/add-workspace`}
+                className={`${rowBase(activeAddWorkspace)} mt-1 block border-t border-[var(--border-subtle)] pl-2 pt-2`}
                 onClick={() => setWorkspacePickerOpen(false)}
               >
-                + Add organization
+                + Add workspace
               </Link>
             </div>
           )}
@@ -259,7 +257,9 @@ export function WorkspaceSidebar({
           {orgTreeOpen &&
             (
               <div className="space-y-2">
-                {depts.length === 0 ? (
+                {workspaceLoading ? (
+                  <p className="px-2 text-xs leading-relaxed text-[var(--muted)]">Loading levels…</p>
+                ) : depts.length === 0 ? (
                   <p className="px-2 text-xs leading-relaxed text-[var(--muted)]">No levels yet.</p>
                 ) : (
                   <ul className="space-y-0.5">

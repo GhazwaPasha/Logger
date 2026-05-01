@@ -10,6 +10,8 @@ import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { ListsService } from "../lists/lists.service";
+import { TasksService } from "../tasks/tasks.service";
 
 @Injectable()
 export class OrganizationsService {
@@ -17,6 +19,8 @@ export class OrganizationsService {
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
     private readonly departments: DepartmentsService,
+    private readonly lists: ListsService,
+    private readonly tasks: TasksService,
   ) {}
 
   async listForUser(userId: string) {
@@ -42,6 +46,17 @@ export class OrganizationsService {
     const org = rows[0];
     if (!org) throw new NotFoundException("Organization not found");
     return org;
+  }
+
+  /** Single round-trip workspace payload for app shell (parallel DB reads). */
+  async workspaceBootstrap(userId: string, organizationId: string) {
+    const [departments, lists, taskRows, members] = await Promise.all([
+      this.departments.list(userId, organizationId),
+      this.lists.list(userId, organizationId),
+      this.tasks.list(userId, organizationId, { includeSubtasks: false }),
+      this.listMembers(userId, organizationId),
+    ]);
+    return { departments, lists, tasks: taskRows, members };
   }
 
   async patch(userId: string, organizationId: string, body: unknown) {

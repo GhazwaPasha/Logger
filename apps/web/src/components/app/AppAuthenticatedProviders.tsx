@@ -8,7 +8,8 @@ import { safeReturnPath } from "@/lib/safe-return-path";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 
-export function AppWorkspaceGate({ children }: { children: React.ReactNode }) {
+/** Session redirect + app preferences + organizations context for `/app/*`. */
+export function AppAuthenticatedProviders({ children }: { children: React.ReactNode }) {
   const { session, isSessionPending } = useApiSession();
   const { theme, setTheme } = useThemePreference();
   const router = useRouter();

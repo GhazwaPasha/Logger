@@ -45,7 +45,7 @@ export type TaskRow = {
   deletedAt: string | null;
   /** Present on organization task list responses; resolved from task assignees. */
   assigneeUserIds?: string[];
-  /** Present on organization task list responses; avoids per-task subtask fetches. */
+  /** Present on full task list (`GET .../tasks`); workspace bootstrap omits subtasks (lazy-load via `/tasks/:id/subtasks`). */
   subtasks?: SubtaskRow[];
 };
 export type LedgerRow = {

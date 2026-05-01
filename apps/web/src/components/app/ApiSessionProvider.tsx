@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
+import { clearJwtCapture, getJwtCapturedFromGetSession } from "@/lib/auth-session-jwt-capture";
 
 type ApiSessionContextValue = {
   session: ReturnType<typeof authClient.useSession>["data"];
@@ -34,11 +35,19 @@ export function ApiSessionProvider({ children }: { children: ReactNode }) {
     if (!sessionUserId) {
       setToken(null);
       setTokenResolved(true);
+      clearJwtCapture();
       return;
     }
     setTokenResolved(false);
     let cancelled = false;
     void (async () => {
+      const captured = getJwtCapturedFromGetSession();
+      if (captured) {
+        if (cancelled) return;
+        setToken(captured);
+        setTokenResolved(true);
+        return;
+      }
       const { data, error } = await authClient.token();
       if (cancelled) return;
       if (error) setToken(null);

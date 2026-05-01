@@ -6,18 +6,20 @@
   --fg: #0c0c0d;
   --border: #e5e5e5;
   --border-subtle: #ededed;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --accent: #27272a;
+  --accent-hover: #18181b;
+  --on-accent: #fafafa;
   --muted: #737373;
   --surface-base: #fafafa;
   --surface-elevated: #ffffff;
   --surface-muted: #f4f4f5;
   --surface-hover: #f4f4f5;
   --surface-nav: #f4f4f5;
-  --bg-header: rgba(250, 250, 250, 0.92);
-  --accent-muted: rgba(37, 99, 235, 0.1);
-  --accent-glow: rgba(37, 99, 235, 0.15);
-  --accent-glow-soft: rgba(37, 99, 235, 0.08);
+  --bg-header: #f4f4f5;
+  --accent-muted: rgba(39, 39, 42, 0.09);
+  --accent-glow: rgba(39, 39, 42, 0.05);
+  --accent-glow-soft: rgba(39, 39, 42, 0.03);
+  --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 html[data-theme="dark"] {
@@ -26,18 +28,20 @@ html[data-theme="dark"] {
   --fg: #fafafa;
   --border: #27272a;
   --border-subtle: #1f1f23;
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
+  --accent: #e4e4e7;
+  --accent-hover: #fafafa;
+  --on-accent: #18181b;
   --muted: #a1a1aa;
   --surface-base: #09090b;
   --surface-elevated: #121214;
   --surface-muted: #18181b;
   --surface-hover: #1c1c21;
   --surface-nav: #0f0f12;
-  --bg-header: rgba(9, 9, 11, 0.88);
-  --accent-muted: rgba(59, 130, 246, 0.15);
-  --accent-glow: rgba(59, 130, 246, 0.2);
-  --accent-glow-soft: rgba(59, 130, 246, 0.1);
+  --bg-header: #0f0f12;
+  --accent-muted: rgba(228, 228, 231, 0.12);
+  --accent-glow: rgba(228, 228, 231, 0.06);
+  --accent-glow-soft: rgba(228, 228, 231, 0.035);
+  --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,18 +51,20 @@ html[data-theme="dark"] {
     --fg: #fafafa;
     --border: #27272a;
     --border-subtle: #1f1f23;
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
+    --accent: #e4e4e7;
+    --accent-hover: #fafafa;
+    --on-accent: #18181b;
     --muted: #a1a1aa;
     --surface-base: #09090b;
     --surface-elevated: #121214;
     --surface-muted: #18181b;
     --surface-hover: #1c1c21;
     --surface-nav: #0f0f12;
-    --bg-header: rgba(9, 9, 11, 0.88);
-    --accent-muted: rgba(59, 130, 246, 0.15);
-    --accent-glow: rgba(59, 130, 246, 0.2);
-    --accent-glow-soft: rgba(59, 130, 246, 0.1);
+    --bg-header: #0f0f12;
+    --accent-muted: rgba(228, 228, 231, 0.12);
+    --accent-glow: rgba(228, 228, 231, 0.06);
+    --accent-glow-soft: rgba(228, 228, 231, 0.035);
+    --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -69,18 +75,20 @@ html[data-theme="dark"] {
     --fg: #0c0c0d;
     --border: #e5e5e5;
     --border-subtle: #ededed;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
+    --accent: #27272a;
+    --accent-hover: #18181b;
+    --on-accent: #fafafa;
     --muted: #737373;
     --surface-base: #fafafa;
     --surface-elevated: #ffffff;
     --surface-muted: #f4f4f5;
     --surface-hover: #f4f4f5;
     --surface-nav: #f4f4f5;
-    --bg-header: rgba(250, 250, 250, 0.92);
-    --accent-muted: rgba(37, 99, 235, 0.1);
-    --accent-glow: rgba(37, 99, 235, 0.15);
-    --accent-glow-soft: rgba(37, 99, 235, 0.08);
+    --bg-header: #f4f4f5;
+    --accent-muted: rgba(39, 39, 42, 0.09);
+    --accent-glow: rgba(39, 39, 42, 0.05);
+    --accent-glow-soft: rgba(39, 39, 42, 0.03);
+    --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.06);
   }
 }
 
@@ -217,19 +225,25 @@ html[data-theme="dark"] select.input-compact {
   border-radius: 0.5rem;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
+  box-shadow: var(--shadow-primary);
   transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
     transform 0.1s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn-primary:disabled {
@@ -286,6 +300,97 @@ html[data-theme="dark"] select.input-compact {
 .btn-primary.legacy,
 .btn.btn-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
+  box-shadow: var(--shadow-primary);
+}
+
+/* App mark / small logo tile — matches primary button */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-primary);
+}
+
+/*
+ * PNG wordmark: light UI → `logbase-light.png`; dark UI → `logbase-dark.png`.
+ * Target `img` explicitly so rules win over layout utilities / Next image wrappers.
+ */
+img.brand-logo-mark-for-light-theme {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+img.brand-logo-mark-for-dark-theme {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+html[data-theme="dark"] img.brand-logo-mark-for-light-theme {
+  display: none;
+}
+
+html[data-theme="dark"] img.brand-logo-mark-for-dark-theme {
+  display: block;
+}
+
+html[data-theme="light"] img.brand-logo-mark-for-light-theme {
+  display: block;
+}
+
+html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme="system"] img.brand-logo-mark-for-light-theme {
+    display: none;
+  }
+
+  html[data-theme="system"] img.brand-logo-mark-for-dark-theme {
+    display: block;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] img.brand-logo-mark-for-light-theme {
+    display: block;
+  }
+
+  html[data-theme="system"] img.brand-logo-mark-for-dark-theme {
+    display: none;
+  }
+}
+
+/* Inline controls that read as primary (e.g. popover save, selected chips). */
+.surface-glass-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-primary);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.surface-glass-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }

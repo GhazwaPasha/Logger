@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -23,8 +24,10 @@ export class TasksController {
   list(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
+    @Query("includeSubtasks") includeSubtasks?: string,
   ) {
-    return this.tasks.list(user.id, organizationId);
+    const withSubtasks = includeSubtasks !== "false";
+    return this.tasks.list(user.id, organizationId, { includeSubtasks: withSubtasks });
   }
 
   @Post()

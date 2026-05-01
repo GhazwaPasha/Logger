@@ -17,14 +17,18 @@ export function WorkspaceShell({
 }) {
   const router = useRouter();
   const { token } = useApiSession();
-  const { orgs } = useOrganizationsState();
+  const { orgs, isLoading: orgsLoading } = useOrganizationsState();
 
   useEffect(() => {
-    if (!token || orgs.length === 0) return;
+    if (!token || orgsLoading) return;
+    if (orgs.length === 0) {
+      router.replace("/app");
+      return;
+    }
     if (!orgs.some((o) => o.id === workspaceId)) {
       router.replace(`/app/w/${orgs[0].id}/dashboard`);
     }
-  }, [token, orgs, workspaceId, router]);
+  }, [token, orgs, orgsLoading, workspaceId, router]);
 
   return (
     <WorkspaceDataProvider workspaceId={workspaceId}>

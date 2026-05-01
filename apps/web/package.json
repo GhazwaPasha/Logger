@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@better-auth/infra": "^0.2.5",
+    "@tanstack/query-sync-storage-persister": "^5.100.6",
     "@tanstack/react-query": "^5.100.6",
+    "@tanstack/react-query-persist-client": "^5.100.6",
     "@types/pg": "^8.20.0",
     "@work-ledger/db": "^0.0.1",
     "better-auth": "^1.6.9",

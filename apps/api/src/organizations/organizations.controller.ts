@@ -22,6 +22,11 @@ export class OrganizationsController {
     return this.orgs.patch(user.id, organizationId, body);
   }
 
+  @Get(":organizationId/workspace")
+  workspace(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
+    return this.orgs.workspaceBootstrap(user.id, organizationId);
+  }
+
   @Get(":organizationId")
   getOne(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
     return this.orgs.getById(user.id, organizationId);

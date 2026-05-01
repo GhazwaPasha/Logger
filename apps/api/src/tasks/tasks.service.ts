@@ -24,8 +24,8 @@ export class TasksService {
     private readonly lists: ListsService,
   ) {}
 
-  async list(userId: string, organizationId: string) {
-    return this.authz.listTasksForUser(userId, organizationId);
+  async list(userId: string, organizationId: string, opts?: { includeSubtasks?: boolean }) {
+    return this.authz.listTasksForUser(userId, organizationId, opts);
   }
 
   async create(userId: string, organizationId: string, body: unknown) {
@@ -356,7 +356,7 @@ export class TasksService {
       y -= size + 6;
     };
 
-    line("Work Ledger — Task report", 14);
+    line("LogBase — Task report", 14);
     line(`Task: ${detail.task.title}`, 12);
     line(`Task ID: ${detail.task.id}`, 10, true);
     line(`Status: ${detail.task.status}`, 10);
