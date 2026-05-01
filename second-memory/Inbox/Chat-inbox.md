@@ -4,6 +4,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-02 — Workspace bootstrap includes subtasks (board N+1 fix)
+
+- **Context:** Subtasks were slow in testing and missing or flaky in production; new subtasks could “vanish” on the board after save.
+- **What we did:** **`workspaceBootstrap`** now loads tasks with **`includeSubtasks: true`** so the API runs one batched **`attachSubtasks`** query instead of the web client firing **`GET /tasks/:id/subtasks`** per visible task (kanban prefetch storm). **`work/page.tsx`** sync from **`filteredTasks`** overwrites **`subtasksByTaskId`** when the workspace task carries **`subtasks`** (same-array ref check) so refetches after create/edit are not stuck behind stale lazy-loaded state.
+- **Takeaway / follow-ups:** If production still shows no subtasks, verify **`subtasks`** table exists (**`0001_lists_subtasks.sql`** / migrate) and API deploy matches this code. CORS / **`NEXT_PUBLIC_API_URL`** issues would affect all endpoints, not only subtasks. Bumped **`QUERY_CACHE_VERSION`** to **`5`** so persisted workspace entries refetch and pick up **`subtasks`** on the task rows without waiting for **`staleTime`**.
+- **Code / repo:** `apps/api/src/organizations/organizations.service.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/lib/query-cache-version.ts`.
+
 ### 2026-05-01 — Login copy: brand-heavy “your base”
 
 - **Context:** User wanted auth clearly **on-brand** (“login to your base,” etc.); earlier split layout was dropped for a **single centered card**.
@@ -38,7 +45,7 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 - **What we did:**
   - **Persisted React Query:** **`@tanstack/react-query-persist-client`** + **`@tanstack/query-sync-storage-persister`**; **`QueryProvider`** wraps **`PersistQueryClientProvider`** with **`localStorage`** key **`wl_rq_${QUERY_CACHE_VERSION}_${userId|guest}`**, **`Fragment` key** per user, **`QUERY_CACHE_VERSION`** in **`lib/query-cache-version.ts`** (bump **`3`** when cache breaks). Dehydrates **`organizations`** + **`workspace`** only when logged in. **`QueryAuthListeners`** drops those caches on **`wl:auth-expired`**; **`apiJson`** dispatches that event on **401**.
   - **Auth timing:** **`apps/web/src/app/api/auth/[...all]/route.ts`** wraps Better Auth handler; logs **`get-session`**, **`token`**, **`sign-in`** when **`AUTH_TIMING_LOG`** unset in dev, **`AUTH_TIMING_LOG=1`** in prod, **`0`**/`false` to silence (**`auth-api-timing.ts`**).
-  - **Bootstrap tasks without subtasks:** **`AuthorizationService.listTasksForUser`** accepts **`includeSubtasks`** (default **true**); **`finalizeTaskList`** skips batched subtask query when **false**. **`workspaceBootstrap`** passes **`includeSubtasks: false`**. **`GET .../tasks?includeSubtasks=false`** for clients that want the same trim.
+  - **Bootstrap tasks + subtasks (updated 2026-05-02):** **`listTasksForUser`** still supports **`includeSubtasks: false`**; **`workspaceBootstrap`** now uses **`true`** (one batched subtask query) to avoid client N+1. **`GET .../tasks?includeSubtasks=false`** still trims for other clients.
 - **Code / repo:** `apps/api/src/authorization/authorization.service.ts`, `tasks.service.ts`, `tasks.controller.ts`, `organizations.service.ts`, `apps/web/src/components/app/QueryProvider.tsx`, `lib/api.ts`, `lib/query-cache-version.ts`, `lib/auth-api-timing.ts`, `app/api/auth/[...all]/route.ts`, `package.json` (web).
 
 ### 2026-05-01 — Brand mark from `Logo/` (designer light/dark PNGs)

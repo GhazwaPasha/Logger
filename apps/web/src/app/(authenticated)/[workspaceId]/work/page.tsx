@@ -1027,9 +1027,12 @@ function WorkItemsInner() {
       let changed = false;
       const next = { ...c };
       for (const t of filteredTasks) {
-        if (t.subtasks !== undefined && next[t.id] === undefined) {
-          next[t.id] = t.subtasks;
-          changed = true;
+        if (t.subtasks !== undefined) {
+          const cur = next[t.id];
+          if (cur !== t.subtasks) {
+            next[t.id] = t.subtasks;
+            changed = true;
+          }
         }
       }
       return changed ? next : c;

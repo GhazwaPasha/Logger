@@ -78,7 +78,8 @@ export class OrganizationsService {
     const [departments, lists, taskRows, members] = await Promise.all([
       this.departments.list(userId, organizationId),
       this.lists.list(userId, organizationId),
-      this.tasks.list(userId, organizationId, { includeSubtasks: false }),
+      /** One batched subtasks query (see `attachSubtasks`); avoids N+1 `GET /tasks/:id/subtasks` from the web board. */
+      this.tasks.list(userId, organizationId, { includeSubtasks: true }),
       this.listMembers(userId, organizationId),
     ]);
     return { departments, lists, tasks: taskRows, members };
