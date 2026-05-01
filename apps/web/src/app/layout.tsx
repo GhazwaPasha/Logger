@@ -24,10 +24,11 @@ export const metadata: Metadata = {
     icon: [
       { url: "/favicon.ico", type: "image/x-icon" },
       { url: "/pwa-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-256.png", sizes: "256x256", type: "image/png" },
       { url: "/pwa-512.png", sizes: "512x512", type: "image/png" },
     ],
     shortcut: "/favicon.ico",
-    apple: "/pwa-192.png",
+    apple: "/pwa-256.png",
   },
   other: {
     "msapplication-TileImage": `${siteOrigin}/pwa-512.png`,

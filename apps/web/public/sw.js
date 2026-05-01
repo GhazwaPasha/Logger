@@ -10,6 +10,7 @@ const BYPASS_PATHS = new Set([
   "/icon.png",
   "/apple-icon.png",
   "/pwa-192.png",
+  "/pwa-256.png",
   "/pwa-512.png",
 ]);
 
