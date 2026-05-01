@@ -17,11 +17,20 @@ import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
+import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
-import { parseTaskDueRepeat, type MemberRow, type SubtaskRow, type TaskDetail, type TaskDueRepeat, type TaskRow } from "@/lib/ledger-types";
+import {
+  parseTaskDueRepeat,
+  type MemberRow,
+  type SubtaskRow,
+  type TaskDetail,
+  type TaskDueRepeat,
+  type TaskMutationResult,
+  type TaskRow,
+} from "@/lib/ledger-types";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
@@ -33,20 +42,27 @@ import {
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import {
-  KANBAN_STATUS_ORDER,
+  FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
+  TASK_FLOW_ORDER,
   type BoardTaskStatus,
   type DatePreset,
+  type ManualTaskStatus,
   type SortMode,
   type TaskPriority,
-  kanbanAllowedTransitions,
-  kanbanTransitionAllowed,
+  kanbanAllowedTransitionsFromStored,
+  kanbanTransitionAllowedFromStored,
+  manualStatusFromStored,
+  nextWorkflowManualStatus,
   normalizeTaskStatus,
   sortTasks,
+  statusPillPaletteClasses,
+  storedStatusToFlowColumn,
   taskMatchesDatePreset,
   taskMatchesDueRange,
   taskPriority,
+  taskStatusDisplayLabel,
 } from "@/lib/task-board";
 
 type ViewMode = "list" | "kanban";
@@ -257,13 +273,13 @@ function TaskPanelScopeBadges({ level, list }: { level: string | null; list: str
   );
 }
 
-/** Same box for every workflow stage (label length varies; aligns with list row `h-8` tiles). */
+/** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
 const STATUS_PILL_LAYOUT =
-  "relative inline-flex h-8 w-[9.5rem] min-w-[9.5rem] max-w-[9.5rem] shrink-0 items-center justify-between gap-1 px-2";
+  "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 px-1.5";
 
-/** Expanded list subtasks: align tree under title (pill + row `gap-x-1` / `sm:gap-x-3` + chevron `size-11`). */
+/** Expanded list subtasks: pill + gap + checklist (`size-7`) + gap + chevron (`size-11`), matching row layout. */
 const LIST_ROW_SUBTASK_TREE_MARGIN =
-  "ml-[calc(9.5rem+0.25rem+2.75rem+0.25rem)] sm:ml-[calc(9.5rem+0.75rem+2.75rem+0.75rem)]";
+  "ml-[calc(6.875rem+0.25rem+1.75rem+0.25rem+2.75rem+0.25rem)] sm:ml-[calc(6.875rem+0.75rem+1.75rem+0.75rem+2.75rem+0.75rem)]";
 
 function priorityLabelShort(p: TaskPriority): string {
   if (p === "high") return "HIGH";
@@ -280,22 +296,10 @@ function tasksToolbarIconButtonClasses(active: boolean) {
   ].join(" ");
 }
 
-/** Same background + text hues as status dropdowns on task cards (`KanbanStatusPill`). */
-function statusPillPalette(st: BoardTaskStatus): string {
-  if (st === "pending") return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
-  if (st === "assigned") return "bg-sky-500/15 text-sky-800 dark:text-sky-200";
-  if (st === "in_progress") return "bg-violet-500/15 text-violet-800 dark:text-violet-200";
-  if (st === "late") return "bg-orange-500/15 text-orange-800 dark:text-orange-200";
-  if (st === "done") return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
-  return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
-}
-
-const BOARD_STATS_SEGMENTS: { status: BoardTaskStatus; label: string; title: string }[] = [
-  { status: "pending", label: "Pending", title: STATUS_LABELS.pending },
-  { status: "assigned", label: "Assigned", title: STATUS_LABELS.assigned },
-  { status: "in_progress", label: "In progress", title: STATUS_LABELS.in_progress },
-  { status: "late", label: "Late", title: STATUS_LABELS.late },
-  { status: "done", label: "Done", title: STATUS_LABELS.done },
+const BOARD_STATS_SEGMENTS: { status: ManualTaskStatus; label: string; title: string }[] = [
+  { status: "pending", label: "Pending", title: FLOW_COLUMN_LABELS.pending },
+  { status: "in_progress", label: "In progress", title: FLOW_COLUMN_LABELS.in_progress },
+  { status: "done", label: "Done", title: FLOW_COLUMN_LABELS.done },
 ];
 
 const PIPELINE_BADGE_FRAME =
@@ -307,7 +311,7 @@ function WorkBoardStatsCard({
   loading = false,
 }: {
   total: number;
-  counts: Record<BoardTaskStatus, number>;
+  counts: Record<ManualTaskStatus, number>;
   loading?: boolean;
 }) {
   const cancelled = counts.cancelled;
@@ -358,7 +362,7 @@ function WorkBoardStatsCard({
                 aria-label={`${title}: ${loading ? "loading" : counts[status]}`}
               >
                 <span className="truncate text-xs font-medium text-[var(--fg)]">{label}</span>
-                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette(status)}`}>{n(counts[status])}</span>
+                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPaletteClasses(status)}`}>{n(counts[status])}</span>
               </div>
             ))}
             <div
@@ -367,7 +371,7 @@ function WorkBoardStatsCard({
               aria-label={`${STATUS_LABELS.cancelled}: ${loading ? "loading" : cancelled}`}
             >
               <span className="truncate text-xs font-medium text-[var(--fg)]">{STATUS_LABELS.cancelled}</span>
-              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPalette("cancelled")}`}>{n(cancelled)}</span>
+              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPaletteClasses("cancelled")}`}>{n(cancelled)}</span>
             </div>
           </div>
         </div>
@@ -398,21 +402,20 @@ function WorkItemsInner() {
   const [due, setDue] = useState("");
   const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [newTaskStatus, setNewTaskStatus] = useState<BoardTaskStatus>("pending");
+  const [newTaskStatus, setNewTaskStatus] = useState<ManualTaskStatus>("pending");
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium");
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
   const [editDueRepeat, setEditDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
-  const [editStatus, setEditStatus] = useState<BoardTaskStatus>("pending");
+  const [editStatus, setEditStatus] = useState<ManualTaskStatus>("pending");
   const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
   const [editShowAssignees, setEditShowAssignees] = useState(false);
   const [editShowDuePanel, setEditShowDuePanel] = useState(false);
@@ -432,7 +435,8 @@ function WorkItemsInner() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [listRowExpanded, setListRowExpanded] = useState<Set<string>>(() => new Set());
   const [subtasksByTaskId, setSubtasksByTaskId] = useState<Record<string, SubtaskRow[] | "loading">>({});
-  const [subtaskUpdatingId, setSubtaskUpdatingId] = useState<string | null>(null);
+  const subtasksByTaskIdRef = useRef(subtasksByTaskId);
+  subtasksByTaskIdRef.current = subtasksByTaskId;
   const [sortMode, setSortMode] = useState<SortMode>("priority_desc");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dueFrom, setDueFrom] = useState("");
@@ -665,7 +669,7 @@ function WorkItemsInner() {
     setEditAssigneeIds([...editDetail.assigneeUserIds]);
     setEditDue(dueAtToLocalInput(editDetail.task.dueAt));
     setEditDueRepeat(parseTaskDueRepeat(editDetail.task.dueRepeat));
-    setEditStatus(normalizeTaskStatus(editDetail.task.status));
+    setEditStatus(manualStatusFromStored(normalizeTaskStatus(editDetail.task.status)));
     setEditPriority(taskPriority(editDetail.task));
     setEditNewSubtasks([]);
   }, [editTaskId, editDetail?.task.id]);
@@ -676,9 +680,9 @@ function WorkItemsInner() {
       patch,
     }: {
       taskId: string;
-      patch: { status?: BoardTaskStatus; priority?: TaskPriority };
+      patch: { status?: ManualTaskStatus; priority?: TaskPriority };
     }) =>
-      apiJson<TaskDetail>(`/tasks/${taskId}`, {
+      apiJson<TaskMutationResult>(`/tasks/${taskId}`, {
         method: "PATCH",
         token: token!,
         body: JSON.stringify(patch),
@@ -686,7 +690,6 @@ function WorkItemsInner() {
     onMutate: async ({ taskId, patch }) => {
       if (!token) return;
       setError(null);
-      setUpdatingTaskId(taskId);
       await queryClient.cancelQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
       const previous = queryClient.getQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId));
       if (previous) {
@@ -713,109 +716,125 @@ function WorkItemsInner() {
             return {
               ...t,
               ...detail.task,
-              assigneeUserIds: detail.assigneeUserIds ?? t.assigneeUserIds,
-              subtasks: detail.subtasks.length ? detail.subtasks : t.subtasks,
+              assigneeUserIds: detail.assigneeUserIds,
+              subtasks: detail.subtasks,
             };
           }),
         };
       });
+      queryClient.setQueryData<TaskDetail>(taskKeys.detail(taskId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          task: { ...old.task, ...detail.task },
+          assigneeUserIds: detail.assigneeUserIds,
+          subtasks: detail.subtasks,
+          capabilities: detail.capabilities,
+          ledger: [...detail.ledgerDelta, ...old.ledger],
+        };
+      });
     },
-    onSettled: () => setUpdatingTaskId(null),
+  });
+
+  const patchSubtaskMutation = useMutation({
+    mutationFn: async (vars: { taskId: string; subtaskId: string; done: boolean }) =>
+      apiJson<SubtaskRow>(`/tasks/${vars.taskId}/subtasks/${vars.subtaskId}`, {
+        method: "PATCH",
+        token: token!,
+        body: JSON.stringify({ done: vars.done }),
+      }),
+    onMutate: async ({ taskId, subtaskId, done }) => {
+      setError(null);
+      await queryClient.cancelQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      const previousWorkspace = queryClient.getQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId));
+      const previousSubs = { ...subtasksByTaskIdRef.current };
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks.map((t) => {
+            if (t.id !== taskId || !Array.isArray(t.subtasks)) return t;
+            return {
+              ...t,
+              subtasks: t.subtasks.map((s) => (s.id === subtaskId ? { ...s, done } : s)),
+            };
+          }),
+        };
+      });
+      setSubtasksByTaskId((c) => {
+        const cur = c[taskId];
+        if (!Array.isArray(cur)) return c;
+        return { ...c, [taskId]: cur.map((s) => (s.id === subtaskId ? { ...s, done } : s)) };
+      });
+      return { previousWorkspace, previousSubs };
+    },
+    onError: (err, _v, ctx) => {
+      if (ctx?.previousWorkspace) {
+        queryClient.setQueryData(workspaceKeys.workspace(workspaceId), ctx.previousWorkspace);
+      }
+      if (ctx?.previousSubs) setSubtasksByTaskId(ctx.previousSubs);
+      setError(err instanceof Error ? err.message : "Could not update subtask");
+    },
+    onSuccess: (row, { taskId, subtaskId }) => {
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks.map((t) => {
+            if (t.id !== taskId || !Array.isArray(t.subtasks)) return t;
+            return {
+              ...t,
+              subtasks: t.subtasks.map((s) => (s.id === subtaskId ? row : s)),
+            };
+          }),
+        };
+      });
+      setSubtasksByTaskId((c) => {
+        const cur = c[taskId];
+        if (!Array.isArray(cur)) return c;
+        return { ...c, [taskId]: cur.map((s) => (s.id === subtaskId ? row : s)) };
+      });
+      queryClient.setQueryData<TaskDetail>(taskKeys.detail(taskId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          subtasks: old.subtasks.map((s) => (s.id === subtaskId ? row : s)),
+        };
+      });
+    },
   });
 
   const patchTask = useCallback(
-    (taskId: string, patch: { status?: BoardTaskStatus; priority?: TaskPriority }) => {
+    (taskId: string, patch: { status?: ManualTaskStatus; priority?: TaskPriority }) => {
       if (!token) return;
       patchTaskMutation.mutate({ taskId, patch });
     },
     [token, patchTaskMutation],
   );
 
-  const toggleListRowExpand = useCallback(
-    (taskId: string) => {
-      const task = tasks.find((t) => t.id === taskId);
-      const embedded = task?.subtasks;
+  const toggleListRowExpand = useCallback((taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    const embedded = task?.subtasks ?? [];
 
-      setListRowExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(taskId)) {
-          next.delete(taskId);
-          return next;
-        }
-        next.add(taskId);
+    setListRowExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
         return next;
-      });
-
-      if (embedded !== undefined) {
-        setSubtasksByTaskId((c) => ({ ...c, [taskId]: embedded }));
-        return;
       }
+      next.add(taskId);
+      return next;
+    });
 
-      setSubtasksByTaskId((c) => {
-        if (c[taskId] !== undefined) return c;
-        if (!token) return c;
-        void (async () => {
-          try {
-            const rows = await apiJson<SubtaskRow[]>(`/tasks/${taskId}/subtasks`, { token });
-            setSubtasksByTaskId((x) => ({ ...x, [taskId]: rows }));
-          } catch (e) {
-            setError(e instanceof Error ? e.message : "Could not load subtasks");
-            setListRowExpanded((p) => {
-              const n = new Set(p);
-              n.delete(taskId);
-              return n;
-            });
-            setSubtasksByTaskId((x) => {
-              const { [taskId]: _, ...rest } = x;
-              return rest;
-            });
-          }
-        })();
-        return { ...c, [taskId]: "loading" };
-      });
-    },
-    [token, setError, tasks],
-  );
+    setSubtasksByTaskId((c) => ({ ...c, [taskId]: embedded }));
+  }, [tasks]);
 
   const patchListSubtaskDone = useCallback(
-    async (taskId: string, subtaskId: string, done: boolean) => {
+    (taskId: string, subtaskId: string, done: boolean) => {
       if (!token) return;
-      setError(null);
-      setSubtaskUpdatingId(subtaskId);
-      try {
-        await apiJson(`/tasks/${taskId}/subtasks/${subtaskId}`, {
-          method: "PATCH",
-          token,
-          body: JSON.stringify({ done }),
-        });
-        setSubtasksByTaskId((c) => {
-          const cur = c[taskId];
-          if (!Array.isArray(cur)) return c;
-          return {
-            ...c,
-            [taskId]: cur.map((s) => (s.id === subtaskId ? { ...s, done } : s)),
-          };
-        });
-        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            tasks: old.tasks.map((t) => {
-              if (t.id !== taskId || t.subtasks === undefined) return t;
-              return {
-                ...t,
-                subtasks: t.subtasks.map((s) => (s.id === subtaskId ? { ...s, done } : s)),
-              };
-            }),
-          };
-        });
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not update subtask");
-      } finally {
-        setSubtaskUpdatingId(null);
-      }
+      patchSubtaskMutation.mutate({ taskId, subtaskId, done });
     },
-    [token, setError, queryClient, workspaceId],
+    [token, patchSubtaskMutation],
   );
 
   async function createTask() {
@@ -823,7 +842,10 @@ function WorkItemsInner() {
     setError(null);
     try {
       const dueIso = due.trim() ? new Date(due).toISOString() : undefined;
-      const created = await apiJson<{ task: { id: string } }>(`/organizations/${workspaceId}/tasks`, {
+      const initialSubtasks = subtaskItems
+        .map((t) => ({ title: t.trim() }))
+        .filter((x) => x.title.length > 0);
+      const created = await apiJson<TaskMutationResult>(`/organizations/${workspaceId}/tasks`, {
         method: "POST",
         token,
         body: JSON.stringify({
@@ -833,16 +855,18 @@ function WorkItemsInner() {
           status: newTaskStatus,
           priority: newTaskPriority,
           ...(dueIso ? { dueAt: dueIso, dueRepeat: dueRepeat ?? null } : {}),
+          ...(initialSubtasks.length > 0 ? { initialSubtasks } : {}),
         }),
       });
-      const createdTaskId = created.task.id;
-      for (const subtaskTitle of subtaskItems) {
-        await apiJson(`/tasks/${createdTaskId}/subtasks`, {
-          method: "POST",
-          token,
-          body: JSON.stringify({ title: subtaskTitle }),
-        });
-      }
+      const row: TaskRow = {
+        ...created.task,
+        assigneeUserIds: created.assigneeUserIds,
+        subtasks: created.subtasks,
+      };
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return { ...old, tasks: [row, ...old.tasks] };
+      });
       setTitle("");
       setDue("");
       setDueRepeat(null);
@@ -855,7 +879,6 @@ function WorkItemsInner() {
       setShowDuePanel(false);
       setShowRepeatPanel(false);
       setCreateModalOpen(false);
-      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create task");
     }
@@ -874,7 +897,11 @@ function WorkItemsInner() {
       const prevIso = editDetail.task.dueAt ? new Date(editDetail.task.dueAt).toISOString() : null;
       const nextIso = editDue.trim() ? new Date(editDue).toISOString() : null;
       const duePatch = prevIso !== nextIso ? { dueAt: nextIso === null ? null : nextIso } : {};
-      await apiJson<TaskDetail>(`/tasks/${editTaskId}`, {
+      const subtasksToCreate = editNewSubtasks
+        .map((st) => st.trim())
+        .filter(Boolean)
+        .map((line) => ({ title: line }));
+      const saved = await apiJson<TaskMutationResult>(`/tasks/${editTaskId}`, {
         method: "PATCH",
         token,
         body: JSON.stringify({
@@ -884,19 +911,36 @@ function WorkItemsInner() {
           assigneeUserIds: editAssigneeIds,
           dueRepeat: editDueRepeat,
           ...duePatch,
+          ...(subtasksToCreate.length > 0 ? { subtasksToCreate } : {}),
         }),
       });
-      for (const st of editNewSubtasks) {
-        const line = st.trim();
-        if (!line) continue;
-        await apiJson(`/tasks/${editTaskId}/subtasks`, {
-          method: "POST",
-          token,
-          body: JSON.stringify({ title: line }),
-        });
-      }
-      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-      await queryClient.invalidateQueries({ queryKey: taskKeys.detail(editTaskId) });
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks.map((t) =>
+            t.id !== editTaskId
+              ? t
+              : {
+                  ...t,
+                  ...saved.task,
+                  assigneeUserIds: saved.assigneeUserIds,
+                  subtasks: saved.subtasks,
+                },
+          ),
+        };
+      });
+      queryClient.setQueryData<TaskDetail>(taskKeys.detail(editTaskId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          task: { ...old.task, ...saved.task },
+          assigneeUserIds: saved.assigneeUserIds,
+          subtasks: saved.subtasks,
+          capabilities: saved.capabilities,
+          ledger: [...saved.ledgerDelta, ...old.ledger],
+        };
+      });
       setEditTaskId(null);
       setEditNewSubtasks([]);
       setEditSubtaskDraft("");
@@ -957,16 +1001,14 @@ function WorkItemsInner() {
   }, [activeTasks, selectedList, selectedLevel, levelLists]);
 
   const boardStatusCounts = useMemo(() => {
-    const counts: Record<BoardTaskStatus, number> = {
+    const counts: Record<ManualTaskStatus, number> = {
       pending: 0,
-      assigned: 0,
       in_progress: 0,
-      late: 0,
       done: 0,
       cancelled: 0,
     };
     for (const t of visibleTasks) {
-      counts[normalizeTaskStatus(t.status)]++;
+      counts[storedStatusToFlowColumn(normalizeTaskStatus(t.status))]++;
     }
     return counts;
   }, [visibleTasks]);
@@ -1017,11 +1059,6 @@ function WorkItemsInner() {
     };
   }, [editDetail, lists, depts]);
 
-  const kanbanSubtaskPrefetchKey = useMemo(
-    () => filteredTasks.map((t) => t.id).sort().join(","),
-    [filteredTasks],
-  );
-
   useEffect(() => {
     setSubtasksByTaskId((c) => {
       let changed = false;
@@ -1039,38 +1076,6 @@ function WorkItemsInner() {
     });
   }, [filteredTasks]);
 
-  useEffect(() => {
-    if (viewMode !== "kanban" || !token) return;
-    const ids = kanbanSubtaskPrefetchKey.split(",").filter(Boolean);
-    const toFetch: string[] = [];
-    setSubtasksByTaskId((c) => {
-      const next = { ...c };
-      for (const taskId of ids) {
-        const task = filteredTasks.find((t) => t.id === taskId);
-        if (task?.subtasks !== undefined) continue;
-        if (next[taskId] === undefined) {
-          next[taskId] = "loading";
-          toFetch.push(taskId);
-        }
-      }
-      return toFetch.length ? next : c;
-    });
-    for (const taskId of toFetch) {
-      void (async () => {
-        try {
-          const rows = await apiJson<SubtaskRow[]>(`/tasks/${taskId}/subtasks`, { token });
-          setSubtasksByTaskId((x) => ({ ...x, [taskId]: rows }));
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "Could not load subtasks");
-          setSubtasksByTaskId((x) => {
-            const { [taskId]: _, ...rest } = x;
-            return rest;
-          });
-        }
-      })();
-    }
-  }, [viewMode, token, kanbanSubtaskPrefetchKey, setError, filteredTasks]);
-
   /** `null` when unassigned; otherwise comma-separated display names (or `"Unknown"` if IDs present but not resolved). */
   function assigneeNamesForTask(task: TaskRow, memberRows: MemberRow[]): string | null {
     const ids = task.assigneeUserIds ?? [];
@@ -1084,12 +1089,6 @@ function WorkItemsInner() {
       })
       .filter((n): n is string => Boolean(n));
     return names.length > 0 ? names.join(", ") : "Unknown";
-  }
-
-  function priorityClass(p: TaskPriority) {
-    if (p === "high") return "bg-rose-500/15 text-rose-700 dark:text-rose-300";
-    if (p === "low") return "bg-slate-500/15 text-slate-600 dark:text-slate-300";
-    return "bg-amber-500/15 text-amber-800 dark:text-amber-200";
   }
 
   function dueDatePillClass(hasDue: boolean) {
@@ -1116,7 +1115,11 @@ function WorkItemsInner() {
   function ListTaskCard({ task }: { task: TaskRow }) {
     const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const p = taskPriority(task);
-    const busy = updatingTaskId === task.id;
+    const storedStatus = normalizeTaskStatus(task.status);
+    const flowCol = storedStatusToFlowColumn(storedStatus);
+    const checklistDone = flowCol === "done";
+    const checklistDisabled = flowCol === "cancelled";
+    const advanceTo = nextWorkflowManualStatus(storedStatus);
     const expanded = listRowExpanded.has(task.id);
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
@@ -1129,8 +1132,64 @@ function WorkItemsInner() {
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-4 py-3">
             <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 sm:gap-x-3">
-              <div className="shrink-0 self-center" onMouseDown={(e) => e.stopPropagation()}>
+              <div className="flex shrink-0 items-center gap-1 self-center" onMouseDown={(e) => e.stopPropagation()}>
                 <KanbanStatusPill task={task} />
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={checklistDone}
+                  disabled={checklistDisabled || (!checklistDone && advanceTo == null)}
+                  title={
+                    checklistDisabled
+                      ? "Cancelled — use status menu to reopen"
+                      : checklistDone
+                        ? "Mark as not done"
+                        : advanceTo
+                          ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                          : "Cannot advance"
+                  }
+                  aria-label={
+                    checklistDisabled
+                      ? "Task cancelled"
+                      : checklistDone
+                        ? "Mark task not done"
+                        : advanceTo
+                          ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                          : "Cannot advance task"
+                  }
+                  className={`flex size-7 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                    checklistDone
+                      ? "surface-glass-primary border-solid text-[var(--fg)]"
+                      : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
+                  } ${
+                    checklistDisabled || (!checklistDone && advanceTo == null)
+                      ? "cursor-not-allowed opacity-40"
+                      : "cursor-pointer hover:bg-[var(--surface-hover)]"
+                  }`}
+                  onClick={() => {
+                    if (checklistDisabled) return;
+                    if (checklistDone) {
+                      void patchTask(task.id, { status: "in_progress" });
+                      return;
+                    }
+                    if (advanceTo) void patchTask(task.id, { status: advanceTo });
+                  }}
+                >
+                  {checklistDone ? (
+                    <svg
+                      className="size-[15px] shrink-0"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : null}
+                </button>
               </div>
               <button
                 type="button"
@@ -1145,7 +1204,11 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id)}
-                  className="min-w-0 flex-1 truncate text-left text-sm font-medium text-[var(--fg)] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+                  className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                    checklistDone
+                      ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
+                      : "text-[var(--fg)]"
+                  }`}
                 >
                   {task.title}
                 </button>
@@ -1201,7 +1264,6 @@ function WorkItemsInner() {
                   <select
                     className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
                     value={p}
-                    disabled={busy}
                     onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
                     aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
                   >
@@ -1245,18 +1307,16 @@ function WorkItemsInner() {
                 {Array.isArray(subtasksState) && subtasksState.length > 0 && (
                   <ul className="space-y-1 py-1">
                     {subtasksState.map((s) => {
-                      const stBusy = subtaskUpdatingId === s.id;
                       return (
                         <li key={s.id} className="flex items-start gap-2 text-sm">
                           <button
                             type="button"
-                            disabled={stBusy}
                             onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               s.done
                                 ? "surface-glass-primary border-solid"
                                 : "border-[var(--border-subtle)] hover:border-[var(--accent)]"
-                            } ${stBusy ? "cursor-wait opacity-50" : ""}`}
+                            }`}
                             aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                           >
                             {s.done ? (
@@ -1282,36 +1342,42 @@ function WorkItemsInner() {
   function StatusPillSelect({
     "aria-label": ariaLabel,
     value,
+    displayLabel,
+    pillAppearance,
     onChange,
     options,
     disabled,
   }: {
     "aria-label": string;
-    value: BoardTaskStatus;
-    onChange: (next: BoardTaskStatus) => void;
-    options: readonly BoardTaskStatus[];
+    value: ManualTaskStatus;
+    /** When set (e.g. kanban cards), overrides the visible label while `value` stays the manual stage. */
+    displayLabel?: string;
+    /** When set, drives pill colors so **Assigned** / **Late** match their labels (manual `value` stays the flow bucket). */
+    pillAppearance?: BoardTaskStatus;
+    onChange: (next: ManualTaskStatus) => void;
+    options: readonly ManualTaskStatus[];
     disabled?: boolean;
   }) {
-    const st = normalizeTaskStatus(value as string);
+    const paletteKey = pillAppearance ?? value;
     return (
       <div
-        className={`${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPalette(st)}`}
+        className={`${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
       >
         <select
           className="absolute inset-0 z-[1] cursor-pointer opacity-0"
-          value={st}
+          value={value}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value as BoardTaskStatus)}
+          onChange={(e) => onChange(e.target.value as ManualTaskStatus)}
           aria-label={ariaLabel}
         >
           {options.map((s) => (
             <option key={s} value={s}>
-              {STATUS_LABELS[s]}
+              {FLOW_COLUMN_LABELS[s]}
             </option>
           ))}
         </select>
         <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
-          {STATUS_LABELS[st]}
+          {displayLabel ?? FLOW_COLUMN_LABELS[value]}
         </span>
         <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" aria-hidden />
       </div>
@@ -1319,33 +1385,33 @@ function WorkItemsInner() {
   }
 
   function KanbanStatusPill({ task }: { task: TaskRow }) {
-    const st = normalizeTaskStatus(task.status);
-    const busy = updatingTaskId === task.id;
-    const allowed = kanbanAllowedTransitions(st);
+    const stored = normalizeTaskStatus(task.status);
+    const manual = manualStatusFromStored(stored);
+    const allowed = kanbanAllowedTransitionsFromStored(stored);
     return (
       <StatusPillSelect
-        aria-label="Task stage (one step on the pipeline)"
-        value={st}
+        aria-label="Task stage (one step on the workflow)"
+        value={manual}
+        displayLabel={taskStatusDisplayLabel(stored)}
+        pillAppearance={stored}
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={allowed}
-        disabled={busy}
       />
     );
   }
 
+  /** Matches list-row priority tile ({@link ListTaskCard}) — same footprint as {@link STATUS_PILL_LAYOUT} (`h-8`). */
   function KanbanPriorityPill({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
-    const busy = updatingTaskId === task.id;
     return (
       <div
-        className={`relative inline-flex shrink-0 items-center gap-1 rounded-sm border border-[var(--border-subtle)] px-2 py-1 ${priorityClass(p)}`}
+        className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]`}
       >
         <select
-          className="absolute inset-0 cursor-pointer opacity-0"
+          className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
           value={p}
-          disabled={busy}
           onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
-          aria-label="Task priority"
+          aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
         >
           {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
             <option key={k} value={k}>
@@ -1353,8 +1419,7 @@ function WorkItemsInner() {
             </option>
           ))}
         </select>
-        <span className="pointer-events-none text-[11px] font-semibold uppercase tracking-wide">{PRIORITY_LABELS[p]}</span>
-        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" />
+        <span className={`${LIST_ROW_BADGE_LABEL} uppercase`}>{priorityLabelShort(p)}</span>
       </div>
     );
   }
@@ -1375,6 +1440,7 @@ function WorkItemsInner() {
     const listBadge = taskListName(task);
     const levelBadge = taskLevelBadge(task);
     const assigneeFirstName = firstAssigneeLabel(task, members);
+    const assigneeInitial = assigneeFirstName?.trim().charAt(0).toUpperCase() ?? "";
 
     return (
       <li
@@ -1383,108 +1449,135 @@ function WorkItemsInner() {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
         }}
-        className="surface-elevated cursor-grab touch-manipulation rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-sm transition-[box-shadow,border-color] hover:border-[var(--border)] hover:shadow-md active:cursor-grabbing dark:hover:shadow-lg dark:hover:shadow-black/20"
+        className="group/card relative cursor-grab touch-manipulation overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_1px_0_0_rgba(0,0,0,0.04)] ring-0 transition-[box-shadow,border-color,transform] hover:-translate-y-px hover:border-[var(--border)] hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.12)] active:cursor-grabbing dark:shadow-[0_1px_0_0_rgba(255,255,255,0.05)] dark:hover:shadow-[0_12px_28px_-10px_rgba(0,0,0,0.45)]"
       >
-        <div className="flex flex-col gap-0">
-          <div className="flex gap-3 border-b border-[var(--border-subtle)]/70 px-4 pb-3 pt-4">
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => openEditTask(task.id)}
-                className="line-clamp-3 w-full text-left text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
-              >
-                {task.title}
-              </button>
-              {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
-                <span className="flex w-fit max-w-full flex-wrap items-center gap-1.5">
-                  {showTaskLevelBadge && levelBadge ? (
-                    <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
-                      {levelBadge}
-                    </span>
-                  ) : null}
-                  {showTaskListBadge && listBadge ? (
-                    <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
-                      {listBadge}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-            </div>
-            <div
-              className="flex shrink-0 flex-col items-end gap-1.5"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <KanbanStatusPill task={task} />
-              <div className="flex items-center gap-1">
-                <KanbanPriorityPill task={task} />
-                <button
-                  type="button"
-                  onClick={() => openEditTask(task.id)}
-                  className={TASK_ROW_OVERFLOW_MENU_BTN}
-                  title="Edit task"
-                  aria-label={`More options — edit: ${task.title}`}
-                >
-                  <IconEllipsisVertical className="opacity-90" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-x-4 gap-y-2.5 px-4 pb-3 pt-3 text-xs leading-snug">
+        <div className="flex flex-col gap-2.5 px-3 pb-3 pt-3.5">
+          <div className="flex min-w-0 items-start gap-2">
             <button
               type="button"
-              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => openEditTask(task.id)}
+              className="line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-4 decoration-[var(--muted)]/40 hover:underline hover:decoration-[var(--accent)] focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
+            >
+              {task.title}
+            </button>
+            <button
+              type="button"
+              onClick={() => openEditTask(task.id)}
+              className="-mr-0.5 -mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
+              title="Edit task"
+              aria-label={`More options — edit: ${task.title}`}
+            >
+              <IconEllipsisVertical className="size-[18px] opacity-90" />
+            </button>
+          </div>
+
+          {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
+            <span className="flex w-fit max-w-full flex-wrap items-center gap-1.5">
+              {showTaskLevelBadge && levelBadge ? (
+                <span className={`${LEVEL_BADGE_CLASS} py-0.5 text-[11px]`} title={`${NODE_LABELS.level}: ${levelBadge}`}>
+                  {levelBadge}
+                </span>
+              ) : null}
+              {showTaskListBadge && listBadge ? (
+                <span className={`${LIST_BADGE_CLASS} py-0.5 text-[11px]`} title={`List: ${listBadge}`}>
+                  {listBadge}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-1.5" onMouseDown={(e) => e.stopPropagation()}>
+            <KanbanStatusPill task={task} />
+            <KanbanPriorityPill task={task} />
+          </div>
+
+          <div
+            className="flex flex-wrap items-stretch gap-2 border-t border-[var(--border-subtle)]/50 pt-2.5"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
               onClick={() => openEditTask(task.id, "due")}
-              className={`${TASK_DUE_CHIP_CLASS} ${dueDatePillClass(Boolean(task.dueAt))}`}
-              title={
-                task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"
-              }
+              className={`${TASK_DUE_CHIP_CLASS} min-h-9 justify-start px-2.5 ${dueDatePillClass(Boolean(task.dueAt))}`}
+              title={task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"}
             >
               <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
-              <span className={TASK_DUE_CHIP_LABEL_CLASS}>
+              <span className={`${TASK_DUE_CHIP_LABEL_CLASS} text-left`}>
                 {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
               </span>
             </button>
             <button
               type="button"
-              onMouseDown={(e) => e.stopPropagation()}
               onClick={() => openEditTask(task.id, "assignees")}
               title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
               aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
-              className={`inline-flex h-8 w-[5rem] min-h-[2rem] max-h-[2rem] min-w-[5rem] max-w-[5rem] shrink-0 items-center justify-center overflow-hidden rounded-sm border px-1 py-0.5 text-left transition-colors hover:opacity-95 ${
-                assigneeNames ? dueDatePillClass(false) : "border-[var(--border-subtle)] bg-[var(--surface-muted)]"
+              className={`inline-flex min-h-9 max-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border px-2 py-1 text-left transition-colors hover:opacity-95 sm:flex-initial sm:max-w-[10rem] ${
+                assigneeNames
+                  ? "border-[var(--border-subtle)] bg-[var(--surface-muted)]/80"
+                  : "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-hover)]/60"
               }`}
             >
               {assigneeFirstName ? (
-                <span className="pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-tight text-[var(--fg)]">
-                  {assigneeFirstName}
-                </span>
+                <>
+                  <span
+                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[11px] font-bold tabular-nums text-[var(--accent-hover)] dark:text-[var(--accent)]"
+                    aria-hidden
+                  >
+                    {assigneeInitial}
+                  </span>
+                  <span className="pointer-events-none min-w-0 flex-1 truncate text-[12px] font-medium leading-tight text-[var(--fg)]">
+                    {assigneeFirstName}
+                  </span>
+                </>
               ) : (
-                <IconUserPlus className="size-4 shrink-0 opacity-65" aria-hidden />
+                <>
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)]/50">
+                    <IconUserPlus className="size-3.5 shrink-0 opacity-70" aria-hidden />
+                  </span>
+                  <span className="pointer-events-none text-[12px] font-medium text-[var(--muted)]">Assign</span>
+                </>
               )}
             </button>
           </div>
 
           {subtasksState === "loading" && (
-            <p className="border-t border-[var(--border-subtle)]/60 px-4 py-2.5 text-xs text-[var(--muted)]">Loading subtasks…</p>
+            <p className="border-t border-[var(--border-subtle)]/40 pt-2.5 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
           )}
           {subtasksPreview.length > 0 && (
-            <div className="border-t border-[var(--border-subtle)]/60 px-4 pb-4 pt-2">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">Checklist</p>
-              <ul className="space-y-2">
+            <div className="border-t border-[var(--border-subtle)]/40 pt-2.5">
+              <div className="mb-2 flex items-center gap-1.5 text-[var(--muted)]">
+                <svg
+                  className="size-3 shrink-0 opacity-70"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+                <span className="text-[11px] font-medium tracking-tight">
+                  Subtasks
+                  {Array.isArray(subtasksState) ? (
+                    <span className="ml-1 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
+                  ) : null}
+                </span>
+              </div>
+              <ul className="space-y-1.5 rounded-lg bg-[var(--surface-base)]/60 py-2 pl-2 pr-1 dark:bg-black/15">
                 {subtasksPreview.map((s) => {
-                  const stBusy = subtaskUpdatingId === s.id;
                   return (
-                    <li key={s.id} className="flex items-start gap-2.5 text-[13px] leading-snug">
+                    <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
                       <button
                         type="button"
-                        disabled={stBusy}
                         onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
-                        className={`mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors ${
+                        className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
                           s.done
                             ? "surface-glass-primary border-solid"
                             : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
-                        } ${stBusy ? "cursor-wait opacity-50" : ""}`}
+                        }`}
                         aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                       >
                         {s.done ? (
@@ -1493,7 +1586,9 @@ function WorkItemsInner() {
                           </svg>
                         ) : null}
                       </button>
-                      <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80" : "text-[var(--fg)]"}`}>
+                      <span
+                        className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80" : "text-[var(--fg)]"}`}
+                      >
                         {s.title}
                       </span>
                     </li>
@@ -1547,17 +1642,22 @@ function WorkItemsInner() {
     return (
       <div>
         <p className="mb-3 max-w-2xl text-[11px] leading-relaxed text-[var(--muted)]">
-          Stages follow the workflow left to right. Drag a card to the next column, or change stage from the card — moves are limited to{" "}
-          <span className="text-[var(--fg)]/90">one step at a time</span> (no skipping ahead).
+          Columns are <span className="text-[var(--fg)]/90">Pending</span>,{" "}
+          <span className="text-[var(--fg)]/90">In progress</span>, <span className="text-[var(--fg)]/90">Done</span>, and{" "}
+          <span className="text-[var(--fg)]/90">Cancelled</span>. Assignees and due dates drive{" "}
+          <span className="text-[var(--fg)]/90">Assigned</span> and <span className="text-[var(--fg)]/90">Late</span> automatically. Drag or use the
+          stage control — moves are limited to <span className="text-[var(--fg)]/90">one step at a time</span> along the manual workflow (cancel anytime).
         </p>
         <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
           <div
             className="flex min-h-[min(72vh,38rem)] gap-4 md:min-h-[min(78vh,42rem)]"
             style={{ minWidth: "min(100%, 92rem)" }}
           >
-            {KANBAN_STATUS_ORDER.map((col) => {
-              const colTasks = rows.filter((t) => normalizeTaskStatus(t.status) === col);
-              const label = STATUS_LABELS[col];
+            {TASK_FLOW_ORDER.map((col) => {
+              const colTasks = rows.filter(
+                (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
+              );
+              const label = FLOW_COLUMN_LABELS[col];
               return (
                 <div
                   key={col}
@@ -1575,8 +1675,8 @@ function WorkItemsInner() {
                   const task = rows.find((t) => t.id === id);
                   if (!task) return;
                   const from = normalizeTaskStatus(task.status);
-                  if (!kanbanTransitionAllowed(from, col)) {
-                    setError("Move tasks one stage at a time along the pipeline.");
+                  if (!kanbanTransitionAllowedFromStored(from, col)) {
+                    setError("Move tasks one stage at a time along the workflow.");
                     return;
                   }
                   void patchTask(id, { status: col });
@@ -1883,7 +1983,7 @@ function WorkItemsInner() {
                           aria-label="Status"
                           value={editStatus}
                           onChange={setEditStatus}
-                          options={KANBAN_STATUS_ORDER}
+                          options={TASK_FLOW_ORDER}
                         />
                         <select
                           aria-label="Priority"
@@ -2021,6 +2121,7 @@ function WorkItemsInner() {
                         {editSaving ? "Saving…" : "Save"}
                       </button>
                     </div>
+                    <TaskPanelHistoryCard task={editDetail.task} ledger={editDetail.ledger} members={members} />
                   </>
                 ) : (
                   <>
@@ -2045,7 +2146,7 @@ function WorkItemsInner() {
                   aria-label="Status"
                   value={newTaskStatus}
                   onChange={setNewTaskStatus}
-                  options={KANBAN_STATUS_ORDER}
+                  options={TASK_FLOW_ORDER}
                 />
                 <select
                   aria-label="Priority"

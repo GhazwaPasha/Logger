@@ -15,26 +15,37 @@ export default function PeoplePage() {
   const { depts, members, error, setError, reload } = useWorkspaceData();
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"owner" | "manager" | "member">("member");
-  const [memberDeptId, setMemberDeptId] = useState("");
+  /** Selected level ids when inviting as manager (multi-select). */
+  const [memberDeptIds, setMemberDeptIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
 
   useEffect(() => {
-    if (depts.length && !memberDeptId) setMemberDeptId(depts[0]!.id);
-  }, [depts, memberDeptId]);
+    if (depts.length === 0 || memberRole !== "manager") return;
+    setMemberDeptIds((prev) => (prev.size === 0 ? new Set([depts[0]!.id]) : prev));
+  }, [depts, memberRole]);
+
+  function toggleMemberDept(id: string) {
+    setMemberDeptIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   async function addMember() {
     if (!token || !memberEmail.trim()) return;
-    if (memberRole === "manager" && !memberDeptId) {
-      setError("Select a level for managers.");
+    if (memberRole === "manager" && memberDeptIds.size === 0) {
+      setError(`Select at least one ${NODE_LABELS.level.toLowerCase()} for managers.`);
       return;
     }
     setError(null);
     try {
       const body: Record<string, unknown> = { email: memberEmail.trim(), role: memberRole };
-      if (memberRole === "manager") body.departmentId = memberDeptId;
+      if (memberRole === "manager") body.departmentIds = [...memberDeptIds];
       await apiJson(`/organizations/${workspaceId}/members`, {
         method: "POST",
         token,
@@ -53,7 +64,9 @@ export default function PeoplePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Who can access this {NODE_LABELS.workspace.toLowerCase()} and, for managers, which {NODE_LABELS.level.toLowerCase()} they cover.
+          Who can access this {NODE_LABELS.workspace.toLowerCase()} and, for managers, which{" "}
+          {NODE_LABELS.level.toLowerCase()}
+          (s) they cover.
         </p>
       </div>
       <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
@@ -64,6 +77,16 @@ export default function PeoplePage() {
               <div>
                 <span className="font-medium">{m.name}</span>
                 <span className="ml-2 text-[var(--muted)]">{m.email}</span>
+                {m.role === "manager" && m.managedDepartmentIds.length > 0 && (
+                  <div className="mt-1 text-xs text-[var(--muted)]">
+                    {NODE_LABELS.level}
+                    {": "}
+                    {m.managedDepartmentIds
+                      .map((id) => depts.find((d) => d.id === id)?.name)
+                      .filter(Boolean)
+                      .join(", ")}
+                  </div>
+                )}
               </div>
               <span className="rounded-full bg-[var(--surface-muted)] px-2.5 py-0.5 text-xs font-medium capitalize">
                 {m.role}
@@ -94,16 +117,26 @@ export default function PeoplePage() {
             </select>
           </div>
           {memberRole === "manager" && (
-            <div>
-              <label className="mb-1.5 block text-xs text-[var(--muted)]">{NODE_LABELS.level}</label>
-              <select className="input rounded-xl" value={memberDeptId} onChange={(e) => setMemberDeptId(e.target.value)}>
-                <option value="">Select…</option>
+            <div className="sm:col-span-2">
+              <label className="mb-1.5 block text-xs text-[var(--muted)]">
+                {NODE_LABELS.level}
+                {` (select one or more)`}
+              </label>
+              <ul className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-[var(--border-subtle)] p-3">
                 {depts.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
+                  <li key={d.id}>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="rounded border-[var(--border-subtle)]"
+                        checked={memberDeptIds.has(d.id)}
+                        onChange={() => toggleMemberDept(d.id)}
+                      />
+                      {d.name}
+                    </label>
+                  </li>
                 ))}
-              </select>
+              </ul>
             </div>
           )}
         </div>

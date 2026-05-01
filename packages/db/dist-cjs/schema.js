@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -105,7 +105,10 @@ exports.organizationMembers = (0, pg_core_1.pgTable)("organization_members", {
         .notNull()
         .references(() => exports.user.id, { onDelete: "cascade" }),
     role: (0, exports.orgRoleEnum)("role").notNull(),
-    /** When role is `manager`, the department this user manages. Null for owner/member. */
+    /**
+     * Legacy column: first managed level when role is `manager`.
+     * Canonical many-to-many is `organization_member_managed_departments`.
+     */
     departmentId: (0, pg_core_1.uuid)("department_id").references(() => exports.departments.id, {
         onDelete: "set null",
     }),
@@ -113,6 +116,19 @@ exports.organizationMembers = (0, pg_core_1.pgTable)("organization_members", {
 }, (t) => [
     (0, pg_core_1.uniqueIndex)("organization_members_org_user_idx").on(t.organizationId, t.userId),
     (0, pg_core_1.index)("organization_members_user_idx").on(t.userId),
+]);
+/** Levels a manager covers (role `manager`); empty for owner/member. */
+exports.organizationMemberManagedDepartments = (0, pg_core_1.pgTable)("organization_member_managed_departments", {
+    organizationMemberId: (0, pg_core_1.uuid)("organization_member_id")
+        .notNull()
+        .references(() => exports.organizationMembers.id, { onDelete: "cascade" }),
+    departmentId: (0, pg_core_1.uuid)("department_id")
+        .notNull()
+        .references(() => exports.departments.id, { onDelete: "cascade" }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.primaryKey)({ columns: [t.organizationMemberId, t.departmentId] }),
+    (0, pg_core_1.index)("organization_member_managed_departments_dept_idx").on(t.departmentId),
 ]);
 exports.lists = (0, pg_core_1.pgTable)("lists", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -190,6 +206,7 @@ exports.ledgerTypeEnum = (0, pg_core_1.pgEnum)("ledger_type", [
     "note",
     "reschedule",
     "status_change",
+    "assignee_change",
     "archive",
 ]);
 exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
@@ -221,12 +238,23 @@ exports.organizationsRelations = (0, drizzle_orm_1.relations)(exports.organizati
     lists: many(exports.lists),
     tasks: many(exports.tasks),
 }));
-exports.organizationMembersRelations = (0, drizzle_orm_1.relations)(exports.organizationMembers, ({ one }) => ({
+exports.organizationMembersRelations = (0, drizzle_orm_1.relations)(exports.organizationMembers, ({ one, many }) => ({
     organization: one(exports.organizations, {
         fields: [exports.organizationMembers.organizationId],
         references: [exports.organizations.id],
     }),
     user: one(exports.user, { fields: [exports.organizationMembers.userId], references: [exports.user.id] }),
+    managedDepartments: many(exports.organizationMemberManagedDepartments),
+}));
+exports.organizationMemberManagedDepartmentsRelations = (0, drizzle_orm_1.relations)(exports.organizationMemberManagedDepartments, ({ one }) => ({
+    member: one(exports.organizationMembers, {
+        fields: [exports.organizationMemberManagedDepartments.organizationMemberId],
+        references: [exports.organizationMembers.id],
+    }),
+    department: one(exports.departments, {
+        fields: [exports.organizationMemberManagedDepartments.departmentId],
+        references: [exports.departments.id],
+    }),
 }));
 exports.departmentsRelations = (0, drizzle_orm_1.relations)(exports.departments, ({ one, many }) => ({
     organization: one(exports.organizations, {
@@ -284,6 +312,7 @@ exports.authSchema = {
 exports.appSchema = {
     organizations: exports.organizations,
     organizationMembers: exports.organizationMembers,
+    organizationMemberManagedDepartments: exports.organizationMemberManagedDepartments,
     departments: exports.departments,
     lists: exports.lists,
     tasks: exports.tasks,
@@ -292,6 +321,7 @@ exports.appSchema = {
     activityLedger: exports.activityLedger,
     organizationsRelations: exports.organizationsRelations,
     organizationMembersRelations: exports.organizationMembersRelations,
+    organizationMemberManagedDepartmentsRelations: exports.organizationMemberManagedDepartmentsRelations,
     departmentsRelations: exports.departmentsRelations,
     listsRelations: exports.listsRelations,
     tasksRelations: exports.tasksRelations,

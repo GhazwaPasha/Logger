@@ -53,6 +53,8 @@ export function AppHeader({
 }) {
   const { data: session } = authClient.useSession();
   const user = session?.user;
+  /** Header only mounts in authenticated chrome — never send users to marketing `/`. */
+  const brandHref = workspaceSlug ? `/${workspaceSlug}/dashboard` : "/app";
   const settingsHref = workspaceSlug ? `/${workspaceSlug}/settings` : undefined;
   const profileTitle = user?.email ? `Account (${user.email})` : "Account";
   const initials = user ? userInitials(user.name, user.email) : "?";
@@ -83,7 +85,7 @@ export function AppHeader({
       <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href={brandHref}
             className="group flex min-h-9 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--fg)]"
           >
             <LogBaseMark variant="chrome" decorative />

@@ -15,6 +15,7 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import { computeAutomatedTaskStatus } from "./task-status-automation";
 
 @Injectable()
 export class TasksService {
@@ -25,7 +26,8 @@ export class TasksService {
   ) {}
 
   async list(userId: string, organizationId: string, opts?: { includeSubtasks?: boolean }) {
-    return this.authz.listTasksForUser(userId, organizationId, opts);
+    const rows = await this.authz.listTasksForUser(userId, organizationId, opts);
+    return this.syncAutomatedStatuses(rows);
   }
 
   async create(userId: string, organizationId: string, body: unknown) {
@@ -35,43 +37,76 @@ export class TasksService {
 
     const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
     const dueRepeat = dueAt ? (parsed.dueRepeat ?? null) : null;
+    const initialSubtasks = parsed.initialSubtasks;
 
-    const [task] = await this.db
-      .insert(tasks)
-      .values({
-        organizationId,
-        listId: parsed.listId,
-        assignerId: userId,
-        title: parsed.title,
-        dueAt,
-        dueRepeat,
-        ...(parsed.status !== undefined ? { status: parsed.status } : {}),
-        ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
-      })
-      .returning();
+    const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
+    let createdId!: string;
 
-    if (parsed.assigneeUserIds?.length) {
-      const rows = parsed.assigneeUserIds.map((uid) => ({
-        taskId: task.id,
-        userId: uid,
-      }));
-      await this.db
-        .insert(taskAssignees)
-        .values(rows)
-        .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
-    }
+    await this.db.transaction(async (tx) => {
+      const [task] = await tx
+        .insert(tasks)
+        .values({
+          organizationId,
+          listId: parsed.listId,
+          assignerId: userId,
+          title: parsed.title,
+          dueAt,
+          dueRepeat,
+          ...(parsed.status !== undefined ? { status: parsed.status } : {}),
+          ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
+        })
+        .returning();
 
-    await this.db.insert(activityLedger).values({
-      taskId: task.id,
-      actorId: userId,
-      type: "note",
-      payload: { message: "Task created.", title: parsed.title },
+      createdId = task!.id;
+
+      if (parsed.assigneeUserIds?.length) {
+        const rows = parsed.assigneeUserIds.map((uid) => ({
+          taskId: createdId,
+          userId: uid,
+        }));
+        await tx
+          .insert(taskAssignees)
+          .values(rows)
+          .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
+      }
+
+      if (initialSubtasks.length > 0) {
+        await tx.insert(subtasks).values(initialSubtasks.map((s) => ({ taskId: createdId, title: s.title })));
+      }
+
+      const [noteRow] = await tx
+        .insert(activityLedger)
+        .values({
+          taskId: createdId,
+          actorId: userId,
+          type: "note",
+          payload: { message: "Task created.", title: parsed.title },
+        })
+        .returning();
+      ledgerDelta.push(noteRow!);
+
+      if (parsed.assigneeUserIds?.length) {
+        const [assignRow] = await tx
+          .insert(activityLedger)
+          .values({
+            taskId: createdId,
+            actorId: userId,
+            type: "assignee_change",
+            payload: {
+              previousAssigneeUserIds: [] as string[],
+              assigneeUserIds: [...new Set(parsed.assigneeUserIds)].sort(),
+            },
+          })
+          .returning();
+        ledgerDelta.push(assignRow!);
+      }
     });
 
-    return this.getDetail(userId, task.id);
+    return this.taskMutationResult(userId, createdId, ledgerDelta);
   }
 
   async getDetail(userId: string, taskId: string) {
+    await this.applyAutomationForTaskId(taskId);
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
 
@@ -185,47 +220,57 @@ export class TasksService {
     const newIso = newDue?.toISOString() ?? null;
 
     if (oldIso === newIso) {
-      return this.getDetail(userId, taskId);
+      return this.taskMutationResult(userId, taskId, []);
     }
 
+    const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     await this.db.transaction(async (tx) => {
       await tx
         .update(tasks)
         .set({ dueAt: newDue, updatedAt: new Date() })
         .where(eq(tasks.id, taskId));
-      await tx.insert(activityLedger).values({
-        taskId,
-        actorId: userId,
-        type: "reschedule",
-        payload: {
-          oldDueAt: oldIso,
-          newDueAt: newIso,
-          reason: parsed.reason,
-        },
-      });
+      const [row] = await tx
+        .insert(activityLedger)
+        .values({
+          taskId,
+          actorId: userId,
+          type: "reschedule",
+          payload: {
+            oldDueAt: oldIso,
+            newDueAt: newIso,
+            reason: parsed.reason,
+          },
+        })
+        .returning();
+      ledgerDelta.push(row!);
     });
 
-    return this.getDetail(userId, taskId);
+    return this.taskMutationResult(userId, taskId, ledgerDelta);
   }
 
   async archive(userId: string, taskId: string) {
     await this.authz.getTaskAccess(userId, taskId);
 
     const now = new Date();
+    const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     await this.db.transaction(async (tx) => {
       await tx
         .update(tasks)
         .set({ deletedAt: now, updatedAt: now })
         .where(eq(tasks.id, taskId));
-      await tx.insert(activityLedger).values({
-        taskId,
-        actorId: userId,
-        type: "archive",
-        payload: { archivedAt: now.toISOString() },
-      });
+      const [row] = await tx
+        .insert(activityLedger)
+        .values({
+          taskId,
+          actorId: userId,
+          type: "archive",
+          payload: { archivedAt: now.toISOString() },
+        })
+        .returning();
+      ledgerDelta.push(row!);
     });
 
-    return this.getDetail(userId, taskId);
+    return this.taskMutationResult(userId, taskId, ledgerDelta);
   }
 
   async updateStatus(userId: string, taskId: string, body: unknown) {
@@ -241,6 +286,9 @@ export class TasksService {
     const parsed = patchTaskSchema.parse(body);
     const task = access.task;
     const orgId = task.organizationId;
+
+    const subtasksToCreate = parsed.subtasksToCreate ?? [];
+    const hasSubtasksCreate = subtasksToCreate.length > 0;
 
     const oldStatus = task.status;
     const oldPriority = task.priority;
@@ -263,6 +311,13 @@ export class TasksService {
       dueCleared ? null : parsed.dueRepeat !== undefined ? (parsed.dueRepeat ?? null) : (task.dueRepeat ?? null);
     const repeatChanged = (task.dueRepeat ?? null) !== nextRepeat;
 
+    const hasTaskFieldUpdates =
+      statusChanged || priorityChanged || titleChanged || assigneesChanged || dueChanged || repeatChanged;
+
+    if (!hasTaskFieldUpdates && !hasSubtasksCreate) {
+      return this.taskMutationResult(userId, taskId, []);
+    }
+
     if (dueChanged && !caps.canReschedule) throw new ForbiddenException("Cannot update due date");
 
     if (assigneesChanged && parsed.assigneeUserIds && parsed.assigneeUserIds.length > 0) {
@@ -276,62 +331,185 @@ export class TasksService {
       }
     }
 
-    if (!statusChanged && !priorityChanged && !titleChanged && !assigneesChanged && !dueChanged && !repeatChanged) {
-      return this.getDetail(userId, taskId);
-    }
+    const previousAssigneeSorted = assigneesChanged
+      ? (
+          await this.db
+            .select({ userId: taskAssignees.userId })
+            .from(taskAssignees)
+            .where(eq(taskAssignees.taskId, taskId))
+        )
+          .map((r) => r.userId)
+          .sort()
+      : ([] as string[]);
+    const nextAssigneeSorted = assigneesChanged ? [...new Set(parsed.assigneeUserIds!)].sort() : ([] as string[]);
+    const assigneesActuallyChanged =
+      assigneesChanged && JSON.stringify(previousAssigneeSorted) !== JSON.stringify(nextAssigneeSorted);
 
+    const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     const now = new Date();
+
     await this.db.transaction(async (tx) => {
-      await tx
-        .update(tasks)
-        .set({
-          ...(parsed.status !== undefined ? { status: nextStatus } : {}),
-          ...(parsed.priority !== undefined ? { priority: nextPriority } : {}),
-          ...(parsed.title !== undefined ? { title: parsed.title } : {}),
-          ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
-          ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
-          updatedAt: now,
-        })
-        .where(eq(tasks.id, taskId));
+      if (hasTaskFieldUpdates) {
+        await tx
+          .update(tasks)
+          .set({
+            ...(parsed.status !== undefined ? { status: nextStatus } : {}),
+            ...(parsed.priority !== undefined ? { priority: nextPriority } : {}),
+            ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+            ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
+            ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
+            updatedAt: now,
+          })
+          .where(eq(tasks.id, taskId));
 
-      if (assigneesChanged) {
-        await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
-        const ids = parsed.assigneeUserIds!;
-        if (ids.length > 0) {
-          await tx
-            .insert(taskAssignees)
-            .values(ids.map((uid) => ({ taskId, userId: uid })))
-            .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
+        if (assigneesChanged) {
+          await tx.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
+          const ids = parsed.assigneeUserIds!;
+          if (ids.length > 0) {
+            await tx
+              .insert(taskAssignees)
+              .values(ids.map((uid) => ({ taskId, userId: uid })))
+              .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
+          }
         }
+
+        if (dueChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "reschedule",
+              payload: {
+                oldDueAt: oldDueIso,
+                newDueAt: nextDueIso!,
+                reason: "Due updated via task edit",
+              },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
+
+        if (statusChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "status_change",
+              payload: {
+                oldStatus,
+                newStatus: parsed.status,
+              },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
+
+        if (assigneesActuallyChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "assignee_change",
+              payload: {
+                previousAssigneeUserIds: previousAssigneeSorted,
+                assigneeUserIds: nextAssigneeSorted,
+              },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
+      } else if (hasSubtasksCreate) {
+        await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
       }
 
-      if (dueChanged) {
-        await tx.insert(activityLedger).values({
-          taskId,
-          actorId: userId,
-          type: "reschedule",
-          payload: {
-            oldDueAt: oldDueIso,
-            newDueAt: nextDueIso!,
-            reason: "Due updated via task edit",
-          },
-        });
-      }
-
-      if (statusChanged) {
-        await tx.insert(activityLedger).values({
-          taskId,
-          actorId: userId,
-          type: "status_change",
-          payload: {
-            oldStatus,
-            newStatus: parsed.status,
-          },
-        });
+      if (hasSubtasksCreate) {
+        await tx.insert(subtasks).values(subtasksToCreate.map((s) => ({ taskId, title: s.title })));
       }
     });
 
-    return this.getDetail(userId, taskId);
+    return this.taskMutationResult(userId, taskId, ledgerDelta);
+  }
+
+  /** Slim write response: task row + assignees + subtasks + caps + ledger rows created in this request (no full ledger load). */
+  private async taskMutationResult(
+    userId: string,
+    taskId: string,
+    ledgerDelta: (typeof activityLedger.$inferSelect)[],
+  ) {
+    await this.applyAutomationForTaskId(taskId);
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+
+    const [assignees, taskSubtasks] = await Promise.all([
+      this.db
+        .select({ userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(eq(taskAssignees.taskId, taskId)),
+      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt)),
+    ]);
+
+    return {
+      task: access.task,
+      capabilities: caps,
+      assigneeUserIds: assignees.map((a) => a.userId),
+      subtasks: taskSubtasks,
+      ledgerDelta,
+    };
+  }
+
+  /** Reconcile `assigned` / `late` from assignees + due date (no ledger rows). */
+  private async applyAutomationForTaskId(taskId: string): Promise<void> {
+    const [row] = await this.db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    if (!row || row.deletedAt != null) return;
+
+    const assigneeRows = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+    const assigneeCount = assigneeRows.length;
+
+    const now = new Date();
+    const next = computeAutomatedTaskStatus(row.status, row.dueAt, assigneeCount, now);
+    if (next === row.status) return;
+
+    await this.db
+      .update(tasks)
+      .set({ status: next as typeof row.status, updatedAt: now })
+      .where(eq(tasks.id, taskId));
+  }
+
+  private async syncAutomatedStatuses<
+    T extends { id: string; status: string; dueAt: Date | null; assigneeUserIds?: string[] },
+  >(rows: T[]): Promise<T[]> {
+    if (rows.length === 0) return rows;
+    const now = new Date();
+    const updates: { id: string; status: string }[] = [];
+    for (const row of rows) {
+      const next = computeAutomatedTaskStatus(
+        row.status,
+        row.dueAt,
+        row.assigneeUserIds?.length ?? 0,
+        now,
+      );
+      if (next !== row.status) updates.push({ id: row.id, status: next });
+    }
+    if (updates.length === 0) return rows;
+
+    await this.db.transaction(async (tx) => {
+      const tnow = new Date();
+      for (const u of updates) {
+        await tx
+          .update(tasks)
+          .set({ status: u.status as (typeof tasks.$inferSelect)["status"], updatedAt: tnow })
+          .where(eq(tasks.id, u.id));
+      }
+    });
+
+    const map = new Map(updates.map((u) => [u.id, u.status]));
+    return rows.map((r) => (map.has(r.id) ? { ...r, status: map.get(r.id)! } : r));
   }
 
   async buildTaskPdf(userId: string, taskId: string): Promise<Uint8Array> {

@@ -41,16 +41,21 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 **Tasks (org-scoped list + create)**
 
 - `GET /organizations/:organizationId/tasks` — list filtered by [[domain-authorization-and-tasks]]
-- `POST /organizations/:organizationId/tasks` — create; **`assignerId`** = current user
+- `POST /organizations/:organizationId/tasks` — create; **`assignerId`** = current user; optional **`initialSubtasks`** (bulk checklist in one transaction). Response is **slim** — see [[task-write-contracts-and-cache]] (not the same as `GET` detail).
+
+**Workspace shell**
+
+- `GET /organizations/:organizationId/workspace` — departments, lists, members, tasks with **batched subtasks** (avoids N per-task subtask fetches for the board).
 
 **Tasks (by id)**
 
-- `GET/PATCH /tasks/:taskId` — detail / patch (Zod `patchTaskSchema` from `@work-ledger/contracts`)
+- `GET /tasks/:taskId` — **full** task detail including **complete** `ledger` (use this when you need full history).
+- `PATCH /tasks/:taskId` — Zod `patchTaskSchema` (optional **`subtasksToCreate`** for bulk new lines). Response is **slim** — [[task-write-contracts-and-cache]].
 - `POST /tasks/:taskId/ledger` — append ack/note/status_change
-- `POST /tasks/:taskId/reschedule` — due change + reason → ledger type `reschedule`
-- `POST /tasks/:taskId/status` — status transition
+- `POST /tasks/:taskId/reschedule` — due change + reason → ledger type `reschedule`; response **slim**
+- `POST /tasks/:taskId/status` — status transition (delegates to patch)
 - `GET/POST /tasks/:taskId/subtasks`, `PATCH .../subtasks/:subtaskId`
-- `POST /tasks/:taskId/archive` — **`AssignerOnlyGuard`**: only **`tasks.assignerId`** may archive
+- `POST /tasks/:taskId/archive` — **`AssignerOnlyGuard`**: only **`tasks.assignerId`** may archive; response **slim**
 - `GET /tasks/:taskId/report.pdf` — PDF attachment (`pdf-lib`)
 
 ## Guards beyond JWT

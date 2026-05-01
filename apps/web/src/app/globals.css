@@ -124,6 +124,15 @@ body {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
 }
 
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .surface-elevated {
   background: var(--surface-elevated);
 }

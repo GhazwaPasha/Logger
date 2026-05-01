@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { OrganizationsService } from "./organizations.service";
@@ -25,6 +25,18 @@ export class OrganizationsController {
   @Get(":organizationId/workspace")
   workspace(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
     return this.orgs.workspaceBootstrap(user.id, organizationId);
+  }
+
+  @Get(":organizationId/activity")
+  activityFeed(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query("limit") limitRaw?: string,
+  ) {
+    const n = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    return this.orgs.activityFeed(user.id, organizationId, {
+      limit: n !== undefined && Number.isFinite(n) ? n : undefined,
+    });
   }
 
   @Get(":organizationId")

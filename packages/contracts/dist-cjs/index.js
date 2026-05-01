@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.taskCapabilitiesSchema = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.orgRoleSchema = void 0;
+exports.taskCapabilitiesSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
+/** Stages the client may set via create / PATCH / status endpoint. `assigned` and `late` are server-derived. */
+exports.taskManualStatusSchema = zod_1.z.enum(["pending", "in_progress", "done", "cancelled"]);
+/** Full persisted enum (includes automated labels). */
 exports.taskStatusSchema = zod_1.z.enum([
     "pending",
     "assigned",
@@ -15,10 +18,21 @@ exports.taskStatusSchema = zod_1.z.enum([
 exports.taskStatusInputSchema = zod_1.z
     .union([exports.taskStatusSchema, zod_1.z.literal("open")])
     .transform((s) => (s === "open" ? "pending" : s));
+/** Manual stage input (API writes); `open` → `pending`. */
+exports.taskManualStatusInputSchema = zod_1.z
+    .union([exports.taskManualStatusSchema, zod_1.z.literal("open")])
+    .transform((s) => (s === "open" ? "pending" : s));
 exports.taskPrioritySchema = zod_1.z.enum(["high", "medium", "low"]);
 /** Optional cadence after the due instant (no recurrence engine yet; stored for UX / future use). */
 exports.taskDueRepeatSchema = zod_1.z.enum(["daily", "weekly", "monthly", "yearly"]);
-exports.ledgerTypeSchema = zod_1.z.enum(["ack", "note", "reschedule", "status_change", "archive"]);
+exports.ledgerTypeSchema = zod_1.z.enum([
+    "ack",
+    "note",
+    "reschedule",
+    "status_change",
+    "assignee_change",
+    "archive",
+]);
 exports.appendableLedgerTypeSchema = zod_1.z.enum(["ack", "note", "status_change"]);
 exports.createOrganizationSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
@@ -31,14 +45,24 @@ exports.upsertOrganizationMemberSchema = zod_1.z
     .object({
     email: zod_1.z.string().email(),
     role: exports.orgRoleSchema,
+    /** Single level (legacy); ignored when `departmentIds` is non-empty. */
     departmentId: zod_1.z.string().uuid().optional().nullable(),
+    /** One or more levels for `manager`; preferred over `departmentId`. */
+    departmentIds: zod_1.z.array(zod_1.z.string().uuid()).optional(),
 })
     .superRefine((data, ctx) => {
-    if (data.role === "manager" && !data.departmentId) {
+    if (data.role !== "manager")
+        return;
+    const raw = data.departmentIds && data.departmentIds.length > 0
+        ? data.departmentIds
+        : data.departmentId
+            ? [data.departmentId]
+            : [];
+    if (raw.length === 0) {
         ctx.addIssue({
             code: zod_1.z.ZodIssueCode.custom,
-            message: "Managers must have a departmentId",
-            path: ["departmentId"],
+            message: "Managers must have at least one level (departmentIds or departmentId)",
+            path: ["departmentIds"],
         });
     }
 });
@@ -48,6 +72,15 @@ exports.createDepartmentSchema = zod_1.z.object({
 exports.updateDepartmentSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
 });
+exports.createSubtaskSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1).max(512),
+});
+exports.updateSubtaskSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1).max(512).optional(),
+    done: zod_1.z.boolean().optional(),
+});
+/** Max checklist lines accepted on create / PATCH in one request (server-enforced). */
+exports.MAX_SUBTASKS_PER_TASK_MUTATION = 100;
 exports.createTaskSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(512),
     listId: zod_1.z.string().uuid(),
@@ -55,8 +88,14 @@ exports.createTaskSchema = zod_1.z.object({
     dueAt: zod_1.z.string().datetime().optional().nullable(),
     /** Only meaningful when `dueAt` is set; ignored otherwise. */
     dueRepeat: exports.taskDueRepeatSchema.nullable().optional(),
-    status: exports.taskStatusSchema.optional(),
+    status: exports.taskManualStatusSchema.optional(),
     priority: exports.taskPrioritySchema.optional(),
+    /** Created in the same transaction as the task (single round-trip vs N POST subtasks). */
+    initialSubtasks: zod_1.z
+        .array(exports.createSubtaskSchema)
+        .max(exports.MAX_SUBTASKS_PER_TASK_MUTATION)
+        .optional()
+        .default([]),
 });
 exports.createListSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
@@ -76,31 +115,31 @@ exports.rescheduleTaskSchema = zod_1.z.object({
     reason: zod_1.z.string().min(1).max(4000),
 });
 exports.updateTaskStatusSchema = zod_1.z.object({
-    status: exports.taskStatusInputSchema,
+    status: exports.taskManualStatusInputSchema,
 });
 exports.patchTaskSchema = zod_1.z
     .object({
-    status: exports.taskStatusInputSchema.optional(),
+    status: exports.taskManualStatusInputSchema.optional(),
     priority: exports.taskPrioritySchema.optional(),
     title: zod_1.z.string().min(1).max(512).optional(),
     assigneeUserIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
     /** Same instant semantics as `POST …/reschedule`: ISO datetime or `null` to clear. Requires reschedule capability when changed. */
     dueAt: zod_1.z.union([zod_1.z.string().datetime(), zod_1.z.null()]).optional(),
     dueRepeat: exports.taskDueRepeatSchema.nullable().optional(),
+    /** New checklist lines inserted in the same transaction as task field updates. */
+    subtasksToCreate: zod_1.z.array(exports.createSubtaskSchema).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
 })
-    .refine((d) => d.status !== undefined ||
-    d.priority !== undefined ||
-    d.title !== undefined ||
-    d.assigneeUserIds !== undefined ||
-    d.dueAt !== undefined ||
-    d.dueRepeat !== undefined, { message: "Provide at least one field to update" });
-exports.createSubtaskSchema = zod_1.z.object({
-    title: zod_1.z.string().min(1).max(512),
-});
-exports.updateSubtaskSchema = zod_1.z.object({
-    title: zod_1.z.string().min(1).max(512).optional(),
-    done: zod_1.z.boolean().optional(),
-});
+    .refine((d) => {
+    const subs = d.subtasksToCreate;
+    const hasSubs = subs != null && subs.length > 0;
+    return (d.status !== undefined ||
+        d.priority !== undefined ||
+        d.title !== undefined ||
+        d.assigneeUserIds !== undefined ||
+        d.dueAt !== undefined ||
+        d.dueRepeat !== undefined ||
+        hasSubs);
+}, { message: "Provide at least one field to update" });
 exports.taskCapabilitiesSchema = zod_1.z.object({
     canDeleteTask: zod_1.z.boolean(),
     canReschedule: zod_1.z.boolean(),

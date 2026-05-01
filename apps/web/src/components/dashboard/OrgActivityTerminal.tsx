@@ -1,0 +1,71 @@
+"use client";
+
+import Link from "next/link";
+import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
+import type { MemberRow, OrgActivityLedgerRow, OrgActivityTaskMeta } from "@/lib/ledger-types";
+import { formatLogTimestamp } from "@/lib/task-activity-log";
+
+type Props = {
+  entries: OrgActivityLedgerRow[];
+  tasksById: Record<string, OrgActivityTaskMeta>;
+  members: MemberRow[];
+  workHrefBase: string;
+  isLoading: boolean;
+  errorMessage: string | null;
+};
+
+export function OrgActivityTerminal({
+  entries,
+  tasksById,
+  members,
+  workHrefBase,
+  isLoading,
+  errorMessage,
+}: Props) {
+  if (errorMessage) {
+    return <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>;
+  }
+
+  if (isLoading) {
+    return <p className="text-sm text-[var(--muted)]">Loading activity…</p>;
+  }
+
+  if (entries.length === 0) {
+    return (
+      <p className="text-sm text-[var(--muted)]">
+        No activity logged yet for tasks you can access in this workspace.
+      </p>
+    );
+  }
+
+  return (
+    <div
+      className="scrollbar-hide max-h-[min(55vh,26rem)] overflow-y-auto overflow-x-hidden overscroll-contain pr-1 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
+      aria-label="Organization activity log"
+    >
+      <div className="space-y-2">
+        {entries.map((entry) => {
+          const meta = tasksById[entry.taskId];
+          const title = meta?.title ?? entry.taskId;
+          const taskLink = `${workHrefBase}/work?task=${encodeURIComponent(entry.taskId)}`;
+          return (
+            <p key={entry.id} className="break-words">
+              <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+              <span className="text-[var(--muted)]"> · </span>
+              <Link
+                href={taskLink}
+                className="text-[var(--fg)] underline decoration-[var(--border-subtle)] underline-offset-2 hover:decoration-[var(--fg)]"
+              >
+                {title}
+              </Link>
+              <span className="text-[var(--muted)]"> · </span>
+              <span>
+              <LedgerLineDescription entry={entry} members={members} />
+            </span>
+            </p>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

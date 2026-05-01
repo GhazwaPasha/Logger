@@ -1,6 +1,13 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import { lists, organizationMembers, subtasks, taskAssignees, tasks } from "@work-ledger/db";
+import {
+  lists,
+  organizationMemberManagedDepartments,
+  organizationMembers,
+  subtasks,
+  taskAssignees,
+  tasks,
+} from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 
@@ -15,6 +22,22 @@ export type TaskAccess = {
 @Injectable()
 export class AuthorizationService {
   constructor(@Inject(DRIZZLE) private readonly db: AppDatabase) {}
+
+  /** Levels a manager may access; falls back to legacy `organization_members.department_id`. */
+  private async managedDepartmentIdsForMember(
+    membershipId: string,
+    role: string,
+    legacyDepartmentId: string | null,
+  ): Promise<string[]> {
+    if (role !== "manager") return [];
+    const rows = await this.db
+      .select({ departmentId: organizationMemberManagedDepartments.departmentId })
+      .from(organizationMemberManagedDepartments)
+      .where(eq(organizationMemberManagedDepartments.organizationMemberId, membershipId));
+    const fromJunction = rows.map((r) => r.departmentId);
+    if (fromJunction.length > 0) return fromJunction;
+    return legacyDepartmentId ? [legacyDepartmentId] : [];
+  }
 
   async assertOrgMember(userId: string, organizationId: string) {
     const row = await this.db
@@ -62,8 +85,15 @@ export class AuthorizationService {
     const membership = memberRows[0];
 
     const isOwner = membership?.role === "owner";
+    const managedDeptIds = membership
+      ? await this.managedDepartmentIdsForMember(
+          membership.id,
+          membership.role,
+          membership.departmentId,
+        )
+      : [];
     const isDeptManager =
-      membership?.role === "manager" && membership.departmentId === list.departmentId;
+      membership?.role === "manager" && managedDeptIds.includes(list.departmentId);
 
     const canParticipate = isOwner || isDeptManager || isAssignee;
     if (!canParticipate) {
@@ -143,15 +173,14 @@ export class AuthorizationService {
       return this.finalizeTaskList(ownerRows, includeSubtasks);
     }
 
-    if (m?.role === "manager" && m.departmentId) {
+    if (m?.role === "manager") {
+      const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
+      if (managedDeptIds.length === 0) return [];
       const managerLists = await this.db
         .select()
         .from(lists)
         .where(
-          and(
-            eq(lists.organizationId, organizationId),
-            eq(lists.departmentId, m.departmentId),
-          ),
+          and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)),
         );
       if (managerLists.length === 0) return [];
       const managerRows = await this.db

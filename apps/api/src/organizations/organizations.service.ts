@@ -1,12 +1,18 @@
 import { randomBytes } from "node:crypto";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import {
   createOrganizationSchema,
   updateOrganizationSchema,
   upsertOrganizationMemberSchema,
 } from "@work-ledger/contracts";
-import { organizationMembers, organizations, user } from "@work-ledger/db";
+import {
+  activityLedger,
+  organizationMemberManagedDepartments,
+  organizationMembers,
+  organizations,
+  user,
+} from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -73,6 +79,44 @@ export class OrganizationsService {
     return org;
   }
 
+  /**
+   * Activity ledger across all tasks the user can see in this org (same rules as task list),
+   * newest first. Caps at 500 rows per request.
+   */
+  async activityFeed(userId: string, organizationId: string, opts?: { limit?: number }) {
+    await this.authz.assertOrgMember(userId, organizationId);
+    const raw = opts?.limit;
+    const limit =
+      typeof raw === "number" && Number.isFinite(raw)
+        ? Math.min(Math.max(Math.floor(raw), 1), 500)
+        : 150;
+
+    const taskRows = await this.tasks.list(userId, organizationId, { includeSubtasks: false });
+    const taskIds = taskRows.map((t) => t.id);
+    const tasksById = Object.fromEntries(taskRows.map((t) => [t.id, { id: t.id, title: t.title }]));
+
+    if (taskIds.length === 0) {
+      return { entries: [], tasksById: {} };
+    }
+
+    const rows = await this.db
+      .select({
+        id: activityLedger.id,
+        taskId: activityLedger.taskId,
+        actorId: activityLedger.actorId,
+        type: activityLedger.type,
+        payload: activityLedger.payload,
+        clientMutationId: activityLedger.clientMutationId,
+        createdAt: activityLedger.createdAt,
+      })
+      .from(activityLedger)
+      .where(inArray(activityLedger.taskId, taskIds))
+      .orderBy(desc(activityLedger.createdAt))
+      .limit(limit);
+
+    return { entries: rows, tasksById };
+  }
+
   /** Single round-trip workspace payload for app shell (parallel DB reads). */
   async workspaceBootstrap(userId: string, organizationId: string) {
     const [departments, lists, taskRows, members] = await Promise.all([
@@ -102,8 +146,9 @@ export class OrganizationsService {
 
   async listMembers(requesterId: string, organizationId: string) {
     await this.authz.assertOrgMember(requesterId, organizationId);
-    return this.db
+    const rows = await this.db
       .select({
+        memberId: organizationMembers.id,
         userId: organizationMembers.userId,
         role: organizationMembers.role,
         departmentId: organizationMembers.departmentId,
@@ -113,6 +158,40 @@ export class OrganizationsService {
       .from(organizationMembers)
       .innerJoin(user, eq(organizationMembers.userId, user.id))
       .where(eq(organizationMembers.organizationId, organizationId));
+
+    const managerIds = rows.filter((r) => r.role === "manager").map((r) => r.memberId);
+    const managedMap = new Map<string, string[]>();
+    if (managerIds.length > 0) {
+      const junctionRows = await this.db
+        .select()
+        .from(organizationMemberManagedDepartments)
+        .where(inArray(organizationMemberManagedDepartments.organizationMemberId, managerIds));
+      for (const j of junctionRows) {
+        const prev = managedMap.get(j.organizationMemberId) ?? [];
+        prev.push(j.departmentId);
+        managedMap.set(j.organizationMemberId, prev);
+      }
+    }
+
+    return rows.map((r) => {
+      const fromJunction = managedMap.get(r.memberId) ?? [];
+      const managedDepartmentIds =
+        r.role === "manager"
+          ? fromJunction.length > 0
+            ? fromJunction
+            : r.departmentId
+              ? [r.departmentId]
+              : []
+          : [];
+      return {
+        userId: r.userId,
+        role: r.role,
+        departmentId: managedDepartmentIds[0] ?? null,
+        managedDepartmentIds,
+        email: r.email,
+        name: r.name,
+      };
+    });
   }
 
   async upsertMemberByEmail(requesterId: string, organizationId: string, body: unknown) {
@@ -131,27 +210,55 @@ export class OrganizationsService {
     const targetUser = targetRows[0];
     if (!targetUser) throw new NotFoundException("No user registered with that email");
 
+    const managerDeptIds =
+      parsed.role === "manager"
+        ? [
+            ...new Set(
+              parsed.departmentIds?.length
+                ? parsed.departmentIds
+                : parsed.departmentId
+                  ? [parsed.departmentId]
+                  : [],
+            ),
+          ]
+        : [];
     if (parsed.role === "manager") {
-      await this.departments.assertDeptInOrg(organizationId, parsed.departmentId!);
+      for (const deptId of managerDeptIds) {
+        await this.departments.assertDeptInOrg(organizationId, deptId);
+      }
     }
 
-    const deptId = parsed.role === "manager" ? parsed.departmentId! : null;
+    const primaryDeptId = parsed.role === "manager" ? (managerDeptIds[0] ?? null) : null;
 
-    await this.db
+    const [memberRow] = await this.db
       .insert(organizationMembers)
       .values({
         organizationId,
         userId: targetUser.id,
         role: parsed.role,
-        departmentId: deptId,
+        departmentId: primaryDeptId,
       })
       .onConflictDoUpdate({
         target: [organizationMembers.organizationId, organizationMembers.userId],
         set: {
           role: parsed.role,
-          departmentId: deptId,
+          departmentId: primaryDeptId,
         },
-      });
+      })
+      .returning({ id: organizationMembers.id });
+
+    await this.db
+      .delete(organizationMemberManagedDepartments)
+      .where(eq(organizationMemberManagedDepartments.organizationMemberId, memberRow.id));
+
+    if (parsed.role === "manager" && managerDeptIds.length > 0) {
+      await this.db.insert(organizationMemberManagedDepartments).values(
+        managerDeptIds.map((departmentId) => ({
+          organizationMemberId: memberRow.id,
+          departmentId,
+        })),
+      );
+    }
 
     return this.listMembers(requesterId, organizationId);
   }

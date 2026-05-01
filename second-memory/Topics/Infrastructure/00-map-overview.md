@@ -53,6 +53,7 @@ flowchart TB
 
 - [[apps-api]] — Nest modules, route map, guards, PDF report.
 - [[apps-web]] — Routes under `/app`, middleware aliases, session → JWT → API chain.
+- [[task-write-contracts-and-cache]] — **Task writes return slim JSON** (`ledgerDelta`); **GET task** returns full ledger; workspace bootstrap batches subtasks; web uses **`setQueryData`** — read this before integrating **another client**.
 - [[web-ui-styling]] — Tailwind v4, CSS tokens, glass primary, theme switching (`Topics/Design/`).
 - [[apps-mobile]] — Expo, token refresh, outbox.
 - [[packages-and-data-layer]] — `@work-ledger/db` / `contracts`, dual ESM/CJS, migrations.

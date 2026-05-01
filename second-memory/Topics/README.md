@@ -10,6 +10,7 @@ Long-form notes by theme. Link from **`Inbox/Chat-inbox.md`** when a capture des
 | [[apps-api]] | NestJS API modules and routes |
 | [[apps-web]] | Next.js app, auth, env, routing |
 | [[apps-mobile]] | Expo client, JWT, offline outbox |
+| [[task-write-contracts-and-cache]] | Task **write** vs **read** JSON; `ledgerDelta`; bulk subtasks; web cache merges |
 | [[packages-and-data-layer]] | `@work-ledger/db`, `@work-ledger/contracts`, migrations |
 | [[auth-jwt-and-env]] | Better Auth + API JWT alignment |
 | [[domain-authorization-and-tasks]] | Roles, task visibility, ledger, capabilities |

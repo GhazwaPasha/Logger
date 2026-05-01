@@ -4,6 +4,56 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-02 — Instant-feeling tasks: slim mutation payloads + optimistic UI
+
+- **Context:** Board actions (status, subtasks, create/save) felt slow; prior **`PATCH`/`POST`** returned **`getDetail`** (full ledger + DB load). Client blocked controls during mutations and used sequential subtask **`POST`**s after create/save; kanban prefetched **`GET …/subtasks`** per card though workspace bootstrap already batches subtasks.
+- **What we did:** **Contracts** — **`initialSubtasks`** on **`createTaskSchema`**, **`subtasksToCreate`** on **`patchTaskSchema`** (max **`MAX_SUBTASKS_PER_TASK_MUTATION`** = 100). **API** — **`TasksService.taskMutationResult`** (automation + assignees + subtasks + caps + **`ledgerDelta`** only); **`create`** / **`patchTask`** use transactions with bulk subtask inserts and **`.returning()`** on ledger rows; **`reschedule`** / **`archive`** return the same slim shape. **Web** — **`TaskMutationResult`** in **`ledger-types`**; **`patchTaskMutation`** / **`patchSubtaskMutation`** merge **`workspace`** + **`taskKeys.detail`** (prepend **`ledgerDelta`**); removed **`updatingTaskId`** / **`subtaskUpdatingId`** disables; **create** / **save** send bundled subtasks and **`setQueryData`** instead of **`invalidateQueries`**; dropped kanban N+1 prefetch **`useEffect`**; list expand uses **`task.subtasks ?? []`** only.
+- **Takeaway / follow-ups:** **`GET /tasks/:id`** unchanged for full history. Any client expecting **`TaskDetail`** from **`POST …/tasks`** or **`PATCH /tasks/:id`** must switch to **`TaskMutationResult`**. Non-web callers of **`POST …/reschedule`** or **`POST …/archive`** now get the slim payload too.
+- **Code / repo:** `packages/contracts/src/index.ts`, `apps/api/src/tasks/tasks.service.ts`, `apps/web/src/lib/ledger-types.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+- **Vault:** Architecture captured for cross-app work in **`Topics/Infrastructure/task-write-contracts-and-cache.md`**; hub notes **`00-map-overview`**, **`apps-api`**, **`apps-web`**, and **`Topics/README`** updated with links.
+
+### 2026-05-02 — App header: logo stays in authenticated app
+
+- **Context:** Logo/name in **`AppHeader`** linked to marketing **`/`**, which drops users out of workspace context.
+- **What we did:** **`brandHref`** — with **`workspaceSlug`** → **`/${workspaceSlug}/dashboard`**; otherwise **`/app`** (entry / redirect to last workspace). **`AppHeader`** only mounts in authenticated chrome.
+- **Takeaway / follow-ups:** Login/marketing pages keep their own links to **`/`**.
+- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`.
+
+### 2026-05-02 — Dashboard: org-wide activity log (terminal-style)
+
+- **Context:** User wanted the same monospace task-history style on the dashboard for the whole workspace.
+- **What we did:** **`GET /organizations/:organizationId/activity`** — ledger for tasks visible to the caller (same as **`TasksService.list`**), **`taskId`** on each row, **`tasksById`** for titles, optional **`limit`** (default 150, max 500). Dashboard toggle **Overview** / **Activity log**; **`OrgActivityTerminal`** uses **`task-activity-log.ts`** (shared with **`TaskPanelHistoryCard`**). **`useOrgActivityFeed`**, **`workspaceKeys.activity`**.
+- **Takeaway / follow-ups:** Heavy orgs may want pagination; endpoint runs **`tasks.list`** (includes automated status sync) before querying **`activity_ledger`**.
+- **Code / repo:** `apps/api/src/organizations/organizations.controller.ts`, `organizations.service.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/dashboard/page.tsx`, `apps/web/src/components/dashboard/OrgActivityTerminal.tsx`, `apps/web/src/hooks/useOrgActivityFeed.ts`, `apps/web/src/lib/task-activity-log.ts`, `apps/web/src/lib/query-keys.ts`, `apps/web/src/lib/ledger-types.ts`.
+
+### 2026-05-02 — Managers: multiple levels (departments)
+
+- **Context:** Managers were limited to a single `departmentId` on `organization_members`; product wanted multiple levels per manager.
+- **What we did:** Junction table **`organization_member_managed_departments`** (`packages/db` schema + migration **`0007_manager_managed_departments.sql`**) with backfill from existing manager rows. **`AuthorizationService`** resolves managed levels from the junction (fallback to legacy column). **`POST /organizations/:id/members`** accepts **`departmentIds`** (preferred) or legacy **`departmentId`**; syncs junction and keeps **`organization_members.department_id`** as the first level for compatibility. Member list / bootstrap returns **`managedDepartmentIds`** plus **`departmentId`** (first). **People** UI uses checkboxes for multi-level selection. PG FK constraint names in the migration are short (**`ommd_*`**) to avoid 63-char truncation collisions.
+- **Takeaway / follow-ups:** Run **`npm run db:migrate`**. Old API clients sending only **`departmentId`** still work. See [[Topics/Domain/domain-authorization-and-tasks]].
+- **Code / repo:** `packages/db/src/schema.ts`, `packages/db/drizzle/0007_manager_managed_departments.sql`, `packages/contracts/src/index.ts`, `apps/api/src/authorization/authorization.service.ts`, `apps/api/src/organizations/organizations.service.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/people/page.tsx`, `apps/web/src/lib/ledger-types.ts`.
+
+### 2026-05-02 — Task panel: History card + assignee ledger
+
+- **Context:** User wanted an info card at the bottom of the edit task panel showing who created the task, assignment changes, and status changes.
+- **What we did:** **`TaskPanelHistoryCard`** (`apps/web/src/components/tasks/TaskPanelHistoryCard.tsx`) renders below Save/Cancel on the work board task panel: **Created** line (`assignerId` + `createdAt`), then ledger rows in chronological order (**status_change**, **assignee_change**, **reschedule**, notes, etc.); skips duplicate **Task created.** note. **API** — new ledger type **`assignee_change`** (`packages/db` enum + **`packages/contracts`**); **`TasksService.create`** logs assignees when present; **`patchTask`** logs assignee updates only when the assignee set actually changes. Migration **`0006_ledger_assignee_change.sql`**. **`TaskRow`** optional **`createdAt`** / **`updatedAt`** for typing.
+- **Takeaway / follow-ups:** Run **`npm run db:migrate`** so Postgres accepts **`assignee_change`**. Older tasks have no assignee history until the next assignee edit.
+- **Code / repo:** `apps/web/src/components/tasks/TaskPanelHistoryCard.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/api/src/tasks/tasks.service.ts`, `packages/db/src/schema.ts`, `packages/db/drizzle/0006_ledger_assignee_change.sql`, `packages/contracts/src/index.ts`, `apps/web/src/lib/ledger-types.ts`.
+
+### 2026-05-02 — Kanban task cards: visual hierarchy + affordances
+
+- **Context:** User wanted better card UI/UX on the work board Kanban; validated in-browser via Chrome DevTools MCP on local **`/work`** (Kanban view).
+- **What we did:** **`TaskCard`** in **`work/page.tsx`** — removed heavy header/footer split; **title + overflow** on one row (overflow visible but muted, full opacity on hover/focus for touch); **stage + priority** on their own row under scope badges (**priority tile matches list rows**: `LIST_ROW_BADGE_TILE` + short label, same **`h-8`** as status pill); **due + assignee** grouped in a lighter footer strip (assignee uses **initial avatar** + name, dashed “Assign” empty state); **subtasks** renamed from all-caps “Checklist” to **Subtasks (count)** with icon and inset panel on **`surface-base`**; card uses subtle **lift + shadow** on hover for drag targets. *(Follow-up: dropped left priority accent stripe; kanban priority chrome unified with list.)*
+- **Takeaway / follow-ups:** Column headers are still region-only (no visible titles in the column chrome); add if boards feel unclear without the pipeline explainer line.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx` (`TaskCard`).
+
+### 2026-05-02 — Task workflow: manual stages vs automated Assigned / Late
+
+- **Context:** User wanted the visible flow to be **Pending → In progress → Done** with **Cancelled** anytime; **Assigned** and **Late** should be **automatic** from assignees and due date, not kanban columns.
+- **What we did:** **API** — `computeAutomatedTaskStatus` in `apps/api/src/tasks/task-status-automation.ts`: pre-start bucket syncs **pending ↔ assigned** from assignee count; active bucket (**in_progress** / **late**) syncs **late** when `dueAt` is in the past; terminal **done** / **cancelled** unchanged; **late** clears to **in_progress** when no longer overdue. Runs after task **get**, on org **task list** (batch DB updates), and relies on **getDetail** after **PATCH** / **create**. **Contracts** — create / PATCH / `POST …/status` accept only **manual** statuses (`pending`, `in_progress`, `done`, `cancelled`; `open` → `pending`). **Web** — kanban columns use **`TASK_FLOW_ORDER`**; stats aggregate by **flow column** (assigned/late roll up); cards show **“Assigned”** / **“Late”** only for those automated statuses via **`taskStatusDisplayLabel`**.
+- **Takeaway / follow-ups:** Clearing **late** always returns **in_progress** (no extra DB field for “was pre-start overdue”). If that edge matters, add persistence later. See [[Topics/Domain/domain-authorization-and-tasks]].
+- **Code / repo:** `apps/api/src/tasks/task-status-automation.ts`, `apps/api/src/tasks/tasks.service.ts`, `packages/contracts/src/index.ts`, `apps/web/src/lib/task-board.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
 ### 2026-05-02 — Workspace bootstrap includes subtasks (board N+1 fix)
 
 - **Context:** Subtasks were slow in testing and missing or flaky in production; new subtasks could “vanish” on the board after save.

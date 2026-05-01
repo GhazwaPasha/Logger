@@ -5,6 +5,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -135,7 +136,10 @@ export const organizationMembers = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: orgRoleEnum("role").notNull(),
-    /** When role is `manager`, the department this user manages. Null for owner/member. */
+    /**
+     * Legacy column: first managed level when role is `manager`.
+     * Canonical many-to-many is `organization_member_managed_departments`.
+     */
     departmentId: uuid("department_id").references(() => departments.id, {
       onDelete: "set null",
     }),
@@ -144,6 +148,24 @@ export const organizationMembers = pgTable(
   (t) => [
     uniqueIndex("organization_members_org_user_idx").on(t.organizationId, t.userId),
     index("organization_members_user_idx").on(t.userId),
+  ],
+);
+
+/** Levels a manager covers (role `manager`); empty for owner/member. */
+export const organizationMemberManagedDepartments = pgTable(
+  "organization_member_managed_departments",
+  {
+    organizationMemberId: uuid("organization_member_id")
+      .notNull()
+      .references(() => organizationMembers.id, { onDelete: "cascade" }),
+    departmentId: uuid("department_id")
+      .notNull()
+      .references(() => departments.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.organizationMemberId, t.departmentId] }),
+    index("organization_member_managed_departments_dept_idx").on(t.departmentId),
   ],
 );
 
@@ -243,6 +265,7 @@ export const ledgerTypeEnum = pgEnum("ledger_type", [
   "note",
   "reschedule",
   "status_change",
+  "assignee_change",
   "archive",
 ]);
 
@@ -284,13 +307,28 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   tasks: many(tasks),
 }));
 
-export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
+export const organizationMembersRelations = relations(organizationMembers, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [organizationMembers.organizationId],
     references: [organizations.id],
   }),
   user: one(user, { fields: [organizationMembers.userId], references: [user.id] }),
+  managedDepartments: many(organizationMemberManagedDepartments),
 }));
+
+export const organizationMemberManagedDepartmentsRelations = relations(
+  organizationMemberManagedDepartments,
+  ({ one }) => ({
+    member: one(organizationMembers, {
+      fields: [organizationMemberManagedDepartments.organizationMemberId],
+      references: [organizationMembers.id],
+    }),
+    department: one(departments, {
+      fields: [organizationMemberManagedDepartments.departmentId],
+      references: [departments.id],
+    }),
+  }),
+);
 
 export const departmentsRelations = relations(departments, ({ one, many }) => ({
   organization: one(organizations, {
@@ -355,6 +393,7 @@ export const authSchema = {
 export const appSchema = {
   organizations,
   organizationMembers,
+  organizationMemberManagedDepartments,
   departments,
   lists,
   tasks,
@@ -363,6 +402,7 @@ export const appSchema = {
   activityLedger,
   organizationsRelations,
   organizationMembersRelations,
+  organizationMemberManagedDepartmentsRelations,
   departmentsRelations,
   listsRelations,
   tasksRelations,

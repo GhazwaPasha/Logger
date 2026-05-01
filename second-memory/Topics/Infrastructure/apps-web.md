@@ -37,7 +37,9 @@ Optional Better Auth Infra: **`BETTER_AUTH_API_KEY`**, **`BETTER_AUTH_API_URL`**
 
 ## Data loading pattern
 
-- Session gate → organizations → parallel fetches for departments, lists, tasks, members (React Query).
+- Session gate → organizations → **`GET …/workspace`** bootstrap (departments, lists, tasks **with batched subtasks**, members) cached under **`workspaceKeys.workspace`** (React Query).
+- Task panel detail: **`GET /tasks/:id`** via **`useTaskDetail`** (`taskKeys.detail`) — full **`ledger`** for history UI.
+- After **writes** on the work board (create, save, status/priority, checklist toggle), the client prefers **`queryClient.setQueryData`** and merges **`ledgerDelta`** into cached detail — not blanket **`invalidateQueries`** on the workspace. See [[task-write-contracts-and-cache]] for the API mirror of this (slim write responses vs fat GET).
 - Refresh cost: session + JWT + API bundle can waterfall; see perf notes in [[Chat-inbox]].
 
 ## Package deps on shared code

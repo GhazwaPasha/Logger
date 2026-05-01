@@ -1,21 +1,28 @@
 import type { TaskRow } from "@/lib/ledger-types";
 
-export const KANBAN_STATUS_ORDER = [
-  "pending",
-  "assigned",
-  "in_progress",
-  "late",
-  "done",
-  "cancelled",
-] as const;
+/** Kanban columns + user-selectable stages (API PATCH). */
+export const TASK_FLOW_ORDER = ["pending", "in_progress", "done", "cancelled"] as const;
 
-export type BoardTaskStatus = (typeof KANBAN_STATUS_ORDER)[number];
+export type ManualTaskStatus = (typeof TASK_FLOW_ORDER)[number];
+
+export const AUTOMATED_TASK_STATUSES = ["assigned", "late"] as const;
+
+/** Persisted / displayed task status including automated labels. */
+export type BoardTaskStatus = ManualTaskStatus | (typeof AUTOMATED_TASK_STATUSES)[number];
 
 export const STATUS_LABELS: Record<BoardTaskStatus, string> = {
   pending: "Pending",
   assigned: "Assigned",
   in_progress: "In progress",
   late: "Late",
+  done: "Done",
+  cancelled: "Cancelled",
+};
+
+/** Column titles match workflow stages; automated states roll up into Pending / In progress. */
+export const FLOW_COLUMN_LABELS: Record<ManualTaskStatus, string> = {
+  pending: "Pending",
+  in_progress: "In progress",
   done: "Done",
   cancelled: "Cancelled",
 };
@@ -30,18 +37,63 @@ export const PRIORITY_LABELS: Record<TaskPriority, string> = {
 
 export function normalizeTaskStatus(raw: string): BoardTaskStatus {
   if (raw === "open") return "pending";
-  if ((KANBAN_STATUS_ORDER as readonly string[]).includes(raw)) return raw as BoardTaskStatus;
+  const all = [...TASK_FLOW_ORDER, ...AUTOMATED_TASK_STATUSES] as const;
+  if ((all as readonly string[]).includes(raw)) return raw as BoardTaskStatus;
   return "pending";
 }
 
+/** Map stored status to the kanban column / manual-control bucket. */
+export function storedStatusToFlowColumn(stored: BoardTaskStatus): ManualTaskStatus {
+  if (stored === "cancelled") return "cancelled";
+  if (stored === "done") return "done";
+  if (stored === "in_progress" || stored === "late") return "in_progress";
+  return "pending";
+}
+
+export function manualStatusFromStored(stored: BoardTaskStatus): ManualTaskStatus {
+  return storedStatusToFlowColumn(stored);
+}
+
+/** Visible workflow label on cards; automated **assigned** / **late** show as single labels (same flow column underneath). */
+export function taskStatusDisplayLabel(stored: BoardTaskStatus): string {
+  if (stored === "assigned") return STATUS_LABELS.assigned;
+  if (stored === "late") return STATUS_LABELS.late;
+  return STATUS_LABELS[stored];
+}
+
 /**
- * Statuses allowed from the kanban card control and drag-drop: move **one step**
- * along {@link KANBAN_STATUS_ORDER}, cancel active work, or reopen from terminal states.
- * Prevents skipping stages (e.g. jumping straight to Done).
+ * Tinted backgrounds for status pills (list / kanban / stats).
+ * Solid black / white labels except **cancelled** (muted).
  */
-export function kanbanAllowedTransitions(current: BoardTaskStatus): BoardTaskStatus[] {
-  const allowed = new Set<BoardTaskStatus>([current]);
-  const i = KANBAN_STATUS_ORDER.indexOf(current);
+export function statusPillPaletteClasses(st: BoardTaskStatus): string {
+  const solid = "text-black dark:text-white";
+  if (st === "pending") return `bg-slate-500/15 ${solid}`;
+  if (st === "assigned") return `bg-sky-500/15 ${solid}`;
+  if (st === "in_progress") return `bg-violet-500/15 ${solid}`;
+  if (st === "late") return `bg-orange-500/15 ${solid}`;
+  if (st === "done") return `bg-emerald-500/15 ${solid}`;
+  if (st === "cancelled") return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
+  return `bg-neutral-500/15 ${solid}`;
+}
+
+/** Text-only colors for inline status mentions (activity log); hues align with {@link statusPillPaletteClasses}. */
+export function statusLabelTextClasses(st: BoardTaskStatus): string {
+  if (st === "pending") return "text-slate-600 dark:text-slate-400";
+  if (st === "assigned") return "text-sky-600 dark:text-sky-400";
+  if (st === "in_progress") return "text-violet-600 dark:text-violet-400";
+  if (st === "late") return "text-orange-600 dark:text-orange-400";
+  if (st === "done") return "text-emerald-600 dark:text-emerald-400";
+  if (st === "cancelled") return "text-neutral-600 dark:text-neutral-400";
+  return "text-neutral-600 dark:text-neutral-400";
+}
+
+/**
+ * Allowed manual targets from the board controls (one step along {@link TASK_FLOW_ORDER}),
+ * cancel from active stages, reopen from terminal states.
+ */
+export function kanbanAllowedManualTransitions(current: ManualTaskStatus): ManualTaskStatus[] {
+  const allowed = new Set<ManualTaskStatus>([current]);
+  const i = TASK_FLOW_ORDER.indexOf(current);
 
   if (current === "cancelled") {
     allowed.add("pending");
@@ -49,20 +101,51 @@ export function kanbanAllowedTransitions(current: BoardTaskStatus): BoardTaskSta
   }
 
   if (current === "done") {
-    allowed.add("late");
+    allowed.add("in_progress");
     allowed.add("cancelled");
-    return KANBAN_STATUS_ORDER.filter((k) => allowed.has(k));
+    return TASK_FLOW_ORDER.filter((k) => allowed.has(k));
   }
 
-  if (i > 0) allowed.add(KANBAN_STATUS_ORDER[i - 1]!);
-  if (i < KANBAN_STATUS_ORDER.length - 1) allowed.add(KANBAN_STATUS_ORDER[i + 1]!);
+  if (i > 0) allowed.add(TASK_FLOW_ORDER[i - 1]!);
+  if (i < TASK_FLOW_ORDER.length - 1) allowed.add(TASK_FLOW_ORDER[i + 1]!);
   allowed.add("cancelled");
 
-  return KANBAN_STATUS_ORDER.filter((k) => allowed.has(k));
+  return TASK_FLOW_ORDER.filter((k) => allowed.has(k));
 }
 
-export function kanbanTransitionAllowed(from: BoardTaskStatus, to: BoardTaskStatus): boolean {
-  return kanbanAllowedTransitions(from).includes(to);
+export function kanbanAllowedTransitionsFromStored(stored: BoardTaskStatus): ManualTaskStatus[] {
+  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(stored));
+}
+
+export function kanbanTransitionAllowedFromStored(
+  fromStored: BoardTaskStatus,
+  toFlowColumn: ManualTaskStatus,
+): boolean {
+  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(fromStored)).includes(toFlowColumn);
+}
+
+/** Next manual stage along Pending → In progress → Done (not cancel). For list checklist “advance one step”. */
+export function nextWorkflowManualStatus(stored: BoardTaskStatus): ManualTaskStatus | null {
+  const col = storedStatusToFlowColumn(stored);
+  if (col === "done" || col === "cancelled") return null;
+  const i = TASK_FLOW_ORDER.indexOf(col);
+  if (i === -1) return null;
+  const next = TASK_FLOW_ORDER[i + 1];
+  if (!next || next === "cancelled") return null;
+  return next;
+}
+
+/** @deprecated Use {@link TASK_FLOW_ORDER} for columns; full status union is {@link BoardTaskStatus}. */
+export const KANBAN_STATUS_ORDER = TASK_FLOW_ORDER;
+
+/** @deprecated Use {@link kanbanAllowedTransitionsFromStored}. */
+export function kanbanAllowedTransitions(stored: BoardTaskStatus): ManualTaskStatus[] {
+  return kanbanAllowedTransitionsFromStored(stored);
+}
+
+/** @deprecated Use {@link kanbanTransitionAllowedFromStored}. */
+export function kanbanTransitionAllowed(fromStored: BoardTaskStatus, toFlowColumn: ManualTaskStatus): boolean {
+  return kanbanTransitionAllowedFromStored(fromStored, toFlowColumn);
 }
 
 export function taskPriority(task: TaskRow): TaskPriority {
