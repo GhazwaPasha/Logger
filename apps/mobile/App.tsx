@@ -19,7 +19,7 @@ import { apiFetch, apiJson } from "./src/api";
 import { authClient } from "./src/auth-client";
 import { enqueueOutbox, listOutbox, removeOutbox } from "./src/outbox";
 
-type Org = { id: string; name: string };
+type Org = { id: string; name: string; slug?: string };
 type TaskRow = {
   id: string;
   title: string;

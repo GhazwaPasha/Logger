@@ -1,16 +1,60 @@
 "use client";
 
 import Link from "next/link";
+import { Outfit } from "next/font/google";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { safeReturnPath } from "@/lib/safe-return-path";
+
+const brand = Outfit({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
+
+function IconSpinner({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+function IconEye({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function IconEyeOff({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+      <line x1="2" x2="22" y1="2" y2="22" />
+    </svg>
+  );
+}
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeReturnPath(searchParams.get("next"));
+
+  const formId = useId();
+  const emailId = `${formId}-email`;
+  const passwordId = `${formId}-password`;
+  const nameId = `${formId}-name`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +62,7 @@ export function LoginForm() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,89 +87,157 @@ export function LoginForm() {
     }
   }
 
+  function flipMode() {
+    setMode((m) => (m === "signin" ? "signup" : "signin"));
+    setError(null);
+  }
+
   return (
-    <div className="auth-shell">
-      <div className="auth-card surface-elevated">
-        <div className="mb-8 space-y-4">
-          <div className="flex items-center gap-2.5">
-            <LogBaseMark variant="auth" decorative />
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
-              LogBase
-            </p>
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--surface-base)] px-4 py-10 text-[var(--fg)] sm:px-6">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.4]"
+        style={{
+          background:
+            "radial-gradient(ellipse 75% 55% at 50% -20%, var(--accent-glow), transparent), radial-gradient(ellipse 55% 45% at 100% 0%, var(--accent-glow-soft), transparent)",
+        }}
+        aria-hidden
+      />
+
+      <div className="relative z-[1] flex w-full max-w-[22rem] flex-col items-center sm:max-w-[24rem]">
+        <Link
+          href="/"
+          className={`mb-8 inline-flex items-center gap-2.5 rounded-lg outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${brand.className}`}
+        >
+          <LogBaseMark variant="marketing" decorative className="shrink-0" />
+          <span className="text-xl font-bold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
+        </Link>
+
+        <div className="surface-elevated mt-6 w-full rounded-xl border border-[var(--border-subtle)] px-6 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_16px_48px_-16px_rgba(0,0,0,0.12)] sm:px-7 sm:py-8 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2),0_16px_48px_-16px_rgba(0,0,0,0.45)]">
+          <div className="text-center">
+            <h1 className={`${brand.className} text-balance text-[1.65rem] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--fg)] sm:text-[1.75rem]`}>
+              {mode === "signin" ? (
+                <>Log in</>
+              ) : (
+                <>Sign up</>
+              )}
+            </h1>
+            {mode === "signin" ? (
+              <p className="mt-3 text-pretty text-sm leading-relaxed text-[var(--muted)]">Continue to your base</p>
+            ) : null}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--fg)]">
-            {mode === "signin" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p className="text-sm text-[var(--muted)]">
-            {mode === "signin" ? "Sign in to open your workspace." : "Use a work email you can verify later."}
-          </p>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-4">
-          {mode === "signup" && (
+
+          <form onSubmit={onSubmit} className="mt-7 space-y-4">
+            {mode === "signup" && (
+              <div>
+                <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={nameId}>
+                  Name
+                </label>
+                <input
+                  id={nameId}
+                  className="input rounded-xl"
+                  placeholder="How your base will greet you"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
+                  autoComplete="name"
+                />
+              </div>
+            )}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-[var(--muted)]" htmlFor="name">
-                Name
+              <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={emailId}>
+                Email
               </label>
               <input
-                id="name"
+                id={emailId}
                 className="input rounded-xl"
-                placeholder="Your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
-          )}
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--muted)]" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              className="input rounded-xl"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--muted)]" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              className="input rounded-xl"
-              type="password"
-              required
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
-              {error}
-            </p>
-          )}
-          <button className="btn-primary h-11 w-full rounded-xl text-sm font-medium" type="submit" disabled={loading}>
-            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            <div>
+              <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={passwordId}>
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id={passwordId}
+                  className="input rounded-xl pr-11"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-pressed={showPassword}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-800 dark:text-red-200"
+              >
+                {error}
+              </p>
+            )}
+
+            <button
+              className="btn-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium"
+              type="submit"
+              disabled={loading}
+              aria-busy={loading}
+              aria-label={mode === "signin" ? "Sign in to LogBase with email and password" : "Create your LogBase account"}
+            >
+              {loading ? (
+                <>
+                  <IconSpinner className="h-4 w-4 animate-spin" />
+                  <span>{mode === "signin" ? "Opening your base…" : "Building your base…"}</span>
+                </>
+              ) : mode === "signin" ? (
+                "Log in"
+              ) : (
+                "Create Account"
+              )}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            className="mt-6 w-full text-pretty text-center text-sm leading-relaxed text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            onClick={flipMode}
+          >
+            {mode === "signin" ? (
+              <span className={`font-semibold text-[var(--fg)] ${brand.className}`}>Create account?</span>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <span className={`font-semibold text-[var(--fg)] ${brand.className}`}>Log in</span>
+              </>
+            )}
           </button>
-        </form>
-        <button
-          type="button"
-          className="mt-6 w-full text-center text-sm text-[var(--accent)] underline-offset-4 hover:underline"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-          }}
-        >
-          {mode === "signin" ? "Need an account? Sign up" : "Already registered? Sign in"}
-        </button>
-        <Link href="/" className="mt-8 block text-center text-sm text-[var(--muted)] hover:text-[var(--fg)]">
-          ← Back to home
+        </div>
+
+        <p className="mt-6 font-mono-ledger text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--muted)]">
+          LogBase · Organize · Track · Execute
+        </p>
+
+        <Link href="/" className="mt-5 text-sm text-[var(--muted)] transition-colors hover:text-[var(--fg)]">
+          ← Back to LogBase home
         </Link>
       </div>
     </div>

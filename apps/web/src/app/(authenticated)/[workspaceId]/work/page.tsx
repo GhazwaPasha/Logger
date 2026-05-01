@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   Suspense,
@@ -25,7 +25,13 @@ import { parseTaskDueRepeat, type MemberRow, type SubtaskRow, type TaskDetail, t
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
+import {
+  readWorkBoardScope,
+  writeWorkBoardScope,
+  WORK_BOARD_SCOPE_EVENT,
+} from "@/lib/work-board-scope";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import {
   KANBAN_STATUS_ORDER,
   PRIORITY_LABELS,
@@ -371,13 +377,19 @@ function WorkBoardStatsCard({
 }
 
 function WorkItemsInner() {
-  const params = useParams();
+  const { workspaceId } = useWorkspaceRoute();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const workspaceId = params.workspaceId as string;
-  const levelPref = searchParams.get("level");
-  const listPref = searchParams.get("list");
+  const [boardScopeTick, setBoardScopeTick] = useState(0);
+  useEffect(() => {
+    const fn = () => setBoardScopeTick((n) => n + 1);
+    window.addEventListener(WORK_BOARD_SCOPE_EVENT, fn);
+    return () => window.removeEventListener(WORK_BOARD_SCOPE_EVENT, fn);
+  }, []);
+  const boardScope = useMemo(() => readWorkBoardScope(workspaceId), [workspaceId, boardScopeTick]);
+  const levelPref = boardScope?.levelId ?? null;
+  const listPref = boardScope?.listId ?? null;
   const { token } = useApiSession();
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
@@ -626,15 +638,26 @@ function WorkItemsInner() {
     setEditAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  /** Strip legacy board query params; open task panel from `?task=` once; keep URL clean. */
   useEffect(() => {
+    const legacyLevel = searchParams.get("level");
+    const legacyList = searchParams.get("list");
     const tid = searchParams.get("task");
+    if (legacyLevel || legacyList) {
+      writeWorkBoardScope(workspaceId, {
+        levelId: legacyLevel,
+        listId: legacyList,
+      });
+      const next = new URLSearchParams();
+      if (tid) next.set("task", tid);
+      const q = next.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+      return;
+    }
     if (!tid) return;
     openEditTask(tid);
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("task");
-    const q = next.toString();
-    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-  }, [searchParams, pathname, router, openEditTask]);
+    router.replace(pathname, { scroll: false });
+  }, [workspaceId, searchParams, pathname, router, openEditTask]);
 
   useEffect(() => {
     if (!editTaskId || !editDetail || editDetail.task.id !== editTaskId) return;
@@ -890,6 +913,19 @@ function WorkItemsInner() {
   const levelLists = selectedLevel ? lists.filter((l) => l.departmentId === selectedLevel) : lists;
   const selectedList = listPref && levelLists.some((l) => l.id === listPref) ? listPref : null;
   const selectedListName = selectedList ? levelLists.find((l) => l.id === selectedList)?.name ?? null : null;
+
+  /** Sync storage with the visible board filter only. Never persist create-task `listId` as a list filter when viewing a whole level (`selectedList` null). */
+  useEffect(() => {
+    if (!lists.length) return;
+    const listIdToSave =
+      selectedList != null && levelLists.some((l) => l.id === selectedList) ? selectedList : null;
+    let levelIdToSave: string | null =
+      selectedLevel != null && depts.some((d) => d.id === selectedLevel) ? selectedLevel : null;
+    if (listIdToSave != null && levelIdToSave == null) {
+      levelIdToSave = lists.find((l) => l.id === listIdToSave)?.departmentId ?? null;
+    }
+    writeWorkBoardScope(workspaceId, { levelId: levelIdToSave, listId: listIdToSave });
+  }, [workspaceId, lists, depts, selectedLevel, selectedList, levelLists]);
 
   /** Header scope badges (same styles as task cards): level + list when applicable. */
   const filterScopeSegments = useMemo((): { kind: "level" | "list"; label: string }[] => {

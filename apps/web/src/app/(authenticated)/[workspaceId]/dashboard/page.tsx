@@ -1,23 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect } from "react";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export default function WorkspaceDashboardPage() {
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
+  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const { depts, tasks, members, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
 
-  const base = `/app/w/${workspaceId}`;
+  const base = `/${workspaceSlug}`;
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl space-y-8">

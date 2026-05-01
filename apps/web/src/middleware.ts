@@ -18,28 +18,28 @@ export function middleware(request: NextRequest) {
   }
 
   if (!sub) {
-    url.pathname = `/app/w/${id}/dashboard`;
+    url.pathname = `/${id}/dashboard`;
     return NextResponse.redirect(url);
   }
 
   if (sub === "tasks") {
-    url.pathname = `/app/w/${id}/work`;
+    url.pathname = `/${id}/work`;
     return NextResponse.redirect(url);
   }
 
   const taskDeep = sub.match(/^tasks\/(.+)$/);
   if (taskDeep) {
-    url.pathname = `/app/w/${id}/work`;
+    url.pathname = `/${id}/work`;
     url.searchParams.set("task", taskDeep[1]);
     return NextResponse.redirect(url);
   }
 
   if (sub === "structure" || sub.startsWith("structure/")) {
-    url.pathname = `/app/w/${id}/work`;
+    url.pathname = `/${id}/work`;
     return NextResponse.redirect(url);
   }
 
-  url.pathname = `/app/w/${id}/dashboard`;
+  url.pathname = `/${id}/dashboard`;
   return NextResponse.redirect(url);
 }
 

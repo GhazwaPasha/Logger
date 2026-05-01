@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
@@ -11,8 +11,7 @@ import type { Org } from "@/lib/ledger-types";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export default function OrganizationSettingsPage() {
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
+  const { workspaceId } = useWorkspaceRoute();
   const { token } = useApiSession();
   const { reload: reloadWorkspaceList } = useOrganizationsState();
   const { error, setError, reload } = useWorkspaceData();

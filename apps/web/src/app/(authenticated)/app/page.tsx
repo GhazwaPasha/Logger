@@ -7,6 +7,7 @@ import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { AppHeader } from "@/components/app/AppHeader";
 import { AppEntryAccountSidebar } from "@/components/app/AppEntryAccountSidebar";
 import { AddWorkspacePanel } from "@/components/app/AddWorkspacePanel";
+import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { getLastWorkspaceId, setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export default function AppEntryPage() {
@@ -20,7 +21,7 @@ export default function AppEntryPage() {
     const lastWorkspaceId = getLastWorkspaceId();
     const target = orgs.find((o) => o.id === lastWorkspaceId) ?? orgs[0];
     setLastWorkspaceId(target.id);
-    router.replace(`/app/w/${target.id}/dashboard`);
+    router.replace(`/${workspaceUrlSegment(target)}/dashboard`);
   }, [isPending, token, orgs, router]);
 
   return (

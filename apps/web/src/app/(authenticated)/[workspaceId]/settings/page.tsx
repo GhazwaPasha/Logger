@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { useEffect } from "react";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { authClient } from "@/lib/auth-client";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { useAppPreferences } from "@/components/app/AppPreferencesContext";
 import type { ThemePref } from "@/hooks/useThemePreference";
 
 export default function UserSettingsPage() {
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
+  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const { data: session } = authClient.useSession();
   const { theme, setTheme } = useAppPreferences();
 
@@ -18,7 +17,7 @@ export default function UserSettingsPage() {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
 
-  const base = `/app/w/${workspaceId}`;
+  const base = `/${workspaceSlug}`;
   const user = session?.user;
 
   return (

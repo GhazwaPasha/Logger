@@ -1,7 +1,7 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -10,8 +10,7 @@ import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export default function PeoplePage() {
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
+  const { workspaceId } = useWorkspaceRoute();
   const { token } = useApiSession();
   const { depts, members, error, setError, reload } = useWorkspaceData();
   const [memberEmail, setMemberEmail] = useState("");

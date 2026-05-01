@@ -4,6 +4,34 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-01 — Login copy: brand-heavy “your base”
+
+- **Context:** User wanted auth clearly **on-brand** (“login to your base,” etc.); earlier split layout was dropped for a **single centered card**.
+- **What we did:** **`LoginForm`** — **Outfit** for headline + emphasis; **marketing** mark + bold **LogBase** wordmark; eyebrow **Your base for accountable work**; titles **Log in to / Start** + accent line **your base**; supporting copy about trail/workspace; CTAs **Enter your base** / **Create your base**; loading **Opening your base…** / **Building your base…**; flip **No base yet? Start one free** / **Already have a base? Log in**; mono tagline **Organize · Track · Execute**; soft radial backdrop (marketing-adjacent). **`login/layout.tsx`** title **Your base · LogBase** + matching description.
+- **Code / repo:** `apps/web/src/app/login/LoginForm.tsx`, `layout.tsx`, `page.tsx`.
+
+### 2026-05-01 — Marketing home: wide-screen layout
+
+- **Context:** Landing page felt narrow / empty on large monitors (`max-w-6xl`, hero `max-w-3xl`, capped grids).
+- **What we did:** Shell **`max-w-7xl`** (lg) and **`2xl:max-w-[88rem]`** + horizontal padding; **xl+ two-column hero** with abstract “workspace / audit trail” preview card; trust strip and **How it works** row use full content width; slightly larger section copy and card padding at **xl/2xl**; closing CTA **lg+** row layout (copy vs actions).
+- **Code / repo:** `apps/web/src/app/page.tsx`.
+
+### 2026-05-01 — Installable web app (minimal PWA: standalone window)
+
+- **Context:** User wanted the YouTube Music–style experience: same app in its own window, no offline/caching features.
+- **What we did:** **`src/app/manifest.ts`** (LogBase, **`display: standalone`**, **`start_url` `/`**, theme **`#27272a`**, bg **`#fafafa`**). **`public/sw.js`** — installability-only SW; **`fetch`** skips branding paths (icons, **`manifest.webmanifest`**). **`ServiceWorkerRegister`** (production only). **`public/favicon.ico`** via **`scripts/build-favicon.mjs`** (**`prebuild`**). **`getPublicSiteOrigin()`** in **`lib/public-site-url.ts`** (**`NEXT_PUBLIC_APP_URL`** → **`VERCEL_URL`** → localhost): **`metadataBase`** in **`layout.tsx`**, manifest **`id`**, **absolute `icons[].src` URLs**, **`msapplication-TileImage`** — Edge/Windows shell often drew blank/placeholder tiles when icons stayed relative without a stable public origin at build time.
+- **How to verify:** Production serve (**`next build`**, **`next start`**) over HTTPS or localhost; Chromium → Install LogBase.
+- **Code / repo:** `apps/web/src/app/manifest.ts`, `apps/web/public/sw.js`, `apps/web/public/favicon.ico`, `apps/web/public/pwa-192.png`, `apps/web/public/pwa-512.png`, `apps/web/src/app/icon.png`, `apps/web/scripts/build-favicon.mjs`, `apps/web/scripts/gen-pwa-icons.ps1`, `apps/web/src/components/app/ServiceWorkerRegister.tsx`, `apps/web/src/app/layout.tsx`.
+
+### 2026-05-01 — Workspace URLs: `/<workspaceId>/…` (standard shape)
+
+- **Context:** User wanted simpler, conventional URLs instead of **`/app/w/<uuid>/dashboard`**.
+- **What we did:** Moved workspace routes from **`src/app/app/w/[workspaceId]`** into **`src/app/(authenticated)/[workspaceId]`** so URLs are **`/<org-id>/dashboard`**, **`/work`**, **`/settings`**, etc., while **`/app`** and **`/app/workspaces`** stay under the same authenticated layout. **`next.config.mjs`** permanent redirects **`/app/w/:id/:path*`** → **`/:id/:path*`** (and **`.../add-organization`** → **`.../add-workspace`**). **`middleware.ts`** legacy **`/app/orgs`** targets updated to **`/:id/...`**. **`safe-return-path`** allows UUID-first paths and normalizes old **`/app/w/...`** for **`login?next=`**.
+- **Follow-up (same thread):** **`organizations.slug`** (DB migration **`0005_organization_slug`**, unique) + API slug on create; web resolves first path segment by **slug or legacy uuid**, **301 client replace** to canonical slug. Work board **level/list** removed from query string → **`work-board-scope`** sessionStorage + sidebar **`WORK_BOARD_SCOPE_EVENT`**. Task deep link still uses **`?task=`** then strips.
+- **Incident fix:** Without migration / persisted RQ cache missing **`slug`**, **`/app`** could **`replace('/undefined/dashboard')`** and **`WorkspaceShell`** UUID→slug redirect used **`resolved.slug`** bare → loop with **`/app`**. Fixed: **`workspaceUrlSegment(org)`** (**`slug ?? id`**), canonical redirect only when **`resolved.slug`** set, reject path segment **`undefined`**, bump **`QUERY_CACHE_VERSION`** to **`4`**. Run **`npm run db:migrate`** on every env that deploys slug code.
+- **Work board:** Persist effect was writing create-task **`listId`** (defaults to first list in level) into **`work-board-scope`** when **`selectedList`** was null, so level-wide view kept snapping to one list. Persist now follows **`selectedLevel` / `selectedList`** only (`apps/web/.../work/page.tsx`).
+- **Code / repo:** `apps/web/src/app/(authenticated)/`, `middleware.ts`, `next.config.mjs`, `safe-return-path.ts`, `workspace-url.ts`, `work-board-scope.ts`, `WorkspaceShell.tsx`, `packages/db` schema + **`0005_organization_slug.sql`**; topic **`[[apps-web]]`**.
+
 ### 2026-05-01 — Perf follow-ups: persisted queries, auth timing logs, lean bootstrap tasks
 
 - **Context:** Complete remaining items after the first perf pass.

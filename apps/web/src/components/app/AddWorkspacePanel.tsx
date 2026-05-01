@@ -9,6 +9,7 @@ import type { ThemePref } from "@/hooks/useThemePreference";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { apiJson } from "@/lib/api";
 import type { Org } from "@/lib/ledger-types";
+import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 export function AddWorkspacePanel({
@@ -40,7 +41,7 @@ export function AddWorkspacePanel({
       await reload();
       setLastWorkspaceId(org.id);
       setName("");
-      router.replace(`/app/w/${org.id}/dashboard`);
+      router.replace(`/${workspaceUrlSegment(org)}/dashboard`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create workspace");
     } finally {

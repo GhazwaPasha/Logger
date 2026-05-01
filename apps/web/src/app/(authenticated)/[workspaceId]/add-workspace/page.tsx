@@ -1,11 +1,10 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import { AddWorkspacePanel } from "@/components/app/AddWorkspacePanel";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 export default function AddWorkspacePage() {
-  const params = useParams();
-  const workspaceId = params.workspaceId as string;
+  const { workspaceId } = useWorkspaceRoute();
 
   return <AddWorkspacePanel variant="inWorkspace" contextWorkspaceId={workspaceId} />;
 }

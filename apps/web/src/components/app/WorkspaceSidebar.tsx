@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  readWorkBoardScope,
+  writeWorkBoardScope,
+  WORK_BOARD_SCOPE_EVENT,
+} from "@/lib/work-board-scope";
+import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
@@ -37,11 +43,12 @@ function rowBase(active: boolean) {
 
 export function WorkspaceSidebar({
   workspaceId,
+  workspaceSlug,
 }: {
   workspaceId: string;
+  workspaceSlug: string;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { token, session } = useApiSession();
   const { orgs } = useOrganizationsState();
@@ -56,7 +63,7 @@ export function WorkspaceSidebar({
   const [showAddListForLevel, setShowAddListForLevel] = useState<string | null>(null);
   const [addingList, setAddingList] = useState(false);
 
-  const base = `/app/w/${workspaceId}`;
+  const base = `/${workspaceSlug}`;
 
   const listsByLevel = useMemo(() => {
     const m = new Map<string, ListRow[]>();
@@ -91,6 +98,17 @@ export function WorkspaceSidebar({
     });
   }, [depts]);
 
+  const [boardScopeRev, setBoardScopeRev] = useState(0);
+  useEffect(() => {
+    const fn = () => setBoardScopeRev((x) => x + 1);
+    window.addEventListener(WORK_BOARD_SCOPE_EVENT, fn);
+    return () => window.removeEventListener(WORK_BOARD_SCOPE_EVENT, fn);
+  }, []);
+  const boardScope = useMemo(
+    () => readWorkBoardScope(workspaceId),
+    [workspaceId, boardScopeRev],
+  );
+
   const toggleLevel = useCallback((id: string) => {
     setExpanded((prev) => {
       const n = new Set(prev);
@@ -107,11 +125,9 @@ export function WorkspaceSidebar({
   const activeUserSettings = pathname.startsWith(`${base}/settings`);
   const activeAddWorkspace = pathname.startsWith(`${base}/add-workspace`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
-  /** Work page with full board scope (no level/list filters in URL). */
+  /** Work page scoped to whole workspace (level/list live in sessionStorage, not the URL). */
   const activeAllWorkspaceTasks =
-    pathname === `${base}/work` &&
-    !searchParams.get("level") &&
-    !searchParams.get("list");
+    pathname === `${base}/work` && boardScope?.levelId == null && boardScope?.listId == null;
 
   const userLabel = session?.user?.name?.trim() || session?.user?.email || "Account";
   const userSubLabel = session?.user?.email && session.user.name ? session.user.email : null;
@@ -121,7 +137,7 @@ export function WorkspaceSidebar({
       setWorkspacePickerOpen(false);
       return;
     }
-    const tail = pathname.replace(/^\/app\/w\/[^/]+/, "");
+    const tail = pathname.replace(/^\/[^/]+/, "");
     const allowedTails = new Set([
       "/dashboard",
       "/my-tasks",
@@ -132,9 +148,11 @@ export function WorkspaceSidebar({
       "/settings",
     ]);
     const nextTail = allowedTails.has(tail) ? tail : "/dashboard";
+    const nextOrg = orgs.find((o) => o.id === nextId);
+    if (!nextOrg) return;
     setLastWorkspaceId(nextId);
     setWorkspacePickerOpen(false);
-    router.push(`/app/w/${nextId}${nextTail}`);
+    router.push(`/${workspaceUrlSegment(nextOrg)}${nextTail}`);
   }
 
   async function addLevel() {
@@ -239,6 +257,7 @@ export function WorkspaceSidebar({
               className={`${rowBase(activeAllWorkspaceTasks)} flex min-w-0 flex-1 items-center pl-2`}
               title={`All ${NODE_LABELS.workItem.toLowerCase()}s in this workspace`}
               aria-current={activeAllWorkspaceTasks ? "page" : undefined}
+              onClick={() => writeWorkBoardScope(workspaceId, { levelId: null, listId: null })}
             >
               <span className="truncate text-sm font-semibold text-[var(--fg)]">
                 {selectedOrg?.name ?? NODE_LABELS.workspace}
@@ -270,9 +289,16 @@ export function WorkspaceSidebar({
                     <li key={d.id} className="select-none">
                       <div className="flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
                         <Link
-                          href={`${base}/work?level=${encodeURIComponent(d.id)}`}
-                          className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left"
+                          href={`${base}/work`}
+                          className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left ${
+                            pathname === `${base}/work` &&
+                            boardScope?.levelId === d.id &&
+                            boardScope?.listId == null
+                              ? "rounded-md bg-[var(--accent-muted)] font-medium text-[var(--fg)]"
+                              : ""
+                          }`}
                           title={`Open ${d.name}`}
+                          onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
                         >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-[var(--fg)]">{d.name}</p>
@@ -301,9 +327,12 @@ export function WorkspaceSidebar({
                               return (
                                 <li key={l.id}>
                                   <Link
-                                    href={`${base}/work?level=${encodeURIComponent(d.id)}&list=${encodeURIComponent(l.id)}`}
-                                    className={`${rowBase(false)} flex w-full items-center truncate pl-2`}
+                                    href={`${base}/work`}
+                                    className={`${rowBase(boardScope?.listId === l.id)} flex w-full items-center truncate pl-2`}
                                     title={l.name}
+                                    onClick={() =>
+                                      writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
+                                    }
                                   >
                                     <span className="mr-1.5 text-[var(--muted)]">#</span>
                                     <span className="truncate">{l.name}</span>

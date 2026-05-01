@@ -47,7 +47,7 @@ async function main() {
   let org = await db.select().from(organizations).limit(1);
   let orgId = org[0]?.id;
   if (!orgId) {
-    const [created] = await db.insert(organizations).values({ name: "Acme Corp" }).returning();
+    const [created] = await db.insert(organizations).values({ name: "Acme Corp", slug: "acme-corp" }).returning();
     orgId = created.id;
   }
 

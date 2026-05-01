@@ -8,7 +8,7 @@ import { safeReturnPath } from "@/lib/safe-return-path";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 
-/** Session redirect + app preferences + organizations context for `/app/*`. */
+/** Session redirect + app preferences + organizations context for `/app` and `/<workspaceSlug|uuid>/…`. */
 export function AppAuthenticatedProviders({ children }: { children: React.ReactNode }) {
   const { session, isSessionPending } = useApiSession();
   const { theme, setTheme } = useThemePreference();

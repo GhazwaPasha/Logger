@@ -16,7 +16,12 @@ const nextConfig = {
     return [
       {
         source: "/app/w/:workspaceId/add-organization",
-        destination: "/app/w/:workspaceId/add-workspace",
+        destination: "/:workspaceId/add-workspace",
+        permanent: true,
+      },
+      {
+        source: "/app/w/:workspaceId/:path*",
+        destination: "/:workspaceId/:path*",
         permanent: true,
       },
     ];

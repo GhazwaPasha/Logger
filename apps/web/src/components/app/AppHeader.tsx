@@ -46,14 +46,14 @@ const iconBtn =
   "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
 
 export function AppHeader({
-  workspaceId,
+  workspaceSlug,
 }: {
-  /** When set, profile and settings use this workspace in the URL. */
-  workspaceId?: string;
+  /** When set, profile and settings use this workspace slug in the URL. */
+  workspaceSlug?: string;
 }) {
   const { data: session } = authClient.useSession();
   const user = session?.user;
-  const settingsHref = workspaceId ? `/app/w/${workspaceId}/settings` : undefined;
+  const settingsHref = workspaceSlug ? `/${workspaceSlug}/settings` : undefined;
   const profileTitle = user?.email ? `Account (${user.email})` : "Account";
   const initials = user ? userInitials(user.name, user.email) : "?";
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);

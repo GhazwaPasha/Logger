@@ -84,6 +84,8 @@ exports.taskPriorityEnum = (0, pg_core_1.pgEnum)("task_priority", ["high", "medi
 exports.organizations = (0, pg_core_1.pgTable)("organizations", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
     name: (0, pg_core_1.text)("name").notNull(),
+    /** URL segment for web routes (`/<slug>/…`). Immutable after create. */
+    slug: (0, pg_core_1.text)("slug").notNull().unique(),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 exports.departments = (0, pg_core_1.pgTable)("departments", {

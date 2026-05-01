@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, inArray, sql } from "drizzle-orm";
 import {
@@ -13,6 +14,8 @@ import { DepartmentsService } from "../departments/departments.service";
 import { ListsService } from "../lists/lists.service";
 import { TasksService } from "../tasks/tasks.service";
 
+const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
+
 @Injectable()
 export class OrganizationsService {
   constructor(
@@ -23,6 +26,26 @@ export class OrganizationsService {
     private readonly tasks: TasksService,
   ) {}
 
+  private slugifyName(name: string): string {
+    const base = name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48);
+    return base.length >= 2 ? base : "workspace";
+  }
+
+  private async allocateSlug(base: string): Promise<string> {
+    for (let i = 0; i < 40; i++) {
+      const candidate = i === 0 ? base : `${base}-${randomBytes(3).toString("hex")}`;
+      if (RESERVED_SLUGS.has(candidate)) continue;
+      const rows = await this.db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, candidate)).limit(1);
+      if (rows.length === 0) return candidate;
+    }
+    throw new Error("Could not allocate organization slug");
+  }
+
   async listForUser(userId: string) {
     const ids = await this.authz.listOrganizationIdsForUser(userId);
     if (ids.length === 0) return [];
@@ -31,7 +54,9 @@ export class OrganizationsService {
 
   async create(userId: string, body: unknown) {
     const parsed = createOrganizationSchema.parse(body);
-    const [org] = await this.db.insert(organizations).values({ name: parsed.name }).returning();
+    const base = this.slugifyName(parsed.name);
+    const slug = await this.allocateSlug(base);
+    const [org] = await this.db.insert(organizations).values({ name: parsed.name, slug }).returning();
     await this.db.insert(organizationMembers).values({
       organizationId: org.id,
       userId: userId,

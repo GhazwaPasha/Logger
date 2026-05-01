@@ -106,6 +106,8 @@ export const taskPriorityEnum = pgEnum("task_priority", ["high", "medium", "low"
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  /** URL segment for web routes (`/<slug>/…`). Immutable after create. */
+  slug: text("slug").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

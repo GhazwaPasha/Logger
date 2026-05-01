@@ -1,6 +1,6 @@
 # apps-web (Next.js)
 
-Primary **LogBase** UI: marketing `/`, **Better Auth** session, authenticated **`/app`** shell, workspace routes under **`/app/w/[workspaceId]/...`**. Linked from [[00-map-overview]].
+Primary **LogBase** UI: marketing `/`, **Better Auth** session, authenticated **`/app`** hub, workspace routes **`/<slug>/...`** (folder **`[workspaceId]`** = slug or legacy uuid; route group **`(authenticated)`**). Linked from [[00-map-overview]].
 
 ## Stack
 
@@ -28,12 +28,12 @@ Optional Better Auth Infra: **`BETTER_AUTH_API_KEY`**, **`BETTER_AUTH_API_URL`**
 - **Marketing:** `/` (landing).
 - **Login:** under `apps/web/src/app` login routes (see repo).
 - **`/app`** — authenticated entry; org/workspace resolution, **Add workspace** flow when empty.
-- **Workspace:** `/app/w/[workspaceId]/dashboard`, **`/work`** (tasks board), **`/settings`**, **`/add-workspace`**, org/team pages as implemented.
-- **Legacy aliases:** `middleware.ts` redirects **`/app/orgs/...`** to **`/app/w/...`** (dashboard, work, `?task=` deep links).
+- **Workspace:** **`/<org-slug>/...`** (canonical; legacy **`/<uuid>/...`** redirects to slug). **`/work`** board scope (level/list) is **`sessionStorage`** keyed by org id — not query params. **`/work?task=`** still opens the task modal briefly then cleans the URL.
+- **Legacy URLs:** **`next.config.mjs`** **301** **`/app/w/:id/...`** → **`/:id/...`**. **`middleware.ts`** still redirects **`/app/orgs/...`** into **`/:id/...`** (dashboard, work, `?task=` deep links).
 
 ## Middleware
 
-- **`apps/web/src/middleware.ts`** — matcher limited to `/app/orgs` paths; maps old org URLs to `/app/w/:id/...` and task paths to **`/work?task=`**.
+- **`apps/web/src/middleware.ts`** — matcher limited to `/app/orgs` paths; maps old org URLs to **`/:id/...`** and task paths to **`/work?task=`**.
 
 ## Data loading pattern
 

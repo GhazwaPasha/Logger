@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:favicon": "node ./scripts/build-favicon.mjs",
+    "prebuild": "npm run build:favicon",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -31,6 +33,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.2.4",
+    "png-to-ico": "^3.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

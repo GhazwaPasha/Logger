@@ -1,4 +1,4 @@
-export type Org = { id: string; name: string };
+export type Org = { id: string; name: string; slug?: string };
 export type Dept = { id: string; name: string; organizationId: string };
 export type ListRow = {
   id: string;
