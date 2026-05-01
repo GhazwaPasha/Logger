@@ -9,9 +9,9 @@ const BYPASS_PATHS = new Set([
   "/manifest.webmanifest",
   "/icon.png",
   "/apple-icon.png",
-  "/pwa-192.png",
-  "/pwa-256.png",
-  "/pwa-512.png",
+  "/icons/logbase-app-192.png",
+  "/icons/logbase-app-256.png",
+  "/icons/logbase-app-512.png",
 ]);
 
 self.addEventListener("install", (event) => {

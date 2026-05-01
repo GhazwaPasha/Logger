@@ -1,7 +1,9 @@
 Add-Type -AssemblyName System.Drawing
 # Same mark as in-app `LogBaseMark` (dark theme asset). Transparent PNG — no matte fill so OS shells show true alpha.
 $srcPath = Join-Path $PSScriptRoot "..\public\Logos\logbase-dark.png" | Resolve-Path
-$outDir = Join-Path $PSScriptRoot "..\public" | Resolve-Path
+$iconsDir = Join-Path $PSScriptRoot "..\public\icons"
+New-Item -ItemType Directory -Force -Path $iconsDir | Out-Null
+$outDir = Resolve-Path $iconsDir
 $src = [System.Drawing.Image]::FromFile($srcPath)
 
 function Export-SquareIcon {
@@ -26,8 +28,8 @@ function Export-SquareIcon {
   $bmp.Dispose()
 }
 
-Export-SquareIcon -Size 192 -OutPath (Join-Path $outDir "pwa-192.png")
-Export-SquareIcon -Size 256 -OutPath (Join-Path $outDir "pwa-256.png")
-Export-SquareIcon -Size 512 -OutPath (Join-Path $outDir "pwa-512.png")
+Export-SquareIcon -Size 192 -OutPath (Join-Path $outDir "logbase-app-192.png")
+Export-SquareIcon -Size 256 -OutPath (Join-Path $outDir "logbase-app-256.png")
+Export-SquareIcon -Size 512 -OutPath (Join-Path $outDir "logbase-app-512.png")
 $src.Dispose()
-Write-Host "Wrote pwa-192.png, pwa-256.png, and pwa-512.png"
+Write-Host "Wrote public/icons/logbase-app-192.png, logbase-app-256.png, logbase-app-512.png"
