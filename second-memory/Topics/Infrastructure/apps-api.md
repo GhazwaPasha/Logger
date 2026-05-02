@@ -4,7 +4,7 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 
 ## Runtime
 
-- **Bootstrap:** `apps/api/src/main.ts` — loads env via `load-env`, enables **CORS** for `NEXT_PUBLIC_APP_URL` (default `http://localhost:3000`), localhost regex, and `exp://` for Expo.
+- **Bootstrap:** `apps/api/src/main.ts` — loads env via `load-env`, enables **CORS**: **`API_CORS_ORIGINS`** (comma-separated browser origins) when set; otherwise a single origin from **`NEXT_PUBLIC_APP_URL`** (default `http://localhost:3000`). Always includes localhost regex and `exp://` for Expo. If prod users hit a **custom domain** while the API only allows the `*.vercel.app` URL, the workspace **`fetch`** fails with **Failed to fetch** until both origins are listed (or only the domain users actually use).
 - **Port:** `API_PORT` env, default **4000**.
 - **Config:** `@nestjs/config` reads **repo-root** `.env` / `.env.local` (paths resolved from `dist/` up three levels in `app.module.ts`).
 

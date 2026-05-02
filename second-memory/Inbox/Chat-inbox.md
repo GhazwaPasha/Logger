@@ -4,6 +4,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Prod “Failed to fetch” on workspace: CORS / env mismatch analysis
+
+- **Context:** Production showed **Failed to fetch** around workspace UI; test OK; DB and API processes healthy.
+- **What we did:** Confirmed workspace shell calls **`GET …/organizations/:id/workspace`** via **`apiFetch`** (`NEXT_PUBLIC_API_URL`). That error string is a **browser network/CORS/mixed-content** failure, not Nest throwing — **`401` JWT misalignment would still return HTTP** with a body. API CORS previously allowed only **one** string origin (**`NEXT_PUBLIC_APP_URL`**) plus localhost/Expo; Better Auth on web already supports multiple origins (custom domain, **`x-forwarded-host`**, **`*.vercel.app`**), so prod users on a **different origin** than the API’s single allowed URL get a **silent CORS block**. Added optional **`API_CORS_ORIGINS`** (comma-separated) in **`apps/api/src/main.ts`**; docs updated in **`Topics/Infrastructure/apps-api.md`** and **`auth-jwt-and-env.md`**.
+- **Takeaway / follow-ups:** On Vercel, set **`API_CORS_ORIGINS`** to every real web origin (e.g. `https://log-base.vercel.app,https://your-custom-domain.com`) **or** ensure **`NEXT_PUBLIC_APP_URL` on the API** equals the origin users actually open. Verify **`NEXT_PUBLIC_API_URL`** was present at **web build** time (HTTPS, correct API host). Use DevTools → Network: failed request shows **(blocked:cors)** or **mixed content**.
+- **Code / repo:** `apps/api/src/main.ts`, `apps/web/src/lib/api.ts`, `apps/web/src/hooks/useOrgWorkspace.ts`.
+
 ### 2026-05-02 — Instant-feeling tasks: slim mutation payloads + optimistic UI
 
 - **Context:** Board actions (status, subtasks, create/save) felt slow; prior **`PATCH`/`POST`** returned **`getDetail`** (full ledger + DB load). Client blocked controls during mutations and used sequential subtask **`POST`**s after create/save; kanban prefetched **`GET …/subtasks`** per card though workspace bootstrap already batches subtasks.

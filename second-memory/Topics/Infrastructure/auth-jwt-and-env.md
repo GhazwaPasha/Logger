@@ -32,7 +32,7 @@ If issuer/audience don’t match JWT claims → **`401 Invalid or expired token`
 
 ## CORS
 
-- API allows browser origin from **`NEXT_PUBLIC_APP_URL`**, localhost variants, and Expo `exp://`.
+- API allows browser origins from **`API_CORS_ORIGINS`** (comma-separated) when set; otherwise exactly **`NEXT_PUBLIC_APP_URL`**, plus localhost regex and Expo `exp://`. **`NEXT_PUBLIC_APP_URL`** on the API deployment must match the **actual `Origin` header** users’ browsers send (custom domain vs `*.vercel.app` vs `www` vs apex); mismatch → CORS block → client **`Failed to fetch`** on workspace/API calls even though the server process is healthy.
 
 ## Deep references
 
