@@ -4,11 +4,18 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — React Query persist: don’t freeze “Failed to fetch” in localStorage
+
+- **Context:** Prod workspace error persisted after env/CORS fixes; suspected cache.
+- **What we did:** **`PersistQueryClientProvider`** only dehydrated **`organizations`** / **`workspace`** queries without checking **`query.state.status`**, so a **failed** query (e.g. network/CORS **`Failed to fetch`**) could be **written to `localStorage`** and rehydrated for up to **`maxAge`** (24h), masking a fixed backend. **`shouldDehydrateQuery`** now requires **`status === "success"`**. Bumped **`QUERY_CACHE_VERSION`** to **`6`** so existing persisted blobs use a new key prefix. **`ServiceWorkerRegister`** uses **`register(..., { updateViaCache: "none" })`** so **`sw.js`** isn’t stuck on an HTTP-cached copy.
+- **Takeaway / follow-ups:** Users who already have a bad persist can also clear site data or keys matching **`wl_rq_*`**. SW is still pass-through-only (no Cache API for API routes).
+- **Code / repo:** `apps/web/src/components/app/QueryProvider.tsx`, `apps/web/src/lib/query-cache-version.ts`, `apps/web/src/components/app/ServiceWorkerRegister.tsx`.
+
 ### 2026-05-03 — Prod “Failed to fetch” on workspace: CORS / env mismatch analysis
 
 - **Context:** Production showed **Failed to fetch** around workspace UI; test OK; DB and API processes healthy.
 - **What we did:** Confirmed workspace shell calls **`GET …/organizations/:id/workspace`** via **`apiFetch`** (`NEXT_PUBLIC_API_URL`). That error string is a **browser network/CORS/mixed-content** failure, not Nest throwing — **`401` JWT misalignment would still return HTTP** with a body. API CORS previously allowed only **one** string origin (**`NEXT_PUBLIC_APP_URL`**) plus localhost/Expo; Better Auth on web already supports multiple origins (custom domain, **`x-forwarded-host`**, **`*.vercel.app`**), so prod users on a **different origin** than the API’s single allowed URL get a **silent CORS block**. Added optional **`API_CORS_ORIGINS`** (comma-separated) in **`apps/api/src/main.ts`**; docs updated in **`Topics/Infrastructure/apps-api.md`** and **`auth-jwt-and-env.md`**.
-- **Takeaway / follow-ups:** On Vercel, set **`API_CORS_ORIGINS`** to every real web origin (e.g. `https://log-base.vercel.app,https://your-custom-domain.com`) **or** ensure **`NEXT_PUBLIC_APP_URL` on the API** equals the origin users actually open. Verify **`NEXT_PUBLIC_API_URL`** was present at **web build** time (HTTPS, correct API host). Use DevTools → Network: failed request shows **(blocked:cors)** or **mixed content**.
+- **Takeaway / follow-ups:** On Vercel, set **`API_CORS_ORIGINS`** to every real web origin (e.g. `https://log-base.vercel.app,https://your-custom-domain.com`) **or** ensure **`NEXT_PUBLIC_APP_URL` on the API** equals the origin users actually open. Verify **`NEXT_PUBLIC_API_URL`** was present at **web build** time (HTTPS, correct API host). Use DevTools → Network: failed request shows **(blocked:cors)** or **mixed content**. **Migration lag** usually yields **`500`** + PG/Drizzle errors in API logs, not the browser’s generic **`Failed to fetch`** (that implies no normal HTTP response to the client).
 - **Code / repo:** `apps/api/src/main.ts`, `apps/web/src/lib/api.ts`, `apps/web/src/hooks/useOrgWorkspace.ts`.
 
 ### 2026-05-02 — Instant-feeling tasks: slim mutation payloads + optimistic UI

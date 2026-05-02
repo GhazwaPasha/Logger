@@ -49,6 +49,8 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       dehydrateOptions: {
         shouldDehydrateQuery: (query: Query) => {
           if (!userId) return false;
+          // Never persist errors (e.g. "Failed to fetch") — they stick across reloads for maxAge and mask fixes.
+          if (query.state.status !== "success") return false;
           const root = query.queryKey[0];
           return root === "organizations" || root === "workspace";
         },
