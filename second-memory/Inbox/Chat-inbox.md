@@ -4,6 +4,12 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Marketing home: motion + layered backdrop
+
+- **Context:** Redesign public landing (`/`) with animations and moving elements while keeping existing copy and structure.
+- **What we did:** **`MarketingBackground`**: drifting blurred blobs, panning grid, small orbiting dots, breathing gradient wash. **`HeroProductMock`**: floating mock window, traffic-light pulse, shimmer skeleton bars, checkbox glow, live dot, floating SYNCED/EXPORT chips. **`Reveal`** (client): intersection-based fade-up for nav, trust strip, capability/how/CTA/footer; staggered delays on cards. Hero: 3D/blur word stagger on title lines; fade-up chain on badge, body, CTAs. Trust strip: animated gradient border (mask). Section cards: hover lift + shadow. **`globals.css`**: marketing keyframes + **`prefers-reduced-motion`** disables motion and shows static content. No new npm deps.
+- **Code / repo:** `apps/web/src/app/page.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/components/marketing/MarketingBackground.tsx`, `HeroProductMock.tsx`, `Reveal.tsx`.
+
 ### 2026-05-03 — Sidebar: rename levels/lists (owners only)
 
 - **Context:** Rename existed on API (**`PATCH`** departments / lists) but not in UI; controls should appear only for users allowed to call those endpoints (**workspace owners**).
