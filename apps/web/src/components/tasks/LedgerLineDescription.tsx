@@ -45,6 +45,119 @@ function parseIso(v: unknown): string | null {
 
 type Props = { entry: LedgerRow; members: MemberRow[] };
 
+/** Human-readable status transitions (ledger stores raw API enum strings). */
+function StatusChangeLine({ actor, oldRaw, newRaw }: { actor: string; oldRaw: string; newRaw: string }) {
+  const oldS = normalizeTaskStatus(oldRaw);
+  const newS = normalizeTaskStatus(newRaw);
+
+  if (oldS === newS) {
+    return (
+      <>
+        <UserName>{actor}</UserName> updated the status
+      </>
+    );
+  }
+
+  if (newS === "cancelled") {
+    return (
+      <>
+        <UserName>{actor}</UserName> cancelled this task
+      </>
+    );
+  }
+
+  if (oldS === "cancelled" && newS === "pending") {
+    return (
+      <>
+        <UserName>{actor}</UserName> reopened this task
+      </>
+    );
+  }
+
+  if (newS === "done") {
+    return (
+      <>
+        <UserName>{actor}</UserName> marked this task complete
+      </>
+    );
+  }
+
+  if (oldS === "done") {
+    return (
+      <>
+        <UserName>{actor}</UserName> moved this task back to <StatusInlineLabel raw={newRaw} />
+      </>
+    );
+  }
+
+  if (newS === "late") {
+    return (
+      <>
+        <UserName>{actor}</UserName> marked this task as <StatusInlineLabel raw="late" />
+      </>
+    );
+  }
+
+  if (newS === "in_progress") {
+    if (oldS === "late") {
+      return (
+        <>
+          <UserName>{actor}</UserName> resumed work on this task
+        </>
+      );
+    }
+    if (oldS === "assigned") {
+      return (
+        <>
+          <UserName>{actor}</UserName> acknowledged and started work
+        </>
+      );
+    }
+    if (oldS === "pending") {
+      return (
+        <>
+          <UserName>{actor}</UserName> started work on this task
+        </>
+      );
+    }
+    return (
+      <>
+        <UserName>{actor}</UserName> set status to <StatusInlineLabel raw={newRaw} />
+      </>
+    );
+  }
+
+  if (newS === "assigned") {
+    return (
+      <>
+        <UserName>{actor}</UserName> moved this task to <StatusInlineLabel raw={newRaw} />
+      </>
+    );
+  }
+
+  if (newS === "pending") {
+    if (oldS === "in_progress" || oldS === "assigned" || oldS === "late") {
+      return (
+        <>
+          <UserName>{actor}</UserName> moved this task back to <StatusInlineLabel raw={newRaw} />
+        </>
+      );
+    }
+    return (
+      <>
+        <UserName>{actor}</UserName> set status to <StatusInlineLabel raw={newRaw} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <UserName>{actor}</UserName> changed status from <StatusPlainLabel raw={oldRaw} /> to{" "}
+      <StatusInlineLabel raw={newRaw} />
+    </>
+  );
+}
+
 /** Rich ledger line: blue person names, status labels use board pill colors. */
 export function LedgerLineDescription({ entry, members }: Props) {
   const actor = memberDisplayName(members, entry.actorId);
@@ -56,16 +169,11 @@ export function LedgerLineDescription({ entry, members }: Props) {
       if (typeof oldS !== "string" || typeof newS !== "string") {
         return (
           <>
-            <UserName>{actor}</UserName> updated status
+            <UserName>{actor}</UserName> updated the status
           </>
         );
       }
-      return (
-        <>
-          <UserName>{actor}</UserName> changed status from <StatusPlainLabel raw={oldS} /> to{" "}
-          <StatusInlineLabel raw={newS} />
-        </>
-      );
+      return <StatusChangeLine actor={actor} oldRaw={oldS} newRaw={newS} />;
     }
     case "assignee_change": {
       const prev = entry.payload.previousAssigneeUserIds;
@@ -75,13 +183,13 @@ export function LedgerLineDescription({ entry, members }: Props) {
       if (prevIds.length === 0 && nextIds.length > 0) {
         return (
           <>
-            <UserName>{actor}</UserName> assigned <AssigneeNameList members={members} ids={nextIds} />
+            <UserName>{actor}</UserName> assigned this task to <AssigneeNameList members={members} ids={nextIds} />
           </>
         );
       }
       return (
         <>
-          <UserName>{actor}</UserName> changed assignees to <AssigneeNameList members={members} ids={nextIds} />{" "}
+          <UserName>{actor}</UserName> reassigned this task to <AssigneeNameList members={members} ids={nextIds} />{" "}
           <span className="text-[var(--muted)]">(was </span>
           <AssigneeNameList members={members} ids={prevIds} />
           <span className="text-[var(--muted)]">)</span>
@@ -95,7 +203,7 @@ export function LedgerLineDescription({ entry, members }: Props) {
       const newLabel = newDue ? formatLogTimestamp(newDue) : "none";
       return (
         <>
-          <UserName>{actor}</UserName> changed due date ({oldLabel} → {newLabel})
+          <UserName>{actor}</UserName> changed the due date ({oldLabel} → {newLabel})
         </>
       );
     }
@@ -108,7 +216,7 @@ export function LedgerLineDescription({ entry, members }: Props) {
     case "ack":
       return (
         <>
-          <UserName>{actor}</UserName> acknowledged
+          <UserName>{actor}</UserName> acknowledged this assignment
         </>
       );
     case "note": {

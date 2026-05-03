@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, max } from "drizzle-orm";
 import {
+  activityLedger,
   lists,
   organizationMemberManagedDepartments,
   organizationMembers,
@@ -224,8 +225,9 @@ export class AuthorizationService {
   /** Assignees always attached; subtasks loaded only when needed (saves a batched subtask query). */
   private async finalizeTaskList(taskRows: (typeof tasks.$inferSelect)[], includeSubtasks: boolean) {
     const withAssignees = await this.attachAssigneeUserIds(taskRows);
-    if (!includeSubtasks) return withAssignees;
-    return this.attachSubtasks(withAssignees);
+    const withLedger = await this.attachLastLedger(withAssignees);
+    if (!includeSubtasks) return withLedger;
+    return this.attachSubtasks(withLedger);
   }
 
   /** Adds assigneeUserIds to each task for list/board views (names resolved client-side from members). */
@@ -245,6 +247,40 @@ export class AuthorizationService {
     return taskRows.map((t) => ({
       ...t,
       assigneeUserIds: map.get(t.id) ?? [],
+    }));
+  }
+
+  /** Newest ledger row per task for list/kanban preview (single join + group). */
+  private async attachLastLedger<T extends { id: string }>(taskRows: T[]) {
+    if (taskRows.length === 0) return [];
+    const ids = taskRows.map((t) => t.id);
+
+    const latestSq = this.db
+      .select({
+        taskId: activityLedger.taskId,
+        maxCreated: max(activityLedger.createdAt).as("max_created"),
+      })
+      .from(activityLedger)
+      .where(inArray(activityLedger.taskId, ids))
+      .groupBy(activityLedger.taskId)
+      .as("ledger_latest");
+
+    const rows = await this.db
+      .select({ ledger: activityLedger })
+      .from(activityLedger)
+      .innerJoin(
+        latestSq,
+        and(eq(activityLedger.taskId, latestSq.taskId), eq(activityLedger.createdAt, latestSq.maxCreated)),
+      );
+
+    const map = new Map<string, (typeof activityLedger.$inferSelect)>();
+    for (const r of rows) {
+      map.set(r.ledger.taskId, r.ledger);
+    }
+
+    return taskRows.map((t) => ({
+      ...t,
+      lastLedger: map.get(t.id) ?? null,
     }));
   }
 

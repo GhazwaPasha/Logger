@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
+import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -15,8 +15,8 @@ type DashboardView = "overview" | "activity";
 
 export default function WorkspaceDashboardPage() {
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
-  const { token } = useApiSession();
-  const { depts, tasks, members, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
+  const { token, session } = useApiSession();
+  const { depts, tasks, members, lists, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [view, setView] = useState<DashboardView>("overview");
 
   const activityQuery = useOrgActivityFeed(token, workspaceId, view === "activity");
@@ -33,9 +33,9 @@ export default function WorkspaceDashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {NODE_LABELS.workspace} (node 1) → {NODE_LABELS.level}s (node 2) → Lists (node 3) →{" "}
-            {NODE_LABELS.workItem}s (node 4).
+          <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+            Track workload, deadlines, and ownership across your {NODE_LABELS.workspace.toLowerCase()}. Use{" "}
+            <span className="text-[var(--fg)]">Activity log</span> for the full ledger.
           </p>
         </div>
         <div
@@ -71,39 +71,15 @@ export default function WorkspaceDashboardPage() {
       </div>
 
       {view === "overview" ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums">
-                {workspaceLoading ? "…" : depts.length}
-              </p>
-            </div>
-            <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Open tasks</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums">
-                {workspaceLoading ? "…" : tasks.filter((t) => !t.deletedAt).length}
-              </p>
-            </div>
-            <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team members</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums">
-                {workspaceLoading ? "…" : members.length}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link href={`${base}/work`} className="btn-primary rounded-xl px-5">
-              Open tasks
-            </Link>
-            <Link href={`${base}/work`} className="btn-secondary rounded-xl px-5">
-              Task checklist
-            </Link>
-            <Link href={`${base}/people`} className="btn-secondary rounded-xl px-5">
-              Team
-            </Link>
-          </div>
-        </>
+        <DashboardOverview
+          basePath={base}
+          depts={depts}
+          lists={lists}
+          tasks={tasks}
+          members={members}
+          workspaceLoading={workspaceLoading}
+          currentUserId={session?.user?.id ?? null}
+        />
       ) : (
         <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Workspace activity</h2>

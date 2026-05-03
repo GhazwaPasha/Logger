@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -211,6 +211,10 @@ export const tasks = pgTable(
     dueAt: timestamp("due_at", { withTimezone: true }),
     /** `daily` | `weekly` | `monthly` | `yearly`; null = none. */
     dueRepeat: text("due_repeat"),
+    /** Group id for recurring chain; set when the task has `due_repeat` (see migration backfill). */
+    recurringSeriesId: uuid("recurring_series_id"),
+    /** If this row was created as the next cycle of a recurring task, parent task id. */
+    spawnedFromTaskId: uuid("spawned_from_task_id"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -222,6 +226,10 @@ export const tasks = pgTable(
     index("tasks_org_idx").on(t.organizationId),
     index("tasks_list_idx").on(t.listId),
     index("tasks_assigner_idx").on(t.assignerId),
+    index("tasks_recurring_series_idx").on(t.recurringSeriesId),
+    uniqueIndex("tasks_spawned_from_parent_uidx")
+      .on(t.spawnedFromTaskId)
+      .where(sql`${t.spawnedFromTaskId} is not null`),
   ],
 );
 

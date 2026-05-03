@@ -4,6 +4,51 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Late vs overdue: single concept in UI
+
+- **Context:** User treats **Late** (stored status) as the only notion of “running late”; separate **Overdue** wording/filter was redundant.
+- **What we did:** **`DatePreset`** renamed **`overdue` → `late`**; **`taskMatchesDatePreset(..., "late")`** matches **`normalizeTaskStatus(task.status) === "late"`** (not due-date-only). **`dueQueryToDatePreset`**: legacy **`due=overdue`** URLs still map to the Late preset. Work board preset label **Late**, URL **`due=late`**. Dashboard **Needs attention**: removed second chip; kept **`status=late`** link + count. Ledger **`status_change` → late**: copy uses **Late** pill (**`StatusInlineLabel`**).
+- **Code / repo:** `apps/web/src/lib/task-board.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/components/dashboard/DashboardOverview.tsx`, `apps/web/src/components/tasks/LedgerLineDescription.tsx`.
+
+### 2026-05-03 — Activity log: natural-language ledger lines
+
+- **Context:** Task history and dashboard activity used stilted copy (“marked In progress as Cancelled”).
+- **What we did:** **`LedgerLineDescription`** maps **`status_change`** to short sentences (cancel, complete, overdue, started work, acknowledged + started, reopened, rollbacks with status pills where useful); **`assignee_change`** → “assigned this task to …” / “reassigned …”; **`ack`** → “acknowledged this assignment”; reschedule wording tweak. **`TaskPanelHistoryCard`** creation footer → “{creator} created this task · {id}”.
+- **Code / repo:** `apps/web/src/components/tasks/LedgerLineDescription.tsx`, `apps/web/src/components/tasks/TaskPanelHistoryCard.tsx`.
+
+### 2026-05-03 — Recurring tasks model B (spawn next row on done)
+
+- **Context:** Implement recurrence by **inserting a new task** when a repeating task is marked **done** (not roll-forward on one row).
+- **What we did:** Migration **`0008_task_recurrence_series.sql`**: **`tasks.recurring_series_id`**, **`tasks.spawned_from_task_id`** (self-FK in SQL only; Drizzle column has no `.references` to avoid circular TS), partial **unique** on **`spawned_from_task_id`** (one child per parent), index on **`recurring_series_id`**, backfill **`recurring_series_id = id`** where **`due_repeat`** set. **`compute-next-due.ts`**: daily / weekly / **`addMonthsPreserveDay`** for monthly & yearly. **`TasksService.create`**: sets **`recurring_series_id`** to new task id when **`dueRepeat`** + **`dueAt`**. **`patchTask`**: when transitioning to **`done`**, if prior **`dueAt`** + valid **`due_repeat`** and due not cleared in same PATCH, and no row exists with **`spawned_from_task_id`** = this task, inserts sibling task (same list/title/priority/assignees/`due_repeat`, **`due_at`** = next instant, **`recurring_series_id`** carried, **`spawned_from_task_id`** set); ledgers: child **Task created.** + optional assignee_change; parent note **Next occurrence created.** Returns **`spawnedRecurringTaskId`** on **`TaskMutationResult`**. Web **`patchTaskMutation`** + **`saveEditTask`**: **`invalidateQueries`** **`workspace`** when that id present so the new card loads (with **`lastLedger`**). **`ledger-types`**: **`TaskRow.recurringSeriesId`**, **`spawnedFromTaskId`**. Contracts comment updated.
+- **Takeaway / follow-ups:** Re-marking **done** after reopening does **not** spawn again (unique child per parent). No cron yet (completion-driven only). UI grouping by **`recurring_series_id`** still optional. Run **`npm run db:migrate`** (or repo migrate pipeline) before deploy.
+- **Code / repo:** `packages/db/drizzle/0008_task_recurrence_series.sql`, `packages/db/src/schema.ts`, `apps/api/src/tasks/compute-next-due.ts`, `apps/api/src/tasks/tasks.service.ts`, `packages/contracts/src/index.ts`, `apps/web/src/lib/ledger-types.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Work board: last activity on list + kanban cards
+
+- **Context:** User wanted the newest ledger line shown at the bottom of each task card (list + kanban) to orient dense boards and future recurring-task rows.
+- **What we did:** **`AuthorizationService`** batches **`lastLedger`** per task via **`activity_ledger`** (**`MAX(created_at)`** join). **`TasksService.taskMutationResult`** attaches **`lastLedger`** to **`task`** so mutations keep the footer fresh. **`TaskRow.lastLedger`** in **`ledger-types`**. **`TaskCardLastActivity`** uses **`formatLogTimestamp`** + **`LedgerLineDescription`**; kanban **`compact`** (**`line-clamp-2`**) + **`variant="footer"`** (border-top). List rows use **`variant="inline"`** under the title (no divider). Wired on **`work/page.tsx`** **`ListTaskCard`** + **`TaskCard`**.
+- **Code / repo:** `apps/api/src/authorization/authorization.service.ts`, `apps/api/src/tasks/tasks.service.ts`, `apps/web/src/lib/ledger-types.ts`, `apps/web/src/components/tasks/TaskCardLastActivity.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Workspace chrome: viewport-locked shell + sidebar scroll
+
+- **Context:** Sidebar scrolled with the page; user wanted it fixed with its own (hidden) scrollbar.
+- **What we did:** **`WorkspaceShell`** uses **`h-[100dvh] max-h-[100dvh] overflow-hidden`** so the document doesn’t grow; the header + sidebar + **`main`** row is **`flex-1 min-h-0 overflow-hidden`**; **`main`** is **`overflow-y-auto overscroll-contain`**. **`WorkspaceSidebar`**: **`md:h-full`** (fills row under header), removed **`nav`** **`overflow-hidden`** so workspace picker isn’t clipped; tree section **`scrollbar-hide overflow-y-auto overscroll-contain`**; mobile cap **`max-h-[min(70dvh,28rem)]`**.
+- **Code / repo:** `apps/web/src/components/app/WorkspaceShell.tsx`, `apps/web/src/components/app/WorkspaceSidebar.tsx`.
+
+### 2026-05-03 — Dashboard overview: richer widgets + Work drill-down URLs
+
+- **Context:** Follow-up to UX audit—implement overview infographics and honest KPIs; keep activity log as-is.
+- **What we did:** New **`DashboardOverview`**: KPIs (**levels**, **active work** = pipeline excluding done/cancelled, **completed**, **team**); **Needs attention** chips (late status, overdue by date, due this week, unassigned, my tasks); **Status mix** + **Priority** segmented bars + legends; **Checklist progress** when subtasks exist; **Active work by level** + **Assignee load** bar rows—all linking to **`/work`** with query params. Empty workspace state when no levels/lists/tasks. Dashboard subtitle is user-facing. **`task-board`**: **`isDatePreset`**, **`parseUrlStatusFilter`**. **`work/page.tsx`**: effect migrates **`level`/`list`** to scope + strips; strips **`task`** after open; **`due`**, **`status`**, **`mine`**, **`unassigned`**, **`assignee`** stay in the URL (shareable); second effect syncs **`datePreset`** + assignee/status filter state from **`searchParams`**; **`replaceWorkQuery`** keeps the due preset select and **Clear** actions aligned with the URL; **`filteredTasks`** applies synced filters; **“Dashboard filter”** banner reads **`searchParams`**.
+- **Takeaway / follow-ups:** Invalid **`status=`** still shows the raw query in the banner while filters ignore it; optional strip. Chart library still unnecessary.
+- **Code / repo:** `apps/web/src/components/dashboard/DashboardOverview.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/dashboard/page.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/lib/task-board.ts`.
+
+### 2026-05-03 — Task stage menu: forward + cancel only; themed listbox
+
+- **Context:** Board/list status pill exposed every adjacent workflow transition like the checklist; user wanted only **next** stage plus **Cancelled** anytime (except cancelled → reopen pending).
+- **What we did:** **`stageControlDropdownOptions`** in **`task-board.ts`** builds menu targets; **`KanbanStatusPill`** uses it instead of **`kanbanAllowedTransitionsFromStored`**. **`StatusPillSelect`** replaced invisible native **`<select>`** with a button + themed **`role="listbox"`** panel (**`createPortal`** to **`document.body`** + fixed position so list/kanban **`overflow-hidden`** cards don’t clip it). Drag-and-drop still uses **`kanbanTransitionAllowedFromStored`** (one step forward or back). Kanban intro copy updated to distinguish drag vs stage menu.
+- **Takeaway / follow-ups:** Edit/create task panels still use full **`TASK_FLOW_ORDER`** in **`StatusPillSelect`** for unrestricted status picks before save.
+- **Code / repo:** `apps/web/src/lib/task-board.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
 ### 2026-05-03 — React Query persist: don’t freeze “Failed to fetch” in localStorage
 
 - **Context:** Prod workspace error persisted after env/CORS fixes; suspected cache.

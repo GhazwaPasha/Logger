@@ -34,6 +34,15 @@ export function parseTaskDueRepeat(v: unknown): TaskDueRepeat | null {
   return null;
 }
 
+export type LedgerRow = {
+  id: string;
+  type: string;
+  payload: Record<string, unknown>;
+  actorId: string;
+  createdAt: string;
+  clientMutationId: string | null;
+};
+
 export type TaskRow = {
   id: string;
   title: string;
@@ -43,6 +52,10 @@ export type TaskRow = {
   dueAt: string | null;
   /** Cadence after due; `null` / omitted = none. */
   dueRepeat?: TaskDueRepeat | null;
+  /** Recurring chain grouping id (set when `dueRepeat` is active). */
+  recurringSeriesId?: string | null;
+  /** Parent task id when this row was spawned as the next recurrence cycle. */
+  spawnedFromTaskId?: string | null;
   listId: string;
   assignerId: string;
   /** ISO timestamps from API detail/list (`Date` serialized). */
@@ -53,16 +66,10 @@ export type TaskRow = {
   assigneeUserIds?: string[];
   /** On workspace bootstrap and list APIs when subtasks are included (batched on the server). */
   subtasks?: SubtaskRow[];
+  /** Newest ledger row for list/kanban footer; omitted or null when no activity stored yet. */
+  lastLedger?: LedgerRow | null;
 };
 
-export type LedgerRow = {
-  id: string;
-  type: string;
-  payload: Record<string, unknown>;
-  actorId: string;
-  createdAt: string;
-  clientMutationId: string | null;
-};
 export type TaskDetail = {
   task: TaskRow;
   capabilities: { canDeleteTask: boolean; canReschedule: boolean; canAppendLedger: boolean };
@@ -78,6 +85,8 @@ export type TaskMutationResult = {
   assigneeUserIds: string[];
   subtasks: SubtaskRow[];
   ledgerDelta: LedgerRow[];
+  /** Present when completing a recurring task created the next occurrence. */
+  spawnedRecurringTaskId?: string;
 };
 
 /** `GET /organizations/:id/activity` — ledger rows for tasks visible to the user (newest first). */

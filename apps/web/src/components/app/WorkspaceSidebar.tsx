@@ -196,8 +196,8 @@ export function WorkspaceSidebar({
   }
 
   return (
-    <aside className="flex max-h-[70vh] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-[calc(100vh-3.5rem)] md:w-72 md:border-b-0 md:border-r">
-      <nav className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Workspace tree">
+    <aside className="flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
+      <nav className="flex min-h-0 flex-1 flex-col" aria-label="Workspace tree">
         <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
           <button
             type="button"
@@ -250,7 +250,7 @@ export function WorkspaceSidebar({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-1 py-2">
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-2">
           <div className="mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
             <Link
               href={`${base}/work`}

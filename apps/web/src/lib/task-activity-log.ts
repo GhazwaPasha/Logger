@@ -1,12 +1,22 @@
 import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
 
-/** Compact local timestamp for terminal-style log lines. */
+function format12hClock(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  let h = d.getHours();
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${pad(d.getMinutes())} ${ampm}`;
+}
+
+/** Compact local timestamp for terminal-style log lines (YY-MM-DD, 12h + AM/PM). */
 export function formatLogTimestamp(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const yy = pad(d.getFullYear() % 100);
+    return `${yy}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${format12hClock(d)}`;
   } catch {
     return iso;
   }

@@ -23,7 +23,7 @@ exports.taskManualStatusInputSchema = zod_1.z
     .union([exports.taskManualStatusSchema, zod_1.z.literal("open")])
     .transform((s) => (s === "open" ? "pending" : s));
 exports.taskPrioritySchema = zod_1.z.enum(["high", "medium", "low"]);
-/** Optional cadence after the due instant (no recurrence engine yet; stored for UX / future use). */
+/** Optional cadence after the due instant; marking **done** spawns the next task row (model B) when `dueAt` is set. */
 exports.taskDueRepeatSchema = zod_1.z.enum(["daily", "weekly", "monthly", "yearly"]);
 exports.ledgerTypeSchema = zod_1.z.enum([
     "ack",

@@ -1,0 +1,463 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo } from "react";
+import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
+import { NODE_LABELS } from "@/lib/nodes";
+import {
+  normalizeTaskStatus,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  storedStatusToFlowColumn,
+  taskMatchesDatePreset,
+  taskPriority,
+  type BoardTaskStatus,
+  type TaskPriority,
+} from "@/lib/task-board";
+
+const STATUS_BAR_ORDER: BoardTaskStatus[] = [
+  "pending",
+  "assigned",
+  "in_progress",
+  "late",
+  "done",
+  "cancelled",
+];
+
+const STATUS_SEGMENT_BG: Record<BoardTaskStatus, string> = {
+  pending: "bg-slate-500/55",
+  assigned: "bg-sky-500/55",
+  in_progress: "bg-violet-500/55",
+  late: "bg-orange-500/60",
+  done: "bg-emerald-500/55",
+  cancelled: "bg-neutral-500/45",
+};
+
+const PRIORITY_ORDER: TaskPriority[] = ["high", "medium", "low"];
+
+const PRIORITY_BAR_BG: Record<TaskPriority, string> = {
+  high: "bg-rose-500/55",
+  medium: "bg-amber-500/50",
+  low: "bg-slate-400/45",
+};
+
+function workHref(base: string, query: Record<string, string | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (v) sp.set(k, v);
+  }
+  const q = sp.toString();
+  return q ? `${base}/work?${q}` : `${base}/work`;
+}
+
+function SegmentedBar({
+  segments,
+  emptyLabel,
+}: {
+  segments: { key: string; count: number; className: string; title: string }[];
+  emptyLabel: string;
+}) {
+  const total = segments.reduce((s, x) => s + x.count, 0);
+  if (total === 0) {
+    return (
+      <div className="rounded-full bg-[var(--surface-muted)] py-1.5 text-center text-xs text-[var(--muted)]">
+        {emptyLabel}
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+      {segments.map(({ key, count, className, title }) => {
+        if (count <= 0) return null;
+        return (
+          <div
+            key={key}
+            title={`${title}: ${count}`}
+            className={`min-w-px shrink-0 ${className}`}
+            style={{ flexGrow: count }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+export function DashboardOverview({
+  basePath,
+  depts,
+  lists,
+  tasks,
+  members,
+  workspaceLoading,
+  currentUserId,
+}: {
+  basePath: string;
+  depts: Dept[];
+  lists: ListRow[];
+  tasks: TaskRow[];
+  members: MemberRow[];
+  workspaceLoading: boolean;
+  currentUserId: string | null;
+}) {
+  const activeTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks]);
+
+  const stats = useMemo(() => {
+    let pipeline = 0;
+    let done = 0;
+    let cancelled = 0;
+    let lateStatus = 0;
+    let dueThisWeek = 0;
+    let unassignedPipeline = 0;
+    let minePipeline = 0;
+
+    const statusCounts: Record<BoardTaskStatus, number> = {
+      pending: 0,
+      assigned: 0,
+      in_progress: 0,
+      late: 0,
+      done: 0,
+      cancelled: 0,
+    };
+    const priorityCounts: Record<TaskPriority, number> = { high: 0, medium: 0, low: 0 };
+    let unsetPriority = 0;
+
+    const levelPipeline: Record<string, number> = {};
+    for (const d of depts) levelPipeline[d.id] = 0;
+
+    const assigneePipeline: Record<string, number> = {};
+
+    for (const t of activeTasks) {
+      const st = normalizeTaskStatus(t.status);
+      statusCounts[st]++;
+
+      const col = storedStatusToFlowColumn(st);
+      const pri = taskPriority(t);
+      if (t.priority) priorityCounts[pri]++;
+      else unsetPriority++;
+
+      if (col === "done") done++;
+      else if (col === "cancelled") cancelled++;
+      else {
+        pipeline++;
+        if (st === "late") lateStatus++;
+        if (taskMatchesDatePreset(t, "this_week")) dueThisWeek++;
+
+        const ids = t.assigneeUserIds ?? [];
+        if (ids.length === 0) unassignedPipeline++;
+        if (currentUserId && ids.includes(currentUserId)) minePipeline++;
+
+        const list = lists.find((l) => l.id === t.listId);
+        const deptId = list?.departmentId;
+        if (deptId && deptId in levelPipeline) levelPipeline[deptId]++;
+
+        for (const uid of ids) {
+          assigneePipeline[uid] = (assigneePipeline[uid] ?? 0) + 1;
+        }
+      }
+    }
+
+    const topAssignees = Object.entries(assigneePipeline)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+
+    const levelRows = depts
+      .map((d) => ({ dept: d, count: levelPipeline[d.id] ?? 0 }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    let subtasksTotal = 0;
+    let subtasksDone = 0;
+    for (const t of activeTasks) {
+      const subs = t.subtasks;
+      if (!subs?.length) continue;
+      for (const s of subs) {
+        subtasksTotal++;
+        if (s.done) subtasksDone++;
+      }
+    }
+
+    return {
+      pipeline,
+      done,
+      cancelled,
+      lateStatus,
+      dueThisWeek,
+      unassignedPipeline,
+      minePipeline,
+      statusCounts,
+      priorityCounts,
+      unsetPriority,
+      levelRows,
+      topAssignees,
+      subtasksTotal,
+      subtasksDone,
+    };
+  }, [activeTasks, depts, lists, currentUserId]);
+
+  const loading = workspaceLoading;
+
+  const statusSegments = STATUS_BAR_ORDER.map((st) => ({
+    key: st,
+    count: stats.statusCounts[st],
+    className: STATUS_SEGMENT_BG[st],
+    title: STATUS_LABELS[st],
+  }));
+
+  const prioritySegments = [
+    ...PRIORITY_ORDER.map((p) => ({
+      key: p,
+      count: stats.priorityCounts[p],
+      className: PRIORITY_BAR_BG[p],
+      title: PRIORITY_LABELS[p],
+    })),
+    ...(stats.unsetPriority > 0
+      ? [
+          {
+            key: "unset",
+            count: stats.unsetPriority,
+            className: "bg-[var(--border-subtle)]",
+            title: "No priority",
+          },
+        ]
+      : []),
+  ];
+
+  const subtaskPct =
+    stats.subtasksTotal > 0 ? Math.round((stats.subtasksDone / stats.subtasksTotal) * 100) : 0;
+
+  const emptyWorkspace =
+    !loading && depts.length === 0 && lists.length === 0 && activeTasks.length === 0;
+
+  if (emptyWorkspace) {
+    return (
+      <div className="space-y-8">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-8 text-center shadow-sm">
+          <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Add {NODE_LABELS.level}s and lists under Work, then create your first {NODE_LABELS.workItem.toLowerCase()}.
+          </p>
+          <Link href={`${basePath}/work`} className="btn-primary mt-6 inline-flex rounded-xl px-5">
+            Go to Work
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : depts.length}</p>
+          <p className="mt-2 text-xs text-[var(--muted)]">Structure for lists and tasks</p>
+        </div>
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : stats.pipeline}</p>
+          <p className="mt-2 text-xs text-[var(--muted)]">Excludes done and cancelled</p>
+        </div>
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Completed</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {loading ? "…" : stats.done}
+          </p>
+          <p className="mt-2 text-xs text-[var(--muted)]">Tasks marked done</p>
+        </div>
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : members.length}</p>
+          <p className="mt-2 text-xs text-[var(--muted)]">Members in this workspace</p>
+        </div>
+      </div>
+
+      <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={workHref(basePath, { status: "late" })}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden />
+            Late ({loading ? "…" : stats.lateStatus})
+          </Link>
+          <Link
+            href={workHref(basePath, { due: "this_week" })}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            Due this week ({loading ? "…" : stats.dueThisWeek})
+          </Link>
+          <Link
+            href={workHref(basePath, { unassigned: "1" })}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            Unassigned ({loading ? "…" : stats.unassignedPipeline})
+          </Link>
+          {currentUserId ? (
+            <Link
+              href={workHref(basePath, { mine: "1" })}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--accent-muted)] px-3 py-2 text-sm font-medium transition-colors hover:opacity-90"
+            >
+              My tasks ({loading ? "…" : stats.minePipeline})
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">All active tasks (not deleted)</p>
+            </div>
+            <Link href={`${basePath}/work`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
+              Open Work
+            </Link>
+          </div>
+          <div className="mt-4">
+            <SegmentedBar segments={statusSegments} emptyLabel="No tasks yet" />
+          </div>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {STATUS_BAR_ORDER.map((st) => (
+              <li key={st} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_SEGMENT_BG[st]}`} aria-hidden />
+                  <span className="truncate">{STATUS_LABELS[st]}</span>
+                </span>
+                <Link
+                  href={workHref(basePath, { status: st })}
+                  className="tabular-nums font-medium text-[var(--fg)] hover:text-[var(--accent)]"
+                >
+                  {loading ? "…" : stats.statusCounts[st]}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
+          <div className="mt-4">
+            <SegmentedBar
+              segments={prioritySegments}
+              emptyLabel="No tasks or priorities recorded"
+            />
+          </div>
+          <ul className="mt-4 space-y-2 text-sm">
+            {PRIORITY_ORDER.map((p) => (
+              <li key={p} className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-[var(--muted)]">
+                  <span className={`h-2 w-2 rounded-full ${PRIORITY_BAR_BG[p]}`} aria-hidden />
+                  {PRIORITY_LABELS[p]}
+                </span>
+                <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.priorityCounts[p]}</span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between gap-2">
+              <span className="text-[var(--muted)]">No priority set</span>
+              <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.unsetPriority}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {stats.subtasksTotal > 0 ? (
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
+          </p>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+            <div
+              className="h-full rounded-full bg-emerald-500/70 transition-[width]"
+              style={{ width: `${subtaskPct}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Active work by {NODE_LABELS.level.toLowerCase()}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks grouped by list&apos;s level</p>
+          {stats.levelRows.length === 0 && !loading ? (
+            <p className="mt-4 text-sm text-[var(--muted)]">No pipeline tasks to show.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {stats.levelRows.map(({ dept, count }) => {
+                const max = stats.levelRows[0]?.count ?? 1;
+                const w = max > 0 ? (count / max) * 100 : 0;
+                return (
+                  <li key={dept.id}>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate font-medium text-[var(--fg)]">{dept.name}</span>
+                      <Link
+                        href={workHref(basePath, { level: dept.id })}
+                        className="shrink-0 tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
+                      >
+                        {loading ? "…" : count}
+                      </Link>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--accent)]/50"
+                        style={{ width: `${w}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
+          {stats.topAssignees.length === 0 && !loading ? (
+            <p className="mt-4 text-sm text-[var(--muted)]">No assigned pipeline work.</p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {stats.topAssignees.map(([userId, count]) => {
+                const m = members.find((x) => x.userId === userId);
+                const label = m?.name?.trim() || m?.email || userId.slice(0, 8);
+                const max = stats.topAssignees[0]?.[1] ?? 1;
+                const w = max > 0 ? (count / max) * 100 : 0;
+                return (
+                  <li key={userId}>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="min-w-0 truncate font-medium text-[var(--fg)]">{label}</span>
+                      <Link
+                        href={workHref(basePath, { assignee: userId })}
+                        className="shrink-0 tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
+                      >
+                        {loading ? "…" : count}
+                      </Link>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                      <div className="h-full rounded-full bg-violet-500/45" style={{ width: `${w}%` }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Link href={`${basePath}/work`} className="btn-primary rounded-xl px-5">
+          Go to Work
+        </Link>
+        <Link href={`${basePath}/people`} className="btn-secondary rounded-xl px-5">
+          Team
+        </Link>
+      </div>
+    </div>
+  );
+}

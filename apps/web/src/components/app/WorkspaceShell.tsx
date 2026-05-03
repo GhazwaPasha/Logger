@@ -70,11 +70,13 @@ export function WorkspaceShell({
   return (
     <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug }}>
       <WorkspaceDataProvider workspaceId={workspaceId}>
-        <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
+        <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
           <AppHeader workspaceSlug={workspaceSlug} />
-          <div className="flex min-h-0 w-full flex-1 flex-col md:flex-row md:items-stretch">
+          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row md:items-stretch">
             <WorkspaceSidebar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
-            <main className="min-h-0 min-w-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6 lg:px-8">
+              {children}
+            </main>
           </div>
         </div>
       </WorkspaceDataProvider>

@@ -6,6 +6,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,6 +18,7 @@ import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
+import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
@@ -51,11 +53,13 @@ import {
   type ManualTaskStatus,
   type SortMode,
   type TaskPriority,
-  kanbanAllowedTransitionsFromStored,
+  dueQueryToDatePreset,
   kanbanTransitionAllowedFromStored,
   manualStatusFromStored,
   nextWorkflowManualStatus,
   normalizeTaskStatus,
+  parseUrlStatusFilter,
+  stageControlDropdownOptions,
   sortTasks,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
@@ -171,7 +175,7 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 
 const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "All dates" },
-  { value: "overdue", label: "Overdue" },
+  { value: "late", label: "Late" },
   { value: "this_week", label: "Due this week" },
   { value: "no_due", label: "No due date" },
 ];
@@ -394,7 +398,8 @@ function WorkItemsInner() {
   const boardScope = useMemo(() => readWorkBoardScope(workspaceId), [workspaceId, boardScopeTick]);
   const levelPref = boardScope?.levelId ?? null;
   const listPref = boardScope?.listId ?? null;
-  const { token } = useApiSession();
+  const { token, session } = useApiSession();
+  const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [title, setTitle] = useState("");
@@ -439,6 +444,9 @@ function WorkItemsInner() {
   subtasksByTaskIdRef.current = subtasksByTaskId;
   const [sortMode, setSortMode] = useState<SortMode>("priority_desc");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [urlStatusFilter, setUrlStatusFilter] = useState<BoardTaskStatus | null>(null);
+  const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
+  const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -642,26 +650,73 @@ function WorkItemsInner() {
     setEditAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  /** Strip legacy board query params; open task panel from `?task=` once; keep URL clean. */
+  /** Migrate `level` / `list` into session scope and strip; open task panel from `task=` once. Drill-down filters stay in the URL. */
   useEffect(() => {
-    const legacyLevel = searchParams.get("level");
-    const legacyList = searchParams.get("list");
-    const tid = searchParams.get("task");
+    const params = new URLSearchParams(searchParams.toString());
+    let changed = false;
+
+    const legacyLevel = params.get("level");
+    const legacyList = params.get("list");
     if (legacyLevel || legacyList) {
       writeWorkBoardScope(workspaceId, {
         levelId: legacyLevel,
         listId: legacyList,
       });
-      const next = new URLSearchParams();
-      if (tid) next.set("task", tid);
-      const q = next.toString();
-      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-      return;
+      params.delete("level");
+      params.delete("list");
+      changed = true;
     }
-    if (!tid) return;
-    openEditTask(tid);
-    router.replace(pathname, { scroll: false });
+
+    const tid = params.get("task");
+    if (tid) {
+      openEditTask(tid);
+      params.delete("task");
+      changed = true;
+    }
+
+    if (!changed) return;
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }, [workspaceId, searchParams, pathname, router, openEditTask]);
+
+  useEffect(() => {
+    const dueRaw = searchParams.get("due");
+    if (!dueRaw) setDatePreset("all");
+    else {
+      const preset = dueQueryToDatePreset(dueRaw);
+      if (preset) setDatePreset(preset);
+    }
+
+    const statusRaw = searchParams.get("status");
+    setUrlStatusFilter(statusRaw ? parseUrlStatusFilter(statusRaw) : null);
+
+    if (searchParams.get("mine") === "1") {
+      setUrlAssigneeScope("mine");
+      setUrlAssigneeUserId(null);
+    } else if (searchParams.get("unassigned") === "1") {
+      setUrlAssigneeScope("unassigned");
+      setUrlAssigneeUserId(null);
+    } else {
+      const assigneeParam = searchParams.get("assignee");
+      if (assigneeParam) {
+        setUrlAssigneeUserId(assigneeParam);
+        setUrlAssigneeScope("all");
+      } else {
+        setUrlAssigneeScope("all");
+        setUrlAssigneeUserId(null);
+      }
+    }
+  }, [searchParams]);
+
+  const replaceWorkQuery = useCallback(
+    (mutate: (p: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      const q = params.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
 
   useEffect(() => {
     if (!editTaskId || !editDetail || editDetail.task.id !== editTaskId) return;
@@ -733,6 +788,9 @@ function WorkItemsInner() {
           ledger: [...detail.ledgerDelta, ...old.ledger],
         };
       });
+      if (detail.spawnedRecurringTaskId) {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      }
     },
   });
 
@@ -941,6 +999,9 @@ function WorkItemsInner() {
           ledger: [...saved.ledgerDelta, ...old.ledger],
         };
       });
+      if (saved.spawnedRecurringTaskId) {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      }
       setEditTaskId(null);
       setEditNewSubtasks([]);
       setEditSubtaskDraft("");
@@ -1019,6 +1080,14 @@ function WorkItemsInner() {
 
   const filteredTasks = useMemo(() => {
     return visibleTasks.filter((t) => {
+      if (urlStatusFilter && normalizeTaskStatus(t.status) !== urlStatusFilter) return false;
+      const assignees = t.assigneeUserIds ?? [];
+      if (urlAssigneeScope === "mine") {
+        if (!sessionUserId || !assignees.includes(sessionUserId)) return false;
+      } else if (urlAssigneeScope === "unassigned") {
+        if (assignees.length > 0) return false;
+      }
+      if (urlAssigneeUserId && !assignees.includes(urlAssigneeUserId)) return false;
       if (!taskMatchesDatePreset(t, datePreset)) return false;
       if (dueFrom || dueTo) {
         if (!t.dueAt) return false;
@@ -1026,7 +1095,16 @@ function WorkItemsInner() {
       }
       return true;
     });
-  }, [visibleTasks, datePreset, dueFrom, dueTo]);
+  }, [
+    visibleTasks,
+    datePreset,
+    dueFrom,
+    dueTo,
+    urlStatusFilter,
+    urlAssigneeScope,
+    urlAssigneeUserId,
+    sessionUserId,
+  ]);
 
   const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortMode), [filteredTasks, sortMode]);
 
@@ -1131,8 +1209,8 @@ function WorkItemsInner() {
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-4 py-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 sm:gap-x-3">
-              <div className="flex shrink-0 items-center gap-1 self-center" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex min-w-0 flex-wrap items-start gap-x-1 gap-y-2 sm:gap-x-3">
+              <div className="mt-0.5 flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
                 <KanbanStatusPill task={task} />
                 <button
                   type="button"
@@ -1193,41 +1271,46 @@ function WorkItemsInner() {
               </div>
               <button
                 type="button"
-                className="flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+                className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
                 aria-expanded={expanded}
                 aria-label={expanded ? "Hide subtasks" : "Show subtasks"}
                 onClick={() => toggleListRowExpand(task.id)}
               >
                 <IconChevron open={expanded} className="opacity-80" />
               </button>
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
-                <button
-                  type="button"
-                  onClick={() => openEditTask(task.id)}
-                  className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                    checklistDone
-                      ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
-                      : "text-[var(--fg)]"
-                  }`}
-                >
-                  {task.title}
-                </button>
-                {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    {showTaskLevelBadge && levelBadge ? (
-                      <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
-                        {levelBadge}
-                      </span>
-                    ) : null}
-                    {showTaskListBadge && listBadge ? (
-                      <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
-                        {listBadge}
-                      </span>
-                    ) : null}
-                  </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => openEditTask(task.id)}
+                    className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                      checklistDone
+                        ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
+                        : "text-[var(--fg)]"
+                    }`}
+                  >
+                    {task.title}
+                  </button>
+                  {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {showTaskLevelBadge && levelBadge ? (
+                        <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
+                          {levelBadge}
+                        </span>
+                      ) : null}
+                      {showTaskListBadge && listBadge ? (
+                        <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
+                          {listBadge}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </div>
+                {task.lastLedger ? (
+                  <TaskCardLastActivity entry={task.lastLedger} members={members} variant="inline" />
                 ) : null}
               </div>
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:gap-1 sm:ml-auto">
+              <div className="mt-0.5 flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:gap-1 sm:ml-auto">
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "assignees")}
@@ -1338,7 +1421,7 @@ function WorkItemsInner() {
     );
   }
 
-  /** Same chrome as list-row {@link KanbanStatusPill}; options list is caller-defined (full pipeline vs one-step). */
+  /** Same chrome as list-row {@link KanbanStatusPill}; options list is caller-defined (full pipeline vs board menu). */
   function StatusPillSelect({
     "aria-label": ariaLabel,
     value,
@@ -1358,28 +1441,118 @@ function WorkItemsInner() {
     options: readonly ManualTaskStatus[];
     disabled?: boolean;
   }) {
+    const [open, setOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLUListElement>(null);
+    const listboxId = useId();
     const paletteKey = pillAppearance ?? value;
+
+    useLayoutEffect(() => {
+      if (!open || !triggerRef.current) {
+        setMenuPos(null);
+        return;
+      }
+      const el = triggerRef.current;
+      const sync = () => {
+        const r = el.getBoundingClientRect();
+        setMenuPos({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, el.offsetWidth) });
+      };
+      sync();
+      window.addEventListener("scroll", sync, true);
+      window.addEventListener("resize", sync);
+      return () => {
+        window.removeEventListener("scroll", sync, true);
+        window.removeEventListener("resize", sync);
+      };
+    }, [open]);
+
+    useEffect(() => {
+      if (!open) return;
+      const onDocMouseDown = (e: MouseEvent) => {
+        const t = e.target as Node;
+        if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+        setOpen(false);
+      };
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setOpen(false);
+      };
+      document.addEventListener("mousedown", onDocMouseDown);
+      document.addEventListener("keydown", onKeyDown);
+      return () => {
+        document.removeEventListener("mousedown", onDocMouseDown);
+        document.removeEventListener("keydown", onKeyDown);
+      };
+    }, [open]);
+
     return (
       <div
-        className={`${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
+        className={`relative ${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
       >
-        <select
-          className="absolute inset-0 z-[1] cursor-pointer opacity-0"
-          value={value}
+        <button
+          ref={triggerRef}
+          type="button"
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value as ManualTaskStatus)}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-controls={open ? listboxId : undefined}
           aria-label={ariaLabel}
+          id={`${listboxId}-trigger`}
+          onClick={() => {
+            if (disabled) return;
+            setOpen((o) => !o);
+          }}
+          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-[box-shadow] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {options.map((s) => (
-            <option key={s} value={s}>
-              {FLOW_COLUMN_LABELS[s]}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
-          {displayLabel ?? FLOW_COLUMN_LABELS[value]}
-        </span>
-        <IconChevronMiniDown className="pointer-events-none shrink-0 opacity-45" aria-hidden />
+          <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
+            {displayLabel ?? FLOW_COLUMN_LABELS[value]}
+          </span>
+          <IconChevronMiniDown
+            className={`pointer-events-none shrink-0 opacity-45 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+        {open && menuPos
+          ? createPortal(
+              <ul
+                ref={menuRef}
+                id={listboxId}
+                role="listbox"
+                style={{
+                  position: "fixed",
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  minWidth: menuPos.width,
+                  zIndex: 80,
+                }}
+                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-[0_12px_48px_-12px_rgba(0,0,0,0.28)] ring-1 ring-black/5 dark:bg-[var(--surface-base)] dark:shadow-[0_16px_56px_-12px_rgba(0,0,0,0.65)] dark:ring-white/10"
+              >
+                {options.map((s) => (
+                  <li key={s} role="presentation" className="px-1">
+                    <button
+                      type="button"
+                      role="option"
+                      id={`${listboxId}-opt-${s}`}
+                      aria-selected={s === value}
+                      className={`flex w-full min-w-[6.875rem] items-center rounded-md px-2 py-2 text-left text-[11px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
+                        s === value
+                          ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
+                          : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                      onClick={() => {
+                        setOpen(false);
+                        if (s !== value) onChange(s);
+                        queueMicrotask(() => triggerRef.current?.focus());
+                      }}
+                    >
+                      {FLOW_COLUMN_LABELS[s]}
+                    </button>
+                  </li>
+                ))}
+              </ul>,
+              document.body,
+            )
+          : null}
       </div>
     );
   }
@@ -1387,15 +1560,15 @@ function WorkItemsInner() {
   function KanbanStatusPill({ task }: { task: TaskRow }) {
     const stored = normalizeTaskStatus(task.status);
     const manual = manualStatusFromStored(stored);
-    const allowed = kanbanAllowedTransitionsFromStored(stored);
+    const menuOptions = stageControlDropdownOptions(stored);
     return (
       <StatusPillSelect
-        aria-label="Task stage (one step on the workflow)"
+        aria-label="Task stage"
         value={manual}
         displayLabel={taskStatusDisplayLabel(stored)}
         pillAppearance={stored}
         onChange={(v) => void patchTask(task.id, { status: v })}
-        options={allowed}
+        options={menuOptions}
       />
     );
   }
@@ -1611,6 +1784,9 @@ function WorkItemsInner() {
             </div>
           )}
         </div>
+        {task.lastLedger ? (
+          <TaskCardLastActivity entry={task.lastLedger} members={members} compact />
+        ) : null}
       </li>
     );
   }
@@ -1645,8 +1821,9 @@ function WorkItemsInner() {
           Columns are <span className="text-[var(--fg)]/90">Pending</span>,{" "}
           <span className="text-[var(--fg)]/90">In progress</span>, <span className="text-[var(--fg)]/90">Done</span>, and{" "}
           <span className="text-[var(--fg)]/90">Cancelled</span>. Assignees and due dates drive{" "}
-          <span className="text-[var(--fg)]/90">Assigned</span> and <span className="text-[var(--fg)]/90">Late</span> automatically. Drag or use the
-          stage control — moves are limited to <span className="text-[var(--fg)]/90">one step at a time</span> along the manual workflow (cancel anytime).
+          <span className="text-[var(--fg)]/90">Assigned</span> and <span className="text-[var(--fg)]/90">Late</span> automatically. Drag between
+          columns <span className="text-[var(--fg)]/90">one step at a time</span> (forward or back). The stage menu moves to the{" "}
+          <span className="text-[var(--fg)]/90">next</span> step or <span className="text-[var(--fg)]/90">Cancelled</span>, or reopens from cancelled.
         </p>
         <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
           <div
@@ -1696,9 +1873,63 @@ function WorkItemsInner() {
     );
   }
 
+  const drilldownActive =
+    Boolean(searchParams.get("status")) ||
+    searchParams.get("mine") === "1" ||
+    searchParams.get("unassigned") === "1" ||
+    Boolean(searchParams.get("assignee"));
+
+  const drilldownLabel = useMemo(() => {
+    const parts: string[] = [];
+    const st = searchParams.get("status");
+    if (st) {
+      const p = parseUrlStatusFilter(st);
+      if (p) parts.push(STATUS_LABELS[p]);
+      else parts.push(st);
+    }
+    if (searchParams.get("mine") === "1") parts.push("Assigned to me");
+    if (searchParams.get("unassigned") === "1") parts.push("Unassigned");
+    const aid = searchParams.get("assignee");
+    if (aid) {
+      const m = members.find((x) => x.userId === aid);
+      parts.push(m?.name?.trim() || m?.email || "Selected assignee");
+    }
+    return parts.join(" · ");
+  }, [searchParams, members]);
+
   return (
     <div className="mx-auto w-full max-w-screen-2xl space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {drilldownActive ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--accent-muted)]/35 px-4 py-2.5 text-sm"
+          role="status"
+        >
+          <p className="min-w-0 text-[var(--fg)]">
+            <span className="font-medium">Dashboard filter</span>
+            {drilldownLabel ? (
+              <>
+                <span className="text-[var(--muted)]"> · </span>
+                <span className="text-[var(--muted)]">{drilldownLabel}</span>
+              </>
+            ) : null}
+          </p>
+          <button
+            type="button"
+            className="btn-secondary shrink-0 rounded-lg px-3 py-1.5 text-xs"
+            onClick={() => {
+              replaceWorkQuery((p) => {
+                p.delete("status");
+                p.delete("mine");
+                p.delete("unassigned");
+                p.delete("assignee");
+              });
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
       <header className="pb-1">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-6 xl:gap-x-10 lg:gap-y-2">
           <h1 className="min-w-0 text-2xl font-semibold leading-none tracking-tight lg:col-start-1 lg:row-start-1 lg:pt-0.5">
@@ -1849,7 +2080,14 @@ function WorkItemsInner() {
                   <select
                     className="input h-10 w-full rounded-lg text-sm"
                     value={datePreset}
-                    onChange={(e) => setDatePreset(e.target.value as DatePreset)}
+                    onChange={(e) => {
+                      const v = e.target.value as DatePreset;
+                      setDatePreset(v);
+                      replaceWorkQuery((p) => {
+                        if (v === "all") p.delete("due");
+                        else p.set("due", v);
+                      });
+                    }}
                   >
                     {DATE_PRESET_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -1865,14 +2103,20 @@ function WorkItemsInner() {
                   type="date"
                   className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
                   value={dueFrom}
-                  onChange={(e) => setDueFrom(e.target.value)}
+                  onChange={(e) => {
+                    setDueFrom(e.target.value);
+                    replaceWorkQuery((p) => p.delete("due"));
+                  }}
                   aria-label="Due from"
                 />
                 <input
                   type="date"
                   className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
                   value={dueTo}
-                  onChange={(e) => setDueTo(e.target.value)}
+                  onChange={(e) => {
+                    setDueTo(e.target.value);
+                    replaceWorkQuery((p) => p.delete("due"));
+                  }}
                   aria-label="Due to"
                 />
               </div>
@@ -1885,6 +2129,7 @@ function WorkItemsInner() {
                     setDatePreset("all");
                     setDueFrom("");
                     setDueTo("");
+                    replaceWorkQuery((p) => p.delete("due"));
                   }}
                 >
                   Clear date filters

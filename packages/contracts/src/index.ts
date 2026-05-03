@@ -25,7 +25,7 @@ export const taskManualStatusInputSchema = z
   .transform((s) => (s === "open" ? "pending" : s));
 
 export const taskPrioritySchema = z.enum(["high", "medium", "low"]);
-/** Optional cadence after the due instant (no recurrence engine yet; stored for UX / future use). */
+/** Optional cadence after the due instant; marking **done** spawns the next task row (model B) when `dueAt` is set. */
 export const taskDueRepeatSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
 export type TaskDueRepeat = z.infer<typeof taskDueRepeatSchema>;
 export const ledgerTypeSchema = z.enum([

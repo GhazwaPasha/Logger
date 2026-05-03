@@ -51,7 +51,7 @@ export function OrgActivityTerminal({
           return (
             <p key={entry.id} className="break-words">
               <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
-              <span className="text-[var(--muted)]"> · </span>
+              <span className="text-[var(--muted)]">: </span>
               <Link
                 href={taskLink}
                 className="text-[var(--fg)] underline decoration-[var(--border-subtle)] underline-offset-2 hover:decoration-[var(--fg)]"

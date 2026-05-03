@@ -65,17 +65,16 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
           {entriesNewestFirst.map((entry) => (
             <p key={entry.id}>
               <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
-              <span className="text-[var(--muted)]"> · </span>
+              <span className="text-[var(--muted)]">: </span>
               <span>
                 <LedgerLineDescription entry={entry} members={members} />
               </span>
             </p>
           ))}
-          <p className="break-all">
-            <span className="text-[var(--muted)]">(</span>
-            {task.id}
-            <span className="text-[var(--muted)]">) created by </span>
+          <p className="break-words">
             <span className={ledgerLogUserClassName}>{creatorName}</span>
+            <span className="text-[var(--muted)]"> created this task · </span>
+            <span className="break-all text-[var(--muted)]">{task.id}</span>
           </p>
         </div>
       </div>

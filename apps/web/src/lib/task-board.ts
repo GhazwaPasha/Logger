@@ -88,8 +88,25 @@ export function statusLabelTextClasses(st: BoardTaskStatus): string {
 }
 
 /**
- * Allowed manual targets from the board controls (one step along {@link TASK_FLOW_ORDER}),
- * cancel from active stages, reopen from terminal states.
+ * Stage targets for the **board/list status pill** menu: always includes the current stage,
+ * the **next** stage along Pending → In progress → Done (when one exists), and **Cancelled**
+ * whenever the task is not already cancelled. Cancelled tasks only offer reopen → **pending**.
+ */
+export function stageControlDropdownOptions(stored: BoardTaskStatus): ManualTaskStatus[] {
+  const manual = manualStatusFromStored(stored);
+  if (manual === "cancelled") {
+    return ["cancelled", "pending"];
+  }
+  const next = nextWorkflowManualStatus(stored);
+  const out: ManualTaskStatus[] = [manual];
+  if (next) out.push(next);
+  out.push("cancelled");
+  return out;
+}
+
+/**
+ * Allowed manual targets for **drag-and-drop** between columns (one step forward or back along
+ * {@link TASK_FLOW_ORDER}), cancel from active stages, reopen from terminal states.
  */
 export function kanbanAllowedManualTransitions(current: ManualTaskStatus): ManualTaskStatus[] {
   const allowed = new Set<ManualTaskStatus>([current]);
@@ -160,7 +177,40 @@ export function prioritySortKey(p: TaskPriority): number {
   return 2;
 }
 
-export type DatePreset = "all" | "overdue" | "this_week" | "no_due";
+export type DatePreset = "all" | "late" | "this_week" | "no_due";
+
+const DATE_PRESETS = ["all", "late", "this_week", "no_due"] as const satisfies readonly DatePreset[];
+
+export function isDatePreset(v: string): v is DatePreset {
+  return (DATE_PRESETS as readonly string[]).includes(v);
+}
+
+/** Map `due=` query to preset; accepts legacy `overdue` as alias for **Late** (`late` status). */
+export function dueQueryToDatePreset(v: string): DatePreset | null {
+  if (v === "overdue") return "late";
+  if (isDatePreset(v)) return v;
+  return null;
+}
+
+/** Parse `status=` query values from dashboard / deep links (aliases tolerated). */
+export function parseUrlStatusFilter(raw: string): BoardTaskStatus | null {
+  const k = raw
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  const map: Record<string, BoardTaskStatus> = {
+    open: "pending",
+    pending: "pending",
+    assigned: "assigned",
+    in_progress: "in_progress",
+    inprogress: "in_progress",
+    late: "late",
+    done: "done",
+    cancelled: "cancelled",
+    canceled: "cancelled",
+  };
+  return map[k] ?? null;
+}
 
 function startOfLocalDay(d: Date): Date {
   const x = new Date(d);
@@ -194,9 +244,8 @@ export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolea
   const st = normalizeTaskStatus(task.status);
   if (preset === "all") return true;
   if (preset === "no_due") return due === null;
-  if (preset === "overdue") {
-    if (!due || st === "done" || st === "cancelled") return false;
-    return due.getTime() < Date.now();
+  if (preset === "late") {
+    return st === "late";
   }
   if (preset === "this_week") {
     if (!due) return false;

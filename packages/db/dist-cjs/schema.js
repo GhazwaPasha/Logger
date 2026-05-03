@@ -165,6 +165,10 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     dueAt: (0, pg_core_1.timestamp)("due_at", { withTimezone: true }),
     /** `daily` | `weekly` | `monthly` | `yearly`; null = none. */
     dueRepeat: (0, pg_core_1.text)("due_repeat"),
+    /** Group id for recurring chain; set when the task has `due_repeat` (see migration backfill). */
+    recurringSeriesId: (0, pg_core_1.uuid)("recurring_series_id"),
+    /** If this row was created as the next cycle of a recurring task, parent task id. */
+    spawnedFromTaskId: (0, pg_core_1.uuid)("spawned_from_task_id"),
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
@@ -175,6 +179,10 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     (0, pg_core_1.index)("tasks_org_idx").on(t.organizationId),
     (0, pg_core_1.index)("tasks_list_idx").on(t.listId),
     (0, pg_core_1.index)("tasks_assigner_idx").on(t.assignerId),
+    (0, pg_core_1.index)("tasks_recurring_series_idx").on(t.recurringSeriesId),
+    (0, pg_core_1.uniqueIndex)("tasks_spawned_from_parent_uidx")
+        .on(t.spawnedFromTaskId)
+        .where((0, drizzle_orm_1.sql) `${t.spawnedFromTaskId} is not null`),
 ]);
 exports.subtasks = (0, pg_core_1.pgTable)("subtasks", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),

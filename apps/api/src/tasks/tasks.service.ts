@@ -15,6 +15,7 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import { computeNextDue, isDueRepeat } from "./compute-next-due";
 import { computeAutomatedTaskStatus } from "./task-status-automation";
 
 @Injectable()
@@ -58,6 +59,13 @@ export class TasksService {
         .returning();
 
       createdId = task!.id;
+
+      if (dueRepeat && dueAt) {
+        await tx
+          .update(tasks)
+          .set({ recurringSeriesId: createdId })
+          .where(eq(tasks.id, createdId));
+      }
 
       if (parsed.assigneeUserIds?.length) {
         const rows = parsed.assigneeUserIds.map((uid) => ({
@@ -347,6 +355,9 @@ export class TasksService {
 
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     const now = new Date();
+    const preDue = task.dueAt;
+    const preRepeat = task.dueRepeat;
+    let spawnedRecurringTaskId: string | undefined;
 
     await this.db.transaction(async (tx) => {
       if (hasTaskFieldUpdates) {
@@ -428,9 +439,89 @@ export class TasksService {
       if (hasSubtasksCreate) {
         await tx.insert(subtasks).values(subtasksToCreate.map((s) => ({ taskId, title: s.title })));
       }
+
+      if (
+        statusChanged &&
+        parsed.status === "done" &&
+        !dueCleared &&
+        preDue &&
+        isDueRepeat(preRepeat)
+      ) {
+        const [existingChild] = await tx
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(eq(tasks.spawnedFromTaskId, taskId))
+          .limit(1);
+        if (!existingChild) {
+          const nextDue = computeNextDue(preDue, preRepeat);
+          const seriesId = task.recurringSeriesId ?? task.id;
+          const nextTitle = parsed.title !== undefined ? parsed.title : task.title;
+          const nextPri = parsed.priority !== undefined ? parsed.priority : task.priority;
+          const [spawned] = await tx
+            .insert(tasks)
+            .values({
+              organizationId: orgId,
+              listId: task.listId,
+              assignerId: task.assignerId,
+              title: nextTitle,
+              status: "pending",
+              priority: nextPri,
+              dueAt: nextDue,
+              dueRepeat: preRepeat,
+              recurringSeriesId: seriesId,
+              spawnedFromTaskId: taskId,
+            })
+            .returning();
+          const newId = spawned!.id;
+          spawnedRecurringTaskId = newId;
+
+          const curAssignees = await tx
+            .select({ userId: taskAssignees.userId })
+            .from(taskAssignees)
+            .where(eq(taskAssignees.taskId, taskId));
+          const sortedAssignees = [...new Set(curAssignees.map((r) => r.userId))];
+          if (sortedAssignees.length > 0) {
+            await tx
+              .insert(taskAssignees)
+              .values(sortedAssignees.map((uid) => ({ taskId: newId, userId: uid })))
+              .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
+          }
+
+          await tx.insert(activityLedger).values({
+            taskId: newId,
+            actorId: userId,
+            type: "note",
+            payload: { message: "Task created.", title: nextTitle },
+          });
+
+          if (sortedAssignees.length > 0) {
+            await tx.insert(activityLedger).values({
+              taskId: newId,
+              actorId: userId,
+              type: "assignee_change",
+              payload: {
+                previousAssigneeUserIds: [] as string[],
+                assigneeUserIds: [...sortedAssignees].sort(),
+              },
+            });
+          }
+
+          const [parentNote] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "note",
+              payload: { message: "Next occurrence created.", spawnedTaskId: newId },
+            })
+            .returning();
+          ledgerDelta.push(parentNote!);
+        }
+      }
     });
 
-    return this.taskMutationResult(userId, taskId, ledgerDelta);
+    const base = await this.taskMutationResult(userId, taskId, ledgerDelta);
+    return spawnedRecurringTaskId ? { ...base, spawnedRecurringTaskId } : base;
   }
 
   /** Slim write response: task row + assignees + subtasks + caps + ledger rows created in this request (no full ledger load). */
@@ -443,16 +534,24 @@ export class TasksService {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
 
-    const [assignees, taskSubtasks] = await Promise.all([
+    const [assignees, taskSubtasks, latestLedgerRows] = await Promise.all([
       this.db
         .select({ userId: taskAssignees.userId })
         .from(taskAssignees)
         .where(eq(taskAssignees.taskId, taskId)),
       this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt)),
+      this.db
+        .select()
+        .from(activityLedger)
+        .where(eq(activityLedger.taskId, taskId))
+        .orderBy(desc(activityLedger.createdAt))
+        .limit(1),
     ]);
 
+    const latestLedger = latestLedgerRows[0] ?? null;
+
     return {
-      task: access.task,
+      task: { ...access.task, lastLedger: latestLedger },
       capabilities: caps,
       assigneeUserIds: assignees.map((a) => a.userId),
       subtasks: taskSubtasks,
