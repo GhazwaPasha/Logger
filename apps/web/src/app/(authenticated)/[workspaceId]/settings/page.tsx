@@ -26,7 +26,7 @@ export default function UserSettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Your settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Account and appearance for your signed-in user.</p>
       </div>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Appearance</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">Color theme for this browser. System follows your OS light/dark mode.</p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -45,7 +45,7 @@ export default function UserSettingsPage() {
           </select>
         </div>
       </section>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Profile</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">Information from your login session.</p>
         <dl className="mt-4 space-y-3 text-sm">

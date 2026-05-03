@@ -50,6 +50,49 @@ function workHref(base: string, query: Record<string, string | undefined>): stri
   return q ? `${base}/work?${q}` : `${base}/work`;
 }
 
+const DASHBOARD_KPI_TONES = [
+  {
+    toneClass: "dashboard-kpi-card--tone-periwinkle",
+    waveBack: "#c4d4ef",
+    waveFront: "#aabfe6",
+  },
+  {
+    toneClass: "dashboard-kpi-card--tone-lavender",
+    waveBack: "#e3d0f2",
+    waveFront: "#cfbae8",
+  },
+  {
+    toneClass: "dashboard-kpi-card--tone-mint",
+    waveBack: "#bae8d4",
+    waveFront: "#9fdabe",
+  },
+  {
+    toneClass: "dashboard-kpi-card--tone-amber",
+    waveBack: "#ffd8b8",
+    waveFront: "#ffc49a",
+  },
+] as const;
+
+function DashboardKpiWave({ back, front }: { back: string; front: string }) {
+  return (
+    <svg
+      className="dashboard-kpi-wave pointer-events-none absolute inset-x-0 bottom-0 h-[4.25rem] w-[112%] max-w-none -translate-x-[6%]"
+      viewBox="0 0 400 72"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path
+        fill={back}
+        d="M0 40 C48 24 96 48 152 34 C208 20 256 44 304 32 C336 24 368 36 400 38 L400 72 L0 72 Z"
+      />
+      <path
+        fill={front}
+        d="M0 50 C64 36 128 56 196 44 C248 34 296 48 344 42 C362 39 382 44 400 46 L400 72 L0 72 Z"
+      />
+    </svg>
+  );
+}
+
 function SegmentedBar({
   segments,
   emptyLabel,
@@ -231,7 +274,7 @@ export function DashboardOverview({
   if (emptyWorkspace) {
     return (
       <div className="space-y-8">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-8 text-center shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-8 text-center">
           <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Add {NODE_LABELS.level}s and lists under Work, then create your first {NODE_LABELS.workItem.toLowerCase()}.
@@ -247,31 +290,51 @@ export function DashboardOverview({
   return (
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : depts.length}</p>
-          <p className="mt-2 text-xs text-[var(--muted)]">Structure for lists and tasks</p>
+        <div
+          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[0].toneClass} rounded-2xl p-5`}
+        >
+          <DashboardKpiWave back={DASHBOARD_KPI_TONES[0].waveBack} front={DASHBOARD_KPI_TONES[0].waveFront} />
+          <div className="relative z-[1]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : depts.length}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Structure for lists and tasks</p>
+          </div>
         </div>
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : stats.pipeline}</p>
-          <p className="mt-2 text-xs text-[var(--muted)]">Excludes done and cancelled</p>
+        <div
+          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[1].toneClass} rounded-2xl p-5`}
+        >
+          <DashboardKpiWave back={DASHBOARD_KPI_TONES[1].waveBack} front={DASHBOARD_KPI_TONES[1].waveFront} />
+          <div className="relative z-[1]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : stats.pipeline}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Excludes done and cancelled</p>
+          </div>
         </div>
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Completed</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {loading ? "…" : stats.done}
-          </p>
-          <p className="mt-2 text-xs text-[var(--muted)]">Tasks marked done</p>
+        <div
+          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[2].toneClass} rounded-2xl p-5`}
+        >
+          <DashboardKpiWave back={DASHBOARD_KPI_TONES[2].waveBack} front={DASHBOARD_KPI_TONES[2].waveFront} />
+          <div className="relative z-[1]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Completed</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+              {loading ? "…" : stats.done}
+            </p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Tasks marked done</p>
+          </div>
         </div>
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team</p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : members.length}</p>
-          <p className="mt-2 text-xs text-[var(--muted)]">Members in this workspace</p>
+        <div
+          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-5`}
+        >
+          <DashboardKpiWave back={DASHBOARD_KPI_TONES[3].waveBack} front={DASHBOARD_KPI_TONES[3].waveFront} />
+          <div className="relative z-[1]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team</p>
+            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : members.length}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Members in this workspace</p>
+          </div>
         </div>
       </div>
 
-      <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+      <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -306,7 +369,7 @@ export function DashboardOverview({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
@@ -337,7 +400,7 @@ export function DashboardOverview({
           </ul>
         </div>
 
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
           <div className="mt-4">
@@ -365,7 +428,7 @@ export function DashboardOverview({
       </div>
 
       {stats.subtasksTotal > 0 ? (
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
@@ -380,7 +443,7 @@ export function DashboardOverview({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
@@ -416,7 +479,7 @@ export function DashboardOverview({
           )}
         </div>
 
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
           {stats.topAssignees.length === 0 && !loading ? (

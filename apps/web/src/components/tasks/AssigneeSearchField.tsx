@@ -118,7 +118,7 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
             id={optionsId}
             role="listbox"
             aria-label="Team members"
-            className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg"
+            className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
           >
             {available.length === 0 ? (
               <li className="px-3 py-2 text-sm text-[var(--muted)]">{emptyListMessage}</li>

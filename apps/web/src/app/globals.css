@@ -19,7 +19,6 @@
   --accent-muted: rgba(39, 39, 42, 0.09);
   --accent-glow: rgba(39, 39, 42, 0.05);
   --accent-glow-soft: rgba(39, 39, 42, 0.03);
-  --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 html[data-theme="dark"] {
@@ -41,7 +40,6 @@ html[data-theme="dark"] {
   --accent-muted: rgba(228, 228, 231, 0.12);
   --accent-glow: rgba(228, 228, 231, 0.06);
   --accent-glow-soft: rgba(228, 228, 231, 0.035);
-  --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,7 +62,6 @@ html[data-theme="dark"] {
     --accent-muted: rgba(228, 228, 231, 0.12);
     --accent-glow: rgba(228, 228, 231, 0.06);
     --accent-glow-soft: rgba(228, 228, 231, 0.035);
-    --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -88,7 +85,6 @@ html[data-theme="dark"] {
     --accent-muted: rgba(39, 39, 42, 0.09);
     --accent-glow: rgba(39, 39, 42, 0.05);
     --accent-glow-soft: rgba(39, 39, 42, 0.03);
-    --shadow-primary: 0 1px 2px rgba(0, 0, 0, 0.06);
   }
 }
 
@@ -98,7 +94,7 @@ html[data-theme="dark"] {
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-muted: var(--muted);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-jetbrains);
   /* Slightly sharper UI than Tailwind defaults (~25% tighter radii) */
   --radius-sm: 0.1875rem;
@@ -117,11 +113,15 @@ html {
 body {
   background: var(--surface-base);
   color: var(--fg);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
 }
 
 .font-mono-ledger {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.font-outfit {
+  font-family: var(--font-outfit), var(--font-dm-sans), system-ui, sans-serif;
 }
 
 .scrollbar-hide {
@@ -135,6 +135,70 @@ body {
 
 .surface-elevated {
   background: var(--surface-elevated);
+}
+
+/* Dashboard overview KPI strip: pastel tiles + hill graphic — light appearance only */
+.dashboard-kpi-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
+}
+
+html[data-theme="light"] .dashboard-kpi-card--tone-periwinkle {
+  background-color: #e9eefc;
+  border-color: rgba(95, 115, 175, 0.14);
+}
+
+html[data-theme="light"] .dashboard-kpi-card--tone-lavender {
+  background-color: #f3ebfa;
+  border-color: rgba(140, 110, 175, 0.14);
+}
+
+html[data-theme="light"] .dashboard-kpi-card--tone-mint {
+  background-color: #e4f7ee;
+  border-color: rgba(55, 135, 105, 0.14);
+}
+
+html[data-theme="light"] .dashboard-kpi-card--tone-amber {
+  background-color: #fff1e6;
+  border-color: rgba(195, 125, 65, 0.16);
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] .dashboard-kpi-card--tone-periwinkle {
+    background-color: #e9eefc;
+    border-color: rgba(95, 115, 175, 0.14);
+  }
+
+  html[data-theme="system"] .dashboard-kpi-card--tone-lavender {
+    background-color: #f3ebfa;
+    border-color: rgba(140, 110, 175, 0.14);
+  }
+
+  html[data-theme="system"] .dashboard-kpi-card--tone-mint {
+    background-color: #e4f7ee;
+    border-color: rgba(55, 135, 105, 0.14);
+  }
+
+  html[data-theme="system"] .dashboard-kpi-card--tone-amber {
+    background-color: #fff1e6;
+    border-color: rgba(195, 125, 65, 0.16);
+  }
+}
+
+.dashboard-kpi-wave {
+  display: none;
+}
+
+html[data-theme="light"] .dashboard-kpi-wave {
+  display: block;
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] .dashboard-kpi-wave {
+    display: block;
+  }
 }
 
 .auth-shell {
@@ -152,9 +216,6 @@ body {
   padding: 2rem 2rem 1.75rem;
   border-radius: 0.875rem;
   border: 1px solid var(--border-subtle);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 12px 40px -12px rgba(0, 0, 0, 0.12);
 }
 
 .panel {
@@ -171,15 +232,17 @@ body {
   padding: 0.625rem 0.875rem;
   width: 100%;
   font-size: 0.875rem;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent-muted);
+  outline-offset: 2px;
 }
 
 .input-compact {
@@ -194,7 +257,11 @@ body {
 .input-compact:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
+.input-compact:focus-visible {
+  outline: 2px solid var(--accent-muted);
+  outline-offset: 2px;
 }
 
 /* Native selects: visible chevron (default UA arrow is often invisible on dark surfaces). */
@@ -238,7 +305,6 @@ html[data-theme="dark"] select.input-compact {
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  box-shadow: var(--shadow-primary);
   transition:
     background 0.18s ease,
     border-color 0.18s ease,
@@ -311,7 +377,6 @@ html[data-theme="dark"] select.input-compact {
   background: var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
-  box-shadow: var(--shadow-primary);
 }
 
 /* App mark / small logo tile — matches primary button */
@@ -323,7 +388,6 @@ html[data-theme="dark"] select.input-compact {
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 700;
-  box-shadow: var(--shadow-primary);
 }
 
 /*
@@ -393,7 +457,6 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--on-accent);
-  box-shadow: var(--shadow-primary);
   transition:
     background 0.18s ease,
     border-color 0.18s ease;

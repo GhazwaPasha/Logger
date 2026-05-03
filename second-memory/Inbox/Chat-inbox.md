@@ -4,6 +4,43 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — UI font: Inter → DM Sans (Google Fonts)
+
+- **Context:** User chose **DM Sans** as the primary UI sans instead of Inter.
+- **What we did:** **`layout.tsx`**: **`next/font/google`** **`DM_Sans`** with **`--font-dm-sans`** on **`body`**. **`globals.css`**: **`body`**, **`@theme --font-sans`**, and **`.font-outfit`** fallback now use **`var(--font-dm-sans)`** (replacing **`--font-inter`**). **`AppHeader`** brand **`Link`** uses **`font-outfit`** so **LogBase** matches sidebar/marketing **Outfit**, not DM Sans.
+- **Code / repo:** `apps/web/src/app/layout.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/components/app/AppHeader.tsx`.
+
+### 2026-05-03 — Workspace sidebar: smaller, bolder nav type + Outfit
+
+- **Context:** User wanted sidebar labels **bold but smaller**, then **Outfit** for sidebar typography (aligned with marketing wordmark).
+- **What we did:** **`WorkspaceSidebar`**: shared **`rowBase`** links use **`text-sm font-semibold`** (step up from **`text-xs`** for readability). Account + workspace titles **`text-sm font-bold`**. Level rows, counts, helpers, and add-list inputs match **`text-sm`**; Outfit via **`font-outfit`** on **`aside`**. Root **`layout`**: load **Outfit** as **`--font-outfit`** (weights 500–700). **`globals.css`**: **`.font-outfit`** utility; sidebar **`aside`** uses **`font-outfit`**.
+- **Code / repo:** `apps/web/src/components/app/WorkspaceSidebar.tsx`, `apps/web/src/app/layout.tsx`, `apps/web/src/app/globals.css`.
+
+### 2026-05-03 — Status pills: readable labels + stronger light tints
+
+- **Context:** In **light app theme** with **dark OS preference**, Tailwind **`dark:text-white`** applied to pills while backgrounds stayed **`*/15`** → white-on-wash, illegible. User wanted light pills to feel like dark-theme tint strength.
+- **What we did:** **`statusPillPaletteClasses`** (`task-board.ts`): label **`text-[var(--fg)]`** (cancelled **`text-[var(--muted)]`**); light **`bg-*-500/22`** (late **`/24`**) vs unchanged dark **`/15`** overlays.
+- **Code / repo:** `apps/web/src/lib/task-board.ts`.
+
+### 2026-05-03 — Web ESLint: fix FlatCompat crash, align with Next 16
+
+- **Context:** `npx eslint` on a few files exited **2** with `TypeError: Converting circular structure to JSON` from `@eslint/eslintrc` / `FlatCompat` when extending Next configs.
+- **What we did:** Replaced **`eslint.config.mjs`** with Next 16’s native flat config (`eslint/config` **`defineConfig`**, spreads from **`eslint-config-next/core-web-vitals`** + **`typescript`**, **`globalIgnores`**). Removed direct **`@eslint/eslintrc`** devDependency. **`lint`** script is **`eslint .`** ( **`next lint`** removed in Next 16 ). Turned off **`react-hooks/set-state-in-effect`** so existing effect + setState patterns don’t fail the build; **10** **`react-hooks/exhaustive-deps`** / **`no-img-element`** / **`jsx-a11y`** warnings remain (exit **0**).
+- **Code / repo:** `apps/web/eslint.config.mjs`, `apps/web/package.json`, `package-lock.json`.
+
+### 2026-05-03 — Dashboard overview: light-theme KPI stat tiles
+
+- **Context:** User wanted the top dashboard metric cards to match a pastel mobile-style reference (colored tiles + soft hill/wave art), **light appearance only** — no layout/copy changes, **no global accent token edits**, **dark theme unchanged**.
+- **What we did:** **`globals.css`**: **`.dashboard-kpi-card`** base uses **`var(--surface-elevated)`** + **`var(--border-subtle)`**; tone modifiers (**periwinkle / lavender / mint / amber**) and border tints apply only under **`html[data-theme="light"]`** or **`system` + `prefers-color-scheme: light`**. **`.dashboard-kpi-wave`** visible only in those same light contexts (hidden in dark). **`DashboardOverview.tsx`**: top grid of four stats wrapped in **`dashboard-kpi-card`** + tone class; **`DashboardKpiWave`** SVG (two layered paths) sits behind content (**`z-[1]`**); completed count still uses **`text-emerald-600 dark:text-emerald-400`**.
+- **Code / repo:** `apps/web/src/app/globals.css`, `apps/web/src/components/dashboard/DashboardOverview.tsx`.
+
+### 2026-05-03 — UI: flat surfaces (no elevation shadows)
+
+- **Context:** User wanted shadows removed from the UI for a flatter look.
+- **What we did:** Dropped **`--shadow-primary`** and all **`box-shadow`** on buttons, brand mark, glass primary, and **`.auth-card`**. Input focus uses **`outline`** on **`:focus-visible`** instead of a glow ring via **`box-shadow`**. Removed Tailwind **`shadow-*`** / arbitrary shadow utilities across landing, login, dashboard, work board, settings, popovers, and menus.
+- **Takeaway / follow-ups:** **`focus-visible:ring-*`** (Tailwind) remains for keyboard focus on many controls; notification dot still uses **`ring-2`** as a halo—not drop shadows.
+- **Code / repo:** `apps/web/src/app/globals.css`, `apps/web/src/app/page.tsx`, `apps/web/src/app/login/LoginForm.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/dashboard/page.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/people/page.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/settings/page.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/organization-settings/page.tsx`, `apps/web/src/components/dashboard/DashboardOverview.tsx`, `apps/web/src/components/app/AppHeader.tsx`, `apps/web/src/components/app/AddWorkspacePanel.tsx`, `apps/web/src/components/tasks/DueDateTimePopover.tsx`, `apps/web/src/components/tasks/DueRepeatPopover.tsx`, `apps/web/src/components/tasks/AssigneeSearchField.tsx`.
+
 ### 2026-05-03 — Late vs overdue: single concept in UI
 
 - **Context:** User treats **Late** (stored status) as the only notion of “running late”; separate **Overdue** wording/filter was redundant.

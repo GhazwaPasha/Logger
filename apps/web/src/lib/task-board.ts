@@ -63,17 +63,18 @@ export function taskStatusDisplayLabel(stored: BoardTaskStatus): string {
 
 /**
  * Tinted backgrounds for status pills (list / kanban / stats).
- * Solid black / white labels except **cancelled** (muted).
+ * Labels use **`--fg`** (not `dark:` text) so pills stay readable when the app theme is light while the OS prefers dark.
+ * Light mode uses slightly stronger fills (**`/22`–`/25`**) so hues read closer to dark-theme **`/15`** on elevated surfaces.
  */
 export function statusPillPaletteClasses(st: BoardTaskStatus): string {
-  const solid = "text-black dark:text-white";
-  if (st === "pending") return `bg-slate-500/15 ${solid}`;
-  if (st === "assigned") return `bg-sky-500/15 ${solid}`;
-  if (st === "in_progress") return `bg-violet-500/15 ${solid}`;
-  if (st === "late") return `bg-orange-500/15 ${solid}`;
-  if (st === "done") return `bg-emerald-500/15 ${solid}`;
-  if (st === "cancelled") return "bg-neutral-500/15 text-neutral-600 dark:text-neutral-400";
-  return `bg-neutral-500/15 ${solid}`;
+  const label = "text-[var(--fg)]";
+  if (st === "pending") return `bg-slate-500/22 dark:bg-slate-500/15 ${label}`;
+  if (st === "assigned") return `bg-sky-500/22 dark:bg-sky-500/15 ${label}`;
+  if (st === "in_progress") return `bg-violet-500/22 dark:bg-violet-500/15 ${label}`;
+  if (st === "late") return `bg-orange-500/24 dark:bg-orange-500/15 ${label}`;
+  if (st === "done") return `bg-emerald-500/22 dark:bg-emerald-500/15 ${label}`;
+  if (st === "cancelled") return "bg-neutral-500/15 text-[var(--muted)]";
+  return `bg-neutral-500/15 ${label}`;
 }
 
 /** Text-only colors for inline status mentions (activity log); hues align with {@link statusPillPaletteClasses}. */

@@ -36,8 +36,8 @@ function Chevron({ open }: { open: boolean }) {
 
 function rowBase(active: boolean) {
   return [
-    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm transition-colors",
-    active ? "bg-[var(--accent-muted)] font-medium text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
+    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm font-semibold transition-colors",
+    active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
   ].join(" ");
 }
 
@@ -196,7 +196,7 @@ export function WorkspaceSidebar({
   }
 
   return (
-    <aside className="flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
+    <aside className="font-outfit flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
       <nav className="flex min-h-0 flex-1 flex-col" aria-label="Workspace tree">
         <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
           <button
@@ -207,8 +207,8 @@ export function WorkspaceSidebar({
             aria-label="Toggle workspace switcher"
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-[var(--fg)]">{userLabel}</p>
-              {userSubLabel && <p className="truncate text-xs text-[var(--muted)]">{userSubLabel}</p>}
+              <p className="truncate text-sm font-bold text-[var(--fg)]">{userLabel}</p>
+              {userSubLabel && <p className="truncate text-sm text-[var(--muted)]">{userSubLabel}</p>}
             </div>
             <Chevron open={workspacePickerOpen} />
           </button>
@@ -259,7 +259,7 @@ export function WorkspaceSidebar({
               aria-current={activeAllWorkspaceTasks ? "page" : undefined}
               onClick={() => writeWorkBoardScope(workspaceId, { levelId: null, listId: null })}
             >
-              <span className="truncate text-sm font-semibold text-[var(--fg)]">
+              <span className="truncate text-sm font-bold text-[var(--fg)]">
                 {selectedOrg?.name ?? NODE_LABELS.workspace}
               </span>
             </Link>
@@ -277,9 +277,9 @@ export function WorkspaceSidebar({
             (
               <div className="space-y-2">
                 {workspaceLoading ? (
-                  <p className="px-2 text-xs leading-relaxed text-[var(--muted)]">Loading levels…</p>
+                  <p className="px-2 text-sm leading-relaxed text-[var(--muted)]">Loading levels…</p>
                 ) : depts.length === 0 ? (
-                  <p className="px-2 text-xs leading-relaxed text-[var(--muted)]">No levels yet.</p>
+                  <p className="px-2 text-sm leading-relaxed text-[var(--muted)]">No levels yet.</p>
                 ) : (
                   <ul className="space-y-0.5">
                 {depts.map((d) => {
@@ -294,16 +294,16 @@ export function WorkspaceSidebar({
                             pathname === `${base}/work` &&
                             boardScope?.levelId === d.id &&
                             boardScope?.listId == null
-                              ? "rounded-md bg-[var(--accent-muted)] font-medium text-[var(--fg)]"
+                              ? "rounded-md bg-[var(--accent-muted)] font-semibold text-[var(--fg)]"
                               : ""
                           }`}
                           title={`Open ${d.name}`}
                           onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
                         >
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-[var(--fg)]">{d.name}</p>
+                            <p className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</p>
                           </div>
-                          <span className="shrink-0 text-xs font-normal text-[var(--muted)] tabular-nums">
+                          <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
                             {levelLists.length}
                           </span>
                         </Link>
@@ -320,7 +320,7 @@ export function WorkspaceSidebar({
                       {open && (
                         <ul className="ml-4 border-l border-[var(--border-subtle)] pl-2">
                           {levelLists.length === 0 ? (
-                            <li className="py-1 pl-1 text-xs text-[var(--muted)]">Empty</li>
+                            <li className="py-1 pl-1 text-sm text-[var(--muted)]">Empty</li>
                           ) : (
                             levelLists.map((l) => {
                               const listTaskCount = (tasksByList.get(l.id) ?? []).length;
@@ -336,7 +336,7 @@ export function WorkspaceSidebar({
                                   >
                                     <span className="mr-1.5 text-[var(--muted)]">#</span>
                                     <span className="truncate">{l.name}</span>
-                                    <span className="ml-auto shrink-0 pl-2 text-xs font-normal text-[var(--muted)] tabular-nums">
+                                    <span className="ml-auto shrink-0 pl-2 text-sm font-semibold text-[var(--muted)] tabular-nums">
                                       {listTaskCount}
                                     </span>
                                   </Link>
@@ -348,7 +348,7 @@ export function WorkspaceSidebar({
                             {showAddListForLevel !== d.id ? (
                               <button
                                 type="button"
-                                className="text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)]"
+                                className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
                                 onClick={() => {
                                   setShowAddListForLevel(d.id);
                                   setNewListName("");
@@ -359,7 +359,7 @@ export function WorkspaceSidebar({
                             ) : (
                               <input
                                 autoFocus
-                                className="input h-8 w-full rounded-lg px-2 text-xs"
+                                className="input h-8 w-full rounded-lg px-2 text-sm"
                                 placeholder="Name your list"
                                 value={newListName}
                                 onChange={(e) => setNewListName(e.target.value)}
@@ -393,7 +393,7 @@ export function WorkspaceSidebar({
                   {!showAddLevelInput ? (
                     <button
                       type="button"
-                      className="text-xs font-medium text-[var(--muted)] hover:text-[var(--fg)]"
+                      className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
                       onClick={() => setShowAddLevelInput(true)}
                     >
                       + Add {NODE_LABELS.level}
@@ -401,7 +401,7 @@ export function WorkspaceSidebar({
                   ) : (
                     <input
                       autoFocus
-                      className="input h-8 w-full rounded-lg px-2 text-xs"
+                      className="input h-8 w-full rounded-lg px-2 text-sm"
                       placeholder={`Name your ${NODE_LABELS.level.toLowerCase()}`}
                       value={newLevelName}
                       onChange={(e) => setNewLevelName(e.target.value)}

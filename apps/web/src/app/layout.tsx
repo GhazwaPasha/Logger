@@ -1,17 +1,23 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
+});
+
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 const siteOrigin = getPublicSiteOrigin();
@@ -52,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-theme="system" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrains.variable} antialiased`}>
+      <body className={`${dmSans.variable} ${jetbrains.variable} ${outfit.variable} antialiased`}>
         <ServiceWorkerRegister />
         {children}
       </body>

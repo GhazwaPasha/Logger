@@ -86,10 +86,10 @@ export function AppHeader({
         <div className="flex items-center gap-3">
           <Link
             href={brandHref}
-            className="group flex min-h-9 items-center gap-2 text-sm font-semibold tracking-tight text-[var(--fg)]"
+            className="group flex min-h-9 items-center gap-2 font-outfit font-semibold tracking-tight text-[var(--fg)]"
           >
             <LogBaseMark variant="chrome" decorative />
-            <span className="hidden leading-none sm:inline">LogBase</span>
+            <span className="hidden text-lg leading-none sm:inline">LogBase</span>
           </Link>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -119,7 +119,7 @@ export function AppHeader({
               {accountMenuOpen && (
                 <div
                   id="account-menu"
-                  className="absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg"
+                  className="absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
                 >
                   {user.email && (
                     <p className="max-w-[16rem] truncate px-3 py-2 font-mono-ledger text-xs text-[var(--muted)]" title={user.email}>

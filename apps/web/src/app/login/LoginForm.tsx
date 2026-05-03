@@ -112,7 +112,7 @@ export function LoginForm() {
           <span className="text-xl font-bold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
         </Link>
 
-        <div className="surface-elevated mt-6 w-full rounded-xl border border-[var(--border-subtle)] px-6 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_16px_48px_-16px_rgba(0,0,0,0.12)] sm:px-7 sm:py-8 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2),0_16px_48px_-16px_rgba(0,0,0,0.45)]">
+        <div className="surface-elevated mt-6 w-full rounded-xl border border-[var(--border-subtle)] px-6 py-7 sm:px-7 sm:py-8">
           <div className="text-center">
             <h1 className={`${brand.className} text-balance text-[1.65rem] font-bold leading-[1.15] tracking-[-0.03em] text-[var(--fg)] sm:text-[1.75rem]`}>
               {mode === "signin" ? (

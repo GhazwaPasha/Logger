@@ -39,7 +39,7 @@ export default function WorkspaceDashboardPage() {
           </p>
         </div>
         <div
-          className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5 shadow-sm"
+          className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
           role="group"
           aria-label="Dashboard view"
         >
@@ -81,7 +81,7 @@ export default function WorkspaceDashboardPage() {
           currentUserId={session?.user?.id ?? null}
         />
       ) : (
-        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5 shadow-sm">
+        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Workspace activity</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Ledger from tasks you can access, newest first (same format as task history).

@@ -161,7 +161,7 @@ const TASK_PANEL_HEADER_RIGHT =
   "flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:flex-nowrap sm:gap-2";
 
 const TASK_PANEL_HEADER_SELECT =
-  "input-compact h-8 max-w-full shrink-0 cursor-pointer rounded-md py-0 pl-2 pr-7 text-xs leading-tight text-[var(--fg)] shadow-none";
+  "input-compact h-8 max-w-full shrink-0 cursor-pointer rounded-md py-0 pl-2 pr-7 text-xs leading-tight text-[var(--fg)]";
 
 const TASK_PANEL_HEADER_CLOSE_BTN =
   "btn-secondary shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium leading-none";
@@ -326,7 +326,7 @@ function WorkBoardStatsCard({
       aria-live="polite"
       aria-label="Task counts by workflow stage"
     >
-      <div className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_1px_0_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]">
+      <div className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--accent)_45%,transparent)] to-transparent opacity-90"
           aria-hidden
@@ -1171,7 +1171,7 @@ function WorkItemsInner() {
 
   function dueDatePillClass(hasDue: boolean) {
     if (hasDue) {
-      return "border border-[var(--accent)]/25 bg-[var(--accent-muted)] text-[var(--accent-hover)] shadow-sm dark:text-[var(--accent)]";
+      return "border border-[var(--accent)]/25 bg-[var(--accent-muted)] text-[var(--accent-hover)] dark:text-[var(--accent)]";
     }
     return "border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]";
   }
@@ -1207,7 +1207,7 @@ function WorkItemsInner() {
     const assigneeNames = assigneeNamesForTask(task, members);
     const assigneeFirstName = firstAssigneeLabel(task, members);
     return (
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] shadow-sm transition-colors hover:bg-[var(--surface-hover)]/80">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-4 py-3">
             <div className="flex min-w-0 flex-wrap items-start gap-x-1 gap-y-2 sm:gap-x-3">
               <div className="mt-0.5 flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
@@ -1502,7 +1502,7 @@ function WorkItemsInner() {
             if (disabled) return;
             setOpen((o) => !o);
           }}
-          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-[box-shadow] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
             {displayLabel ?? FLOW_COLUMN_LABELS[value]}
@@ -1525,7 +1525,7 @@ function WorkItemsInner() {
                   minWidth: menuPos.width,
                   zIndex: 80,
                 }}
-                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-[0_12px_48px_-12px_rgba(0,0,0,0.28)] ring-1 ring-black/5 dark:bg-[var(--surface-base)] dark:shadow-[0_16px_56px_-12px_rgba(0,0,0,0.65)] dark:ring-white/10"
+                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 dark:bg-[var(--surface-base)]"
               >
                 {options.map((s) => (
                   <li key={s} role="presentation" className="px-1">
@@ -1622,7 +1622,7 @@ function WorkItemsInner() {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
         }}
-        className="group/card relative cursor-grab touch-manipulation overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] shadow-[0_1px_0_0_rgba(0,0,0,0.04)] ring-0 transition-[box-shadow,border-color,transform] hover:-translate-y-px hover:border-[var(--border)] hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.12)] active:cursor-grabbing dark:shadow-[0_1px_0_0_rgba(255,255,255,0.05)] dark:hover:shadow-[0_12px_28px_-10px_rgba(0,0,0,0.45)]"
+        className="group/card relative cursor-grab touch-manipulation overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] transition-[border-color,transform] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
       >
         <div className="flex flex-col gap-2.5 px-3 pb-3 pt-3.5">
           <div className="flex min-w-0 items-start gap-2">
@@ -2033,7 +2033,7 @@ function WorkItemsInner() {
           <div
             ref={sortPanelRef}
             style={sortPanelStyle}
-            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2 shadow-lg"
+            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2"
             role="menu"
             aria-label="Sort options"
           >
@@ -2069,7 +2069,7 @@ function WorkItemsInner() {
           <div
             ref={datePanelRef}
             style={datePanelStyle}
-            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-lg"
+            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)]"
             role="dialog"
             aria-label="Due date filter"
           >
@@ -2198,7 +2198,7 @@ function WorkItemsInner() {
             role="dialog"
             aria-modal="true"
             aria-label={editTaskId ? "Edit task" : "Create task"}
-            className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col space-y-4 overflow-y-auto border-l border-[var(--border-subtle)] p-6 shadow-[0_0_40px_rgba(0,0,0,0.12)]"
+            className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col space-y-4 overflow-y-auto border-l border-[var(--border-subtle)] p-6"
             onClick={(e) => e.stopPropagation()}
           >
             {editTaskId ? (

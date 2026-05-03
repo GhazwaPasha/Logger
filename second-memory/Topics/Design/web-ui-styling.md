@@ -6,7 +6,7 @@ How the **Next.js** app implements look-and-feel: **Tailwind v4**, **CSS variabl
 
 - **Tailwind CSS v4** via `@import "tailwindcss"` and **`@tailwindcss/postcss`** (`postcss.config.mjs`).
 - **Design tokens** live in **`apps/web/src/app/globals.css`** (`:root`, `html[data-theme="dark"]`, and **`html[data-theme="system"]`** under `prefers-color-scheme` media queries).
-- **Fonts:** **`next/font/google`** in **`layout.tsx`** — **Inter** (`--font-inter`), **JetBrains Mono** (`--font-jetbrains`). Body uses Inter + `antialiased`; monospace helper **`.font-mono-ledger`** for ledger-style UI.
+- **Fonts:** **`next/font/google`** in **`layout.tsx`** — **DM Sans** (`--font-dm-sans`), **JetBrains Mono** (`--font-jetbrains`), **Outfit** (`--font-outfit`). Body uses DM Sans + `antialiased`; **`.font-outfit`** (sidebar + marketing) stacks Outfit then DM Sans; monospace helper **`.font-mono-ledger`** for ledger-style UI.
 
 ## Theme switching
 

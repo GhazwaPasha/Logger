@@ -124,7 +124,7 @@ export default function Home() {
             className="relative mt-10 hidden min-h-[280px] min-w-0 xl:mt-0 xl:block 2xl:min-h-[320px]"
             aria-hidden
           >
-            <div className="absolute inset-0 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+            <div className="absolute inset-0 rounded-3xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)]/80 backdrop-blur-sm">
               <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-5 py-3">
                 <span className="h-2.5 w-2.5 rounded-full bg-[var(--muted)]/35" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[var(--muted)]/25" />
@@ -177,7 +177,7 @@ export default function Home() {
             </p>
           </div>
           <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5 xl:gap-6 2xl:gap-7">
-            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
+            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition-colors group-hover:text-[var(--fg)]">
                 <IconTasks className="h-5 w-5" />
               </div>
@@ -186,7 +186,7 @@ export default function Home() {
                 Tasks, owners, and departments live together so responsibility is obvious—not buried in message history.
               </p>
             </li>
-            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
+            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition-colors group-hover:text-[var(--fg)]">
                 <IconTrail className="h-5 w-5" />
               </div>
@@ -195,7 +195,7 @@ export default function Home() {
                 Append-style logging keeps updates visible and tamper-resistant—ideal when timelines matter.
               </p>
             </li>
-            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
+            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition-colors group-hover:text-[var(--fg)]">
                 <IconExport className="h-5 w-5" />
               </div>
@@ -204,7 +204,7 @@ export default function Home() {
                 Export the trail for audits, retros, leadership readouts, or customer diligence—without manual reconstruction.
               </p>
             </li>
-            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
+            <li className="group rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-colors hover:border-[var(--border)] xl:p-7 2xl:p-8">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition-colors group-hover:text-[var(--fg)]">
                 <IconShield className="h-5 w-5" />
               </div>

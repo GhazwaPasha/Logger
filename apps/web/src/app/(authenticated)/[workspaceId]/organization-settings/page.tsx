@@ -65,7 +65,7 @@ export default function OrganizationSettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Manage this organization&apos;s name and identity details.</p>
       </div>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Rename organization</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">This updates how the organization appears across your workspace list.</p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">

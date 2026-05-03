@@ -133,7 +133,7 @@ export function DueRepeatPopover({
             id={panelId}
             role="dialog"
             aria-label="Due repeat"
-            className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+            className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
             style={{
               top: pos.top,
               left: pos.left,

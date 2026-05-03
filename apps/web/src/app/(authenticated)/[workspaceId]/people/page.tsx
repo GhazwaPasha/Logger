@@ -69,7 +69,7 @@ export default function PeoplePage() {
           (s) they cover.
         </p>
       </div>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Members</h2>
         <ul className="mt-4 divide-y divide-[var(--border-subtle)] rounded-xl border border-[var(--border-subtle)]">
           {members.map((m) => (
@@ -95,7 +95,7 @@ export default function PeoplePage() {
           ))}
         </ul>
       </section>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Invite by email</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">They must already have an account. Owners can add or update roles.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">

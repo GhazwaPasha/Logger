@@ -63,7 +63,7 @@ export function AddWorkspacePanel({
         <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
       </div>
 
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 shadow-sm">
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
         <h2 className="text-sm font-semibold">Workspace details</h2>
         {variant === "inWorkspace" && contextWorkspaceId ? (
           <p className="mt-1 text-xs text-[var(--muted)]">
