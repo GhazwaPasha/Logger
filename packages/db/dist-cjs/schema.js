@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -230,9 +230,24 @@ exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     clientMutationId: (0, pg_core_1.text)("client_mutation_id"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("activity_ledger_task_created_idx").on(t.taskId, t.createdAt)]);
+/** Browser Web Push subscriptions (FCM/Apple/APNs via browser endpoint). */
+exports.pushSubscriptions = (0, pg_core_1.pgTable)("push_subscriptions", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    endpoint: (0, pg_core_1.text)("endpoint").notNull(),
+    p256dh: (0, pg_core_1.text)("p256dh").notNull(),
+    auth: (0, pg_core_1.text)("auth").notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.uniqueIndex)("push_subscriptions_endpoint_uidx").on(t.endpoint),
+    (0, pg_core_1.index)("push_subscriptions_user_idx").on(t.userId),
+]);
 exports.usersRelations = (0, drizzle_orm_1.relations)(exports.user, ({ many }) => ({
     sessions: many(exports.session),
     accounts: many(exports.account),
+    pushSubscriptions: many(exports.pushSubscriptions),
 }));
 exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.session, ({ one }) => ({
     user: one(exports.user, { fields: [exports.session.userId], references: [exports.user.id] }),
@@ -304,6 +319,9 @@ exports.activityLedgerRelations = (0, drizzle_orm_1.relations)(exports.activityL
     task: one(exports.tasks, { fields: [exports.activityLedger.taskId], references: [exports.tasks.id] }),
     actor: one(exports.user, { fields: [exports.activityLedger.actorId], references: [exports.user.id] }),
 }));
+exports.pushSubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.pushSubscriptions, ({ one }) => ({
+    user: one(exports.user, { fields: [exports.pushSubscriptions.userId], references: [exports.user.id] }),
+}));
 exports.subtasksRelations = (0, drizzle_orm_1.relations)(exports.subtasks, ({ one }) => ({
     task: one(exports.tasks, { fields: [exports.subtasks.taskId], references: [exports.tasks.id] }),
 }));
@@ -327,6 +345,7 @@ exports.appSchema = {
     subtasks: exports.subtasks,
     taskAssignees: exports.taskAssignees,
     activityLedger: exports.activityLedger,
+    pushSubscriptions: exports.pushSubscriptions,
     organizationsRelations: exports.organizationsRelations,
     organizationMembersRelations: exports.organizationMembersRelations,
     organizationMemberManagedDepartmentsRelations: exports.organizationMemberManagedDepartmentsRelations,
@@ -336,4 +355,5 @@ exports.appSchema = {
     subtasksRelations: exports.subtasksRelations,
     taskAssigneesRelations: exports.taskAssigneesRelations,
     activityLedgerRelations: exports.activityLedgerRelations,
+    pushSubscriptionsRelations: exports.pushSubscriptionsRelations,
 };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
+import { useOptionalWorkspaceNotifications } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { authClient } from "@/lib/auth-client";
 
 function userInitials(name: string | null | undefined, email: string | null | undefined) {
@@ -19,6 +20,24 @@ function userInitials(name: string | null | undefined, email: string | null | un
   const e = email?.trim();
   if (e) return e.slice(0, 2).toUpperCase();
   return "?";
+}
+
+function IconBell({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </svg>
+  );
 }
 
 function IconSettings({ className }: { className?: string }) {
@@ -60,6 +79,7 @@ export function AppHeader({
   const initials = user ? userInitials(user.name, user.email) : "?";
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const notifications = useOptionalWorkspaceNotifications();
 
   const closeAccountMenu = useCallback(() => setAccountMenuOpen(false), []);
 
@@ -93,6 +113,21 @@ export function AppHeader({
           </Link>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {settingsHref && notifications && (
+            <button
+              type="button"
+              className={`${iconBtn} relative`}
+              aria-label={notifications.unreadCount > 0 ? `Notifications (${notifications.unreadCount} unread)` : "Notifications"}
+              onClick={() => notifications.setPanelOpen(true)}
+            >
+              <IconBell className="size-[1.125rem]" />
+              {notifications.unreadCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex min-w-[1.125rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-[var(--on-accent)]">
+                  {notifications.unreadCount > 99 ? "99+" : notifications.unreadCount}
+                </span>
+              ) : null}
+            </button>
+          )}
           {settingsHref && (
             <Link href={settingsHref} className={iconBtn} aria-label="User settings">
               <IconSettings className="size-[1.125rem]" />

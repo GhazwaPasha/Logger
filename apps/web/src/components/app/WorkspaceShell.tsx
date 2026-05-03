@@ -6,6 +6,7 @@ import { AppHeader } from "./AppHeader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceRouteContext } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
+import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { useApiSession } from "@/hooks/useApiSession";
 import type { Org } from "@/lib/ledger-types";
@@ -70,15 +71,17 @@ export function WorkspaceShell({
   return (
     <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug }}>
       <WorkspaceDataProvider workspaceId={workspaceId}>
-        <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
-          <AppHeader workspaceSlug={workspaceSlug} />
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row md:items-stretch">
-            <WorkspaceSidebar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6 lg:px-8">
-              {children}
-            </main>
+        <WorkspaceNotificationsProvider>
+          <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
+            <AppHeader workspaceSlug={workspaceSlug} />
+            <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row md:items-stretch">
+              <WorkspaceSidebar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
+              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6 lg:px-8">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
+        </WorkspaceNotificationsProvider>
       </WorkspaceDataProvider>
     </WorkspaceRouteContext.Provider>
   );

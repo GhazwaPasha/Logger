@@ -295,9 +295,29 @@ export const activityLedger = pgTable(
   (t) => [index("activity_ledger_task_created_idx").on(t.taskId, t.createdAt)],
 );
 
+/** Browser Web Push subscriptions (FCM/Apple/APNs via browser endpoint). */
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint_uidx").on(t.endpoint),
+    index("push_subscriptions_user_idx").on(t.userId),
+  ],
+);
+
 export const usersRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const sessionsRelations = relations(session, ({ one }) => ({
@@ -383,6 +403,10 @@ export const activityLedgerRelations = relations(activityLedger, ({ one }) => ({
   actor: one(user, { fields: [activityLedger.actorId], references: [user.id] }),
 }));
 
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  user: one(user, { fields: [pushSubscriptions.userId], references: [user.id] }),
+}));
+
 export const subtasksRelations = relations(subtasks, ({ one }) => ({
   task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));
@@ -408,6 +432,7 @@ export const appSchema = {
   subtasks,
   taskAssignees,
   activityLedger,
+  pushSubscriptions,
   organizationsRelations,
   organizationMembersRelations,
   organizationMemberManagedDepartmentsRelations,
@@ -417,4 +442,5 @@ export const appSchema = {
   subtasksRelations,
   taskAssigneesRelations,
   activityLedgerRelations,
+  pushSubscriptionsRelations,
 };

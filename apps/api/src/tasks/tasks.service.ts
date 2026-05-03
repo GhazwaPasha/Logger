@@ -14,6 +14,7 @@ import type { AppDatabase } from "@work-ledger/db";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
+import { PushNotificationsService } from "../push/push-notifications.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { computeNextDue, isDueRepeat } from "./compute-next-due";
 import { computeAutomatedTaskStatus } from "./task-status-automation";
@@ -24,6 +25,7 @@ export class TasksService {
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
     private readonly lists: ListsService,
+    private readonly pushNotifications: PushNotificationsService,
   ) {}
 
   async list(userId: string, organizationId: string, opts?: { includeSubtasks?: boolean }) {
@@ -211,6 +213,22 @@ export class TasksService {
         clientMutationId: parsed.clientMutationId ?? null,
       })
       .returning();
+
+    const assigneesAfter = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    void this.pushNotifications
+      .notifyLedgerActivity({
+        organizationId: access.task.organizationId,
+        actorUserId: userId,
+        taskId,
+        taskTitle: access.task.title,
+        assigneeUserIds: assigneesAfter.map((a) => a.userId),
+        ledgerDelta: [entry!],
+      })
+      .catch(() => {});
 
     return { idempotent: false as const, entry: entry! };
   }
@@ -549,6 +567,19 @@ export class TasksService {
     ]);
 
     const latestLedger = latestLedgerRows[0] ?? null;
+
+    if (ledgerDelta.length > 0) {
+      void this.pushNotifications
+        .notifyLedgerActivity({
+          organizationId: access.task.organizationId,
+          actorUserId: userId,
+          taskId,
+          taskTitle: access.task.title,
+          assigneeUserIds: assignees.map((a) => a.userId),
+          ledgerDelta,
+        })
+        .catch(() => {});
+    }
 
     return {
       task: { ...access.task, lastLedger: latestLedger },

@@ -4,6 +4,16 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Notifications: bell panel, toasts, web push
+
+- **Context:** User wanted in-app notifications + mobile web push, a bell next to settings, a slide-over panel like the task panel, and toast alerts.
+- **What we did:**
+  - **Web:** **`WorkspaceNotificationsProvider`** polls **`GET /organizations/:id/activity`** every 45s, filters ledger rows to the current user (assignee / assignment-change logic in **`notification-eligibility`**), slide-over panel (**`createPortal`**, same chrome pattern as task panel). **`AppHeader`** bell + unread badge; **`sonner`** **`AppToaster`** in root layout. Service worker always registered; **`public/sw.js`** handles **`push`** + **`notificationclick`** (deep link uses absolute **`PUBLIC_WEB_ORIGIN`** from API).
+  - **API:** **`push`** module — public **`GET /push/vapid-public-key`**, authenticated **`POST`/`DELETE /push/subscription`**; **`TasksService`** fires **`notifyLedgerActivity`** after **`taskMutationResult`** and **`appendLedger`** inserts (assignees except actor).
+  - **DB:** **`push_subscriptions`** table + migration **`0009_push_subscriptions.sql`**.
+- **Takeaway / follow-ups:** Run DB migrate for **`0009`**. Configure **`WEB_PUSH_VAPID_PUBLIC_KEY`**, **`WEB_PUSH_VAPID_PRIVATE_KEY`**, **`WEB_PUSH_CONTACT`** (e.g. **`mailto:`…**), and **`PUBLIC_WEB_ORIGIN`** (canonical browser origin for notification URLs). Generate keys: **`npx web-push generate-vapid-keys`**. Push delivery depends on browser/OS background behavior for PWAs.
+- **Code / repo:** `apps/web/src/components/notifications/WorkspaceNotificationsProvider.tsx`, `AppHeader.tsx`, `WorkspaceShell.tsx`, `AppToaster.tsx`, `ServiceWorkerRegister.tsx`, `public/sw.js`, `web-push-client.ts`, `notification-eligibility.ts`, `useOrgActivityFeed.ts`; `apps/api/src/push/*`, `tasks.service.ts`, `tasks.module.ts`; `packages/db/src/schema.ts`, `drizzle/0009_push_subscriptions.sql`.
+
 ### 2026-05-03 — Kanban: removed workflow / drag intro paragraph
 
 - **What we did:** Deleted the muted intro paragraph above the board (**`KanbanBoard`**); column header cards remain the primary labels.
