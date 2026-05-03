@@ -606,18 +606,6 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   }
 }
 
-@keyframes home-live-breathe {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.15);
-  }
-}
-
 @keyframes home-plus-pulse {
   0%,
   100% {
@@ -625,26 +613,6 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   }
   50% {
     opacity: 0.45;
-  }
-}
-
-@keyframes home-chip-float-a {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes home-chip-float-b {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(7px);
   }
 }
 
@@ -784,21 +752,8 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   animation: home-checkbox-pulse 2.8s ease-in-out infinite;
 }
 
-.home-live-dot {
-  background: rgb(52 211 153 / 0.95);
-  animation: home-live-breathe 2s ease-in-out infinite;
-}
-
 .home-plus-pulse {
   animation: home-plus-pulse 2.4s ease-in-out infinite;
-}
-
-.home-chip-a {
-  animation: home-chip-float-a 5.5s ease-in-out infinite;
-}
-
-.home-chip-b {
-  animation: home-chip-float-b 6s ease-in-out infinite 0.6s;
 }
 
 .home-task-card {
@@ -828,10 +783,19 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
 }
 
 .home-hero-word {
-  display: block;
+  display: flex;
   opacity: 0;
   transform-origin: 50% 80%;
   animation: home-hero-word 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Secondary phrase on hero lines — smaller, quieter; reads as a second meaning beside the verb */
+.home-hero-sub {
+  font-size: clamp(0.8125rem, 0.36em, 1.125rem);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--muted) 88%, var(--fg));
 }
 
 .home-hero-word:nth-child(1) {
@@ -916,10 +880,7 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   .home-shimmer-bar,
   .home-shimmer-bar--delayed,
   .home-checkbox-glow,
-  .home-live-dot,
   .home-plus-pulse,
-  .home-chip-a,
-  .home-chip-b,
   .home-trust-strip::before,
   .home-hero-word,
   .home-fade-item,

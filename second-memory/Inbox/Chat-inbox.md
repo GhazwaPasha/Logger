@@ -4,6 +4,41 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Marketing home: hero headline + secondary phrase
+
+- **What we did:** Hero H1 is three rows: **Optimize** / **Organize** / **Orchestrate** plus smaller baseline-aligned phrases (**your plan**, **your workforce**, **your Outcome**). New **`.home-hero-sub`** in **`globals.css`** (muted mix, ~**`0.36em`** with clamp). Slight vertical **`gap`** between rows.
+- **Code / repo:** `apps/web/src/app/page.tsx`, `apps/web/src/app/globals.css`.
+
+### 2026-05-03 — Marketing home: hero eyebrow copy
+
+- **What we did:** Pill **Accountability & Audit** → **Task Management with Accountability**.
+- **Code / repo:** `apps/web/src/app/page.tsx`.
+
+### 2026-05-03 — Marketing home: hero headline words
+
+- **What we did:** Hero H1 → **Optimize / Organize / Orchestrate**.
+- **Code / repo:** `apps/web/src/app/page.tsx`.
+
+### 2026-05-03 — Marketing home: less side gutter
+
+- **What we did:** Widen page shell (**`max-w-7xl`** default, **`lg:max-w-[90rem]`**, **`2xl:max-w-[min(100%,100rem)]`**) and reduce horizontal padding (**`px-4` / `sm:px-6` / `lg:px-8` / `2xl:px-10`**) so content uses more viewport width.
+- **Code / repo:** `apps/web/src/app/page.tsx`.
+
+### 2026-05-03 — Marketing hero: no Live pill, wider mock
+
+- **What we did:** Removed **Live** pill from **`HeroProductMock`**; deleted **`home-live-*`** animation/CSS. Hero grid narrows copy (**`30rem` / `34rem`** max) and slightly tighter gaps so the mock column is wider; shimmer bars use percentage widths so they scale with the wider card.
+- **Code / repo:** `apps/web/src/components/marketing/HeroProductMock.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/app/globals.css`.
+
+### 2026-05-03 — Marketing hero: larger product mock
+
+- **What we did:** Increased **`HeroProductMock`** min-heights (**`400px` / `420px` xl / `500px` 2xl**), slightly stronger shadow, larger chrome (padding, dots, shimmer bars, type). Hero grid gives the mock column more width (**`38rem` / `42rem`** max copy vs **`42rem` / `46rem`** before) via **`minmax(0,1fr)`** on the second track.
+- **Code / repo:** `apps/web/src/components/marketing/HeroProductMock.tsx`, `apps/web/src/app/page.tsx`.
+
+### 2026-05-03 — Marketing hero: removed SYNCED / EXPORT floating chips
+
+- **What we did:** Removed the decorative **SYNCED** and **EXPORT** labels beside the hero window mock; dropped unused **`home-chip-*`** keyframes and animation classes from **`globals.css`**.
+- **Code / repo:** `apps/web/src/components/marketing/HeroProductMock.tsx`, `apps/web/src/app/globals.css`.
+
 ### 2026-05-03 — Workspace main: tighter page gutters
 
 - **What we did:** Reduced **`WorkspaceShell`** `<main>` horizontal padding (**`px-3 sm:px-4 lg:px-5`**) and top padding (**`pt-3 sm:pt-4`**, bottom stays **`pb-6`**). Same on **`app`** entry **`AddWorkspacePanel`** main. **`AppHeader`** inner row matches horizontal padding.

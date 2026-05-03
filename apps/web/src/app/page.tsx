@@ -93,7 +93,7 @@ export default function Home() {
     <main className="relative min-h-screen overflow-hidden bg-[var(--surface-base)] text-[var(--fg)]">
       <MarketingBackground />
 
-      <div className="relative mx-auto w-full max-w-6xl px-5 pb-14 pt-6 sm:px-8 lg:max-w-7xl lg:px-12 lg:pb-20 lg:pt-8 2xl:max-w-[88rem] 2xl:px-16">
+      <div className="relative mx-auto w-full max-w-7xl px-4 pb-14 pt-6 sm:px-6 lg:max-w-[90rem] lg:px-8 lg:pb-20 lg:pt-8 2xl:max-w-[min(100%,100rem)] 2xl:px-10">
         {/* Nav */}
         <Reveal className="will-change-[opacity,transform]">
           <header className="flex flex-wrap items-center justify-between gap-4">
@@ -132,21 +132,30 @@ export default function Home() {
 
         {/* Hero */}
         <section
-          className="grid pt-4 text-left sm:pt-6 xl:grid-cols-[minmax(0,42rem)_1fr] xl:items-center xl:gap-12 xl:pt-8 2xl:grid-cols-[minmax(0,46rem)_1fr] 2xl:gap-16 2xl:pt-10"
+          className="grid pt-4 text-left sm:pt-6 xl:grid-cols-[minmax(0,30rem)_minmax(0,1fr)] xl:items-center xl:gap-10 xl:pt-8 2xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)] 2xl:gap-14 2xl:pt-10"
           aria-labelledby="hero-heading"
         >
           <div className="min-w-0 max-w-3xl xl:max-w-none">
             <p className="home-fade-item home-fade-item--1 inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)] shadow-[0_1px_0_color-mix(in_srgb,var(--fg)_6%,transparent)]">
-              Accountability &amp; Audit
+              Task Management with Accountability
             </p>
             <h1
               id="hero-heading"
-              className={`${wordmark.className} mt-6 flex flex-col gap-0 text-balance text-4xl font-bold tracking-[-0.04em] text-[var(--fg)] sm:text-5xl lg:text-[3.35rem] 2xl:text-[3.65rem]`}
+              className={`${wordmark.className} mt-6 flex flex-col gap-1 text-balance text-4xl font-bold tracking-[-0.04em] text-[var(--fg)] sm:gap-1.5 sm:text-5xl lg:gap-2 lg:text-[3.35rem] 2xl:text-[3.65rem]`}
               style={{ perspective: "880px" }}
             >
-              <span className="home-hero-word block leading-[1.05]">Organize</span>
-              <span className="home-hero-word block leading-[1.05]">Track</span>
-              <span className="home-hero-word block leading-[1.05]">Execute.</span>
+              <span className="home-hero-word flex flex-wrap items-baseline gap-x-[0.35em] gap-y-1 leading-[1.06]">
+                <span className="text-[var(--fg)]">Optimize</span>
+                <span className="home-hero-sub">your plan</span>
+              </span>
+              <span className="home-hero-word flex flex-wrap items-baseline gap-x-[0.35em] gap-y-1 leading-[1.06]">
+                <span className="text-[var(--fg)]">Organize</span>
+                <span className="home-hero-sub">your workforce</span>
+              </span>
+              <span className="home-hero-word flex flex-wrap items-baseline gap-x-[0.35em] gap-y-1 leading-[1.06]">
+                <span className="text-[var(--fg)]">Orchestrate</span>
+                <span className="home-hero-sub">your Outcome</span>
+              </span>
             </h1>
             <p className="home-fade-item home-fade-item--2 mt-6 max-w-2xl text-pretty text-justify text-lg leading-relaxed text-[var(--muted)] sm:text-xl xl:max-w-[36rem] 2xl:max-w-[40rem] 2xl:text-[1.125rem] 2xl:leading-relaxed">
               A fast, intuitive task management app built for people who are tired of bloated, overcomplicated tools available across the internet. Instead of overwhelming you with features you&apos;ll never use, Logbase focuses on what actually matters: capturing tasks quickly, staying organized, and getting things done. With natural language task creation, you can simply type what you need (&ldquo;Call Ahmed tomorrow at 3pm&rdquo;) and it handles the rest.
