@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   readWorkBoardScope,
@@ -13,7 +14,9 @@ import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
-import type { ListRow, TaskRow } from "@/lib/ledger-types";
+import type { Dept, ListRow, TaskRow } from "@/lib/ledger-types";
+import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
+import { workspaceKeys } from "@/lib/query-keys";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 
@@ -34,6 +37,23 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
 function rowBase(active: boolean) {
   return [
     "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm font-semibold transition-colors",
@@ -50,9 +70,10 @@ export function WorkspaceSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { token, session } = useApiSession();
   const { orgs } = useOrganizationsState();
-  const { depts, lists, tasks, setError, reload, isLoading: workspaceLoading } = useWorkspaceData();
+  const { depts, lists, tasks, members, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const [orgTreeOpen, setOrgTreeOpen] = useState(true);
@@ -62,8 +83,21 @@ export function WorkspaceSidebar({
   const [newListName, setNewListName] = useState("");
   const [showAddListForLevel, setShowAddListForLevel] = useState<string | null>(null);
   const [addingList, setAddingList] = useState(false);
+  const [renamingLevelId, setRenamingLevelId] = useState<string | null>(null);
+  const [renameLevelDraft, setRenameLevelDraft] = useState("");
+  const [renamingLevelBusy, setRenamingLevelBusy] = useState(false);
+  const [renamingListId, setRenamingListId] = useState<string | null>(null);
+  const [renameListDraft, setRenameListDraft] = useState("");
+  const [renamingListBusy, setRenamingListBusy] = useState(false);
 
   const base = `/${workspaceSlug}`;
+
+  /** Matches API: only workspace owners may PATCH departments / lists (rename, create). */
+  const canRenameOrgStructure = useMemo(() => {
+    const uid = session?.user?.id;
+    if (!uid) return false;
+    return members.some((m) => m.userId === uid && m.role === "owner");
+  }, [session?.user?.id, members]);
 
   const listsByLevel = useMemo(() => {
     const m = new Map<string, ListRow[]>();
@@ -160,14 +194,21 @@ export function WorkspaceSidebar({
     setError(null);
     setAddingLevel(true);
     try {
-      await apiJson(`/organizations/${workspaceId}/departments`, {
+      const created = await apiJson<Dept>(`/organizations/${workspaceId}/departments`, {
         method: "POST",
         token,
         body: JSON.stringify({ name: newLevelName.trim() }),
       });
       setNewLevelName("");
       setShowAddLevelInput(false);
-      await reload();
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        if (old.depts.some((d) => d.id === created.id)) return old;
+        return {
+          ...old,
+          depts: [...old.depts, created].sort((a, b) => a.name.localeCompare(b.name)),
+        };
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add level");
     } finally {
@@ -180,18 +221,101 @@ export function WorkspaceSidebar({
     setError(null);
     setAddingList(true);
     try {
-      await apiJson(`/organizations/${workspaceId}/lists`, {
+      const created = await apiJson<ListRow>(`/organizations/${workspaceId}/lists`, {
         method: "POST",
         token,
         body: JSON.stringify({ name: newListName.trim(), departmentId }),
       });
       setNewListName("");
       setShowAddListForLevel(null);
-      await reload();
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        if (old.lists.some((l) => l.id === created.id)) return old;
+        return {
+          ...old,
+          lists: [...old.lists, created].sort((a, b) => a.name.localeCompare(b.name)),
+        };
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add list");
     } finally {
       setAddingList(false);
+    }
+  }
+
+  function cancelRenameLevel() {
+    setRenamingLevelId(null);
+    setRenameLevelDraft("");
+  }
+
+  function cancelRenameList() {
+    setRenamingListId(null);
+    setRenameListDraft("");
+  }
+
+  async function commitRenameLevel(deptId: string) {
+    if (!token || renamingLevelBusy) return;
+    const trimmed = renameLevelDraft.trim();
+    const original = depts.find((x) => x.id === deptId)?.name ?? "";
+    if (!trimmed || trimmed === original) {
+      cancelRenameLevel();
+      return;
+    }
+    setError(null);
+    setRenamingLevelBusy(true);
+    try {
+      const updated = await apiJson<Dept>(`/organizations/${workspaceId}/departments/${deptId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ name: trimmed }),
+      });
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          depts: old.depts
+            .map((x) => (x.id === deptId ? updated : x))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        };
+      });
+      cancelRenameLevel();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename level");
+    } finally {
+      setRenamingLevelBusy(false);
+    }
+  }
+
+  async function commitRenameList(listId: string) {
+    if (!token || renamingListBusy) return;
+    const trimmed = renameListDraft.trim();
+    const original = lists.find((x) => x.id === listId)?.name ?? "";
+    if (!trimmed || trimmed === original) {
+      cancelRenameList();
+      return;
+    }
+    setError(null);
+    setRenamingListBusy(true);
+    try {
+      const updated = await apiJson<ListRow>(`/organizations/${workspaceId}/lists/${listId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ name: trimmed }),
+      });
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          lists: old.lists
+            .map((x) => (x.id === listId ? updated : x))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        };
+      });
+      cancelRenameList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not rename list");
+    } finally {
+      setRenamingListBusy(false);
     }
   }
 
@@ -287,26 +411,90 @@ export function WorkspaceSidebar({
                   const levelLists = listsByLevel.get(d.id) ?? [];
                   return (
                     <li key={d.id} className="select-none">
-                      <div className="flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
-                        <Link
-                          href={`${base}/work`}
-                          className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left ${
-                            pathname === `${base}/work` &&
-                            boardScope?.levelId === d.id &&
-                            boardScope?.listId == null
-                              ? "rounded-md bg-[var(--accent-muted)] font-semibold text-[var(--fg)]"
-                              : ""
-                          }`}
-                          title={`Open ${d.name}`}
-                          onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</p>
+                      <div className="group/level flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+                        {renamingLevelId === d.id ? (
+                          <div
+                            className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 ${
+                              pathname === `${base}/work` &&
+                              boardScope?.levelId === d.id &&
+                              boardScope?.listId == null
+                                ? "rounded-md bg-[var(--accent-muted)]"
+                                : ""
+                            }`}
+                          >
+                            <input
+                              autoFocus
+                              disabled={renamingLevelBusy}
+                              className="input h-8 min-w-0 flex-1 rounded-lg px-2 text-sm font-semibold"
+                              aria-label={`Rename ${NODE_LABELS.level}`}
+                              value={renameLevelDraft}
+                              onChange={(e) => setRenameLevelDraft(e.target.value)}
+                              onBlur={() => {
+                                if (renamingLevelBusy) return;
+                                void commitRenameLevel(d.id);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void commitRenameLevel(d.id);
+                                }
+                                if (e.key === "Escape" && !renamingLevelBusy) {
+                                  cancelRenameLevel();
+                                }
+                              }}
+                            />
+                            <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
+                              {levelLists.length}
+                            </span>
                           </div>
-                          <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
-                            {levelLists.length}
-                          </span>
-                        </Link>
+                        ) : (
+                          <div
+                            className={`flex min-w-0 flex-1 items-center rounded-md text-left ${
+                              pathname === `${base}/work` &&
+                              boardScope?.levelId === d.id &&
+                              boardScope?.listId == null
+                                ? "bg-[var(--accent-muted)] font-semibold text-[var(--fg)]"
+                                : ""
+                            }`}
+                          >
+                            <Link
+                              href={`${base}/work`}
+                              className="flex min-w-0 flex-1 items-center px-2 py-2 pr-1"
+                              title={`Open ${d.name}`}
+                              onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
+                            >
+                              <span className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</span>
+                            </Link>
+                            {canRenameOrgStructure && (
+                              <button
+                                type="button"
+                                className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                aria-label={`Rename ${NODE_LABELS.level} ${d.name}`}
+                                title={`Rename ${NODE_LABELS.level}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setRenamingListId(null);
+                                  setRenameListDraft("");
+                                  setRenamingLevelId(d.id);
+                                  setRenameLevelDraft(d.name);
+                                }}
+                              >
+                                <PencilIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            <Link
+                              href={`${base}/work`}
+                              tabIndex={-1}
+                              aria-hidden
+                              className="shrink-0 px-2 py-2 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
+                              title={`Open ${d.name}`}
+                              onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
+                            >
+                              {levelLists.length}
+                            </Link>
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
@@ -326,20 +514,85 @@ export function WorkspaceSidebar({
                               const listTaskCount = (tasksByList.get(l.id) ?? []).length;
                               return (
                                 <li key={l.id}>
-                                  <Link
-                                    href={`${base}/work`}
-                                    className={`${rowBase(boardScope?.listId === l.id)} flex w-full items-center truncate pl-2`}
-                                    title={l.name}
-                                    onClick={() =>
-                                      writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
-                                    }
-                                  >
-                                    <span className="mr-1.5 text-[var(--muted)]">#</span>
-                                    <span className="truncate">{l.name}</span>
-                                    <span className="ml-auto shrink-0 pl-2 text-sm font-semibold text-[var(--muted)] tabular-nums">
-                                      {listTaskCount}
-                                    </span>
-                                  </Link>
+                                  <div className="group/list flex w-full items-center gap-0.5">
+                                    {renamingListId === l.id ? (
+                                      <div
+                                        className={`${rowBase(boardScope?.listId === l.id)} flex min-w-0 flex-1 items-center gap-2 pl-2 pr-1`}
+                                      >
+                                        <span className="shrink-0 text-[var(--muted)]">#</span>
+                                        <input
+                                          autoFocus
+                                          disabled={renamingListBusy}
+                                          className="input h-8 min-w-0 flex-1 rounded-lg px-2 text-sm font-semibold"
+                                          aria-label="Rename list"
+                                          value={renameListDraft}
+                                          onChange={(e) => setRenameListDraft(e.target.value)}
+                                          onBlur={() => {
+                                            if (renamingListBusy) return;
+                                            void commitRenameList(l.id);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                              e.preventDefault();
+                                              void commitRenameList(l.id);
+                                            }
+                                            if (e.key === "Escape" && !renamingListBusy) {
+                                              cancelRenameList();
+                                            }
+                                          }}
+                                        />
+                                        <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
+                                          {listTaskCount}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className={`${rowBase(boardScope?.listId === l.id)} flex min-w-0 flex-1 items-center pl-2`}
+                                      >
+                                        <Link
+                                          href={`${base}/work`}
+                                          className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-1.5 pr-1"
+                                          title={l.name}
+                                          onClick={() =>
+                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
+                                          }
+                                        >
+                                          <span className="shrink-0 text-[var(--muted)]">#</span>
+                                          <span className="min-w-0 truncate">{l.name}</span>
+                                        </Link>
+                                        {canRenameOrgStructure && (
+                                          <button
+                                            type="button"
+                                            className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                            aria-label={`Rename list ${l.name}`}
+                                            title="Rename list"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setRenamingLevelId(null);
+                                              setRenameLevelDraft("");
+                                              setRenamingListId(l.id);
+                                              setRenameListDraft(l.name);
+                                            }}
+                                          >
+                                            <PencilIcon className="h-3.5 w-3.5" />
+                                          </button>
+                                        )}
+                                        <Link
+                                          href={`${base}/work`}
+                                          tabIndex={-1}
+                                          aria-hidden
+                                          className="shrink-0 py-1.5 pr-2 pl-1 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
+                                          title={l.name}
+                                          onClick={() =>
+                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
+                                          }
+                                        >
+                                          {listTaskCount}
+                                        </Link>
+                                      </div>
+                                    )}
+                                  </div>
                                 </li>
                               );
                             })
@@ -364,10 +617,14 @@ export function WorkspaceSidebar({
                                 value={newListName}
                                 onChange={(e) => setNewListName(e.target.value)}
                                 onBlur={() => {
-                                  if (!addingList) {
-                                    setShowAddListForLevel(null);
-                                    setNewListName("");
+                                  if (addingList) return;
+                                  const trimmed = newListName.trim();
+                                  if (trimmed) {
+                                    void addList(d.id);
+                                    return;
                                   }
+                                  setShowAddListForLevel(null);
+                                  setNewListName("");
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
@@ -406,10 +663,14 @@ export function WorkspaceSidebar({
                       value={newLevelName}
                       onChange={(e) => setNewLevelName(e.target.value)}
                       onBlur={() => {
-                        if (!addingLevel) {
-                          setShowAddLevelInput(false);
-                          setNewLevelName("");
+                        if (addingLevel) return;
+                        const trimmed = newLevelName.trim();
+                        if (trimmed) {
+                          void addLevel();
+                          return;
                         }
+                        setShowAddLevelInput(false);
+                        setNewLevelName("");
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {

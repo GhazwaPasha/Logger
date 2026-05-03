@@ -1209,108 +1209,102 @@ function WorkItemsInner() {
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-4 py-3">
-            <div className="flex min-w-0 flex-wrap items-start gap-x-1 gap-y-2 sm:gap-x-3">
-              <div className="mt-0.5 flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-                <KanbanStatusPill task={task} />
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={checklistDone}
-                  disabled={checklistDisabled || (!checklistDone && advanceTo == null)}
-                  title={
-                    checklistDisabled
-                      ? "Cancelled — use status menu to reopen"
-                      : checklistDone
-                        ? "Mark as not done"
-                        : advanceTo
-                          ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
-                          : "Cannot advance"
-                  }
-                  aria-label={
-                    checklistDisabled
-                      ? "Task cancelled"
-                      : checklistDone
-                        ? "Mark task not done"
-                        : advanceTo
-                          ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
-                          : "Cannot advance task"
-                  }
-                  className={`flex size-7 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                    checklistDone
-                      ? "surface-glass-primary border-solid text-[var(--fg)]"
-                      : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
-                  } ${
-                    checklistDisabled || (!checklistDone && advanceTo == null)
-                      ? "cursor-not-allowed opacity-40"
-                      : "cursor-pointer hover:bg-[var(--surface-hover)]"
-                  }`}
-                  onClick={() => {
-                    if (checklistDisabled) return;
-                    if (checklistDone) {
-                      void patchTask(task.id, { status: "in_progress" });
-                      return;
-                    }
-                    if (advanceTo) void patchTask(task.id, { status: advanceTo });
-                  }}
-                >
-                  {checklistDone ? (
-                    <svg
-                      className="size-[15px] shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  ) : null}
-                </button>
-              </div>
+          <div className="flex min-w-0 items-center gap-x-2 sm:gap-x-3">
+            <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+              <KanbanStatusPill task={task} />
               <button
                 type="button"
-                className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-                aria-expanded={expanded}
-                aria-label={expanded ? "Hide subtasks" : "Show subtasks"}
-                onClick={() => toggleListRowExpand(task.id)}
+                role="checkbox"
+                aria-checked={checklistDone}
+                disabled={checklistDisabled || (!checklistDone && advanceTo == null)}
+                title={
+                  checklistDisabled
+                    ? "Cancelled — use status menu to reopen"
+                    : checklistDone
+                      ? "Mark as not done"
+                      : advanceTo
+                        ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                        : "Cannot advance"
+                }
+                aria-label={
+                  checklistDisabled
+                    ? "Task cancelled"
+                    : checklistDone
+                      ? "Mark task not done"
+                      : advanceTo
+                        ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                        : "Cannot advance task"
+                }
+                className={`flex size-7 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                  checklistDone
+                    ? "surface-glass-primary border-solid text-[var(--fg)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
+                } ${
+                  checklistDisabled || (!checklistDone && advanceTo == null)
+                    ? "cursor-not-allowed opacity-40"
+                    : "cursor-pointer hover:bg-[var(--surface-hover)]"
+                }`}
+                onClick={() => {
+                  if (checklistDisabled) return;
+                  if (checklistDone) {
+                    void patchTask(task.id, { status: "in_progress" });
+                    return;
+                  }
+                  if (advanceTo) void patchTask(task.id, { status: advanceTo });
+                }}
               >
-                <IconChevron open={expanded} className="opacity-80" />
-              </button>
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <button
-                    type="button"
-                    onClick={() => openEditTask(task.id)}
-                    className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                      checklistDone
-                        ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
-                        : "text-[var(--fg)]"
-                    }`}
+                {checklistDone ? (
+                  <svg
+                    className="size-[15px] shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
                   >
-                    {task.title}
-                  </button>
-                  {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      {showTaskLevelBadge && levelBadge ? (
-                        <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
-                          {levelBadge}
-                        </span>
-                      ) : null}
-                      {showTaskListBadge && listBadge ? (
-                        <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
-                          {listBadge}
-                        </span>
-                      ) : null}
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                ) : null}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+              aria-expanded={expanded}
+              aria-label={expanded ? "Hide subtasks" : "Show subtasks"}
+              onClick={() => toggleListRowExpand(task.id)}
+            >
+              <IconChevron open={expanded} className="opacity-80" />
+            </button>
+            <div className="flex min-w-0 flex-1 items-center gap-x-2 gap-y-1">
+              <button
+                type="button"
+                onClick={() => openEditTask(task.id)}
+                className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                  checklistDone
+                    ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
+                    : "text-[var(--fg)]"
+                }`}
+              >
+                {task.title}
+              </button>
+              {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {showTaskLevelBadge && levelBadge ? (
+                    <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
+                      {levelBadge}
                     </span>
                   ) : null}
-                </div>
-                {task.lastLedger ? (
-                  <TaskCardLastActivity entry={task.lastLedger} members={members} variant="inline" />
-                ) : null}
-              </div>
-              <div className="mt-0.5 flex shrink-0 flex-wrap items-center justify-end gap-0.5 sm:gap-1 sm:ml-auto">
+                  {showTaskListBadge && listBadge ? (
+                    <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
+                      {listBadge}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+              <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "assignees")}
@@ -1370,6 +1364,7 @@ function WorkItemsInner() {
                 </button>
               </div>
             </div>
+          </div>
         </div>
         {expanded && (
           <div className="border-t border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-4 pb-3 pt-2">
@@ -1417,6 +1412,9 @@ function WorkItemsInner() {
               </div>
           </div>
         )}
+        {task.lastLedger ? (
+          <TaskCardLastActivity entry={task.lastLedger} members={members} compact />
+        ) : null}
       </div>
     );
   }
@@ -2288,6 +2286,12 @@ function WorkItemsInner() {
                             value={editSubtaskDraft}
                             onChange={(e) => setEditSubtaskDraft(e.target.value)}
                             placeholder="Add subtask"
+                            onBlur={() => {
+                              const v = editSubtaskDraft.trim();
+                              if (!v) return;
+                              setEditNewSubtasks((prev) => [...prev, v]);
+                              setEditSubtaskDraft("");
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
@@ -2439,6 +2443,12 @@ function WorkItemsInner() {
                     value={subtaskDraft}
                     onChange={(e) => setSubtaskDraft(e.target.value)}
                     placeholder="Add subtask"
+                    onBlur={() => {
+                      const v = subtaskDraft.trim();
+                      if (!v) return;
+                      setSubtaskItems((prev) => [...prev, v]);
+                      setSubtaskDraft("");
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();

@@ -4,6 +4,31 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Sidebar: rename levels/lists (owners only)
+
+- **Context:** Rename existed on API (**`PATCH`** departments / lists) but not in UI; controls should appear only for users allowed to call those endpoints (**workspace owners**).
+- **What we did:** **`WorkspaceSidebar`**: derive **`canRenameOrgStructure`** from **`members`** (**`userId === session.user.id`** and **`role === "owner"`**). Owners see a pencil next to each level and list; click opens inline rename (Enter / blur commit, Escape cancel). **`PATCH`** merges updated **`Dept`** / **`ListRow`** into **`workspaceKeys.workspace`** cache (sorted by name). Non-owners see no rename affordances.
+- **Follow-up:** Pencil uses **`group/level`** & **`group/list`** — **`opacity-0`** until row hover (**`group-hover/…:opacity-100`**) or **`focus-visible`** (keyboard); placed beside the name via split links (name · rename · count) so it doesn’t reserve a permanent column.
+- **Code / repo:** `apps/web/src/components/app/WorkspaceSidebar.tsx`.
+
+### 2026-05-03 — Sidebar: instant level/list rows after create
+
+- **Context:** Creating a level or list felt slow: typed label vanished, then the row appeared only after a **full workspace refetch**.
+- **What we did:** **`WorkspaceSidebar`** **`addLevel`** / **`addList`**: after POST, **`queryClient.setQueryData`** on **`workspaceKeys.workspace(workspaceId)`** merges the returned **`Dept`** / **`ListRow`** into the cached **`WorkspaceBundle`** (sorted by name). Removed **`await reload()`** so we don’t block on **`/workspace`**.
+- **Code / repo:** `apps/web/src/components/app/WorkspaceSidebar.tsx`.
+
+### 2026-05-03 — Sidebar + task panel: commit draft on blur (level, list, subtask)
+
+- **Context:** Adding a level, list, or subtask required **Enter**; focusing away discarded sidebar drafts and felt broken.
+- **What we did:** **`WorkspaceSidebar`**: **level** and **list** inputs **`onBlur`** — if trimmed text, **`void addLevel()`** / **`void addList(d.id)`**; if empty, cancel inline UI (same as before). Still **`return`** early when **`addingLevel`** / **`addingList`** so in-flight requests don’t get cancelled. **`work/page.tsx`**: **New task** and **Edit task** subtask draft inputs **`onBlur`** commit trimmed line to **`subtaskItems`** / **`editNewSubtasks`** (Enter unchanged).
+- **Code / repo:** `apps/web/src/components/app/WorkspaceSidebar.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Work board list: last activity in card footer (kanban parity)
+
+- **Context:** User wanted list-view task rows to show **last activity** in the **card footer** like kanban cards, not under the title; then **title + level/list badges** on the **same row** as assignee / due / priority (not wrapping to a separate line).
+- **What we did:** **`ListTaskCard`**: **`TaskCardLastActivity`** **`compact`** footer after subtasks expand block. Main row: status + checklist, chevron, then one **`flex-1 min-w-0`** segment with **truncating title** (**`flex-1`**), **badges**, and **`ml-auto`** chip group (assignee, due, priority, overflow) — **`items-center`**, no outer **`flex-wrap`** so the meta chips stay on the title row.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
 ### 2026-05-03 — UI font: Inter → DM Sans (Google Fonts)
 
 - **Context:** User chose **DM Sans** as the primary UI sans instead of Inter.
@@ -63,7 +88,7 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 ### 2026-05-03 — Work board: last activity on list + kanban cards
 
 - **Context:** User wanted the newest ledger line shown at the bottom of each task card (list + kanban) to orient dense boards and future recurring-task rows.
-- **What we did:** **`AuthorizationService`** batches **`lastLedger`** per task via **`activity_ledger`** (**`MAX(created_at)`** join). **`TasksService.taskMutationResult`** attaches **`lastLedger`** to **`task`** so mutations keep the footer fresh. **`TaskRow.lastLedger`** in **`ledger-types`**. **`TaskCardLastActivity`** uses **`formatLogTimestamp`** + **`LedgerLineDescription`**; kanban **`compact`** (**`line-clamp-2`**) + **`variant="footer"`** (border-top). List rows use **`variant="inline"`** under the title (no divider). Wired on **`work/page.tsx`** **`ListTaskCard`** + **`TaskCard`**.
+- **What we did:** **`AuthorizationService`** batches **`lastLedger`** per task via **`activity_ledger`** (**`MAX(created_at)`** join). **`TasksService.taskMutationResult`** attaches **`lastLedger`** to **`task`** so mutations keep the footer fresh. **`TaskRow.lastLedger`** in **`ledger-types`**. **`TaskCardLastActivity`** uses **`formatLogTimestamp`** + **`LedgerLineDescription`**; list + kanban cards use **`compact`** + **`variant="footer"`** (border-top footer). Wired on **`work/page.tsx`** **`ListTaskCard`** + **`TaskCard`**.
 - **Code / repo:** `apps/api/src/authorization/authorization.service.ts`, `apps/api/src/tasks/tasks.service.ts`, `apps/web/src/lib/ledger-types.ts`, `apps/web/src/components/tasks/TaskCardLastActivity.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
 
 ### 2026-05-03 — Workspace chrome: viewport-locked shell + sidebar scroll

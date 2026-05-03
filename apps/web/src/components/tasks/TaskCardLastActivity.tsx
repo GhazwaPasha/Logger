@@ -10,8 +10,8 @@ type Props = {
   /** Tighter line clamp for dense kanban columns */
   compact?: boolean;
   /**
-   * `inline` — under title in list rows (no divider).
-   * `footer` — bottom of kanban card (border-top separator).
+   * `inline` — dense preview without footer chrome (rare; list/kanban use `footer`).
+   * `footer` — card footer with border-top separator (default; list + kanban).
    */
   variant?: "inline" | "footer";
 };
