@@ -11,6 +11,7 @@
  *
  * Usage (repo root): npm run db:migrate
  */
+import "./pg-dns-order.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";

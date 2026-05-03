@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.normalizeDatabaseUrl = normalizeDatabaseUrl;
 exports.createDb = createDb;
 exports.createDbFromPool = createDbFromPool;
+require("./pg-dns-order.js");
 const node_postgres_1 = require("drizzle-orm/node-postgres");
 const pg_1 = require("pg");
 const schema = __importStar(require("./schema.js"));

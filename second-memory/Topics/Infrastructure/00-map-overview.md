@@ -57,6 +57,7 @@ flowchart TB
 - [[web-ui-styling]] — Tailwind v4, CSS tokens, glass primary, theme switching (`Topics/Design/`).
 - [[apps-mobile]] — Expo, token refresh, outbox.
 - [[packages-and-data-layer]] — `@work-ledger/db` / `contracts`, dual ESM/CJS, migrations.
+- [[postgres-node-pg-dns-ipv4first]] — optional: Node DNS order for `pg` (dual-stack / rollback).
 - [[auth-jwt-and-env]] — JWKS URL, issuer/audience alignment, prod pitfalls (see also [[Chat-inbox]]).
 - [[domain-authorization-and-tasks]] — Org hierarchy, roles, who sees which tasks, ledger semantics (`Topics/Domain/`).
 

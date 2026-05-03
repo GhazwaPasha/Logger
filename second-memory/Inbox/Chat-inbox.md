@@ -4,6 +4,21 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Postgres DNS: prefer IPv4 when dual-stack (`ipv4first`)
+
+- **Context:** Local sign-in sometimes **`ETIMEDOUT`** on networks with broken IPv6; other networks fine (see also entry below on env vs network).
+- **What we did:** **`dns.setDefaultResultOrder('ipv4first')`** before **`pg`** connects via side-effect **`packages/db/src/pg-dns-order.ts`**, imported first from **`packages/db/src/index.ts`** and **`packages/db/src/migrate-cli.ts`**.
+- **Rollback:** Step-by-step in vault note [[postgres-node-pg-dns-ipv4first]] (delete file, remove two imports, `npm run build -w @work-ledger/db`, restart servers).
+- **Code / repo:** `packages/db/src/pg-dns-order.ts`, `packages/db/src/index.ts`, `packages/db/src/migrate-cli.ts`.
+
+### 2026-05-03 — POST `/api/auth/sign-in/email` 500 (~24s): DB `ETIMEDOUT`
+
+- **Context:** Sign-in returned 500 after ~24s; Next attributed slowness to application code.
+- **Root cause:** Better Auth runs a Drizzle/pg query on `"user"` by email; the driver raised **`ETIMEDOUT`** (Postgres host unreachable or TCP blocked), not an auth bug. Terminal showed failed query + `AggregateError` with `code: 'ETIMEDOUT'`.
+- **Localhost vs prod:** Prod (e.g. Vercel) env can be fine while local fails if **repo-root `.env.local` overrides a bad/stale `DATABASE_URL`** — **`apps/web/next.config.mjs`** loads **`../../.env`** then **`../../.env.local`** with **`override: true`**, so **`.env.local` wins**. Align local URL with the working production value or remove the duplicate key. If the URL matches prod and still times out on **Windows**, suspect **IPv6 routing / firewall on port 5432** for that machine.
+- **Follow-ups:** Verify **`DATABASE_URL`** (correct Neon project/branch, pooled host if recommended, machine can reach **:5432**), firewall/VPN, and that the DB is not mis-pointed. `apps/web` uses `pg` `Pool` in **`apps/web/src/lib/auth.ts`**.
+- **Code / repo:** `apps/web/src/lib/auth.ts`, `apps/web/src/app/api/auth/[...all]/route.ts`, `apps/web/next.config.mjs`.
+
 ### 2026-05-03 — Marketing home: hero headline + secondary phrase
 
 - **What we did:** Hero H1 is three rows: **Optimize** / **Organize** / **Orchestrate** plus smaller baseline-aligned phrases (**your plan**, **your workforce**, **your Outcome**). New **`.home-hero-sub`** in **`globals.css`** (muted mix, ~**`0.36em`** with clamp). Slight vertical **`gap`** between rows.

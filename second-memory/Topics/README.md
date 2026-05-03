@@ -12,6 +12,7 @@ Long-form notes by theme. Link from **`Inbox/Chat-inbox.md`** when a capture des
 | [[apps-mobile]] | Expo client, JWT, offline outbox |
 | [[task-write-contracts-and-cache]] | Task **write** vs **read** JSON; `ledgerDelta`; bulk subtasks; web cache merges |
 | [[packages-and-data-layer]] | `@work-ledger/db`, `@work-ledger/contracts`, migrations |
+| [[postgres-node-pg-dns-ipv4first]] | Node `pg` DNS: `ipv4first` + rollback steps |
 | [[auth-jwt-and-env]] | Better Auth + API JWT alignment |
 | [[domain-authorization-and-tasks]] | Roles, task visibility, ledger, capabilities |
 | [[web-ui-styling]] | Web CSS/Tailwind tokens, glass UI, fonts, theme |
