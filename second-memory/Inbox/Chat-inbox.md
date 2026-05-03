@@ -4,6 +4,17 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Workspace main: tighter page gutters
+
+- **What we did:** Reduced **`WorkspaceShell`** `<main>` horizontal padding (**`px-3 sm:px-4 lg:px-5`**) and top padding (**`pt-3 sm:pt-4`**, bottom stays **`pb-6`**). Same on **`app`** entry **`AddWorkspacePanel`** main. **`AppHeader`** inner row matches horizontal padding.
+- **Code / repo:** `apps/web/src/components/app/WorkspaceShell.tsx`, `apps/web/src/app/(authenticated)/app/page.tsx`, `apps/web/src/components/app/AppHeader.tsx`.
+
+### 2026-05-03 — Tighter dashboard + work/kanban card spacing
+
+- **Context:** Dashboard panels and kanban/list task cards felt too airy; horizontal gaps (e.g. work header grid, kanban columns, pipeline stats row) read larger than vertical rhythm.
+- **What we did:** Reduced padding/gaps on **`DashboardOverview`** KPI tiles and panels; **`dashboard/page`** vertical stack + activity card. **`WorkBoardStatsCard`** and main work **`lg` grid**: smaller horizontal gaps, slightly larger row gap for balance. **`KanbanBoard`**: narrower column gap, tighter column chrome and card stack; **`TaskCard`** / **`ListTaskCard`** inner padding and section spacing; **`TaskCardLastActivity`** compact footer padding.
+- **Dashboard (wider + denser KPIs):** **`max-w-[min(100%,104rem)]`**, **`text-3xl`** page title, KPI **`text-4xl`** with **`p-3.5`** panels; segmented bars **`h-2`**; slightly taller KPI wave SVG. Removed bottom **Go to Work / Team** buttons; section stack **`space-y-3`**; card grids use **`gap-x-4 gap-y-3`**. **Hero band:** KPIs **`lg`** **`2×2`** grid left; **Needs attention** narrow **`lg:col-start-3`** **`row-span-2`**, links **`lg:flex-col`** full-width. KPI 1 **Pending work** (`pending` + **`assigned`**) → **`?status=pending_work`**; KPI 2 **Active work** (**`in_progress` + `late`**) → **`?status=active_work`** (**`normalizedStatusMatchesUrlFilter`**); KPI 4 **Workspace** — members + levels + lists.
+
 ### 2026-05-03 — Notifications: bell panel, toasts, web push
 
 - **Context:** User wanted in-app notifications + mobile web push, a bell next to settings, a slide-over panel like the task panel, and toast alerts.

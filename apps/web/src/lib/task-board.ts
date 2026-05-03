@@ -10,6 +10,27 @@ export const AUTOMATED_TASK_STATUSES = ["assigned", "late"] as const;
 /** Persisted / displayed task status including automated labels. */
 export type BoardTaskStatus = ManualTaskStatus | (typeof AUTOMATED_TASK_STATUSES)[number];
 
+/**
+ * URL `status=` values only (composite buckets for dashboard KPIs / deep links).
+ */
+export type PendingWorkUrlFilter = "pending_work";
+/** **In progress** + **Late** tasks (matches dashboard “Active work” KPI). */
+export type ActiveWorkUrlFilter = "active_work";
+
+export type UrlStatusFilter = BoardTaskStatus | PendingWorkUrlFilter | ActiveWorkUrlFilter;
+
+/** Label for drilldown banner when `status=pending_work`. */
+export const PENDING_WORK_URL_FILTER_LABEL = "Pending work";
+
+/** Label for drilldown banner when `status=active_work`. */
+export const ACTIVE_WORK_URL_FILTER_LABEL = "Active work";
+
+export function normalizedStatusMatchesUrlFilter(st: BoardTaskStatus, filter: UrlStatusFilter): boolean {
+  if (filter === "pending_work") return st === "pending" || st === "assigned";
+  if (filter === "active_work") return st === "in_progress" || st === "late";
+  return st === filter;
+}
+
 export const STATUS_LABELS: Record<BoardTaskStatus, string> = {
   pending: "Pending",
   assigned: "Assigned",
@@ -177,11 +198,13 @@ export function dueQueryToDatePreset(v: string): DatePreset | null {
 }
 
 /** Parse `status=` query values from dashboard / deep links (aliases tolerated). */
-export function parseUrlStatusFilter(raw: string): BoardTaskStatus | null {
+export function parseUrlStatusFilter(raw: string): UrlStatusFilter | null {
   const k = raw
     .trim()
     .toLowerCase()
     .replace(/-/g, "_");
+  if (k === "pending_work" || k === "pendingwork") return "pending_work";
+  if (k === "active_work" || k === "activework") return "active_work";
   const map: Record<string, BoardTaskStatus> = {
     open: "pending",
     pending: "pending",

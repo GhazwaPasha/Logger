@@ -102,7 +102,7 @@ export function AppHeader({
 
   return (
     <header className="ui-app-header sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150">
-      <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-14 w-full items-center justify-between gap-4 px-3 sm:px-4 lg:px-5">
         <div className="flex items-center gap-3">
           <Link
             href={brandHref}

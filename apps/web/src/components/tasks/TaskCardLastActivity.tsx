@@ -36,7 +36,7 @@ export function TaskCardLastActivity({ entry, members, compact, variant = "foote
 
   return (
     <div
-      className={`border-t border-[var(--border-subtle)]/50 pt-2 ${compact ? "px-3 pb-2.5" : "px-4 pb-3"} font-mono-ledger text-[11px] leading-snug`}
+      className={`border-t border-[var(--border-subtle)]/50 ${compact ? "px-2.5 pb-2 pt-1.5" : "px-4 pb-3 pt-2"} font-mono-ledger text-[11px] leading-snug`}
       aria-label="Last activity"
     >
       <p className={`min-w-0 text-[var(--muted)] ${lineClamp}`}>

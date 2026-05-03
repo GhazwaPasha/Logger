@@ -28,12 +28,12 @@ export default function WorkspaceDashboardPage() {
   const base = `/${workspaceSlug}`;
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl space-y-8">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-3">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
             Track workload, deadlines, and ownership across your {NODE_LABELS.workspace.toLowerCase()}. Use{" "}
             <span className="text-[var(--fg)]">Activity log</span> for the full ledger.
           </p>
@@ -81,12 +81,12 @@ export default function WorkspaceDashboardPage() {
           currentUserId={session?.user?.id ?? null}
         />
       ) : (
-        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Workspace activity</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-0.5 text-sm text-[var(--muted)]">
             Ledger from tasks you can access, newest first (same format as task history).
           </p>
-          <div className="mt-4">
+          <div className="mt-2">
             <OrgActivityTerminal
               entries={activityQuery.data?.entries ?? []}
               tasksById={activityQuery.data?.tasksById ?? {}}

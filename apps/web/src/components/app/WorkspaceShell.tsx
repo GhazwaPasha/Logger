@@ -76,7 +76,7 @@ export function WorkspaceShell({
             <AppHeader workspaceSlug={workspaceSlug} />
             <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row md:items-stretch">
               <WorkspaceSidebar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
-              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6 lg:px-8">
+              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
                 {children}
               </main>
             </div>

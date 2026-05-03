@@ -53,12 +53,16 @@ import {
   type ManualTaskStatus,
   type SortMode,
   type TaskPriority,
+  type UrlStatusFilter,
   dueQueryToDatePreset,
   kanbanTransitionAllowedFromStored,
   manualStatusFromStored,
   nextWorkflowManualStatus,
   normalizeTaskStatus,
+  normalizedStatusMatchesUrlFilter,
   parseUrlStatusFilter,
+  ACTIVE_WORK_URL_FILTER_LABEL,
+  PENDING_WORK_URL_FILTER_LABEL,
   stageControlDropdownOptions,
   sortTasks,
   statusPillPaletteClasses,
@@ -339,15 +343,15 @@ function WorkBoardStatsCard({
           }}
         />
         <div className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2.5 sm:px-4">
-            <div className="flex min-w-0 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
+            <div className="flex min-w-0 items-center gap-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Pipeline</span>
               <span className="hidden text-[10px] text-[var(--muted)] sm:inline" aria-hidden>
                 ·
               </span>
               <span className="hidden truncate text-[10px] text-[var(--muted)]/90 sm:inline">Live · current scope</span>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               <span className="text-xs font-medium text-[var(--muted)]">Total</span>
               <span
                 className={`${PIPELINE_BADGE_FRAME} min-w-[2rem] bg-[var(--surface-muted)] px-2.5 text-sm text-[var(--fg)]`}
@@ -357,11 +361,11 @@ function WorkBoardStatsCard({
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-3 pb-2.5 pt-0 sm:gap-x-5 sm:px-4 sm:pb-2.5 lg:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 px-2.5 pb-2 pt-0 sm:gap-x-2.5 sm:px-3 sm:pb-2 lg:justify-between">
             {BOARD_STATS_SEGMENTS.map(({ status, label, title }) => (
               <div
                 key={status}
-                className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
+                className="group flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
                 role="group"
                 aria-label={`${title}: ${loading ? "loading" : counts[status]}`}
               >
@@ -370,7 +374,7 @@ function WorkBoardStatsCard({
               </div>
             ))}
             <div
-              className="group flex min-w-0 items-center gap-2 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
+              className="group flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
               role="group"
               aria-label={`${STATUS_LABELS.cancelled}: ${loading ? "loading" : cancelled}`}
             >
@@ -444,7 +448,7 @@ function WorkItemsInner() {
   subtasksByTaskIdRef.current = subtasksByTaskId;
   const [sortMode, setSortMode] = useState<SortMode>("priority_desc");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [urlStatusFilter, setUrlStatusFilter] = useState<BoardTaskStatus | null>(null);
+  const [urlStatusFilter, setUrlStatusFilter] = useState<UrlStatusFilter | null>(null);
   const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
   const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
   const [dueFrom, setDueFrom] = useState("");
@@ -1080,7 +1084,11 @@ function WorkItemsInner() {
 
   const filteredTasks = useMemo(() => {
     return visibleTasks.filter((t) => {
-      if (urlStatusFilter && normalizeTaskStatus(t.status) !== urlStatusFilter) return false;
+      if (
+        urlStatusFilter &&
+        !normalizedStatusMatchesUrlFilter(normalizeTaskStatus(t.status), urlStatusFilter)
+      )
+        return false;
       const assignees = t.assigneeUserIds ?? [];
       if (urlAssigneeScope === "mine") {
         if (!sessionUserId || !assignees.includes(sessionUserId)) return false;
@@ -1208,8 +1216,8 @@ function WorkItemsInner() {
     const assigneeFirstName = firstAssigneeLabel(task, members);
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-colors hover:bg-[var(--surface-hover)]/80">
-        <div className="px-4 py-3">
-          <div className="flex min-w-0 items-center gap-x-2 sm:gap-x-3">
+        <div className="px-3 py-2">
+          <div className="flex min-w-0 items-center gap-x-2">
             <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
               <KanbanStatusPill task={task} />
               <button
@@ -1278,7 +1286,7 @@ function WorkItemsInner() {
             >
               <IconChevron open={expanded} className="opacity-80" />
             </button>
-            <div className="flex min-w-0 flex-1 items-center gap-x-2 gap-y-1">
+            <div className="flex min-w-0 flex-1 items-center gap-x-1.5 gap-y-1">
               <button
                 type="button"
                 onClick={() => openEditTask(task.id)}
@@ -1367,7 +1375,7 @@ function WorkItemsInner() {
           </div>
         </div>
         {expanded && (
-          <div className="border-t border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-4 pb-3 pt-2">
+          <div className="border-t border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-3 pb-2 pt-1.5">
               <div className={`${LIST_ROW_SUBTASK_TREE_MARGIN} border-l border-[var(--border-subtle)] pl-4`}>
                 {subtasksState === "loading" && <p className="py-2 text-xs text-[var(--muted)]">Loading subtasks…</p>}
                 {Array.isArray(subtasksState) && subtasksState.length === 0 && (
@@ -1622,8 +1630,8 @@ function WorkItemsInner() {
         }}
         className="group/card relative cursor-grab touch-manipulation overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] transition-[border-color,transform] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
       >
-        <div className="flex flex-col gap-2.5 px-3 pb-3 pt-3.5">
-          <div className="flex min-w-0 items-start gap-2">
+        <div className="flex flex-col gap-1.5 px-2.5 pb-2 pt-2.5">
+          <div className="flex min-w-0 items-start gap-1.5">
             <button
               type="button"
               onClick={() => openEditTask(task.id)}
@@ -1657,13 +1665,13 @@ function WorkItemsInner() {
             </span>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-1.5" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="flex flex-wrap items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
             <KanbanStatusPill task={task} />
             <KanbanPriorityPill task={task} />
           </div>
 
           <div
-            className="flex flex-wrap items-stretch gap-2 border-t border-[var(--border-subtle)]/50 pt-2.5"
+            className="flex flex-wrap items-stretch gap-x-1.5 gap-y-1.5 border-t border-[var(--border-subtle)]/50 pt-2"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button
@@ -1712,11 +1720,11 @@ function WorkItemsInner() {
           </div>
 
           {subtasksState === "loading" && (
-            <p className="border-t border-[var(--border-subtle)]/40 pt-2.5 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
+            <p className="border-t border-[var(--border-subtle)]/40 pt-2 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
           )}
           {subtasksPreview.length > 0 && (
-            <div className="border-t border-[var(--border-subtle)]/40 pt-2.5">
-              <div className="mb-2 flex items-center gap-1.5 text-[var(--muted)]">
+            <div className="border-t border-[var(--border-subtle)]/40 pt-2">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[var(--muted)]">
                 <svg
                   className="size-3 shrink-0 opacity-70"
                   viewBox="0 0 24 24"
@@ -1737,7 +1745,7 @@ function WorkItemsInner() {
                   ) : null}
                 </span>
               </div>
-              <ul className="space-y-1.5 rounded-lg bg-[var(--surface-base)]/60 py-2 pl-2 pr-1 dark:bg-black/15">
+              <ul className="space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
                 {subtasksPreview.map((s) => {
                   return (
                     <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
@@ -1791,7 +1799,7 @@ function WorkItemsInner() {
 
   function ListViewCards({ rows }: { rows: TaskRow[] }) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {rows.map((task) => (
           <ListTaskCard key={task.id} task={task} />
         ))}
@@ -1816,7 +1824,7 @@ function WorkItemsInner() {
     return (
       <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
           <div
-            className="flex min-h-[min(72vh,38rem)] gap-4 md:min-h-[min(78vh,42rem)]"
+            className="flex min-h-[min(72vh,38rem)] gap-2.5 md:min-h-[min(78vh,42rem)]"
             style={{ minWidth: "min(100%, 92rem)" }}
           >
             {TASK_FLOW_ORDER.map((col) => {
@@ -1829,7 +1837,7 @@ function WorkItemsInner() {
                   key={col}
                   role="region"
                   aria-label={`${label}, ${colTasks.length} tasks`}
-                  className="flex min-h-0 min-w-[17rem] flex-1 flex-col gap-3 sm:min-w-[18rem]"
+                  className="flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 sm:min-w-[17rem]"
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
@@ -1849,14 +1857,14 @@ function WorkItemsInner() {
                 }}
                 >
                   <div
-                    className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-3 py-2 shadow-sm ${statusPillPaletteClasses(col)}`}
+                    className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 shadow-sm ${statusPillPaletteClasses(col)}`}
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1.5">
                       <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
                       <span className="tabular-nums text-[10px] font-medium opacity-80">{colTasks.length}</span>
                     </div>
                   </div>
-                  <ul className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto py-1">
+                  <ul className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto py-1">
                     {colTasks.map((task) => (
                       <TaskCard key={task.id} task={task} />
                     ))}
@@ -1880,7 +1888,9 @@ function WorkItemsInner() {
     const st = searchParams.get("status");
     if (st) {
       const p = parseUrlStatusFilter(st);
-      if (p) parts.push(STATUS_LABELS[p]);
+      if (p === "pending_work") parts.push(PENDING_WORK_URL_FILTER_LABEL);
+      else if (p === "active_work") parts.push(ACTIVE_WORK_URL_FILTER_LABEL);
+      else if (p) parts.push(STATUS_LABELS[p]);
       else parts.push(st);
     }
     if (searchParams.get("mine") === "1") parts.push("Assigned to me");
@@ -1927,7 +1937,7 @@ function WorkItemsInner() {
         </div>
       ) : null}
       <header className="pb-1">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-6 xl:gap-x-10 lg:gap-y-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-4 xl:gap-x-5 lg:gap-y-3">
           <h1 className="min-w-0 text-2xl font-semibold leading-none tracking-tight lg:col-start-1 lg:row-start-1 lg:pt-0.5">
             {NODE_LABELS.workItem}s
           </h1>

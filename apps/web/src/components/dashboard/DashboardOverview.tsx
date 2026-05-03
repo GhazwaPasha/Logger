@@ -76,7 +76,7 @@ const DASHBOARD_KPI_TONES = [
 function DashboardKpiWave({ back, front }: { back: string; front: string }) {
   return (
     <svg
-      className="dashboard-kpi-wave pointer-events-none absolute inset-x-0 bottom-0 h-[4.25rem] w-[112%] max-w-none -translate-x-[6%]"
+      className="dashboard-kpi-wave pointer-events-none absolute inset-x-0 bottom-0 h-[4.75rem] w-[112%] max-w-none -translate-x-[6%]"
       viewBox="0 0 400 72"
       preserveAspectRatio="none"
       aria-hidden
@@ -103,13 +103,13 @@ function SegmentedBar({
   const total = segments.reduce((s, x) => s + x.count, 0);
   if (total === 0) {
     return (
-      <div className="rounded-full bg-[var(--surface-muted)] py-1.5 text-center text-xs text-[var(--muted)]">
+      <div className="rounded-full bg-[var(--surface-muted)] py-1 text-center text-xs text-[var(--muted)]">
         {emptyLabel}
       </div>
     );
   }
   return (
-    <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+    <div className="flex h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
       {segments.map(({ key, count, className, title }) => {
         if (count <= 0) return null;
         return (
@@ -273,8 +273,8 @@ export function DashboardOverview({
 
   if (emptyWorkspace) {
     return (
-      <div className="space-y-8">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-8 text-center">
+      <div className="space-y-4">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5 text-center">
           <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Add {NODE_LABELS.level}s and lists under Work, then create your first {NODE_LABELS.workItem.toLowerCase()}.
@@ -288,101 +288,123 @@ export function DashboardOverview({
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div
-          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[0].toneClass} rounded-2xl p-5`}
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 items-stretch gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14.5rem,19rem)] lg:grid-rows-[auto_auto]">
+        <Link
+          href={workHref(basePath, { status: "pending_work" })}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[0].toneClass} rounded-2xl p-3 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-3.5 lg:col-start-1 lg:row-start-1 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[0].waveBack} front={DASHBOARD_KPI_TONES[0].waveFront} />
           <div className="relative z-[1]">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">{NODE_LABELS.level}s</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : depts.length}</p>
-            <p className="mt-2 text-xs text-[var(--muted)]">Structure for lists and tasks</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Pending work</p>
+            <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight">
+              {loading ? "…" : stats.statusCounts.pending + stats.statusCounts.assigned}
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
+              {`${STATUS_LABELS.pending} & ${STATUS_LABELS.assigned}`}
+            </p>
           </div>
-        </div>
-        <div
-          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[1].toneClass} rounded-2xl p-5`}
+        </Link>
+        <Link
+          href={workHref(basePath, { status: "active_work" })}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[1].toneClass} rounded-2xl p-3 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-3.5 lg:col-start-2 lg:row-start-1 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[1].waveBack} front={DASHBOARD_KPI_TONES[1].waveFront} />
           <div className="relative z-[1]">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : stats.pipeline}</p>
-            <p className="mt-2 text-xs text-[var(--muted)]">Excludes done and cancelled</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
+            <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight">
+              {loading ? "…" : stats.statusCounts.in_progress + stats.statusCounts.late}
+            </p>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
+              {`${STATUS_LABELS.in_progress} & ${STATUS_LABELS.late}`}
+            </p>
           </div>
-        </div>
+        </Link>
         <div
-          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[2].toneClass} rounded-2xl p-5`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[2].toneClass} rounded-2xl p-3 sm:p-3.5 lg:col-start-1 lg:row-start-2 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[2].waveBack} front={DASHBOARD_KPI_TONES[2].waveFront} />
           <div className="relative z-[1]">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Completed</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Completed</p>
+            <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight text-emerald-600 dark:text-emerald-400">
               {loading ? "…" : stats.done}
             </p>
-            <p className="mt-2 text-xs text-[var(--muted)]">Tasks marked done</p>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">Tasks marked done</p>
           </div>
         </div>
         <div
-          className={`dashboard-kpi-card ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-5`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-3 sm:p-3.5 lg:col-start-2 lg:row-start-2 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[3].waveBack} front={DASHBOARD_KPI_TONES[3].waveFront} />
-          <div className="relative z-[1]">
-            <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Team</p>
-            <p className="mt-2 text-3xl font-semibold tabular-nums">{loading ? "…" : members.length}</p>
-            <p className="mt-2 text-xs text-[var(--muted)]">Members in this workspace</p>
+          <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Workspace</p>
+            <dl className="mt-2 flex flex-1 flex-col justify-center gap-2.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-[11px] text-[var(--muted)]">Members</dt>
+                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : members.length}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-[11px] text-[var(--muted)]">{NODE_LABELS.level}s</dt>
+                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : depts.length}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-[11px] text-[var(--muted)]">Lists</dt>
+                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : lists.length}</dd>
+              </div>
+            </dl>
           </div>
         </div>
-      </div>
 
-      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={workHref(basePath, { status: "late" })}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
-          >
-            <span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden />
-            Late ({loading ? "…" : stats.lateStatus})
-          </Link>
-          <Link
-            href={workHref(basePath, { due: "this_week" })}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
-          >
-            Due this week ({loading ? "…" : stats.dueThisWeek})
-          </Link>
-          <Link
-            href={workHref(basePath, { unassigned: "1" })}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-hover)]"
-          >
-            Unassigned ({loading ? "…" : stats.unassignedPipeline})
-          </Link>
-          {currentUserId ? (
+        <aside className="surface-elevated ui-elevated-panel flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] p-3.5 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:h-full">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
+          <p className="mt-0.5 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
+          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1.5 lg:mt-3 lg:flex-1 lg:flex-col lg:gap-2 lg:pt-1">
             <Link
-              href={workHref(basePath, { mine: "1" })}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--accent-muted)] px-3 py-2 text-sm font-medium transition-colors hover:opacity-90"
+              href={workHref(basePath, { status: "late" })}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
             >
-              My tasks ({loading ? "…" : stats.minePipeline})
+              <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-hidden />
+              Late ({loading ? "…" : stats.lateStatus})
             </Link>
-          ) : null}
-        </div>
+            <Link
+              href={workHref(basePath, { due: "this_week" })}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
+            >
+              Due this week ({loading ? "…" : stats.dueThisWeek})
+            </Link>
+            <Link
+              href={workHref(basePath, { unassigned: "1" })}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
+            >
+              Unassigned ({loading ? "…" : stats.unassignedPipeline})
+            </Link>
+            {currentUserId ? (
+              <Link
+                href={workHref(basePath, { mine: "1" })}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--accent-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:opacity-90 lg:w-full lg:justify-start lg:text-left"
+              >
+                My tasks ({loading ? "…" : stats.minePipeline})
+              </Link>
+            ) : null}
+          </div>
+        </aside>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
-          <div className="flex items-start justify-between gap-3">
+      <div className="grid gap-x-4 gap-y-3 lg:grid-cols-2">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+          <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">All active tasks (not deleted)</p>
+              <p className="mt-0.5 text-sm text-[var(--muted)]">All active tasks (not deleted)</p>
             </div>
             <Link href={`${basePath}/work`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
               Open Work
             </Link>
           </div>
-          <div className="mt-4">
+          <div className="mt-2">
             <SegmentedBar segments={statusSegments} emptyLabel="No tasks yet" />
           </div>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-2 grid gap-x-2 gap-y-1 sm:grid-cols-2">
             {STATUS_BAR_ORDER.map((st) => (
               <li key={st} className="flex items-center justify-between gap-2 text-sm">
                 <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
@@ -400,16 +422,16 @@ export function DashboardOverview({
           </ul>
         </div>
 
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
-          <div className="mt-4">
+          <p className="mt-0.5 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
+          <div className="mt-2">
             <SegmentedBar
               segments={prioritySegments}
               emptyLabel="No tasks or priorities recorded"
             />
           </div>
-          <ul className="mt-4 space-y-2 text-sm">
+          <ul className="mt-2 space-y-1 text-sm">
             {PRIORITY_ORDER.map((p) => (
               <li key={p} className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-[var(--muted)]">
@@ -428,12 +450,12 @@ export function DashboardOverview({
       </div>
 
       {stats.subtasksTotal > 0 ? (
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
+          <p className="mt-0.5 text-sm text-[var(--muted)]">
             Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
           </p>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
             <div
               className="h-full rounded-full bg-emerald-500/70 transition-[width]"
               style={{ width: `${subtaskPct}%` }}
@@ -442,16 +464,16 @@ export function DashboardOverview({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
+      <div className="grid gap-x-4 gap-y-3 lg:grid-cols-2">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks grouped by list&apos;s level</p>
+          <p className="mt-0.5 text-sm text-[var(--muted)]">Pipeline tasks grouped by list&apos;s level</p>
           {stats.levelRows.length === 0 && !loading ? (
-            <p className="mt-4 text-sm text-[var(--muted)]">No pipeline tasks to show.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]">No pipeline tasks to show.</p>
           ) : (
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-2 space-y-1.5">
               {stats.levelRows.map(({ dept, count }) => {
                 const max = stats.levelRows[0]?.count ?? 1;
                 const w = max > 0 ? (count / max) * 100 : 0;
@@ -466,7 +488,7 @@ export function DashboardOverview({
                         {loading ? "…" : count}
                       </Link>
                     </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                       <div
                         className="h-full rounded-full bg-[var(--accent)]/50"
                         style={{ width: `${w}%` }}
@@ -479,13 +501,13 @@ export function DashboardOverview({
           )}
         </div>
 
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
+          <p className="mt-0.5 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
           {stats.topAssignees.length === 0 && !loading ? (
-            <p className="mt-4 text-sm text-[var(--muted)]">No assigned pipeline work.</p>
+            <p className="mt-2 text-sm text-[var(--muted)]">No assigned pipeline work.</p>
           ) : (
-            <ul className="mt-4 space-y-3">
+            <ul className="mt-2 space-y-1.5">
               {stats.topAssignees.map(([userId, count]) => {
                 const m = members.find((x) => x.userId === userId);
                 const label = m?.name?.trim() || m?.email || userId.slice(0, 8);
@@ -502,7 +524,7 @@ export function DashboardOverview({
                         {loading ? "…" : count}
                       </Link>
                     </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                       <div className="h-full rounded-full bg-violet-500/45" style={{ width: `${w}%` }} />
                     </div>
                   </li>
@@ -511,15 +533,6 @@ export function DashboardOverview({
             </ul>
           )}
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Link href={`${basePath}/work`} className="btn-primary rounded-xl px-5">
-          Go to Work
-        </Link>
-        <Link href={`${basePath}/people`} className="btn-secondary rounded-xl px-5">
-          Team
-        </Link>
       </div>
     </div>
   );
