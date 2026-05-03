@@ -274,7 +274,7 @@ export function DashboardOverview({
   if (emptyWorkspace) {
     return (
       <div className="space-y-8">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-8 text-center">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-8 text-center">
           <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Add {NODE_LABELS.level}s and lists under Work, then create your first {NODE_LABELS.workItem.toLowerCase()}.
@@ -334,7 +334,7 @@ export function DashboardOverview({
         </div>
       </div>
 
-      <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
         <p className="mt-1 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -369,7 +369,7 @@ export function DashboardOverview({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
@@ -400,7 +400,7 @@ export function DashboardOverview({
           </ul>
         </div>
 
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
           <div className="mt-4">
@@ -428,7 +428,7 @@ export function DashboardOverview({
       </div>
 
       {stats.subtasksTotal > 0 ? (
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
             Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
@@ -443,7 +443,7 @@ export function DashboardOverview({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
@@ -479,7 +479,7 @@ export function DashboardOverview({
           )}
         </div>
 
-        <div className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
           {stats.topAssignees.length === 0 && !loading ? (

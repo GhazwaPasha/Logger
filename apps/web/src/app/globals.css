@@ -143,6 +143,18 @@ body {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.28s ease,
+    transform 0.22s ease;
+}
+
+@media (hover: hover) {
+  .dashboard-kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 24%, var(--border-subtle));
+    box-shadow: 0 18px 44px -22px color-mix(in srgb, var(--fg) 14%, transparent);
+  }
 }
 
 html[data-theme="light"] .dashboard-kpi-card--tone-periwinkle {
@@ -950,5 +962,101 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
 
   .home-task-card:hover {
     transform: none;
+  }
+
+  .ui-page-enter,
+  .ui-auth-card-enter,
+  .ui-dropdown-pop {
+    animation: none !important;
+  }
+
+  .ui-page-enter,
+  .ui-auth-card-enter {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (hover: hover) {
+    .dashboard-kpi-card:hover,
+    .ui-elevated-panel:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+/* --- App UI: route enter + chrome (see prefers-reduced-motion merge above) --- */
+
+/* Opacity only: never set `transform` here — it creates a containing block and breaks
+   `position: fixed` (e.g. work task panel) under `overflow-hidden` workspace chrome. */
+@keyframes ui-page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-auth-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-dropdown-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.ui-page-enter {
+  animation: ui-page-enter 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ui-auth-card-enter {
+  animation: ui-auth-card-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+.ui-dropdown-pop {
+  animation: ui-dropdown-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
+
+.ui-app-header {
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.32s ease,
+    background-color 0.28s ease;
+}
+
+.ui-sidebar-chrome {
+  transition:
+    border-color 0.28s ease,
+    box-shadow 0.35s ease;
+}
+
+.ui-elevated-panel {
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.28s ease,
+    transform 0.22s ease;
+}
+
+@media (hover: hover) {
+  .ui-elevated-panel:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--border-subtle));
+    box-shadow: 0 16px 42px -24px color-mix(in srgb, var(--fg) 12%, transparent);
   }
 }

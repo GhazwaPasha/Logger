@@ -106,29 +106,12 @@ export function stageControlDropdownOptions(stored: BoardTaskStatus): ManualTask
 }
 
 /**
- * Allowed manual targets for **drag-and-drop** between columns (one step forward or back along
- * {@link TASK_FLOW_ORDER}), cancel from active stages, reopen from terminal states.
+ * Allowed targets for **drag-and-drop** between kanban columns — same as {@link stageControlDropdownOptions}
+ * (list row + kanban stage menu): **next** workflow stage only (Pending → In progress → Done), plus **Cancelled**,
+ * or **Pending** when reopening from cancelled (**Done** only moves to Cancelled, not backward via drag).
  */
 export function kanbanAllowedManualTransitions(current: ManualTaskStatus): ManualTaskStatus[] {
-  const allowed = new Set<ManualTaskStatus>([current]);
-  const i = TASK_FLOW_ORDER.indexOf(current);
-
-  if (current === "cancelled") {
-    allowed.add("pending");
-    return ["cancelled", "pending"];
-  }
-
-  if (current === "done") {
-    allowed.add("in_progress");
-    allowed.add("cancelled");
-    return TASK_FLOW_ORDER.filter((k) => allowed.has(k));
-  }
-
-  if (i > 0) allowed.add(TASK_FLOW_ORDER[i - 1]!);
-  if (i < TASK_FLOW_ORDER.length - 1) allowed.add(TASK_FLOW_ORDER[i + 1]!);
-  allowed.add("cancelled");
-
-  return TASK_FLOW_ORDER.filter((k) => allowed.has(k));
+  return stageControlDropdownOptions(current);
 }
 
 export function kanbanAllowedTransitionsFromStored(stored: BoardTaskStatus): ManualTaskStatus[] {

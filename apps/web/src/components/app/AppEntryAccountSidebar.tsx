@@ -24,7 +24,7 @@ function Chevron({ open }: { open: boolean }) {
 
 function rowBase(active: boolean) {
   return [
-    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm transition-colors",
+    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]",
     active ? "bg-[var(--accent-muted)] font-medium text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
   ].join(" ");
 }
@@ -62,13 +62,13 @@ export function AppEntryAccountSidebar() {
   }, [pickerOpen]);
 
   return (
-    <aside className="flex max-h-[70vh] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-[calc(100vh-3.5rem)] md:w-72 md:border-b-0 md:border-r">
+    <aside className="ui-sidebar-chrome flex max-h-[70vh] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-[calc(100vh-3.5rem)] md:w-72 md:border-b-0 md:border-r">
       <nav ref={navRef} className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Account">
         <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
           <button
             type="button"
             onClick={() => setPickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--surface-hover)]"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-[background-color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] motion-safe:active:scale-[0.99]"
             aria-expanded={pickerOpen}
             aria-label="Toggle account menu"
           >

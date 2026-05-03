@@ -40,10 +40,10 @@ function IconSettings({ className }: { className?: string }) {
 }
 
 const profileShell =
-  "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-xs font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
+  "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-xs font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
 
 const iconBtn =
-  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--fg)] transition-[background-color,border-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
 
 export function AppHeader({
   workspaceSlug,
@@ -81,12 +81,12 @@ export function AppHeader({
   }, [accountMenuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)]">
+    <header className="ui-app-header sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150">
       <div className="flex h-14 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <Link
             href={brandHref}
-            className="group flex min-h-9 items-center gap-2 font-outfit font-semibold tracking-tight text-[var(--fg)]"
+            className="group flex min-h-9 items-center gap-2 rounded-lg font-outfit font-semibold tracking-tight text-[var(--fg)] transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.98]"
           >
             <LogBaseMark variant="chrome" decorative />
             <span className="hidden text-lg leading-none sm:inline">LogBase</span>
@@ -119,7 +119,7 @@ export function AppHeader({
               {accountMenuOpen && (
                 <div
                   id="account-menu"
-                  className="absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+                  className="ui-dropdown-pop absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg shadow-black/10 dark:shadow-black/40"
                 >
                   {user.email && (
                     <p className="max-w-[16rem] truncate px-3 py-2 font-mono-ledger text-xs text-[var(--muted)]" title={user.email}>

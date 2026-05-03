@@ -4,6 +4,48 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-03 — Kanban: removed workflow / drag intro paragraph
+
+- **What we did:** Deleted the muted intro paragraph above the board (**`KanbanBoard`**); column header cards remain the primary labels.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Kanban column header cards (status labels)
+
+- **Context:** Kanban columns had no visible titles beyond intro copy and **`aria-label`** on regions.
+- **What we did:** **`KanbanBoard`**: above each column’s task list, compact header card with **`FLOW_COLUMN_LABELS`** + task count; styling uses **`statusPillPaletteClasses(col)`** + border/shadow for consistency with status pills.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Kanban drag matches list stage rules (next + Cancelled)
+
+- **Context:** Stage menus already use **`stageControlDropdownOptions`**; kanban drag still allowed backward moves (e.g. Done → In progress).
+- **What we did:** **`kanbanAllowedManualTransitions`** delegates to **`stageControlDropdownOptions`** so **`kanbanTransitionAllowedFromStored`** matches list/kanban menus. Kanban intro copy + invalid-drop message updated.
+- **Code / repo:** `apps/web/src/lib/task-board.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Kanban: top cards no longer clip on hover lift
+
+- **Context:** Kanban task cards use **`hover:-translate-y-px`**; the column list is **`overflow-y-auto`**, so the first card’s upward motion was clipped at the scrollport top (and visually against content above the column).
+- **What we did:** Kanban column **`ul`**: added **`py-1`** so the scroll area has vertical padding and hover translate stays inside the visible region.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx` (**`KanbanBoard`** column list).
+
+### 2026-05-03 — Dropdowns: opaque menus (no frosted “light through”)
+
+- **Context:** User disliked bright bleed-through on opened dropdowns.
+- **What we did:** **`AppHeader`** account menu: removed **`supports-[backdrop-filter]:backdrop-blur-md`** and translucent **`color-mix`** surface override — menu stays **`bg-[var(--surface-elevated)]`**. Shadow is **`shadow-lg shadow-black/10`** (`dark:shadow-black/40`) instead of a large soft **`color-mix`** glow. **`WorkspaceSidebar`** workspace switcher panel: same shadow swap for consistency.
+- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `WorkspaceSidebar.tsx`.
+
+### 2026-05-03 — Fix: task panel clipped (`ui-page-enter` + `fixed`)
+
+- **Context:** Create/edit task panel uses **`position: fixed`**; it appeared clipped after route-enter animation on **`[workspaceId]`** pages.
+- **What we did:** **`ui-page-enter`** keyframes use **opacity only** (no **`transform`**). Non-**`none`** **`transform`** on an ancestor creates a new containing block for **`fixed`** descendants, so the panel was positioned inside **`overflow-hidden`** workspace **`main`** instead of the viewport. **`ui-auth-card-enter`** / **`ui-dropdown-pop`** end state **`transform: none`** (same pitfall for identity transforms). Later: task create/edit overlay **`createPortal(..., document.body)`** with **`z-[60]`** (above **`AppHeader`** **`z-40`** / account **`z-50`**, below status dropdown **`80`** and due popovers **`z-[100]`**).
+- **Code / repo:** `apps/web/src/app/globals.css`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-03 — Authenticated UI: motion without ambient backdrop
+
+- **Context:** Extend marketing-style motion (enter transitions, micro-interactions) across app chrome and key surfaces; user opted **out** of animated ambient backdrop layers.
+- **What we did:** **`(authenticated)/[workspaceId]/template.tsx`** and **`app/template.tsx`**: **`ui-page-enter`** on route changes. **`AppHeader`**: translucent **`backdrop-blur`** where supported, **`active:scale`** on icon/profile, account menu **`ui-dropdown-pop`** + shadow. **`WorkspaceSidebar`** / **`AppEntryAccountSidebar`**: **`ui-sidebar-chrome`**, smoother nav rows, workspace switcher **`origin-top-left`** dropdown pop. **`globals.css`**: **`ui-*`** enter/pop/chrome/panel classes; **`dashboard-kpi-card`** + **`ui-elevated-panel`** hover lift; **`prefers-reduced-motion`** disables enter pops and hover lifts. **`DashboardOverview`**: **`ui-elevated-panel`** on major panels. **`LoginForm`**: static radial wash (no motion) + **`ui-auth-card-enter`** on card. Removed **`AppAmbientBackdrop`** and all **`ui-ambient-*`** CSS.
+- **Follow-up:** Dense views (**`/work`**) can adopt lighter transitions if desired.
+- **Code / repo:** `WorkspaceShell.tsx`, `AppHeader.tsx`, `WorkspaceSidebar.tsx`, `AppEntryAccountSidebar.tsx`, `apps/web/src/app/login/LoginForm.tsx`, `apps/web/src/app/(authenticated)/app/page.tsx`, `apps/web/src/app/(authenticated)/app/template.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/template.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/components/dashboard/DashboardOverview.tsx`.
+
 ### 2026-05-03 — Marketing home: motion + layered backdrop
 
 - **Context:** Redesign public landing (`/`) with animations and moving elements while keeping existing copy and structure.

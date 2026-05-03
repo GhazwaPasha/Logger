@@ -1814,16 +1814,7 @@ function WorkItemsInner() {
 
   function KanbanBoard({ rows }: { rows: TaskRow[] }) {
     return (
-      <div>
-        <p className="mb-3 max-w-2xl text-[11px] leading-relaxed text-[var(--muted)]">
-          Columns are <span className="text-[var(--fg)]/90">Pending</span>,{" "}
-          <span className="text-[var(--fg)]/90">In progress</span>, <span className="text-[var(--fg)]/90">Done</span>, and{" "}
-          <span className="text-[var(--fg)]/90">Cancelled</span>. Assignees and due dates drive{" "}
-          <span className="text-[var(--fg)]/90">Assigned</span> and <span className="text-[var(--fg)]/90">Late</span> automatically. Drag between
-          columns <span className="text-[var(--fg)]/90">one step at a time</span> (forward or back). The stage menu moves to the{" "}
-          <span className="text-[var(--fg)]/90">next</span> step or <span className="text-[var(--fg)]/90">Cancelled</span>, or reopens from cancelled.
-        </p>
-        <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+      <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
           <div
             className="flex min-h-[min(72vh,38rem)] gap-4 md:min-h-[min(78vh,42rem)]"
             style={{ minWidth: "min(100%, 92rem)" }}
@@ -1851,13 +1842,21 @@ function WorkItemsInner() {
                   if (!task) return;
                   const from = normalizeTaskStatus(task.status);
                   if (!kanbanTransitionAllowedFromStored(from, col)) {
-                    setError("Move tasks one stage at a time along the workflow.");
+                    setError("You can only move to the next stage or Cancelled (or reopen cancelled tasks to Pending).");
                     return;
                   }
                   void patchTask(id, { status: col });
                 }}
                 >
-                  <ul className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto">
+                  <div
+                    className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-3 py-2 shadow-sm ${statusPillPaletteClasses(col)}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
+                      <span className="tabular-nums text-[10px] font-medium opacity-80">{colTasks.length}</span>
+                    </div>
+                  </div>
+                  <ul className="flex min-h-24 flex-1 flex-col gap-2 overflow-y-auto py-1">
                     {colTasks.map((task) => (
                       <TaskCard key={task.id} task={task} />
                     ))}
@@ -1867,7 +1866,6 @@ function WorkItemsInner() {
             })}
           </div>
         </div>
-      </div>
     );
   }
 
@@ -2182,8 +2180,10 @@ function WorkItemsInner() {
         )}
       </section>
 
-      {taskPanelOpen && (
-        <div className="fixed inset-0 z-50">
+      {taskPanelOpen &&
+        toolbarMenusMounted &&
+        createPortal(
+          <div className="fixed inset-0 z-[60]">
           <div
             className="absolute inset-0 bg-black/40"
             aria-hidden
@@ -2520,8 +2520,9 @@ function WorkItemsInner() {
               </>
             )}
           </section>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

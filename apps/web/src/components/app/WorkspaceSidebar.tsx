@@ -56,7 +56,7 @@ function PencilIcon({ className }: { className?: string }) {
 
 function rowBase(active: boolean) {
   return [
-    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm font-semibold transition-colors",
+    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]",
     active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
   ].join(" ");
 }
@@ -320,13 +320,13 @@ export function WorkspaceSidebar({
   }
 
   return (
-    <aside className="font-outfit flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
+    <aside className="ui-sidebar-chrome font-outfit flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
       <nav className="flex min-h-0 flex-1 flex-col" aria-label="Workspace tree">
         <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
           <button
             type="button"
             onClick={() => setWorkspacePickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-[var(--surface-hover)]"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-[background-color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] motion-safe:active:scale-[0.99]"
             aria-expanded={workspacePickerOpen}
             aria-label="Toggle workspace switcher"
           >
@@ -337,7 +337,7 @@ export function WorkspaceSidebar({
             <Chevron open={workspacePickerOpen} />
           </button>
           {workspacePickerOpen && (
-            <div className="mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1">
+            <div className="ui-dropdown-pop origin-top-left mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg shadow-black/10 dark:shadow-black/40">
               <ul className="space-y-0.5">
                 {orgs.map((o) => {
                   const active = o.id === workspaceId;
