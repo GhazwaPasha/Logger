@@ -39,10 +39,7 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     queryFn: () => fetchWorkspace(token!, orgId!),
     enabled: Boolean(token && orgId),
     staleTime: 60_000,
-    // No push channel yet: other users' edits only reach this client via refetch.
     refetchOnWindowFocus: true,
-    refetchInterval: 45_000,
-    refetchIntervalInBackground: false,
   });
 
   const error = manualError ?? (q.error ? (q.error as Error).message : null);

@@ -5,12 +5,14 @@ import { departments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { CollaborationService } from "../realtime/collaboration.service";
 
 @Injectable()
 export class DepartmentsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
+    private readonly collaboration: CollaborationService,
   ) {}
 
   async list(userId: string, organizationId: string) {
@@ -31,6 +33,7 @@ export class DepartmentsService {
       .insert(departments)
       .values({ organizationId, name: parsed.name })
       .returning();
+    this.collaboration.notifyOrgChanged(organizationId, null);
     return dept;
   }
 
@@ -46,6 +49,7 @@ export class DepartmentsService {
       .set({ name: parsed.name })
       .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)))
       .returning();
+    this.collaboration.notifyOrgChanged(organizationId, null);
     return dept!;
   }
 

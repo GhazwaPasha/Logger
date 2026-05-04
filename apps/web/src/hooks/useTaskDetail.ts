@@ -41,8 +41,6 @@ export function useTaskDetail(
     staleTime: 15_000,
     placeholderData,
     refetchOnWindowFocus: true,
-    refetchInterval: 45_000,
-    refetchIntervalInBackground: false,
   });
 
   const error = useMemo(

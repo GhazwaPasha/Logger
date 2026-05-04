@@ -9,6 +9,7 @@ import { ListsModule } from "./lists/lists.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { HealthController } from "./health.controller";
+import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HealthController } from "./health.controller";
     DepartmentsModule,
     ListsModule,
     TasksModule,
+    RealtimeModule,
   ],
   controllers: [HealthController],
 })

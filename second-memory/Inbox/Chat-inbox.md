@@ -4,6 +4,19 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Railway: monorepo root + explicit API build/start
+
+- **Context:** Service **root directory** was **`/apps/api`**, so install could not resolve workspace packages **`@work-ledger/db`** / **`@work-ledger/contracts`** (404 from registry).
+- **What we did:** Repo-root **`railway.json`** — **`buildCommand`:** **`npm ci && npm run build:api`**, **`startCommand`:** **`npm run start:api`**, **`healthcheckPath`:** **`/health`**. Root **`package.json`** scripts **`build:api`** (**`npm run build -w @work-ledger/api`**, relies on API **`prebuild`** for db/contracts) and **`start:api`**. **Railway:** clear **Root Directory** (use repo root).
+- **Code / repo:** `railway.json`, `package.json`.
+
+### 2026-05-05 — Socket.IO org collaboration (Nest + web)
+
+- **Context:** Multi-user UI; move toward push instead of polling-only.
+- **What we did:** **`RealtimeModule`** — **`CollaborationService`** (**`notifyOrgChanged`**, **`emitWorkspaceChanged`**), **`OrgCollaborationGateway`** (handshake **`auth.token`** + **`auth.organizationId`**, **`assertOrgMember`**, room **`org:{id}`**; **`collaboration_auth_error`** before disconnect on auth failure). **`TasksService`**, **`OrganizationsService`** (create / patch / member upsert), **`ListsService`**, **`DepartmentsService`** notify after writes. **`JwtAuthGuard`** skips **`ws`**. **`main.ts`:** **`cors-origins.ts`**, **`PORT ?? API_PORT`**. Optional **`REDIS_URL`** → **`@socket.io/redis-adapter`** + **`redis`**; gateway **`onModuleDestroy`**. **Web:** **`WorkspaceRealtimeSubscriber`** — **`collaboration_auth_error`** + **`connect_error`** (auth-like) → **`wl:auth-expired`**; invalidate **`workspace`**, **`activity`**, **`task.detail`**. **`getApiBaseUrl`**. Removed **`refetchInterval`** on **`useOrgWorkspace`** / **`useTaskDetail`** (kept **`refetchOnWindowFocus`**).
+- **Takeaway / follow-ups:** Set **`REDIS_URL`** on Railway when API replicas > 1. Tune **`connect_error`** heuristics if false-positive auth refresh.
+- **Code / repo:** `apps/api/src/realtime/*`, `cors-origins.ts`, `main.ts`, `jwt-auth.guard.ts`, `tasks.service.ts`, `organizations.service.ts`, `organizations.module.ts`, `lists.service.ts`, `lists.module.ts`, `departments.service.ts`, `departments.module.ts`, `WorkspaceRealtimeSubscriber.tsx`, `WorkspaceShell.tsx`, `apps/web/src/lib/api.ts`, `useOrgWorkspace.ts`, `useTaskDetail.ts`. [[Topics/Infrastructure/websocket-railway-plan]].
+
 ### 2026-05-05 — Prod CORS “random” sessions: merge origins + optional Vercel + preflight headers
 
 - **Context:** User saw intermittent **Failed to fetch** / CORS in production across sessions — often **different `Origin`** per session (custom domain vs **`*.vercel.app`**, preview vs prod, **`www`** vs apex) while the API allowed only a subset. **`API_CORS_ORIGINS`** previously **replaced** **`NEXT_PUBLIC_APP_URL`**, so partial env easily dropped an allowed origin.
@@ -14,8 +27,8 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 ### 2026-05-05 — Multi-user UI: poll workspace + task detail
 
 - **Context:** Edits from another teammate did not show until a full manual refresh; only the acting client’s mutations updated React Query via **`setQueryData`** (no WebSocket/SSE).
-- **What we did:** **`useOrgWorkspace`** and **`useTaskDetail`** now **`refetchOnWindowFocus: true`** (overrides global **`false`** for these queries) and **`refetchInterval: 45_000`** with **`refetchIntervalInBackground: false`** (aligned with activity poll cadence; avoids work when the tab is hidden).
-- **Takeaway / follow-ups:** True push (SSE/WebSocket + invalidation) would reduce API churn and latency further if needed.
+- **What we did:** **`useOrgWorkspace`** and **`useTaskDetail`** gained **`refetchOnWindowFocus: true`** and short-interval **`refetchInterval`** (later **removed** once Socket.IO collaboration shipped — see **Socket.IO org collaboration** entry above).
+- **Takeaway / follow-ups:** Superseded for freshness by push + invalidation; **`refetchOnWindowFocus`** kept as safety net.
 - **Code / repo:** `apps/web/src/hooks/useOrgWorkspace.ts`, `apps/web/src/hooks/useTaskDetail.ts`.
 
 ### 2026-05-05 — Stay signed in: secure cookies on localhost + session length + UI

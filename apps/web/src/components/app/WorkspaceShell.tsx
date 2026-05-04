@@ -6,6 +6,7 @@ import { AppHeader } from "./AppHeader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceRouteContext } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
+import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -71,6 +72,7 @@ export function WorkspaceShell({
   return (
     <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug }}>
       <WorkspaceDataProvider workspaceId={workspaceId}>
+        <WorkspaceRealtimeSubscriber workspaceId={workspaceId} />
         <WorkspaceNotificationsProvider>
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
             <AppHeader workspaceSlug={workspaceSlug} />

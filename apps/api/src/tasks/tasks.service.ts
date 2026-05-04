@@ -15,6 +15,7 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
 import { PushNotificationsService } from "../push/push-notifications.service";
+import { CollaborationService } from "../realtime/collaboration.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { computeNextDue, isDueRepeat } from "./compute-next-due";
 import { coerceLegacyTaskStatus } from "./task-status-automation";
@@ -26,6 +27,7 @@ export class TasksService {
     private readonly authz: AuthorizationService,
     private readonly lists: ListsService,
     private readonly pushNotifications: PushNotificationsService,
+    private readonly collaboration: CollaborationService,
   ) {}
 
   async list(userId: string, organizationId: string, opts?: { includeSubtasks?: boolean }) {
@@ -112,7 +114,9 @@ export class TasksService {
       }
     });
 
-    return this.taskMutationResult(userId, createdId, ledgerDelta);
+    const created = await this.taskMutationResult(userId, createdId, ledgerDelta);
+    this.collaboration.notifyOrgChanged(organizationId, createdId);
+    return created;
   }
 
   async getDetail(userId: string, taskId: string) {
@@ -159,6 +163,7 @@ export class TasksService {
         title: parsed.title,
       })
       .returning();
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return row!;
   }
 
@@ -177,6 +182,7 @@ export class TasksService {
       .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
       .returning();
     if (!row) throw new ForbiddenException("Subtask not found");
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return row;
   }
 
@@ -230,6 +236,7 @@ export class TasksService {
       })
       .catch(() => {});
 
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return { idempotent: false as const, entry: entry! };
   }
 
@@ -271,11 +278,13 @@ export class TasksService {
       ledgerDelta.push(row!);
     });
 
-    return this.taskMutationResult(userId, taskId, ledgerDelta);
+    const rescheduled = await this.taskMutationResult(userId, taskId, ledgerDelta);
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    return rescheduled;
   }
 
   async archive(userId: string, taskId: string) {
-    await this.authz.getTaskAccess(userId, taskId);
+    const access = await this.authz.getTaskAccess(userId, taskId);
 
     const now = new Date();
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
@@ -296,7 +305,9 @@ export class TasksService {
       ledgerDelta.push(row!);
     });
 
-    return this.taskMutationResult(userId, taskId, ledgerDelta);
+    const archived = await this.taskMutationResult(userId, taskId, ledgerDelta);
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    return archived;
   }
 
   async updateStatus(userId: string, taskId: string, body: unknown) {
@@ -539,6 +550,7 @@ export class TasksService {
     });
 
     const base = await this.taskMutationResult(userId, taskId, ledgerDelta);
+    this.collaboration.notifyOrgChanged(orgId, taskId);
     return spawnedRecurringTaskId ? { ...base, spawnedRecurringTaskId } : base;
   }
 

@@ -18,6 +18,7 @@ import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { ListsService } from "../lists/lists.service";
+import { CollaborationService } from "../realtime/collaboration.service";
 import { TasksService } from "../tasks/tasks.service";
 
 const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
@@ -30,6 +31,7 @@ export class OrganizationsService {
     private readonly departments: DepartmentsService,
     private readonly lists: ListsService,
     private readonly tasks: TasksService,
+    private readonly collaboration: CollaborationService,
   ) {}
 
   private slugifyName(name: string): string {
@@ -68,6 +70,7 @@ export class OrganizationsService {
       userId: userId,
       role: "owner",
     });
+    this.collaboration.notifyOrgChanged(org.id, null);
     return org;
   }
 
@@ -141,6 +144,7 @@ export class OrganizationsService {
       .where(eq(organizations.id, organizationId))
       .returning();
     if (!row) throw new NotFoundException("Organization not found");
+    this.collaboration.notifyOrgChanged(organizationId, null);
     return row;
   }
 
@@ -260,6 +264,7 @@ export class OrganizationsService {
       );
     }
 
+    this.collaboration.notifyOrgChanged(organizationId, null);
     return this.listMembers(requesterId, organizationId);
   }
 }
