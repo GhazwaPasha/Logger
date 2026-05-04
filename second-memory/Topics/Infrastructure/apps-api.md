@@ -4,7 +4,7 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 
 ## Runtime
 
-- **Bootstrap:** `apps/api/src/main.ts` — loads env via `load-env`, enables **CORS**: **`API_CORS_ORIGINS`** (comma-separated browser origins) when set; otherwise origins from **`NEXT_PUBLIC_APP_URL`** — **comma-separated** like **`AuthService`** issuer list (default `http://localhost:3000`). Always includes localhost regex and `exp://` for Expo. If prod users hit a **custom domain** while the API omits that origin, the workspace **`fetch`** fails with **Failed to fetch** until every real **`Origin`** is listed (via **`API_CORS_ORIGINS`** or comma-separated **`NEXT_PUBLIC_APP_URL`** on the API deployment).
+- **Bootstrap:** `apps/api/src/main.ts` — loads env via `load-env`, enables **CORS** from **`NEXT_PUBLIC_APP_URL`** (comma-separated, default `http://localhost:3000`) **merged** with **`API_CORS_ORIGINS`** when the latter is set (deduped), plus localhost regex and `exp://` for Expo. Optional **`API_CORS_ALLOW_VERCEL_APP`** (`1` / `true`) adds **`https://*.vercel.app`** for branch/preview deploys. Explicit **`methods`** + **`allowedHeaders`** (`Authorization`, `Content-Type`, `Accept`) for preflight. If the browser **`Origin`** is missing from this set, **`fetch`** fails with **Failed to fetch** / CORS — list **every** real web origin (custom domain, apex vs `www`, production vs preview) on the **API** deployment.
 - **Port:** `API_PORT` env, default **4000**.
 - **Config:** `@nestjs/config` reads **repo-root** `.env` / `.env.local` (paths resolved from `dist/` up three levels in `app.module.ts`).
 

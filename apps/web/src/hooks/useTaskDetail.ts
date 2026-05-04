@@ -40,6 +40,9 @@ export function useTaskDetail(
     enabled: Boolean(token && taskId),
     staleTime: 15_000,
     placeholderData,
+    refetchOnWindowFocus: true,
+    refetchInterval: 45_000,
+    refetchIntervalInBackground: false,
   });
 
   const error = useMemo(

@@ -4,6 +4,20 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Prod CORS “random” sessions: merge origins + optional Vercel + preflight headers
+
+- **Context:** User saw intermittent **Failed to fetch** / CORS in production across sessions — often **different `Origin`** per session (custom domain vs **`*.vercel.app`**, preview vs prod, **`www`** vs apex) while the API allowed only a subset. **`API_CORS_ORIGINS`** previously **replaced** **`NEXT_PUBLIC_APP_URL`**, so partial env easily dropped an allowed origin.
+- **What we did:** **`corsAllowedOrigins()`** in **`apps/api/src/main.ts`** now **dedupe-merges** explicit **`API_CORS_ORIGINS`** with **`NEXT_PUBLIC_APP_URL`**. Optional **`API_CORS_ALLOW_VERCEL_APP`** (`1`/`true`) adds regex **`https://*.vercel.app`**. **`enableCors`** sets explicit **`methods`** and **`allowedHeaders`** (`Authorization`, `Content-Type`, `Accept`). Docs: **`Topics/Infrastructure/apps-api.md`**.
+- **Takeaway / follow-ups:** In DevTools → Network, confirm failed calls show **`(blocked:cors)`** or missing **`Access-Control-Allow-Origin`** on **OPTIONS** vs true network errors. On the **API** host (e.g. Vercel), list every origin users actually open; use **`API_CORS_ALLOW_VERCEL_APP`** only if previews must talk to that API (JWT still gates data).
+- **Code / repo:** `apps/api/src/main.ts`, `second-memory/Topics/Infrastructure/apps-api.md`.
+
+### 2026-05-05 — Multi-user UI: poll workspace + task detail
+
+- **Context:** Edits from another teammate did not show until a full manual refresh; only the acting client’s mutations updated React Query via **`setQueryData`** (no WebSocket/SSE).
+- **What we did:** **`useOrgWorkspace`** and **`useTaskDetail`** now **`refetchOnWindowFocus: true`** (overrides global **`false`** for these queries) and **`refetchInterval: 45_000`** with **`refetchIntervalInBackground: false`** (aligned with activity poll cadence; avoids work when the tab is hidden).
+- **Takeaway / follow-ups:** True push (SSE/WebSocket + invalidation) would reduce API churn and latency further if needed.
+- **Code / repo:** `apps/web/src/hooks/useOrgWorkspace.ts`, `apps/web/src/hooks/useTaskDetail.ts`.
+
 ### 2026-05-05 — Stay signed in: secure cookies on localhost + session length + UI
 
 - **Context:** Users had to log in on every visit; no “remember me” in the UI. Common cause: **`NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` set to `https://…`** while running **`next dev` on `http://localhost`** — Better Auth then uses **`__Secure-*`** session cookies, which the browser **drops on non-HTTPS** origins, so the session never sticks.
