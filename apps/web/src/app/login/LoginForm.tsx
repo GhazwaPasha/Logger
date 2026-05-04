@@ -63,6 +63,8 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  /** Maps to Better Auth `rememberMe` (persistent cookie + longer DB session when true). */
+  const [staySignedIn, setStaySignedIn] = useState(true);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,15 +72,21 @@ export function LoginForm() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        // Server accepts `rememberMe`; inferred client types for `signUp.email` omit it in some releases.
         const { error: err } = await authClient.signUp.email({
           email,
           password,
           name: name || email.split("@")[0] || "User",
-        });
+          ...(staySignedIn ? {} : { rememberMe: false }),
+        } as Parameters<typeof authClient.signUp.email>[0]);
         if (err) setError(err.message ?? "Sign up failed");
         else router.push(next);
       } else {
-        const { error: err } = await authClient.signIn.email({ email, password });
+        const { error: err } = await authClient.signIn.email({
+          email,
+          password,
+          rememberMe: staySignedIn,
+        });
         if (err) setError(err.message ?? "Sign in failed");
         else router.push(next);
       }
@@ -185,6 +193,23 @@ export function LoginForm() {
                   {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <input
+                id={`${formId}-stay-signed-in`}
+                type="checkbox"
+                className="mt-0.5 size-4 shrink-0 rounded border border-[var(--border)] accent-[var(--accent)]"
+                checked={staySignedIn}
+                onChange={(e) => setStaySignedIn(e.target.checked)}
+                disabled={loading}
+              />
+              <label htmlFor={`${formId}-stay-signed-in`} className="text-left text-sm leading-snug text-[var(--muted)]">
+                Stay signed in on this device
+                <span className="mt-0.5 block text-xs text-[var(--muted)]/90">
+                  Uncheck to sign out when you close the browser.
+                </span>
+              </label>
             </div>
 
             {error && (

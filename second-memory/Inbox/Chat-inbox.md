@@ -4,6 +4,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Stay signed in: secure cookies on localhost + session length + UI
+
+- **Context:** Users had to log in on every visit; no “remember me” in the UI. Common cause: **`NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` set to `https://…`** while running **`next dev` on `http://localhost`** — Better Auth then uses **`__Secure-*`** session cookies, which the browser **drops on non-HTTPS** origins, so the session never sticks.
+- **What we did:** **`advanced.useSecureCookies`** is **`false` when `NODE_ENV !== "production"`**, and in production **`true` on Vercel** or when **`NEXT_PUBLIC_APP_URL`** is **`https://…`**. Escape hatches: **`AUTH_FORCE_INSECURE_COOKIES`**, **`AUTH_FORCE_SECURE_COOKIES`** (values **`1`/`true`**). **`session.expiresIn`** **30d**, **`updateAge`** **24h**. Login/sign-up: **“Stay signed in on this device”** checkbox (default on) → **`rememberMe`** on **`signIn.email` / `signUp.email`**.
+- **Takeaway:** For local dev, either keep **`NODE_ENV=development`** (default for `next dev`) or set a **http** app URL in **`.env.local`**; use force flags if you run a **production build on http** locally with prod env.
+- **Code / repo:** `apps/web/src/lib/auth.ts`, `apps/web/src/app/login/LoginForm.tsx`. See also [[Topics/Infrastructure/auth-jwt-and-env]].
+
 ### 2026-05-05 — Notification bell badge: don’t seed last-seen on first visit
 
 - **Context:** Toasts and the notifications panel worked, but the header bell never showed a count.

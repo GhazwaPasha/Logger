@@ -78,6 +78,24 @@ async function resolveTrustedOrigins(request?: Request): Promise<string[]> {
 
 const authBaseUrl = resolveAuthBaseUrl();
 
+/**
+ * `__Secure-*` session cookies require `Secure` and are dropped on `http://` origins.
+ * If `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` point at https while you run `next dev` on
+ * localhost, Better Auth would otherwise mint secure-only cookies and the browser would
+ * never persist the session. See Better Auth `createCookieGetter` + `advanced.useSecureCookies`.
+ */
+function resolveUseSecureCookies(): boolean {
+  if (process.env.AUTH_FORCE_INSECURE_COOKIES === "1" || process.env.AUTH_FORCE_INSECURE_COOKIES === "true") {
+    return false;
+  }
+  if (process.env.AUTH_FORCE_SECURE_COOKIES === "1" || process.env.AUTH_FORCE_SECURE_COOKIES === "true") {
+    return true;
+  }
+  if (process.env.NODE_ENV !== "production") return false;
+  if (process.env.VERCEL === "1") return true;
+  return /^https:\/\//i.test(process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "");
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
     provider: "pg",
@@ -87,6 +105,14 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
   baseURL: authBaseUrl,
   trustedOrigins: resolveTrustedOrigins,
+  session: {
+    /** Keep signed-in users on longer-lived server sessions; sliding window via updateAge. */
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
+  },
+  advanced: {
+    useSecureCookies: resolveUseSecureCookies(),
+  },
   plugins: [
     jwt({
       jwks: {

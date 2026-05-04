@@ -22,6 +22,11 @@ If issuer/audience don’t match JWT claims → **`401 Invalid or expired token`
 - **`NEXT_PUBLIC_APP_URL`** — Public site URL; used in **`resolveAuthBaseUrl()`** before **`VERCEL_URL`** so tokens use a **stable issuer** when explicit Better Auth URL is absent.
 - **`BETTER_AUTH_SECRET`** — Required in prod (dev fallback exists in code but must not ship).
 - **`VERCEL_URL`** — Preview host; combined with trusted origins / fallbacks for CORS and auth base resolution.
+- **`AUTH_FORCE_INSECURE_COOKIES`** / **`AUTH_FORCE_SECURE_COOKIES`** — Optional overrides for **`advanced.useSecureCookies`** in **`apps/web/src/lib/auth.ts`** (`1` or `true`). Use the insecure flag only when debugging a **production build served over `http://` locally** with prod env pointing at **`https://…`** (otherwise **`__Secure-*`** session cookies are rejected by the browser).
+
+### Session cookies vs local dev
+
+If **`BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL`** is **`https://…`** but you open the app at **`http://localhost:…`**, the session cookie must **not** use the **`__Secure-`** prefix. Default behavior: **`NODE_ENV !== "production"`** → non-prefixed cookies; production → secure cookies on **Vercel** or when **`NEXT_PUBLIC_APP_URL`** is **https**.
 
 ## Alignment checklist (local or prod)
 
