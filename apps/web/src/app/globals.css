@@ -1021,3 +1021,43 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
     box-shadow: 0 16px 42px -24px color-mix(in srgb, var(--fg) 12%, transparent);
   }
 }
+
+/* Task panel: AI fill button — indeterminate bar while request runs */
+@keyframes task-ai-fill-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.task-ai-fill-loading-track {
+  position: relative;
+  display: block;
+  height: 4px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--fg) 8%, var(--border-subtle));
+}
+
+.task-ai-fill-loading-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36%;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--accent);
+  animation: task-ai-fill-indeterminate 1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-ai-fill-loading-thumb {
+    animation: none;
+    left: 50%;
+    width: 45%;
+    transform: translateX(-50%);
+  }
+}

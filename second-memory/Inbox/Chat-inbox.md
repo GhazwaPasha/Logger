@@ -4,6 +4,43 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-04 — List row: assigned / late icon chips match `h-8` row
+
+- **What:** **`LIST_ROW_FOOTER_META_ICON_CHIP`** (`size-8`) replaces **`TASK_FOOTER_META_ICON_CHIP`** (`size-7`) for has-assignee + in-progress-overdue hints in **`ListTaskCard`** so they align with assignee tile, due chip, and overflow (**`h-8`**). Kanban mid-footer unchanged (**`h-7`** + **`KANBAN_SUBTASK_BELOW_BADGE_HEIGHT`**).
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-04 — Kanban card: meta grid (status, priority, due, assignee)
+
+- **Context:** User wanted **equal width** for the four controls, **no divider** between the old two-row layout, then a **2×2 grid** that **fills card width**.
+- **What we did:** **`TaskCard`** — **`border-t border-[var(--border-subtle)]/50 pt-1.5`** wraps the meta **grid** so a divider sits **below title + subtasks** and above status/priority/due/assignee. Grid: **`grid w-full grid-cols-2 gap-x-1.5 gap-y-1.5`** — row 1 **status | priority**, row 2 **due | assignee**; each cell **`min-w-0 min-h-8`**. **`StatusPillSelect`** optional **`shellLayoutClassName`** — **`KanbanStatusPill`** only (kanban **`KANBAN_STATUS_SHELL_LAYOUT`**); **list rows** use **`ListRowStatusPill`** (default fixed **`STATUS_PILL_LAYOUT`**). Due in kanban: **`KANBAN_DUE_CHIP_CELL`** (**`!w-full !min-w-0 !shrink`**) + flex wrapper so the chip fills the grid cell. **`KanbanPriorityPill`**: **`KANBAN_PRIORITY_SHELL_LAYOUT`**. Assignee **`h-8 w-full`**, **`size-6`** avatars.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-04 — Task status: retire automated **Assigned** / **Late** as stored states
+
+- **Context:** **Assigned** was pending + assignee; **Late** was in progress + overdue. They should not appear in the workflow status pill; assignee/due chrome + footer badges carry that signal.
+- **What we did:** **API** — `coerceLegacyTaskStatus` in `apps/api/src/tasks/task-status-automation.ts` maps legacy **`assigned`→`pending`**, **`late`→`in_progress`** on list/detail; no assignee/due-driven status writes. **DB** — migration `packages/db/drizzle/0010_normalize_task_status_legacy.sql` + journal entry. **Contracts** — comment only (enum unchanged for reads). **Web** — `task-board.ts`: `taskMatchesUrlStatusFilter`, `taskShowsLateFooter`, `taskHasAssignees`, footer badge + assignee/due chrome class helpers; **`due=` late preset** = in-progress overdue; URL **`status=assigned` / `late`** use derived rules. **Work** — status pill uses manual stage only; **Has assignee** / **in progress overdue** as profile (**sky**) + stopwatch (**orange**) outlined chips: **list** — beside level + list badges in the title row; **kanban** — second footer strip (`border-t`, `px-2.5`) **above** `TaskCardLastActivity`; last-activity footer ledger-only; assignee control uses sky chrome when anyone is assigned; due chip uses orange when late rule matches. **Dashboard** — status mix bar + KPIs use four manual stages; **Late** KPI counts in-progress overdue via `taskShowsLateFooter`.
+- **Takeaway:** Run **`npm run db:migrate`** so existing rows normalize. Activity log still renders historical **`assigned`/`late`** status_change payloads via `taskStatusDisplayLabel`.
+- **Code / repo:** `apps/api/src/tasks/task-status-automation.ts`, `apps/api/src/tasks/tasks.service.ts`, `apps/web/src/lib/task-board.ts`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/components/dashboard/DashboardOverview.tsx`, `packages/contracts/src/index.ts`, `packages/db/drizzle/0010_normalize_task_status_legacy.sql`.
+
+### 2026-05-04 — TaskPanelAiFill: status-pill-style highlight
+
+- **Context:** AI fill block should read like workflow **status pills** (tinted surface + border).
+- **What we did:** Outer shell uses **Tailwind `blue-500`** tints (**`/22`** light, **`/15`** dark), not **sky** / not **`statusPillPaletteClasses("assigned")`**; **`rounded-xl`**, **`border-[var(--border-subtle)]`**, **`shadow-sm`**; header hover **`hover:bg-black/[0.06]`** / **`dark:hover:bg-white/[0.08]`**; expanded body **`surface-base`** overlay + **`border-t`**. **Textarea + “Ai fill” button** use **`blue-*`** fills and focus rings + subtle borders. Success hint: **`Success: …`** (Tasks, Subtask, Member, Due Date, Recurrence, Status, Priority when set).
+- **Code / repo:** `apps/web/src/components/tasks/TaskPanelAiFill.tsx`.
+
+### 2026-05-04 — Work task panel: AI fill (Gemini, natural language)
+
+- **Context:** Task create/edit side panel should support filling fields from plain-language descriptions using a Gemini API key.
+- **What we did:** **`POST /api/ai/task-fill`** (Next Route Handler) calls Google **`generateContent`** with JSON schema output, **`auth.api.getSession`** for auth, and **`GEMINI_API_KEY`** (or **`GOOGLE_GENERATIVE_AI_API_KEY`**) server-side only. **`GEMINI_MODEL`** optional: when unset, the server calls **`models.list`** and uses the **first** model that advertises **`generateContent`** (Google’s order), cached ~**20m** per key fingerprint—no hardcoded default model id. Response is sanitized (assignees must match roster `userId`s; status/priority/repeat enums; local due **`YYYY-MM-DDTHH:mm`**). **`TaskPanelAiFill`** collapsible block on work page create + edit panels; client sends **`timeZone`**, **`nowIso`**, and workspace **members** for grounding. **Quota UX:** when Google returns **`free_tier` + `limit: 0`**, the route appends a short hint (allocation / billing project vs RPM). When the model returns JSON but **no fields apply** after normalize (**`taskAiFillResultIsEmpty`**), **422** message: **`I failed to understand, please try again!`**
+- **Takeaway:** Add the key to **repo-root `.env.local`** (loaded by **`apps/web/next.config.mjs`**); never expose in `NEXT_PUBLIC_*`. Pin a model with **`GEMINI_MODEL`** if discovery picks one with bad quota. **`limit: 0` on `generate_content_free_tier_requests`** is usually the **GCP project behind the key**, not “rate limit used”—link **billing** to that project or use a key from a project that has Gemini allowance.
+- **Code / repo:** `apps/web/src/app/api/ai/task-fill/route.ts`, `apps/web/src/lib/task-ai-fill.ts`, `apps/web/src/components/tasks/TaskPanelAiFill.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`.
+
+### 2026-05-04 — Task AI fill: playbook + resilient JSON parsing
+
+- **Context:** Model sometimes returned non-JSON; need a clear contract for allowed task fields vs API.
+- **What we did:** **`task-ai-playbook.ts`**: `TASK_AI_SYSTEM_INSTRUCTION`, `GEMINI_TASK_FILL_RESPONSE_SCHEMA` (enums), `buildTaskFillUserTurn` (roster + `CURRENT_USER_ID` for “me”). **`task-ai-json.ts`**: `extractJsonObjectFromModelText` (fences + first balanced `{…}`). Route uses **`systemInstruction`**, lower temperature, larger **`maxOutputTokens`**, parse fallback + clearer 502 snippet. Subtasks sanitize max **100**. Human playbook doc: **`apps/web/docs/task-ai-fill-playbook.md`** (not second-memory).
+- **Code / repo:** `apps/web/src/lib/task-ai-playbook.ts`, `apps/web/src/lib/task-ai-json.ts`, `apps/web/src/app/api/ai/task-fill/route.ts`, `apps/web/src/lib/task-ai-fill.ts`, `apps/web/docs/task-ai-fill-playbook.md`.
+
 ### 2026-05-03 — Postgres DNS: prefer IPv4 when dual-stack (`ipv4first`)
 
 - **Context:** Local sign-in sometimes **`ETIMEDOUT`** on networks with broken IPv6; other networks fine (see also entry below on env vs network).

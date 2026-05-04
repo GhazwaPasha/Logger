@@ -5,30 +5,22 @@ import { useMemo } from "react";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
+  FLOW_COLUMN_LABELS,
   normalizeTaskStatus,
   PRIORITY_LABELS,
-  STATUS_LABELS,
   storedStatusToFlowColumn,
   taskMatchesDatePreset,
   taskPriority,
-  type BoardTaskStatus,
+  taskShowsLateFooter,
+  type ManualTaskStatus,
   type TaskPriority,
 } from "@/lib/task-board";
 
-const STATUS_BAR_ORDER: BoardTaskStatus[] = [
-  "pending",
-  "assigned",
-  "in_progress",
-  "late",
-  "done",
-  "cancelled",
-];
+const STATUS_BAR_ORDER: ManualTaskStatus[] = ["pending", "in_progress", "done", "cancelled"];
 
-const STATUS_SEGMENT_BG: Record<BoardTaskStatus, string> = {
+const STATUS_SEGMENT_BG: Record<ManualTaskStatus, string> = {
   pending: "bg-slate-500/55",
-  assigned: "bg-sky-500/55",
   in_progress: "bg-violet-500/55",
-  late: "bg-orange-500/60",
   done: "bg-emerald-500/55",
   cancelled: "bg-neutral-500/45",
 };
@@ -153,11 +145,9 @@ export function DashboardOverview({
     let unassignedPipeline = 0;
     let minePipeline = 0;
 
-    const statusCounts: Record<BoardTaskStatus, number> = {
+    const workflowCounts: Record<ManualTaskStatus, number> = {
       pending: 0,
-      assigned: 0,
       in_progress: 0,
-      late: 0,
       done: 0,
       cancelled: 0,
     };
@@ -171,9 +161,9 @@ export function DashboardOverview({
 
     for (const t of activeTasks) {
       const st = normalizeTaskStatus(t.status);
-      statusCounts[st]++;
-
       const col = storedStatusToFlowColumn(st);
+      workflowCounts[col]++;
+
       const pri = taskPriority(t);
       if (t.priority) priorityCounts[pri]++;
       else unsetPriority++;
@@ -182,7 +172,7 @@ export function DashboardOverview({
       else if (col === "cancelled") cancelled++;
       else {
         pipeline++;
-        if (st === "late") lateStatus++;
+        if (taskShowsLateFooter(t)) lateStatus++;
         if (taskMatchesDatePreset(t, "this_week")) dueThisWeek++;
 
         const ids = t.assigneeUserIds ?? [];
@@ -227,7 +217,7 @@ export function DashboardOverview({
       dueThisWeek,
       unassignedPipeline,
       minePipeline,
-      statusCounts,
+      workflowCounts,
       priorityCounts,
       unsetPriority,
       levelRows,
@@ -241,9 +231,9 @@ export function DashboardOverview({
 
   const statusSegments = STATUS_BAR_ORDER.map((st) => ({
     key: st,
-    count: stats.statusCounts[st],
+    count: stats.workflowCounts[st],
     className: STATUS_SEGMENT_BG[st],
-    title: STATUS_LABELS[st],
+    title: FLOW_COLUMN_LABELS[st],
   }));
 
   const prioritySegments = [
@@ -298,11 +288,9 @@ export function DashboardOverview({
           <div className="relative z-[1]">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Pending work</p>
             <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight">
-              {loading ? "…" : stats.statusCounts.pending + stats.statusCounts.assigned}
+              {loading ? "…" : stats.workflowCounts.pending}
             </p>
-            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
-              {`${STATUS_LABELS.pending} & ${STATUS_LABELS.assigned}`}
-            </p>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">{FLOW_COLUMN_LABELS.pending} queue</p>
           </div>
         </Link>
         <Link
@@ -313,11 +301,9 @@ export function DashboardOverview({
           <div className="relative z-[1]">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Active work</p>
             <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight">
-              {loading ? "…" : stats.statusCounts.in_progress + stats.statusCounts.late}
+              {loading ? "…" : stats.workflowCounts.in_progress}
             </p>
-            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">
-              {`${STATUS_LABELS.in_progress} & ${STATUS_LABELS.late}`}
-            </p>
+            <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">{FLOW_COLUMN_LABELS.in_progress}</p>
           </div>
         </Link>
         <div
@@ -409,13 +395,13 @@ export function DashboardOverview({
               <li key={st} className="flex items-center justify-between gap-2 text-sm">
                 <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
                   <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_SEGMENT_BG[st]}`} aria-hidden />
-                  <span className="truncate">{STATUS_LABELS[st]}</span>
+                  <span className="truncate">{FLOW_COLUMN_LABELS[st]}</span>
                 </span>
                 <Link
                   href={workHref(basePath, { status: st })}
                   className="tabular-nums font-medium text-[var(--fg)] hover:text-[var(--accent)]"
                 >
-                  {loading ? "…" : stats.statusCounts[st]}
+                  {loading ? "…" : stats.workflowCounts[st]}
                 </Link>
               </li>
             ))}

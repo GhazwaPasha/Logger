@@ -17,7 +17,7 @@ import { ListsService } from "../lists/lists.service";
 import { PushNotificationsService } from "../push/push-notifications.service";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { computeNextDue, isDueRepeat } from "./compute-next-due";
-import { computeAutomatedTaskStatus } from "./task-status-automation";
+import { coerceLegacyTaskStatus } from "./task-status-automation";
 
 @Injectable()
 export class TasksService {
@@ -590,40 +590,26 @@ export class TasksService {
     };
   }
 
-  /** Reconcile `assigned` / `late` from assignees + due date (no ledger rows). */
+  /** One-off normalize of legacy `assigned` / `late` rows (no ledger rows). */
   private async applyAutomationForTaskId(taskId: string): Promise<void> {
     const [row] = await this.db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
     if (!row || row.deletedAt != null) return;
 
-    const assigneeRows = await this.db
-      .select({ userId: taskAssignees.userId })
-      .from(taskAssignees)
-      .where(eq(taskAssignees.taskId, taskId));
-    const assigneeCount = assigneeRows.length;
-
-    const now = new Date();
-    const next = computeAutomatedTaskStatus(row.status, row.dueAt, assigneeCount, now);
+    const next = coerceLegacyTaskStatus(row.status);
     if (next === row.status) return;
 
+    const now = new Date();
     await this.db
       .update(tasks)
       .set({ status: next as typeof row.status, updatedAt: now })
       .where(eq(tasks.id, taskId));
   }
 
-  private async syncAutomatedStatuses<
-    T extends { id: string; status: string; dueAt: Date | null; assigneeUserIds?: string[] },
-  >(rows: T[]): Promise<T[]> {
+  private async syncAutomatedStatuses<T extends { id: string; status: string }>(rows: T[]): Promise<T[]> {
     if (rows.length === 0) return rows;
-    const now = new Date();
     const updates: { id: string; status: string }[] = [];
     for (const row of rows) {
-      const next = computeAutomatedTaskStatus(
-        row.status,
-        row.dueAt,
-        row.assigneeUserIds?.length ?? 0,
-        now,
-      );
+      const next = coerceLegacyTaskStatus(row.status);
       if (next !== row.status) updates.push({ id: row.id, status: next });
     }
     if (updates.length === 0) return rows;

@@ -1,31 +1,10 @@
 /**
- * Derives persisted `task_status` after user-driven updates.
- * Manual stages: pending, in_progress, done, cancelled.
- * Automated: assigned (pre-start + has assignee), late (active work + overdue).
+ * Legacy DB rows may still have `assigned` / `late` from older automation.
+ * Those are normalized to manual workflow stages (no new writes of automated statuses).
  */
-export function computeAutomatedTaskStatus(
-  status: string,
-  dueAt: Date | null,
-  assigneeCount: number,
-  now: Date,
-): string {
+export function coerceLegacyTaskStatus(status: string): string {
   const s = status === "open" ? "pending" : status;
-
-  if (s === "done" || s === "cancelled") return s;
-
-  const overdue = dueAt != null && dueAt.getTime() < now.getTime();
-
-  if (s === "late") {
-    if (overdue) return "late";
-    return "in_progress";
-  }
-
-  if (s === "in_progress") {
-    return overdue ? "late" : "in_progress";
-  }
-
-  // pending | assigned — pre-start bucket
-  if (overdue) return "late";
-
-  return assigneeCount > 0 ? "assigned" : "pending";
+  if (s === "assigned") return "pending";
+  if (s === "late") return "in_progress";
+  return s;
 }

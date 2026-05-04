@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.taskCapabilitiesSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
-/** Stages the client may set via create / PATCH / status endpoint. `assigned` and `late` are server-derived. */
+/** Stages the client may set via create / PATCH / status endpoint. */
 exports.taskManualStatusSchema = zod_1.z.enum(["pending", "in_progress", "done", "cancelled"]);
-/** Full persisted enum (includes automated labels). */
+/** Full persisted enum (`assigned` / `late` are legacy only; API normalizes on read). */
 exports.taskStatusSchema = zod_1.z.enum([
     "pending",
     "assigned",

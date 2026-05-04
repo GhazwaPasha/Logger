@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const orgRoleSchema = z.enum(["owner", "manager", "member"]);
-/** Stages the client may set via create / PATCH / status endpoint. `assigned` and `late` are server-derived. */
+/** Stages the client may set via create / PATCH / status endpoint. */
 export const taskManualStatusSchema = z.enum(["pending", "in_progress", "done", "cancelled"]);
 
-/** Full persisted enum (includes automated labels). */
+/** Full persisted enum (`assigned` / `late` are legacy only; API normalizes on read). */
 export const taskStatusSchema = z.enum([
   "pending",
   "assigned",

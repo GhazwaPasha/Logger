@@ -14,7 +14,7 @@ export type BoardTaskStatus = ManualTaskStatus | (typeof AUTOMATED_TASK_STATUSES
  * URL `status=` values only (composite buckets for dashboard KPIs / deep links).
  */
 export type PendingWorkUrlFilter = "pending_work";
-/** **In progress** + **Late** tasks (matches dashboard “Active work” KPI). */
+/** **In progress** column (overdue work shows **Late** in the card footer, not here). */
 export type ActiveWorkUrlFilter = "active_work";
 
 export type UrlStatusFilter = BoardTaskStatus | PendingWorkUrlFilter | ActiveWorkUrlFilter;
@@ -25,11 +25,53 @@ export const PENDING_WORK_URL_FILTER_LABEL = "Pending work";
 /** Label for drilldown banner when `status=active_work`. */
 export const ACTIVE_WORK_URL_FILTER_LABEL = "Active work";
 
-export function normalizedStatusMatchesUrlFilter(st: BoardTaskStatus, filter: UrlStatusFilter): boolean {
-  if (filter === "pending_work") return st === "pending" || st === "assigned";
-  if (filter === "active_work") return st === "in_progress" || st === "late";
+/**
+ * Whether a task matches a Work URL `status=` / composite filter.
+ * `assigned` / `late` filters are derived from assignees + in-progress overdue (not stored statuses).
+ */
+export function taskMatchesUrlStatusFilter(task: TaskRow, filter: UrlStatusFilter, now: Date = new Date()): boolean {
+  const st = normalizeTaskStatus(task.status);
+  const col = storedStatusToFlowColumn(st);
+
+  if (filter === "pending_work") return col === "pending";
+  if (filter === "active_work") return col === "in_progress";
+
+  if (filter === "late") return taskShowsLateFooter(task, now);
+
+  if (filter === "assigned") {
+    return taskHasAssignees(task) && col !== "done" && col !== "cancelled";
+  }
+
+  if (filter === "pending") return col === "pending";
+  if (filter === "in_progress") return col === "in_progress";
+
   return st === filter;
 }
+
+export function taskHasAssignees(task: Pick<TaskRow, "assigneeUserIds">): boolean {
+  return (task.assigneeUserIds?.length ?? 0) > 0;
+}
+
+export function taskIsOverdue(task: Pick<TaskRow, "dueAt">, now: Date = new Date()): boolean {
+  if (!task.dueAt) return false;
+  const t = new Date(task.dueAt).getTime();
+  return !Number.isNaN(t) && t < now.getTime();
+}
+
+/** In progress with a due time in the past — surfaces **Late** badge + due styling (not a stored status). */
+export function taskShowsLateFooter(task: TaskRow, now: Date = new Date()): boolean {
+  const st = normalizeTaskStatus(task.status);
+  const manual = manualStatusFromStored(st);
+  return manual === "in_progress" && taskIsOverdue(task, now);
+}
+
+/** Assignee control chrome (sky) when the task has at least one assignee. */
+export const TASK_ASSIGNED_CHROME_CLASS =
+  "border-sky-500/35 bg-sky-500/14 text-sky-800 dark:border-sky-500/28 dark:bg-sky-500/10 dark:text-sky-200";
+
+/** Due control chrome (orange) when the task is in progress and overdue. */
+export const TASK_LATE_DUE_CHROME_CLASS =
+  "border-orange-500/45 bg-orange-500/16 text-orange-900 dark:border-orange-500/38 dark:bg-orange-500/12 dark:text-orange-100";
 
 export const STATUS_LABELS: Record<BoardTaskStatus, string> = {
   pending: "Pending",
@@ -75,7 +117,7 @@ export function manualStatusFromStored(stored: BoardTaskStatus): ManualTaskStatu
   return storedStatusToFlowColumn(stored);
 }
 
-/** Visible workflow label on cards; automated **assigned** / **late** show as single labels (same flow column underneath). */
+/** Human-readable status (activity log / legacy rows may still reference **Assigned** / **Late**). */
 export function taskStatusDisplayLabel(stored: BoardTaskStatus): string {
   if (stored === "assigned") return STATUS_LABELS.assigned;
   if (stored === "late") return STATUS_LABELS.late;
@@ -190,7 +232,7 @@ export function isDatePreset(v: string): v is DatePreset {
   return (DATE_PRESETS as readonly string[]).includes(v);
 }
 
-/** Map `due=` query to preset; accepts legacy `overdue` as alias for **Late** (`late` status). */
+/** Map `due=` query to preset; accepts legacy `overdue` as alias for the **Late** due preset. */
 export function dueQueryToDatePreset(v: string): DatePreset | null {
   if (v === "overdue") return "late";
   if (isDatePreset(v)) return v;
@@ -248,11 +290,10 @@ function endOfWeekLocal(d: Date): Date {
 
 export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolean {
   const due = task.dueAt ? new Date(task.dueAt) : null;
-  const st = normalizeTaskStatus(task.status);
   if (preset === "all") return true;
   if (preset === "no_due") return due === null;
   if (preset === "late") {
-    return st === "late";
+    return taskShowsLateFooter(task);
   }
   if (preset === "this_week") {
     if (!due) return false;

@@ -22,6 +22,7 @@ import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
+import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -33,6 +34,7 @@ import {
   type TaskMutationResult,
   type TaskRow,
 } from "@/lib/ledger-types";
+import type { TaskAiFillResult } from "@/lib/task-ai-fill";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
@@ -47,8 +49,9 @@ import {
   FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
   STATUS_LABELS,
+  TASK_ASSIGNED_CHROME_CLASS,
   TASK_FLOW_ORDER,
-  type BoardTaskStatus,
+  TASK_LATE_DUE_CHROME_CLASS,
   type DatePreset,
   type ManualTaskStatus,
   type SortMode,
@@ -59,7 +62,6 @@ import {
   manualStatusFromStored,
   nextWorkflowManualStatus,
   normalizeTaskStatus,
-  normalizedStatusMatchesUrlFilter,
   parseUrlStatusFilter,
   ACTIVE_WORK_URL_FILTER_LABEL,
   PENDING_WORK_URL_FILTER_LABEL,
@@ -67,10 +69,12 @@ import {
   sortTasks,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
+  taskHasAssignees,
   taskMatchesDatePreset,
   taskMatchesDueRange,
+  taskMatchesUrlStatusFilter,
   taskPriority,
-  taskStatusDisplayLabel,
+  taskShowsLateFooter,
 } from "@/lib/task-board";
 
 type ViewMode = "list" | "kanban";
@@ -81,6 +85,50 @@ function IconUserPlus({ className }: { className?: string }) {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M19 8v6M22 11h-6" />
+    </svg>
+  );
+}
+
+/** Task footer: has assignee (neutral icon, no label). */
+function IconTaskFooterProfile({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="9" r="3" />
+      <path d="M5 20v-1a7 7 0 0 1 14 0v1" />
+    </svg>
+  );
+}
+
+/** Task footer: in progress and overdue (neutral icon). */
+function IconTaskFooterStopwatch({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="10" x2="14" y1="3" y2="3" />
+      <line x1="12" x2="12" y1="3" y2="5" />
+      <circle cx="12" cy="14" r="7" />
+      <path d="M12 10v4l2 2" />
     </svg>
   );
 }
@@ -247,6 +295,24 @@ const TASK_DUE_CHIP_CLASS =
 const TASK_DUE_CHIP_LABEL_CLASS = "min-w-0 shrink";
 const TASK_DUE_CHIP_ICON_CLASS =
   "size-3.5 shrink-0 block opacity-80 [stroke-linecap:round] [stroke-linejoin:round]";
+
+/** Outlined shell for profile / stopwatch hints beside level/list badges (list + kanban). */
+const TASK_FOOTER_META_ICON_CHIP =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)]/30";
+
+/** List row title badges: same footprint as assignee / due / overflow (`h-8` / `size-8`). */
+const LIST_ROW_FOOTER_META_ICON_CHIP =
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)]/30";
+
+/** Kanban only: level + list + icon chips in the mid-footer row share height (`h-7` / `size-7`). */
+const KANBAN_SUBTASK_BELOW_BADGE_HEIGHT =
+  "box-border h-7 min-h-7 max-h-7 shrink-0 items-center justify-center py-0 leading-none";
+
+/** Has assignee chip icon (sky, same hue family as former Assigned). */
+const TASK_FOOTER_ASSIGNEE_ICON_CLASS = "size-4 shrink-0 text-sky-600 dark:text-sky-400";
+/** In progress + overdue chip icon (orange, same hue family as former Late). */
+const TASK_FOOTER_LATE_ICON_CLASS = "size-4 shrink-0 text-orange-600 dark:text-orange-400";
+
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
 
@@ -284,6 +350,17 @@ function TaskPanelScopeBadges({ level, list }: { level: string | null; list: str
 /** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
 const STATUS_PILL_LAYOUT =
   "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 px-1.5";
+
+/** Kanban card meta row: status pill fills an equal-width cell (still `h-8`). */
+const KANBAN_STATUS_SHELL_LAYOUT =
+  "relative inline-flex h-8 w-full min-w-0 shrink-0 items-center justify-between gap-0.5 px-1.5";
+
+/** Kanban card meta row: priority tile fills an equal-width cell (matches list-row tile height). */
+const KANBAN_PRIORITY_SHELL_LAYOUT =
+  "relative box-border inline-flex h-8 w-full min-h-8 max-h-8 min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-sm border-0 bg-[var(--surface-muted)] px-1 py-0.5 text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]";
+
+/** Kanban grid: due chip must fill the cell (overrides {@link TASK_DUE_CHIP_CLASS} `w-max` / `min-w` / `shrink-0`). */
+const KANBAN_DUE_CHIP_CELL = "!w-full !min-w-0 !shrink justify-start px-1.5";
 
 /** Expanded list subtasks: pill + gap + checklist (`size-7`) + gap + chevron (`size-11`), matching row layout. */
 const LIST_ROW_SUBTASK_TREE_MARGIN =
@@ -899,6 +976,59 @@ function WorkItemsInner() {
     [token, patchSubtaskMutation],
   );
 
+  const applyAiFillToCreateForm = useCallback((r: TaskAiFillResult) => {
+    if (r.title !== null) setTitle(r.title);
+    if (r.subtasks !== null) setSubtaskItems(r.subtasks);
+    if (r.assigneeUserIds !== null) setAssigneeIds(r.assigneeUserIds);
+    if (r.status !== null) setNewTaskStatus(r.status);
+    if (r.priority !== null) setNewTaskPriority(r.priority);
+    if (r.dueLocal !== null) {
+      setDue(r.dueLocal);
+      if (!r.dueLocal.trim()) setDueRepeat(null);
+    }
+    if (r.dueRepeat !== null) {
+      if (r.dueRepeat === "none") {
+        setDueRepeat(null);
+      } else {
+        const effectiveDue = r.dueLocal !== null ? r.dueLocal : due;
+        if (effectiveDue.trim().length > 0) setDueRepeat(r.dueRepeat);
+        else setDueRepeat(null);
+      }
+    }
+  }, [due]);
+
+  const applyAiFillToEditForm = useCallback((r: TaskAiFillResult) => {
+    if (r.title !== null) setEditTitle(r.title);
+    if (r.subtasks !== null) {
+      if (r.subtasks.length === 0) setEditNewSubtasks([]);
+      else {
+        setEditNewSubtasks((prev) => {
+          const next = [...prev];
+          for (const line of r.subtasks!) {
+            if (!next.includes(line)) next.push(line);
+          }
+          return next;
+        });
+      }
+    }
+    if (r.assigneeUserIds !== null) setEditAssigneeIds(r.assigneeUserIds);
+    if (r.status !== null) setEditStatus(r.status);
+    if (r.priority !== null) setEditPriority(r.priority);
+    if (r.dueLocal !== null) {
+      setEditDue(r.dueLocal);
+      if (!r.dueLocal.trim()) setEditDueRepeat(null);
+    }
+    if (r.dueRepeat !== null) {
+      if (r.dueRepeat === "none") {
+        setEditDueRepeat(null);
+      } else {
+        const effectiveDue = r.dueLocal !== null ? r.dueLocal : editDue;
+        if (effectiveDue.trim().length > 0) setEditDueRepeat(r.dueRepeat);
+        else setEditDueRepeat(null);
+      }
+    }
+  }, [editDue]);
+
   async function createTask() {
     if (!token || !workspaceId || !title.trim() || !listId) return;
     setError(null);
@@ -1084,11 +1214,7 @@ function WorkItemsInner() {
 
   const filteredTasks = useMemo(() => {
     return visibleTasks.filter((t) => {
-      if (
-        urlStatusFilter &&
-        !normalizedStatusMatchesUrlFilter(normalizeTaskStatus(t.status), urlStatusFilter)
-      )
-        return false;
+      if (urlStatusFilter && !taskMatchesUrlStatusFilter(t, urlStatusFilter)) return false;
       const assignees = t.assigneeUserIds ?? [];
       if (urlAssigneeScope === "mine") {
         if (!sessionUserId || !assignees.includes(sessionUserId)) return false;
@@ -1184,6 +1310,11 @@ function WorkItemsInner() {
     return "border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]";
   }
 
+  function dueChipChromeClass(task: TaskRow) {
+    if (taskShowsLateFooter(task)) return TASK_LATE_DUE_CHROME_CLASS;
+    return dueDatePillClass(Boolean(task.dueAt));
+  }
+
   function formatDueForListPill(dueAt: string) {
     const d = new Date(dueAt);
     if (Number.isNaN(d.getTime())) return "—";
@@ -1214,12 +1345,14 @@ function WorkItemsInner() {
     const levelBadge = taskLevelBadge(task);
     const assigneeNames = assigneeNamesForTask(task, members);
     const assigneeFirstName = firstAssigneeLabel(task, members);
+    const showAssignedFooter = taskHasAssignees(task);
+    const showLateFooter = taskShowsLateFooter(task);
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-colors hover:bg-[var(--surface-hover)]/80">
         <div className="px-3 py-2">
           <div className="flex min-w-0 items-center gap-x-2">
             <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-              <KanbanStatusPill task={task} />
+              <ListRowStatusPill task={task} />
               <button
                 type="button"
                 role="checkbox"
@@ -1298,8 +1431,11 @@ function WorkItemsInner() {
               >
                 {task.title}
               </button>
-              {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
-                <span className="flex shrink-0 items-center gap-1.5">
+              {(showTaskLevelBadge && levelBadge) ||
+              (showTaskListBadge && listBadge) ||
+              showAssignedFooter ||
+              showLateFooter ? (
+                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
                   {showTaskLevelBadge && levelBadge ? (
                     <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
                       {levelBadge}
@@ -1310,13 +1446,29 @@ function WorkItemsInner() {
                       {listBadge}
                     </span>
                   ) : null}
+                  {showAssignedFooter ? (
+                    <span className={LIST_ROW_FOOTER_META_ICON_CHIP} title="Has assignee" aria-label="Has assignee">
+                      <IconTaskFooterProfile className={TASK_FOOTER_ASSIGNEE_ICON_CLASS} />
+                    </span>
+                  ) : null}
+                  {showLateFooter ? (
+                    <span
+                      className={LIST_ROW_FOOTER_META_ICON_CHIP}
+                      title="In progress and past due"
+                      aria-label="In progress, past due"
+                    >
+                      <IconTaskFooterStopwatch className={TASK_FOOTER_LATE_ICON_CLASS} />
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
               <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "assignees")}
-                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(false)}`}
+                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                    assigneeNames ? TASK_ASSIGNED_CHROME_CLASS : dueDatePillClass(false)
+                  }`}
                   title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
                   aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
                 >
@@ -1334,7 +1486,7 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openEditTask(task.id, "due")}
-                  className={`${TASK_DUE_CHIP_CLASS} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueDatePillClass(Boolean(task.dueAt))}`}
+                  className={`${TASK_DUE_CHIP_CLASS} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueChipChromeClass(task)}`}
                   title={dueSummary ? `Due ${dueSummary}` : "Due (date & time)"}
                   aria-label={dueSummary ? `Due ${dueSummary}` : "Edit due date and time"}
                 >
@@ -1420,9 +1572,7 @@ function WorkItemsInner() {
               </div>
           </div>
         )}
-        {task.lastLedger ? (
-          <TaskCardLastActivity entry={task.lastLedger} members={members} compact />
-        ) : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact /> : null}
       </div>
     );
   }
@@ -1431,28 +1581,25 @@ function WorkItemsInner() {
   function StatusPillSelect({
     "aria-label": ariaLabel,
     value,
-    displayLabel,
-    pillAppearance,
     onChange,
     options,
     disabled,
+    shellLayoutClassName = STATUS_PILL_LAYOUT,
   }: {
     "aria-label": string;
     value: ManualTaskStatus;
-    /** When set (e.g. kanban cards), overrides the visible label while `value` stays the manual stage. */
-    displayLabel?: string;
-    /** When set, drives pill colors so **Assigned** / **Late** match their labels (manual `value` stays the flow bucket). */
-    pillAppearance?: BoardTaskStatus;
     onChange: (next: ManualTaskStatus) => void;
     options: readonly ManualTaskStatus[];
     disabled?: boolean;
+    /** Outer box sizing (list row uses fixed width; kanban uses equal flex cells). */
+    shellLayoutClassName?: string;
   }) {
     const [open, setOpen] = useState(false);
     const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLUListElement>(null);
     const listboxId = useId();
-    const paletteKey = pillAppearance ?? value;
+    const paletteKey = value;
 
     useLayoutEffect(() => {
       if (!open || !triggerRef.current) {
@@ -1493,7 +1640,7 @@ function WorkItemsInner() {
 
     return (
       <div
-        className={`relative ${STATUS_PILL_LAYOUT} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
+        className={`relative ${shellLayoutClassName} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
       >
         <button
           ref={triggerRef}
@@ -1511,7 +1658,7 @@ function WorkItemsInner() {
           className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
-            {displayLabel ?? FLOW_COLUMN_LABELS[value]}
+            {FLOW_COLUMN_LABELS[value]}
           </span>
           <IconChevronMiniDown
             className={`pointer-events-none shrink-0 opacity-45 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
@@ -1563,6 +1710,21 @@ function WorkItemsInner() {
     );
   }
 
+  /** List row: fixed-width status shell ({@link STATUS_PILL_LAYOUT}) — do not use {@link KanbanStatusPill} here. */
+  function ListRowStatusPill({ task }: { task: TaskRow }) {
+    const stored = normalizeTaskStatus(task.status);
+    const manual = manualStatusFromStored(stored);
+    const menuOptions = stageControlDropdownOptions(stored);
+    return (
+      <StatusPillSelect
+        aria-label="Task stage"
+        value={manual}
+        onChange={(v) => void patchTask(task.id, { status: v })}
+        options={menuOptions}
+      />
+    );
+  }
+
   function KanbanStatusPill({ task }: { task: TaskRow }) {
     const stored = normalizeTaskStatus(task.status);
     const manual = manualStatusFromStored(stored);
@@ -1571,21 +1733,18 @@ function WorkItemsInner() {
       <StatusPillSelect
         aria-label="Task stage"
         value={manual}
-        displayLabel={taskStatusDisplayLabel(stored)}
-        pillAppearance={stored}
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={menuOptions}
+        shellLayoutClassName={KANBAN_STATUS_SHELL_LAYOUT}
       />
     );
   }
 
-  /** Matches list-row priority tile ({@link ListTaskCard}) — same footprint as {@link STATUS_PILL_LAYOUT} (`h-8`). */
+  /** Kanban meta row: same height as list-row priority tile (`h-8`), width follows equal flex cell. */
   function KanbanPriorityPill({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
     return (
-      <div
-        className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]`}
-      >
+      <div className={KANBAN_PRIORITY_SHELL_LAYOUT}>
         <select
           className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
           value={p}
@@ -1620,6 +1779,8 @@ function WorkItemsInner() {
     const levelBadge = taskLevelBadge(task);
     const assigneeFirstName = firstAssigneeLabel(task, members);
     const assigneeInitial = assigneeFirstName?.trim().charAt(0).toUpperCase() ?? "";
+    const showAssignedFooter = taskHasAssignees(task);
+    const showLateFooter = taskShowsLateFooter(task);
 
     return (
       <li
@@ -1647,75 +1808,6 @@ function WorkItemsInner() {
               aria-label={`More options — edit: ${task.title}`}
             >
               <IconEllipsisVertical className="size-[18px] opacity-90" />
-            </button>
-          </div>
-
-          {(showTaskLevelBadge && levelBadge) || (showTaskListBadge && listBadge) ? (
-            <span className="flex w-fit max-w-full flex-wrap items-center gap-1.5">
-              {showTaskLevelBadge && levelBadge ? (
-                <span className={`${LEVEL_BADGE_CLASS} py-0.5 text-[11px]`} title={`${NODE_LABELS.level}: ${levelBadge}`}>
-                  {levelBadge}
-                </span>
-              ) : null}
-              {showTaskListBadge && listBadge ? (
-                <span className={`${LIST_BADGE_CLASS} py-0.5 text-[11px]`} title={`List: ${listBadge}`}>
-                  {listBadge}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-            <KanbanStatusPill task={task} />
-            <KanbanPriorityPill task={task} />
-          </div>
-
-          <div
-            className="flex flex-wrap items-stretch gap-x-1.5 gap-y-1.5 border-t border-[var(--border-subtle)]/50 pt-2"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => openEditTask(task.id, "due")}
-              className={`${TASK_DUE_CHIP_CLASS} min-h-9 justify-start px-2.5 ${dueDatePillClass(Boolean(task.dueAt))}`}
-              title={task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"}
-            >
-              <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
-              <span className={`${TASK_DUE_CHIP_LABEL_CLASS} text-left`}>
-                {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openEditTask(task.id, "assignees")}
-              title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
-              aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
-              className={`inline-flex min-h-9 max-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border px-2 py-1 text-left transition-colors hover:opacity-95 sm:flex-initial sm:max-w-[10rem] ${
-                assigneeNames
-                  ? "border-[var(--border-subtle)] bg-[var(--surface-muted)]/80"
-                  : "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-hover)]/60"
-              }`}
-            >
-              {assigneeFirstName ? (
-                <>
-                  <span
-                    className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[11px] font-bold tabular-nums text-[var(--accent-hover)] dark:text-[var(--accent)]"
-                    aria-hidden
-                  >
-                    {assigneeInitial}
-                  </span>
-                  <span className="pointer-events-none min-w-0 flex-1 truncate text-[12px] font-medium leading-tight text-[var(--fg)]">
-                    {assigneeFirstName}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)]/50">
-                    <IconUserPlus className="size-3.5 shrink-0 opacity-70" aria-hidden />
-                  </span>
-                  <span className="pointer-events-none text-[12px] font-medium text-[var(--muted)]">Assign</span>
-                </>
-              )}
             </button>
           </div>
 
@@ -1789,10 +1881,111 @@ function WorkItemsInner() {
               </ul>
             </div>
           )}
+
+          <div className="border-t border-[var(--border-subtle)]/50 pt-1.5">
+            <div
+              className="grid w-full min-w-0 grid-cols-2 gap-x-1.5 gap-y-1.5"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+            <div className="min-h-8 min-w-0">
+              <KanbanStatusPill task={task} />
+            </div>
+            <div className="min-h-8 min-w-0">
+              <KanbanPriorityPill task={task} />
+            </div>
+            <div className="flex min-h-8 min-w-0 w-full">
+              <button
+                type="button"
+                onClick={() => openEditTask(task.id, "due")}
+                className={`${TASK_DUE_CHIP_CLASS} h-8 ${KANBAN_DUE_CHIP_CELL} ${dueChipChromeClass(task)}`}
+                title={task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"}
+              >
+                <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
+                <span className={`${TASK_DUE_CHIP_LABEL_CLASS} truncate text-left`}>
+                  {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
+                </span>
+              </button>
+            </div>
+            <div className="min-h-8 min-w-0">
+              <button
+                type="button"
+                onClick={() => openEditTask(task.id, "assignees")}
+                title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
+                aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
+                className={`inline-flex box-border h-8 min-h-8 max-h-8 w-full min-w-0 items-center gap-1.5 rounded-lg border px-1.5 py-0 text-left text-xs font-medium leading-none transition-colors hover:opacity-95 ${
+                  assigneeNames
+                    ? TASK_ASSIGNED_CHROME_CLASS
+                    : "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-hover)]/60"
+                }`}
+              >
+                {assigneeFirstName ? (
+                  <>
+                    <span
+                      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/25 text-[10px] font-bold tabular-nums text-sky-900 dark:bg-sky-500/20 dark:text-sky-100"
+                      aria-hidden
+                    >
+                      {assigneeInitial}
+                    </span>
+                    <span className="pointer-events-none min-w-0 flex-1 truncate text-[11px] font-medium leading-tight text-[var(--fg)]">
+                      {assigneeFirstName}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)]/50">
+                      <IconUserPlus className="size-3 shrink-0 opacity-70" aria-hidden />
+                    </span>
+                    <span className="pointer-events-none text-[11px] font-medium text-[var(--muted)]">Assign</span>
+                  </>
+                )}
+              </button>
+            </div>
+            </div>
+          </div>
         </div>
-        {task.lastLedger ? (
-          <TaskCardLastActivity entry={task.lastLedger} members={members} compact />
+        {(showTaskLevelBadge && levelBadge) ||
+        (showTaskListBadge && listBadge) ||
+        showAssignedFooter ||
+        showLateFooter ? (
+          <div
+            className="flex w-full min-w-0 flex-wrap items-center gap-1.5 border-t border-[var(--border-subtle)]/50 px-2.5 py-1.5"
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label="Level, list, and assignment"
+          >
+            {showTaskLevelBadge && levelBadge ? (
+              <span
+                className={`${LEVEL_BADGE_CLASS} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT} text-[11px]`}
+                title={`${NODE_LABELS.level}: ${levelBadge}`}
+              >
+                {levelBadge}
+              </span>
+            ) : null}
+            {showTaskListBadge && listBadge ? (
+              <span className={`${LIST_BADGE_CLASS} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT} text-[11px]`} title={`List: ${listBadge}`}>
+                {listBadge}
+              </span>
+            ) : null}
+            {showAssignedFooter ? (
+              <span
+                className={`${TASK_FOOTER_META_ICON_CHIP} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT}`}
+                title="Has assignee"
+                aria-label="Has assignee"
+              >
+                <IconTaskFooterProfile className={TASK_FOOTER_ASSIGNEE_ICON_CLASS} />
+              </span>
+            ) : null}
+            {showLateFooter ? (
+              <span
+                className={`${TASK_FOOTER_META_ICON_CHIP} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT}`}
+                title="In progress and past due"
+                aria-label="In progress, past due"
+              >
+                <IconTaskFooterStopwatch className={TASK_FOOTER_LATE_ICON_CLASS} />
+              </span>
+            ) : null}
+          </div>
         ) : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact /> : null}
       </li>
     );
   }
@@ -2257,6 +2450,11 @@ function WorkItemsInner() {
                     </div>
                     <div className="space-y-3">
                       <TaskPanelScopeBadges level={editTaskScopeBadges.level} list={editTaskScopeBadges.list} />
+                      <TaskPanelAiFill
+                        members={members}
+                        existingDraft={{ title: editTitle, dueLocal: editDue, dueRepeat: editDueRepeat }}
+                        onApply={applyAiFillToEditForm}
+                      />
                       <input
                         className="input rounded-xl text-base"
                         value={editTitle}
@@ -2426,6 +2624,11 @@ function WorkItemsInner() {
             </div>
             <div className="space-y-3">
               <TaskPanelScopeBadges level={createTaskScopeBadges.level} list={createTaskScopeBadges.list} />
+              <TaskPanelAiFill
+                members={members}
+                existingDraft={{ title, dueLocal: due, dueRepeat }}
+                onApply={applyAiFillToCreateForm}
+              />
               <input
                 className="input rounded-xl text-base"
                 value={title}
