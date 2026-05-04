@@ -101,9 +101,9 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
       setLastSeenTs(Number(raw));
       return;
     }
-    const now = Date.now();
-    localStorage.setItem(key, String(now));
-    setLastSeenTs(now);
+    // Do not seed last-seen to "now" on first visit — that marks the entire existing feed as read
+    // before the user opens the panel, so the bell badge stays at 0 while the panel still lists items.
+    setLastSeenTs(0);
   }, [workspaceId]);
 
   useEffect(() => {

@@ -4,6 +4,18 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Notification bell badge: don’t seed last-seen on first visit
+
+- **Context:** Toasts and the notifications panel worked, but the header bell never showed a count.
+- **What we did:** **`WorkspaceNotificationsProvider`** no longer writes **`Date.now()`** to **`wl:notif:lastSeen:*`** when there is no stored value. That old behavior marked the entire existing activity feed as “already seen” before the user opened the panel, so **`unreadCount`** stayed **0** while the list still showed historical items. First visit now uses **`lastSeenTs = 0`** until the user opens the panel (which persists a real last-seen timestamp).
+- **Code / repo:** `apps/web/src/components/notifications/WorkspaceNotificationsProvider.tsx`.
+
+### 2026-05-05 — Prod CORS: `log-base` → `logger-api` preflight
+
+- **Context:** Browser reported no **`Access-Control-Allow-Origin`** on **`OPTIONS`** for **`https://logger-api-blond.vercel.app/organizations`** from **`https://log-base.vercel.app`**; intermittent across browsers/networks (cached failed queries, different origins, preflight vs simple requests).
+- **What we did:** **`corsAllowedOrigins()`** in **`apps/api/src/main.ts`** now splits comma-separated **`NEXT_PUBLIC_APP_URL`** the same way **`AuthService`** does for issuer/audience, so multiple web origins in one env var get CORS without requiring **`API_CORS_ORIGINS`**. **Deploy fix:** on the **API** Vercel project set **`NEXT_PUBLIC_APP_URL`** and/or **`API_CORS_ORIGINS`** so the set includes the **exact** origin users open (e.g. **`https://log-base.vercel.app`**, plus custom domains / `www` if used).
+- **Code / repo:** `apps/api/src/main.ts`.
+
 ### 2026-05-04 — List row: assigned / late icon chips match `h-8` row
 
 - **What:** **`LIST_ROW_FOOTER_META_ICON_CHIP`** (`size-8`) replaces **`TASK_FOOTER_META_ICON_CHIP`** (`size-7`) for has-assignee + in-progress-overdue hints in **`ListTaskCard`** so they align with assignee tile, due chip, and overflow (**`h-8`**). Kanban mid-footer unchanged (**`h-7`** + **`KANBAN_SUBTASK_BELOW_BADGE_HEIGHT`**).
