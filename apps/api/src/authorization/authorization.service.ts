@@ -112,12 +112,15 @@ export class AuthorizationService {
     return { task, role, isOwner, isDeptManager, isAssignee };
   }
 
-  taskCapabilities(access: TaskAccess, userId: string) {
+  taskCapabilities(access: TaskAccess, _userId: string) {
     const t = access.task;
-    const isAssigner = t.assignerId === userId;
     const active = t.deletedAt == null;
+    /** Managers archive tasks in their levels; owners use delete (same soft-delete endpoint). */
+    const canArchiveTask = active && access.isDeptManager;
+    const canDeleteTask = active && access.isOwner;
     return {
-      canDeleteTask: isAssigner && active,
+      canArchiveTask,
+      canDeleteTask,
       canReschedule: active && (access.isOwner || access.isDeptManager || access.isAssignee),
       canAppendLedger: active && (access.isOwner || access.isDeptManager || access.isAssignee),
     };

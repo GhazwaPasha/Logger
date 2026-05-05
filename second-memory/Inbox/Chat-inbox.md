@@ -4,6 +4,26 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Delete / archive: API + context menus + org danger zone
+
+- **Context:** Product rule: **owners** delete org / levels / lists / tasks; **managers** archive tasks in their levels only; **members** no structural or archive rights. UI: right-click menus on sidebar + work board; org delete in settings.
+- **What we did:** **API** — `DELETE /organizations/:id`, `DELETE .../departments/:id`, `DELETE .../lists/:id` (owner-only; DB FK cascades). **`POST /tasks/:id/archive`** — owner or dept manager (removed **`AssignerOnlyGuard`**). **`taskCapabilities`** adds **`canArchiveTask`** / **`canDeleteTask`** per rules. **Contracts** — `canArchiveTask` on capability schema. **Web** — **`apiVoid`**, **`SimpleContextMenu`**, **`workspace-permissions`** helpers; sidebar level/list context delete; work page list + kanban task context + edit panel buttons; org settings typed-name delete + redirect (`/app` if no orgs left). **`useTaskDetail`** placeholder uses same cap rules until GET returns.
+- **Follow-up (same feature):** Replaced **`window.confirm`** with **`ConfirmDialog`** (portal + backdrop). Destructive labels use **white text** on **red-600** (context menu rows, edit-panel delete, org danger zone on **red-700** panel with white copy).
+- **Code / repo:** `apps/api/src/authorization/authorization.service.ts`, `tasks.service.ts`, `tasks.controller.ts`, `tasks.module.ts` (guard removed), `departments/*`, `lists/*`, `organizations/*`, `packages/contracts`, `apps/web/src/lib/api.ts`, `workspace-permissions.ts`, `SimpleContextMenu.tsx`, **`ConfirmDialog.tsx`**, `WorkspaceSidebar.tsx`, `work/page.tsx`, `organization-settings/page.tsx`, `useTaskDetail.ts`, `ledger-types.ts`.
+- **Links:** [[Topics/Domain/domain-authorization-and-tasks]], [[Topics/Infrastructure/apps-api]].
+
+### 2026-05-05 — Notification badge + Sonner toasts (header layering)
+
+- **Context:** Bell unread badge looked pill/accent-colored; toasts were small/default Sonner styling and easy to sit under other chrome.
+- **What we did:** **AppHeader** — red (`red-600`) squarish badge (`rounded-[3px]`), `h-5`, `tabular-nums`, `11px` count, ring matching icon button surface. **AppToaster** — `className="app-toaster"`, `richColors={false}`, `gap={16}`, `offset` top `12px`. **globals.css** — wider cards (`--width` ~26rem), `surface-elevated` + `--radius-xl`, larger title/description/icon/close, left stripe by `data-type`, `z-index: 160` (above header `z-40`, overlays `z-60`, popovers `z-[100]`).
+- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `AppToaster.tsx`, `apps/web/src/app/globals.css`.
+
+### 2026-05-05 — “Enable push” / web push not configured
+
+- **Context:** Notification panel **Enable push** showed toast: *The server may not be configured for web push yet.*
+- **What we did:** Explained fix only (no code change). **`subscribeWebPush`** returns false when **`GET /push/vapid-public-key`** has no **`publicKey`** — API **`PushNotificationsService`** only enables VAPID when **`WEB_PUSH_VAPID_PUBLIC_KEY`** and **`WEB_PUSH_VAPID_PRIVATE_KEY`** are set (loaded from monorepo root **`.env`** / **`.env.local`** per **`apps/api/src/app.module.ts`**). Optional: **`WEB_PUSH_CONTACT`** (e.g. **`mailto:…`**), **`PUBLIC_WEB_ORIGIN`** for notification URLs. Generate keys: **`npx web-push generate-vapid-keys`**. Restart API after env change; set same vars on **Railway** (or host) for production.
+- **Code / repo:** `apps/api/src/push/push-notifications.service.ts`, `apps/web/src/lib/web-push-client.ts`, `WorkspaceNotificationsProvider.tsx`.
+
 ### 2026-05-05 — Shared loading UI: dashboard, org, workspaces, session
 
 - **Context:** Same **sync ribbon** language as task cards for dashboard, activity, org settings, sidebar bootstrap, and full-page gates.

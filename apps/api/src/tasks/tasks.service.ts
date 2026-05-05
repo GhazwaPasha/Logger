@@ -285,6 +285,12 @@ export class TasksService {
 
   async archive(userId: string, taskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
+    if (access.task.deletedAt) {
+      throw new ForbiddenException("Task already archived");
+    }
+    if (!access.isOwner && !access.isDeptManager) {
+      throw new ForbiddenException("Only owners and department managers can archive tasks");
+    }
 
     const now = new Date();
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];

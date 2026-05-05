@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { ListsService } from "./lists.service";
@@ -29,6 +29,15 @@ export class ListsController {
     @Body() body: unknown,
   ) {
     return this.lists.patch(user.id, organizationId, listId, body);
+  }
+
+  @Delete(":listId")
+  remove(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Param("listId") listId: string,
+  ) {
+    return this.lists.remove(user.id, organizationId, listId);
   }
 }
 

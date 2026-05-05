@@ -39,11 +39,12 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 
 - `GET/POST /organizations`
 - `GET/PATCH /organizations/:organizationId`
+- `DELETE /organizations/:organizationId` — **owner only**; cascades full org data (FK).
 - `GET/POST /organizations/:organizationId/members`
 
-**Departments** — `GET/POST /organizations/:organizationId/departments`, `PATCH .../departments/:departmentId`
+**Departments** — `GET/POST /organizations/:organizationId/departments`, `PATCH .../departments/:departmentId`, `DELETE .../departments/:departmentId` (**owner**; cascades lists + tasks)
 
-**Lists** — `GET/POST /organizations/:organizationId/lists`, `PATCH .../lists/:listId`
+**Lists** — `GET/POST /organizations/:organizationId/lists`, `PATCH .../lists/:listId`, `DELETE .../lists/:listId` (**owner**; cascades tasks)
 
 **Tasks (org-scoped list + create)**
 
@@ -62,12 +63,12 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 - `POST /tasks/:taskId/reschedule` — due change + reason → ledger type `reschedule`; response **slim**
 - `POST /tasks/:taskId/status` — status transition (delegates to patch)
 - `GET/POST /tasks/:taskId/subtasks`, `PATCH .../subtasks/:subtaskId`
-- `POST /tasks/:taskId/archive` — **`AssignerOnlyGuard`**: only **`tasks.assignerId`** may archive; response **slim**
+- `POST /tasks/:taskId/archive` — **owner** or **department manager** for the task’s list’s level; soft-delete (`deletedAt` + ledger `archive`); response **slim**
 - `GET /tasks/:taskId/report.pdf` — PDF attachment (`pdf-lib`)
 
 ## Guards beyond JWT
 
-- **`AssignerOnlyGuard`** — archive; ensures task exists, not deleted, caller is assigner.
+- (Archive is enforced in **`TasksService.archive`** after **`getTaskAccess`** — no separate guard.)
 
 ## Validation & shared types
 

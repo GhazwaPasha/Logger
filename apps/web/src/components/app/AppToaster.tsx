@@ -28,5 +28,20 @@ export function AppToaster() {
     };
   }, []);
 
-  return <Toaster theme={theme} richColors closeButton position="top-center" />;
+  return (
+    <Toaster
+      theme={theme}
+      richColors={false}
+      closeButton
+      position="top-center"
+      className="app-toaster"
+      gap={16}
+      offset={{ top: 12 }}
+      toastOptions={{
+        classNames: {
+          content: "app-toaster__content",
+        },
+      }}
+    />
+  );
 }

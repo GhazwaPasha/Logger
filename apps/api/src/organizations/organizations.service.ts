@@ -148,6 +148,18 @@ export class OrganizationsService {
     return row;
   }
 
+  /** Owner only. Cascades members, levels, lists, tasks (FK). */
+  async remove(userId: string, organizationId: string) {
+    const membership = await this.authz.assertOrgMember(userId, organizationId);
+    if (membership.role !== "owner") {
+      throw new ForbiddenException("Only owners can delete this organization");
+    }
+    const rows = await this.db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+    if (rows.length === 0) throw new NotFoundException("Organization not found");
+    this.collaboration.notifyOrgChanged(organizationId, null);
+    await this.db.delete(organizations).where(eq(organizations.id, organizationId));
+  }
+
   async listMembers(requesterId: string, organizationId: string) {
     await this.authz.assertOrgMember(requesterId, organizationId);
     const rows = await this.db

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { OrganizationsService } from "./organizations.service";
@@ -42,5 +42,10 @@ export class OrganizationsController {
   @Get(":organizationId")
   getOne(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
     return this.orgs.getById(user.id, organizationId);
+  }
+
+  @Delete(":organizationId")
+  remove(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
+    return this.orgs.remove(user.id, organizationId);
   }
 }

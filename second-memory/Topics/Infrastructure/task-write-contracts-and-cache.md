@@ -27,7 +27,7 @@ Shape (conceptual):
 | `task` | Full persisted task row after automation (`assigned` / `late` reconciliation may run). |
 | `assigneeUserIds` | Current assignees. |
 | `subtasks` | All checklist rows for that task (newest-first order matches list endpoints). |
-| `capabilities` | `canDeleteTask`, `canReschedule`, `canAppendLedger`. |
+| `capabilities` | `canArchiveTask`, `canDeleteTask`, `canReschedule`, `canAppendLedger`. |
 | `ledgerDelta` | **Only** ledger rows inserted during **this** request — append client-side to existing history; do not treat as full ledger. |
 
 Full detail for audit UI remains:

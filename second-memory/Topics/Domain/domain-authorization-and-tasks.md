@@ -37,11 +37,12 @@ Returned **`role`** label includes **`assignee_only`** when not in `organization
 
 Derived from access + task state:
 
-- **`canDeleteTask`** — effectively tied to **assigner** + active task (archive flow uses assigner guard).
+- **`canArchiveTask`** — **manager** for the task’s list’s department + active task (same scope as **`isDeptManager`**).
+- **`canDeleteTask`** — **owner** + active task (UI label “Delete”; same **`POST …/archive`** soft-delete as managers).
 - **`canReschedule`** — owner, dept manager, or assignee; active task.
 - **`canAppendLedger`** — same group; drives notes, acks, status_change entries, subtask mutations tied to that permission.
 
-**Archive:** only **`tasks.assignerId`** (`AssignerOnlyGuard` on archive endpoint).
+**Archive API:** **`POST /tasks/:taskId/archive`** — **`TasksService`** allows **owner** or **dept manager** (not assigner-only); idempotent guard if already archived.
 
 ## Task creation
 

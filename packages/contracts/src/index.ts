@@ -165,6 +165,7 @@ export const patchTaskSchema = z
   );
 
 export const taskCapabilitiesSchema = z.object({
+  canArchiveTask: z.boolean(),
   canDeleteTask: z.boolean(),
   canReschedule: z.boolean(),
   canAppendLedger: z.boolean(),

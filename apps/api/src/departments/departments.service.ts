@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { createDepartmentSchema, updateDepartmentSchema } from "@work-ledger/contracts";
 import { departments } from "@work-ledger/db";
@@ -51,6 +51,24 @@ export class DepartmentsService {
       .returning();
     this.collaboration.notifyOrgChanged(organizationId, null);
     return dept!;
+  }
+
+  /** Owner only. Cascades to lists and tasks (FK). */
+  async remove(userId: string, organizationId: string, departmentId: string) {
+    const m = await this.authz.assertOrgMember(userId, organizationId);
+    if (m.role !== "owner") {
+      throw new ForbiddenException("Only owners can delete levels");
+    }
+    const rows = await this.db
+      .select()
+      .from(departments)
+      .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)))
+      .limit(1);
+    if (rows.length === 0) throw new NotFoundException("Level not found");
+    this.collaboration.notifyOrgChanged(organizationId, null);
+    await this.db
+      .delete(departments)
+      .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)));
   }
 
   async assertDeptInOrg(organizationId: string, departmentId: string) {

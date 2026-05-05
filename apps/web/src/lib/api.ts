@@ -41,3 +41,18 @@ export async function apiJson<T>(
   }
   return res.json() as Promise<T>;
 }
+
+/** For DELETE / no-response-body endpoints. */
+export async function apiVoid(
+  path: string,
+  options: RequestInit & { token?: string | null } = {},
+): Promise<void> {
+  const res = await apiFetch(path, options);
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("wl:auth-expired"));
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+}

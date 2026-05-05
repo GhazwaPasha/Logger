@@ -8,12 +8,10 @@ import {
   Post,
   Query,
   Res,
-  UseGuards,
 } from "@nestjs/common";
 import type { Response } from "express";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
-import { AssignerOnlyGuard } from "./assigner-only.guard";
 import { TasksService } from "./tasks.service";
 
 @Controller("organizations/:organizationId/tasks")
@@ -110,7 +108,6 @@ export class TasksByIdController {
   }
 
   @Post(":taskId/archive")
-  @UseGuards(AssignerOnlyGuard)
   archive(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
     return this.tasks.archive(user.id, taskId);
   }

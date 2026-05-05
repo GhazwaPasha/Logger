@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { createListSchema, updateListSchema } from "@work-ledger/contracts";
 import { lists } from "@work-ledger/db";
@@ -55,6 +55,22 @@ export class ListsService {
       .returning();
     this.collaboration.notifyOrgChanged(organizationId, null);
     return row!;
+  }
+
+  /** Owner only. Cascades to tasks (FK). */
+  async remove(userId: string, organizationId: string, listId: string) {
+    const member = await this.authz.assertOrgMember(userId, organizationId);
+    if (member.role !== "owner") {
+      throw new ForbiddenException("Only owners can delete lists");
+    }
+    const rows = await this.db
+      .select()
+      .from(lists)
+      .where(and(eq(lists.id, listId), eq(lists.organizationId, organizationId)))
+      .limit(1);
+    if (rows.length === 0) throw new NotFoundException("List not found");
+    this.collaboration.notifyOrgChanged(organizationId, null);
+    await this.db.delete(lists).where(and(eq(lists.id, listId), eq(lists.organizationId, organizationId)));
   }
 
   async assertListInOrg(organizationId: string, listId: string) {

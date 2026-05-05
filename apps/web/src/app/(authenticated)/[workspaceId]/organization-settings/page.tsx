@@ -1,26 +1,38 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
-import { apiJson } from "@/lib/api";
+import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
+import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { Org } from "@/lib/ledger-types";
+import { orgKeys, workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { workspaceUrlSegment } from "@/lib/workspace-url";
+import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 
 export default function OrganizationSettingsPage() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { workspaceId } = useWorkspaceRoute();
-  const { token } = useApiSession();
+  const { token, session } = useApiSession();
   const { reload: reloadWorkspaceList } = useOrganizationsState();
-  const { error, setError, reload } = useWorkspaceData();
+  const { error, setError, reload, members } = useWorkspaceData();
   const [org, setOrg] = useState<Org | null>(null);
   const [rename, setRename] = useState("");
   const [orgLoading, setOrgLoading] = useState(true);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [orgDeleteDialog, setOrgDeleteDialog] = useState<ConfirmDialogOptions | null>(null);
+  const canDeleteOrg = isWorkspaceOwner(members, session?.user?.id);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -71,8 +83,56 @@ export default function OrganizationSettingsPage() {
     }
   }
 
+  function openOrgDeleteDialog() {
+    if (!org) return;
+    if (deleteConfirm.trim() !== org.name.trim()) {
+      setError("Type the organization name exactly to confirm deletion.");
+      return;
+    }
+    setError(null);
+    setOrgDeleteDialog({
+      title: "Delete this organization?",
+      description: `“${org.name}” and all of its levels, lists, tasks, and members will be permanently removed. This cannot be undone.`,
+      confirmLabel: "Delete forever",
+      variant: "danger",
+      onConfirm: () => void performOrganizationDelete(),
+    });
+  }
+
+  async function performOrganizationDelete() {
+    if (!token || !org || deleteBusy) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await apiVoid(`/organizations/${workspaceId}`, { method: "DELETE", token });
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      const list = await queryClient.fetchQuery({
+        queryKey: orgKeys.all,
+        queryFn: () => apiJson<Org[]>("/organizations", { token }),
+      });
+      setDeleteConfirm("");
+      setOrgDeleteDialog(null);
+      if (list.length > 0) {
+        const next = list[0]!;
+        setLastWorkspaceId(next.id);
+        router.replace(`/${workspaceUrlSegment(next)}/dashboard`);
+      } else {
+        router.replace("/app");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete organization");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-screen-lg space-y-8">
+      <ConfirmDialog
+        open={orgDeleteDialog != null}
+        options={orgDeleteDialog}
+        onClose={() => setOrgDeleteDialog(null)}
+      />
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
@@ -125,6 +185,34 @@ export default function OrganizationSettingsPage() {
           </p>
         </section>
       )}
+      {!orgLoading && org && canDeleteOrg ? (
+        <section className="rounded-2xl border border-red-500/40 bg-red-700 p-6 text-white shadow-md dark:bg-red-900">
+          <h2 className="text-sm font-semibold text-white">Delete organization</h2>
+          <p className="mt-1 text-xs text-white/85">
+            Permanently delete this workspace, all levels, lists, tasks, and members. This cannot be undone.
+          </p>
+          <label className="mt-4 block text-xs font-medium text-white">
+            Type <span className="font-semibold">{org.name}</span> to confirm
+            <input
+              className="mt-1.5 w-full max-w-md rounded-xl border border-white/35 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-white/55 focus:ring-2 focus:ring-white/25"
+              value={deleteConfirm}
+              disabled={deleteBusy}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              autoComplete="off"
+              placeholder="Organization name"
+            />
+          </label>
+          <button
+            type="button"
+            className="mt-4 rounded-xl border-2 border-white/50 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={deleteBusy || deleteConfirm.trim() !== org.name.trim()}
+            aria-busy={deleteBusy || undefined}
+            onClick={() => openOrgDeleteDialog()}
+          >
+            {deleteBusy ? "Deleting…" : "Delete organization forever"}
+          </button>
+        </section>
+      ) : null}
     </div>
   );
 }

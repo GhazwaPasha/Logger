@@ -141,6 +141,7 @@ exports.patchTaskSchema = zod_1.z
         hasSubs);
 }, { message: "Provide at least one field to update" });
 exports.taskCapabilitiesSchema = zod_1.z.object({
+    canArchiveTask: zod_1.z.boolean(),
     canDeleteTask: zod_1.z.boolean(),
     canReschedule: zod_1.z.boolean(),
     canAppendLedger: zod_1.z.boolean(),

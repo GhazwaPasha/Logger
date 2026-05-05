@@ -72,7 +72,12 @@ export type TaskRow = {
 
 export type TaskDetail = {
   task: TaskRow;
-  capabilities: { canDeleteTask: boolean; canReschedule: boolean; canAppendLedger: boolean };
+  capabilities: {
+    canArchiveTask: boolean;
+    canDeleteTask: boolean;
+    canReschedule: boolean;
+    canAppendLedger: boolean;
+  };
   assigneeUserIds: string[];
   subtasks: SubtaskRow[];
   ledger: LedgerRow[];

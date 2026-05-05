@@ -10,7 +10,9 @@ import {
   WORK_BOARD_SCOPE_EVENT,
 } from "@/lib/work-board-scope";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
-import { apiJson } from "@/lib/api";
+import { apiJson, apiVoid } from "@/lib/api";
+import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
+import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
 import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
@@ -91,6 +93,12 @@ export function WorkspaceSidebar({
   const [renamingListId, setRenamingListId] = useState<string | null>(null);
   const [renameListDraft, setRenameListDraft] = useState("");
   const [renamingListBusy, setRenamingListBusy] = useState(false);
+  const [structureMenu, setStructureMenu] = useState<
+    | null
+    | { x: number; y: number; kind: "level"; deptId: string; name: string }
+    | { x: number; y: number; kind: "list"; listId: string; deptId: string; name: string }
+  >(null);
+  const [structureActionConfirm, setStructureActionConfirm] = useState<ConfirmDialogOptions | null>(null);
 
   const base = `/${workspaceSlug}`;
 
@@ -288,6 +296,46 @@ export function WorkspaceSidebar({
     }
   }
 
+  async function deleteLevelById(deptId: string) {
+    if (!token) return;
+    setStructureMenu(null);
+    setError(null);
+    try {
+      await apiVoid(`/organizations/${workspaceId}/departments/${deptId}`, { method: "DELETE", token });
+      const scope = readWorkBoardScope(workspaceId);
+      if (scope?.levelId === deptId) {
+        writeWorkBoardScope(workspaceId, { levelId: null, listId: null });
+        window.dispatchEvent(new Event(WORK_BOARD_SCOPE_EVENT));
+      } else if (scope?.listId) {
+        const scopedList = lists.find((l) => l.id === scope.listId);
+        if (scopedList?.departmentId === deptId) {
+          writeWorkBoardScope(workspaceId, { levelId: null, listId: null });
+          window.dispatchEvent(new Event(WORK_BOARD_SCOPE_EVENT));
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete level");
+    }
+  }
+
+  async function deleteListById(listId: string, deptId: string) {
+    if (!token) return;
+    setStructureMenu(null);
+    setError(null);
+    try {
+      await apiVoid(`/organizations/${workspaceId}/lists/${listId}`, { method: "DELETE", token });
+      const scope = readWorkBoardScope(workspaceId);
+      if (scope?.listId === listId) {
+        writeWorkBoardScope(workspaceId, { levelId: deptId, listId: null });
+        window.dispatchEvent(new Event(WORK_BOARD_SCOPE_EVENT));
+      }
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete list");
+    }
+  }
+
   async function commitRenameList(listId: string) {
     if (!token || renamingListBusy) return;
     const trimmed = renameListDraft.trim();
@@ -321,8 +369,62 @@ export function WorkspaceSidebar({
     }
   }
 
+  const structureMenuItems: SimpleContextMenuItem[] =
+    !structureMenu || !canRenameOrgStructure
+      ? []
+      : structureMenu.kind === "level"
+        ? [
+            {
+              id: "delete-level",
+              label: `Delete ${NODE_LABELS.level}`,
+              destructive: true,
+              onSelect: () => {
+                const deptId = structureMenu.deptId;
+                const name = structureMenu.name;
+                setStructureActionConfirm({
+                  title: `Delete this ${NODE_LABELS.level.toLowerCase()}?`,
+                  description: `“${name}” and every list and task under it will be permanently removed.`,
+                  confirmLabel: `Delete ${NODE_LABELS.level}`,
+                  variant: "danger",
+                  onConfirm: () => void deleteLevelById(deptId),
+                });
+              },
+            },
+          ]
+        : [
+            {
+              id: "delete-list",
+              label: "Delete list",
+              destructive: true,
+              onSelect: () => {
+                const listId = structureMenu.listId;
+                const deptId = structureMenu.deptId;
+                const name = structureMenu.name;
+                setStructureActionConfirm({
+                  title: "Delete this list?",
+                  description: `“${name}” and every task in it will be permanently removed.`,
+                  confirmLabel: "Delete list",
+                  variant: "danger",
+                  onConfirm: () => void deleteListById(listId, deptId),
+                });
+              },
+            },
+          ];
+
   return (
     <aside className="ui-sidebar-chrome font-outfit flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
+      <ConfirmDialog
+        open={structureActionConfirm != null}
+        options={structureActionConfirm}
+        onClose={() => setStructureActionConfirm(null)}
+      />
+      <SimpleContextMenu
+        open={structureMenu != null && structureMenuItems.length > 0}
+        x={structureMenu?.x ?? 0}
+        y={structureMenu?.y ?? 0}
+        items={structureMenuItems}
+        onClose={() => setStructureMenu(null)}
+      />
       <nav className="flex min-h-0 flex-1 flex-col" aria-label="Workspace tree">
         <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
           <button
@@ -419,7 +521,20 @@ export function WorkspaceSidebar({
                   const levelLists = listsByLevel.get(d.id) ?? [];
                   return (
                     <li key={d.id} className="select-none">
-                      <div className="group/level flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+                      <div
+                        className="group/level flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]"
+                        onContextMenu={(e) => {
+                          if (!canRenameOrgStructure || renamingLevelId === d.id) return;
+                          e.preventDefault();
+                          setStructureMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            kind: "level",
+                            deptId: d.id,
+                            name: d.name,
+                          });
+                        }}
+                      >
                         {renamingLevelId === d.id ? (
                           <div
                             className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 ${
@@ -522,7 +637,21 @@ export function WorkspaceSidebar({
                               const listTaskCount = (tasksByList.get(l.id) ?? []).length;
                               return (
                                 <li key={l.id}>
-                                  <div className="group/list flex w-full items-center gap-0.5">
+                                  <div
+                                    className="group/list flex w-full items-center gap-0.5"
+                                    onContextMenu={(e) => {
+                                      if (!canRenameOrgStructure || renamingListId === l.id) return;
+                                      e.preventDefault();
+                                      setStructureMenu({
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        kind: "list",
+                                        listId: l.id,
+                                        deptId: d.id,
+                                        name: l.name,
+                                      });
+                                    }}
+                                  >
                                     {renamingListId === l.id ? (
                                       <div
                                         className={`${rowBase(boardScope?.listId === l.id)} flex min-w-0 flex-1 items-center gap-2 pl-2 pr-1`}

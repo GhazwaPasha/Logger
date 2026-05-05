@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import {
   Suspense,
   useCallback,
@@ -15,6 +15,9 @@ import {
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@/lib/api";
+import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
+import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
+import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
@@ -515,11 +518,20 @@ function WorkItemsInner() {
     () => (editTaskId ? tasks.find((t) => t.id === editTaskId) ?? null : null),
     [editTaskId, tasks],
   );
+  const taskDetailPlaceholderCtx = useMemo(
+    () => ({ lists, members, userId: sessionUserId }),
+    [lists, members, sessionUserId],
+  );
   const { detail: editDetail, isLoading: editDetailLoading } = useTaskDetail(
     token,
     editTaskId,
     editTaskFromList,
+    taskDetailPlaceholderCtx,
   );
+  const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
+    null,
+  );
+  const [taskActionConfirm, setTaskActionConfirm] = useState<ConfirmDialogOptions | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [listRowExpanded, setListRowExpanded] = useState<Set<string>>(() => new Set());
   const [subtasksByTaskId, setSubtasksByTaskId] = useState<Record<string, SubtaskRow[] | "loading">>({});
@@ -964,6 +976,70 @@ function WorkItemsInner() {
     [token, patchTaskMutation],
   );
 
+  const runTaskArchive = useCallback(
+    async (taskId: string) => {
+      if (!token) return;
+      setTaskContextMenu(null);
+      setError(null);
+      try {
+        await apiJson<TaskMutationResult>(`/tasks/${taskId}/archive`, { method: "POST", token });
+        await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+        queryClient.removeQueries({ queryKey: taskKeys.detail(taskId) });
+        setEditTaskId((id) => (id === taskId ? null : id));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not archive task");
+      }
+    },
+    [token, queryClient, workspaceId, setError],
+  );
+
+  function openTaskContextMenu(e: ReactMouseEvent, task: TaskRow) {
+    const caps = taskArchiveDeleteCaps(task, lists, sessionUserId, members);
+    if (!caps.canArchiveTask && !caps.canDeleteTask) return;
+    e.preventDefault();
+    setTaskContextMenu({ x: e.clientX, y: e.clientY, task });
+  }
+
+  const taskContextMenuItems = useMemo((): SimpleContextMenuItem[] => {
+    if (!taskContextMenu) return [];
+    const { task } = taskContextMenu;
+    const caps = taskArchiveDeleteCaps(task, lists, sessionUserId, members);
+    const items: SimpleContextMenuItem[] = [];
+    if (caps.canDeleteTask) {
+      items.push({
+        id: "delete",
+        label: "Delete task",
+        destructive: true,
+        onSelect: () => {
+          setTaskActionConfirm({
+            title: "Delete this task?",
+            description:
+              "It will be removed from the board. You can still rely on exports or backups outside LogBase if you need a record.",
+            confirmLabel: "Delete task",
+            variant: "danger",
+            onConfirm: () => void runTaskArchive(task.id),
+          });
+        },
+      });
+    }
+    if (caps.canArchiveTask) {
+      items.push({
+        id: "archive",
+        label: "Archive task",
+        onSelect: () => {
+          setTaskActionConfirm({
+            title: "Archive this task?",
+            description: "It will be hidden from the board and treated as archived.",
+            confirmLabel: "Archive",
+            variant: "default",
+            onConfirm: () => void runTaskArchive(task.id),
+          });
+        },
+      });
+    }
+    return items;
+  }, [taskContextMenu, lists, sessionUserId, members, runTaskArchive]);
+
   const toggleListRowExpand = useCallback((taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     const embedded = task?.subtasks ?? [];
@@ -1371,6 +1447,7 @@ function WorkItemsInner() {
             ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--accent-muted))]"
             : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-hover)]/80"
         }`}
+        onContextMenu={(e) => openTaskContextMenu(e, task)}
       >
         {taskPatchSyncing ? (
           <div className="task-sync-ribbon-track" aria-hidden>
@@ -1845,6 +1922,7 @@ function WorkItemsInner() {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
         }}
+        onContextMenu={(e) => openTaskContextMenu(e, task)}
         className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
           taskPatchSyncing
             ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
@@ -2168,6 +2246,18 @@ function WorkItemsInner() {
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl space-y-4">
+      <ConfirmDialog
+        open={taskActionConfirm != null}
+        options={taskActionConfirm}
+        onClose={() => setTaskActionConfirm(null)}
+      />
+      <SimpleContextMenu
+        open={taskContextMenu != null && taskContextMenuItems.length > 0}
+        x={taskContextMenu?.x ?? 0}
+        y={taskContextMenu?.y ?? 0}
+        items={taskContextMenuItems}
+        onClose={() => setTaskContextMenu(null)}
+      />
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       {drilldownActive ? (
         <div
@@ -2638,6 +2728,47 @@ function WorkItemsInner() {
                         assigneeIds={editAssigneeIds}
                         onToggleAssignee={toggleEditAssignee}
                       />
+                    )}
+                    {(editDetail.capabilities.canDeleteTask || editDetail.capabilities.canArchiveTask) && (
+                      <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+                        {editDetail.capabilities.canDeleteTask ? (
+                          <button
+                            type="button"
+                            className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 dark:hover:bg-red-500"
+                            disabled={editSaving}
+                            onClick={() =>
+                              setTaskActionConfirm({
+                                title: "Delete this task?",
+                                description:
+                                  "It will be removed from the board. You can still rely on exports or backups outside LogBase if you need a record.",
+                                confirmLabel: "Delete task",
+                                variant: "danger",
+                                onConfirm: () => void runTaskArchive(editDetail.task.id),
+                              })
+                            }
+                          >
+                            Delete task
+                          </button>
+                        ) : null}
+                        {editDetail.capabilities.canArchiveTask ? (
+                          <button
+                            type="button"
+                            className="rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-sm font-medium text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                            disabled={editSaving}
+                            onClick={() =>
+                              setTaskActionConfirm({
+                                title: "Archive this task?",
+                                description: "It will be hidden from the board and treated as archived.",
+                                confirmLabel: "Archive",
+                                variant: "default",
+                                onConfirm: () => void runTaskArchive(editDetail.task.id),
+                              })
+                            }
+                          >
+                            Archive task
+                          </button>
+                        ) : null}
+                      </div>
                     )}
                     <div className="flex justify-end gap-2">
                       <button

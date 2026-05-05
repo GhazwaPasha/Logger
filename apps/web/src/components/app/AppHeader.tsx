@@ -122,7 +122,10 @@ export function AppHeader({
             >
               <IconBell className="size-[1.125rem]" />
               {notifications.unreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 flex min-w-[1.125rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[10px] font-semibold leading-none text-[var(--on-accent)]">
+                <span
+                  className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] bg-red-600 px-1.5 text-[11px] font-semibold tabular-nums leading-none text-white ring-2 ring-[var(--surface-elevated)]"
+                  aria-hidden
+                >
                   {notifications.unreadCount > 99 ? "99+" : notifications.unreadCount}
                 </span>
               ) : null}
