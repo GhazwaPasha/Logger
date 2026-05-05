@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { LoadingFrame, LoadingLinesBlock } from "@/components/ui/LoadingFrame";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
 import type { MemberRow, OrgActivityLedgerRow, OrgActivityTaskMeta } from "@/lib/ledger-types";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
@@ -27,7 +28,15 @@ export function OrgActivityTerminal({
   }
 
   if (isLoading) {
-    return <p className="text-sm text-[var(--muted)]">Loading activity…</p>;
+    return (
+      <LoadingFrame
+        show
+        className="min-h-[min(55vh,26rem)] rounded-xl border border-[var(--border-subtle)] p-4"
+        aria-label="Loading activity log"
+      >
+        <LoadingLinesBlock lines={7} className="pt-1 font-mono-ledger" />
+      </LoadingFrame>
+    );
   }
 
   if (entries.length === 0) {

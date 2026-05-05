@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -278,7 +279,8 @@ export function DashboardOverview({
   }
 
   return (
-    <div className="space-y-3">
+    <LoadingFrame show={loading} className="rounded-2xl p-0.5" ribbonRadius="2xl" aria-label="Loading dashboard">
+      <div className="space-y-3">
       <div className="grid grid-cols-1 items-stretch gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14.5rem,19rem)] lg:grid-rows-[auto_auto]">
         <Link
           href={workHref(basePath, { status: "pending_work" })}
@@ -520,6 +522,7 @@ export function DashboardOverview({
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </LoadingFrame>
   );
 }

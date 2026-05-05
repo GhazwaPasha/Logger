@@ -45,8 +45,8 @@ flowchart TB
 | Workspaces root | `package.json` | `apps/*`, `packages/*`; scripts `dev`, `dev:api`, `dev:web`, `db:*` |
 | Shared DB schema + migrations | `packages/db` | Drizzle schema, `npm run db:migrate` at repo root |
 | API input/output contracts (Zod) | `packages/contracts` | Imported by `apps/api` (validation); aligns with web/mobile types |
-| HTTP API | `apps/api` | NestJS, port `API_PORT` or **4000** |
-| Web app | `apps/web` | Next.js 16, dev **3000**, Better Auth + React Query |
+| HTTP API | `apps/api` | NestJS; prod typically **Railway** (`PORT`); local **`API_PORT`** or **4000**; **Socket.IO** on same process |
+| Web app | `apps/web` | Next.js 16 on **Vercel** (prod), dev **3000**, Better Auth + React Query |
 | Mobile | `apps/mobile` | Expo; same JWT + REST pattern; SQLite outbox for offline POSTs |
 
 ## Topic notes (read these next)

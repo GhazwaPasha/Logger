@@ -24,6 +24,7 @@ import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
   parseTaskDueRepeat,
@@ -509,6 +510,7 @@ function WorkItemsInner() {
   const [editSubtaskDraft, setEditSubtaskDraft] = useState("");
   const [editNewSubtasks, setEditNewSubtasks] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
   const editTaskFromList = useMemo(
     () => (editTaskId ? tasks.find((t) => t.id === editTaskId) ?? null : null),
     [editTaskId, tasks],
@@ -701,13 +703,14 @@ function WorkItemsInner() {
     if (!taskPanelOpen) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (createSaving || editSaving) return;
         setCreateModalOpen(false);
         setEditTaskId(null);
       }
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [taskPanelOpen]);
+  }, [taskPanelOpen, createSaving, editSaving]);
 
   const openEditTask = useCallback((taskId: string, focus?: "assignees" | "due") => {
     setCreateModalOpen(false);
@@ -943,6 +946,16 @@ function WorkItemsInner() {
     },
   });
 
+  const patchTaskPendingId =
+    patchTaskMutation.isPending && patchTaskMutation.variables
+      ? patchTaskMutation.variables.taskId
+      : null;
+
+  const patchSubtaskPendingKey =
+    patchSubtaskMutation.isPending && patchSubtaskMutation.variables
+      ? `${patchSubtaskMutation.variables.taskId}:${patchSubtaskMutation.variables.subtaskId}`
+      : null;
+
   const patchTask = useCallback(
     (taskId: string, patch: { status?: ManualTaskStatus; priority?: TaskPriority }) => {
       if (!token) return;
@@ -1030,7 +1043,8 @@ function WorkItemsInner() {
   }, [editDue]);
 
   async function createTask() {
-    if (!token || !workspaceId || !title.trim() || !listId) return;
+    if (!token || !workspaceId || !title.trim() || !listId || createSaving) return;
+    setCreateSaving(true);
     setError(null);
     try {
       const dueIso = due.trim() ? new Date(due).toISOString() : undefined;
@@ -1073,6 +1087,8 @@ function WorkItemsInner() {
       setCreateModalOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create task");
+    } finally {
+      setCreateSaving(false);
     }
   }
 
@@ -1330,6 +1346,7 @@ function WorkItemsInner() {
   }
 
   function ListTaskCard({ task }: { task: TaskRow }) {
+    const taskPatchSyncing = patchTaskPendingId === task.id;
     const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const p = taskPriority(task);
     const storedStatus = normalizeTaskStatus(task.status);
@@ -1348,7 +1365,18 @@ function WorkItemsInner() {
     const showAssignedFooter = taskHasAssignees(task);
     const showLateFooter = taskShowsLateFooter(task);
     return (
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] transition-colors hover:bg-[var(--surface-hover)]/80">
+      <div
+        className={`relative overflow-hidden rounded-xl border transition-[border-color,background-color] duration-200 ${
+          taskPatchSyncing
+            ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--accent-muted))]"
+            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-hover)]/80"
+        }`}
+      >
+        {taskPatchSyncing ? (
+          <div className="task-sync-ribbon-track" aria-hidden>
+            <div className="task-sync-ribbon-thumb" />
+          </div>
+        ) : null}
         <div className="px-3 py-2">
           <div className="flex min-w-0 items-center gap-x-2">
             <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
@@ -1357,15 +1385,17 @@ function WorkItemsInner() {
                 type="button"
                 role="checkbox"
                 aria-checked={checklistDone}
-                disabled={checklistDisabled || (!checklistDone && advanceTo == null)}
+                disabled={taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)}
                 title={
-                  checklistDisabled
-                    ? "Cancelled — use status menu to reopen"
-                    : checklistDone
-                      ? "Mark as not done"
-                      : advanceTo
-                        ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
-                        : "Cannot advance"
+                  taskPatchSyncing
+                    ? "Saving…"
+                    : checklistDisabled
+                      ? "Cancelled — use status menu to reopen"
+                      : checklistDone
+                        ? "Mark as not done"
+                        : advanceTo
+                          ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                          : "Cannot advance"
                 }
                 aria-label={
                   checklistDisabled
@@ -1376,17 +1406,18 @@ function WorkItemsInner() {
                         ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
                         : "Cannot advance task"
                 }
+                aria-busy={taskPatchSyncing || undefined}
                 className={`flex size-7 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
                   checklistDone
                     ? "surface-glass-primary border-solid text-[var(--fg)]"
                     : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
                 } ${
-                  checklistDisabled || (!checklistDone && advanceTo == null)
+                  taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)
                     ? "cursor-not-allowed opacity-40"
                     : "cursor-pointer hover:bg-[var(--surface-hover)]"
                 }`}
                 onClick={() => {
-                  if (checklistDisabled) return;
+                  if (taskPatchSyncing || checklistDisabled) return;
                   if (checklistDone) {
                     void patchTask(task.id, { status: "in_progress" });
                     return;
@@ -1499,8 +1530,9 @@ function WorkItemsInner() {
                   className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-base)]`}
                 >
                   <select
-                    className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
+                    className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
                     value={p}
+                    disabled={taskPatchSyncing}
                     onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
                     aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
                   >
@@ -1510,7 +1542,9 @@ function WorkItemsInner() {
                       </option>
                     ))}
                   </select>
-                  <span className={`${LIST_ROW_BADGE_LABEL} uppercase`}>{priorityLabelShort(p)}</span>
+                  <span className={`${LIST_ROW_BADGE_LABEL} uppercase ${taskPatchSyncing ? "opacity-45" : ""}`}>
+                    {priorityLabelShort(p)}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -1545,19 +1579,24 @@ function WorkItemsInner() {
                 {Array.isArray(subtasksState) && subtasksState.length > 0 && (
                   <ul className="space-y-1 py-1">
                     {subtasksState.map((s) => {
+                      const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                       return (
                         <li key={s.id} className="flex items-start gap-2 text-sm">
                           <button
                             type="button"
+                            disabled={subPending}
                             onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
+                            aria-busy={subPending || undefined}
                             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                               s.done
                                 ? "surface-glass-primary border-solid"
                                 : "border-[var(--border-subtle)] hover:border-[var(--accent)]"
-                            }`}
+                            } disabled:cursor-not-allowed disabled:opacity-60`}
                             aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                           >
-                            {s.done ? (
+                            {subPending ? (
+                              <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
+                            ) : s.done ? (
                               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
                                 <path d="M20 6 9 17l-5-5" />
                               </svg>
@@ -1584,6 +1623,7 @@ function WorkItemsInner() {
     onChange,
     options,
     disabled,
+    pending,
     shellLayoutClassName = STATUS_PILL_LAYOUT,
   }: {
     "aria-label": string;
@@ -1591,6 +1631,8 @@ function WorkItemsInner() {
     onChange: (next: ManualTaskStatus) => void;
     options: readonly ManualTaskStatus[];
     disabled?: boolean;
+    /** Server sync in progress (e.g. PATCH status). */
+    pending?: boolean;
     /** Outer box sizing (list row uses fixed width; kanban uses equal flex cells). */
     shellLayoutClassName?: string;
   }) {
@@ -1621,6 +1663,10 @@ function WorkItemsInner() {
     }, [open]);
 
     useEffect(() => {
+      if (pending) setOpen(false);
+    }, [pending]);
+
+    useEffect(() => {
       if (!open) return;
       const onDocMouseDown = (e: MouseEvent) => {
         const t = e.target as Node;
@@ -1638,21 +1684,24 @@ function WorkItemsInner() {
       };
     }, [open]);
 
+    const blocked = disabled || pending;
+
     return (
       <div
-        className={`relative ${shellLayoutClassName} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)}`}
+        className={`relative ${shellLayoutClassName} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)} ${pending ? "opacity-[0.88]" : ""}`}
       >
         <button
           ref={triggerRef}
           type="button"
-          disabled={disabled}
+          disabled={blocked}
           aria-expanded={open}
+          aria-busy={pending || undefined}
           aria-haspopup="listbox"
           aria-controls={open ? listboxId : undefined}
           aria-label={ariaLabel}
           id={`${listboxId}-trigger`}
           onClick={() => {
-            if (disabled) return;
+            if (blocked) return;
             setOpen((o) => !o);
           }}
           className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -1661,7 +1710,7 @@ function WorkItemsInner() {
             {FLOW_COLUMN_LABELS[value]}
           </span>
           <IconChevronMiniDown
-            className={`pointer-events-none shrink-0 opacity-45 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            className={`pointer-events-none shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""} ${pending ? "opacity-20" : "opacity-45"}`}
             aria-hidden
           />
         </button>
@@ -1721,6 +1770,7 @@ function WorkItemsInner() {
         value={manual}
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={menuOptions}
+        pending={patchTaskPendingId === task.id}
       />
     );
   }
@@ -1736,6 +1786,7 @@ function WorkItemsInner() {
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={menuOptions}
         shellLayoutClassName={KANBAN_STATUS_SHELL_LAYOUT}
+        pending={patchTaskPendingId === task.id}
       />
     );
   }
@@ -1743,11 +1794,13 @@ function WorkItemsInner() {
   /** Kanban meta row: same height as list-row priority tile (`h-8`), width follows equal flex cell. */
   function KanbanPriorityPill({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
+    const syncing = patchTaskPendingId === task.id;
     return (
-      <div className={KANBAN_PRIORITY_SHELL_LAYOUT}>
+      <div className={`relative ${KANBAN_PRIORITY_SHELL_LAYOUT}`}>
         <select
-          className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none"
+          className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
           value={p}
+          disabled={syncing}
           onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
           aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
         >
@@ -1757,12 +1810,15 @@ function WorkItemsInner() {
             </option>
           ))}
         </select>
-        <span className={`${LIST_ROW_BADGE_LABEL} uppercase`}>{priorityLabelShort(p)}</span>
+        <span className={`${LIST_ROW_BADGE_LABEL} uppercase ${syncing ? "opacity-45" : ""}`}>
+          {priorityLabelShort(p)}
+        </span>
       </div>
     );
   }
 
   function TaskCard({ task }: { task: TaskRow }) {
+    const taskPatchSyncing = patchTaskPendingId === task.id;
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
@@ -1784,13 +1840,22 @@ function WorkItemsInner() {
 
     return (
       <li
-        draggable
+        draggable={!taskPatchSyncing}
         onDragStart={(e) => {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
         }}
-        className="group/card relative cursor-grab touch-manipulation overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] transition-[border-color,transform] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
+        className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
+          taskPatchSyncing
+            ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
+            : "cursor-grab border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
+        }`}
       >
+        {taskPatchSyncing ? (
+          <div className="task-sync-ribbon-track" aria-hidden>
+            <div className="task-sync-ribbon-thumb" />
+          </div>
+        ) : null}
         <div className="flex flex-col gap-1.5 px-2.5 pb-2 pt-2.5">
           <div className="flex min-w-0 items-start gap-1.5">
             <button
@@ -1839,19 +1904,24 @@ function WorkItemsInner() {
               </div>
               <ul className="space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
                 {subtasksPreview.map((s) => {
+                  const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                   return (
                     <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
                       <button
                         type="button"
+                        disabled={subPending}
                         onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
+                        aria-busy={subPending || undefined}
                         className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
                           s.done
                             ? "surface-glass-primary border-solid"
                             : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
-                        }`}
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
                         aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                       >
-                        {s.done ? (
+                        {subPending ? (
+                          <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
+                        ) : s.done ? (
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
                             <path d="M20 6 9 17l-5-5" />
                           </svg>
@@ -2391,6 +2461,7 @@ function WorkItemsInner() {
             className="absolute inset-0 bg-black/40"
             aria-hidden
             onClick={() => {
+              if (createSaving || editSaving) return;
               setCreateModalOpen(false);
               setEditTaskId(null);
             }}
@@ -2430,11 +2501,13 @@ function WorkItemsInner() {
                           value={editStatus}
                           onChange={setEditStatus}
                           options={TASK_FLOW_ORDER}
+                          disabled={editSaving}
                         />
                         <select
                           aria-label="Priority"
                           className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
                           value={editPriority}
+                          disabled={editSaving}
                           onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
                         >
                           {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
@@ -2443,7 +2516,12 @@ function WorkItemsInner() {
                             </option>
                           ))}
                         </select>
-                        <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setEditTaskId(null)}>
+                        <button
+                          type="button"
+                          className={TASK_PANEL_HEADER_CLOSE_BTN}
+                          disabled={editSaving}
+                          onClick={() => setEditTaskId(null)}
+                        >
                           Close
                         </button>
                       </div>
@@ -2458,6 +2536,7 @@ function WorkItemsInner() {
                       <input
                         className="input rounded-xl text-base"
                         value={editTitle}
+                        disabled={editSaving}
                         onChange={(e) => setEditTitle(e.target.value)}
                         placeholder="Task title"
                       />
@@ -2571,11 +2650,15 @@ function WorkItemsInner() {
                       </button>
                       <button
                         type="button"
-                        className="btn-primary rounded-xl px-4"
+                        className="btn-primary inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-xl px-4"
                         disabled={editSaving}
+                        aria-busy={editSaving || undefined}
                         onClick={() => void saveEditTask()}
                       >
-                        {editSaving ? "Saving…" : "Save"}
+                        {editSaving ? (
+                          <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                        ) : null}
+                        <span>{editSaving ? "Saving" : "Save"}</span>
                       </button>
                     </div>
                     <TaskPanelHistoryCard task={editDetail.task} ledger={editDetail.ledger} members={members} />
@@ -2604,11 +2687,13 @@ function WorkItemsInner() {
                   value={newTaskStatus}
                   onChange={setNewTaskStatus}
                   options={TASK_FLOW_ORDER}
+                  disabled={createSaving}
                 />
                 <select
                   aria-label="Priority"
                   className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
                   value={newTaskPriority}
+                  disabled={createSaving}
                   onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
                 >
                   {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
@@ -2617,7 +2702,12 @@ function WorkItemsInner() {
                     </option>
                   ))}
                 </select>
-                <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setCreateModalOpen(false)}>
+                <button
+                  type="button"
+                  className={TASK_PANEL_HEADER_CLOSE_BTN}
+                  disabled={createSaving}
+                  onClick={() => setCreateModalOpen(false)}
+                >
                   Close
                 </button>
               </div>
@@ -2632,6 +2722,7 @@ function WorkItemsInner() {
               <input
                 className="input rounded-xl text-base"
                 value={title}
+                disabled={createSaving}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Add a task"
               />
@@ -2723,11 +2814,25 @@ function WorkItemsInner() {
               />
             )}
             <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary rounded-xl px-4" onClick={() => setCreateModalOpen(false)}>
+              <button
+                type="button"
+                className="btn-secondary rounded-xl px-4"
+                disabled={createSaving}
+                onClick={() => setCreateModalOpen(false)}
+              >
                 Cancel
               </button>
-              <button type="button" className="btn-primary rounded-xl px-4" onClick={() => void createTask()}>
-                Create
+              <button
+                type="button"
+                className="btn-primary inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-xl px-4"
+                disabled={createSaving || !title.trim() || !listId}
+                aria-busy={createSaving || undefined}
+                onClick={() => void createTask()}
+              >
+                {createSaving ? (
+                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                ) : null}
+                <span>{createSaving ? "Creating" : "Create"}</span>
               </button>
             </div>
               </>

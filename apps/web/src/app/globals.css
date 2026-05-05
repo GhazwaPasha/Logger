@@ -1061,3 +1061,48 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
     transform: translateX(-50%);
   }
 }
+
+/* Task list row / kanban card: one shared “sync ribbon” while status or priority PATCH is in flight */
+.task-sync-ribbon-track {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: color-mix(in srgb, var(--fg) 7%, var(--border-subtle));
+}
+
+/* Match rounded-2xl panels (dashboard shell, full-page loaders). */
+.task-sync-ribbon-track--rounded-2xl {
+  border-radius: 1rem 1rem 0 0;
+}
+
+.task-sync-ribbon-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 38%;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 88%, var(--surface-base)),
+    transparent
+  );
+  animation: task-ai-fill-indeterminate 1.05s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-sync-ribbon-thumb {
+    animation: none;
+    left: 50%;
+    width: 42%;
+    transform: translateX(-50%);
+    opacity: 0.85;
+  }
+}

@@ -19,6 +19,8 @@ import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { workspaceKeys } from "@/lib/query-keys";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
+import { InlineSpinner } from "@/components/ui/InlineSpinner";
+import { LoadingFrame } from "@/components/ui/LoadingFrame";
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -401,7 +403,13 @@ export function WorkspaceSidebar({
             (
               <div className="space-y-2">
                 {workspaceLoading ? (
-                  <p className="px-2 text-sm leading-relaxed text-[var(--muted)]">Loading levels…</p>
+                  <LoadingFrame show className="rounded-lg px-2 py-1" aria-label="Loading levels">
+                    <div className="space-y-2" aria-hidden>
+                      <div className="h-8 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                      <div className="h-8 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                      <div className="h-8 w-4/5 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                    </div>
+                  </LoadingFrame>
                 ) : depts.length === 0 ? (
                   <p className="px-2 text-sm leading-relaxed text-[var(--muted)]">No levels yet.</p>
                 ) : (
@@ -601,7 +609,8 @@ export function WorkspaceSidebar({
                             {showAddListForLevel !== d.id ? (
                               <button
                                 type="button"
-                                className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
+                                disabled={addingList || addingLevel}
+                                className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-45"
                                 onClick={() => {
                                   setShowAddListForLevel(d.id);
                                   setNewListName("");
@@ -610,33 +619,47 @@ export function WorkspaceSidebar({
                                 + Add list
                               </button>
                             ) : (
-                              <input
-                                autoFocus
-                                className="input h-8 w-full rounded-lg px-2 text-sm"
-                                placeholder="Name your list"
-                                value={newListName}
-                                onChange={(e) => setNewListName(e.target.value)}
-                                onBlur={() => {
-                                  if (addingList) return;
-                                  const trimmed = newListName.trim();
-                                  if (trimmed) {
-                                    void addList(d.id);
-                                    return;
-                                  }
-                                  setShowAddListForLevel(null);
-                                  setNewListName("");
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    void addList(d.id);
-                                  }
-                                  if (e.key === "Escape" && !addingList) {
+                              <div
+                                className="relative"
+                                aria-busy={addingList && showAddListForLevel === d.id ? true : undefined}
+                              >
+                                <input
+                                  autoFocus
+                                  disabled={addingList && showAddListForLevel === d.id}
+                                  className="input h-8 w-full rounded-lg px-2 py-1 pr-9 text-sm disabled:opacity-70"
+                                  placeholder="Name your list"
+                                  value={newListName}
+                                  onChange={(e) => setNewListName(e.target.value)}
+                                  onBlur={() => {
+                                    if (addingList) return;
+                                    const trimmed = newListName.trim();
+                                    if (trimmed) {
+                                      void addList(d.id);
+                                      return;
+                                    }
                                     setShowAddListForLevel(null);
                                     setNewListName("");
-                                  }
-                                }}
-                              />
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void addList(d.id);
+                                    }
+                                    if (e.key === "Escape" && !addingList) {
+                                      setShowAddListForLevel(null);
+                                      setNewListName("");
+                                    }
+                                  }}
+                                />
+                                {addingList && showAddListForLevel === d.id ? (
+                                  <span
+                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                                    aria-hidden
+                                  >
+                                    <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                                  </span>
+                                ) : null}
+                              </div>
                             )}
                           </li>
                         </ul>
@@ -650,39 +673,51 @@ export function WorkspaceSidebar({
                   {!showAddLevelInput ? (
                     <button
                       type="button"
-                      className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)]"
+                      disabled={addingList || addingLevel}
+                      className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-45"
                       onClick={() => setShowAddLevelInput(true)}
                     >
                       + Add {NODE_LABELS.level}
                     </button>
                   ) : (
-                    <input
-                      autoFocus
-                      className="input h-8 w-full rounded-lg px-2 text-sm"
-                      placeholder={`Name your ${NODE_LABELS.level.toLowerCase()}`}
-                      value={newLevelName}
-                      onChange={(e) => setNewLevelName(e.target.value)}
-                      onBlur={() => {
-                        if (addingLevel) return;
-                        const trimmed = newLevelName.trim();
-                        if (trimmed) {
-                          void addLevel();
-                          return;
-                        }
-                        setShowAddLevelInput(false);
-                        setNewLevelName("");
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void addLevel();
-                        }
-                        if (e.key === "Escape" && !addingLevel) {
+                    <div className="relative" aria-busy={addingLevel ? true : undefined}>
+                      <input
+                        autoFocus
+                        disabled={addingLevel}
+                        className="input h-8 w-full rounded-lg px-2 py-1 pr-9 text-sm disabled:opacity-70"
+                        placeholder={`Name your ${NODE_LABELS.level.toLowerCase()}`}
+                        value={newLevelName}
+                        onChange={(e) => setNewLevelName(e.target.value)}
+                        onBlur={() => {
+                          if (addingLevel) return;
+                          const trimmed = newLevelName.trim();
+                          if (trimmed) {
+                            void addLevel();
+                            return;
+                          }
                           setShowAddLevelInput(false);
                           setNewLevelName("");
-                        }
-                      }}
-                    />
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void addLevel();
+                          }
+                          if (e.key === "Escape" && !addingLevel) {
+                            setShowAddLevelInput(false);
+                            setNewLevelName("");
+                          }
+                        }}
+                      />
+                      {addingLevel ? (
+                        <span
+                          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                          aria-hidden
+                        >
+                          <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                        </span>
+                      ) : null}
+                    </div>
                   )}
                 </div>
                 <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">

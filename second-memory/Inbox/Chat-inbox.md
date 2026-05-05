@@ -4,6 +4,24 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-05 — Shared loading UI: dashboard, org, workspaces, session
+
+- **Context:** Same **sync ribbon** language as task cards for dashboard, activity, org settings, sidebar bootstrap, and full-page gates.
+- **What we did:** **`LoadingFrame`** / **`LoadingScreen`** / **`LoadingLinesBlock`** (`**apps/web/src/components/ui/LoadingFrame.tsx**`); **`.task-sync-ribbon-track--rounded-2xl`** in **`globals.css`**. Dashboard overview **`LoadingFrame`** while workspace pending; activity log frame + mono pulse lines; org settings fetch skeleton + save **`InlineSpinner`**; sidebar levels skeleton **`LoadingFrame`**; **`WorkspaceShell`** / **`AppAuthenticatedProviders`** / route **`Suspense`** via **`AppSectionSuspenseFallback`** → **`LoadingScreen`**.
+- **Code / repo:** `LoadingFrame.tsx`, `AppSectionSuspenseFallback.tsx`, `DashboardOverview.tsx`, `OrgActivityTerminal.tsx`, `organization-settings/page.tsx`, `WorkspaceSidebar.tsx`, `WorkspaceShell.tsx`, `AppAuthenticatedProviders.tsx`, `app/(authenticated)/layout.tsx`, `globals.css`.
+
+### 2026-05-05 — Task + workspace loading UX (work page, sidebar)
+
+- **Context:** Inline task actions and task panel submits had little or no visible busy state; sidebar only showed plain text while workspace loaded.
+- **What we did:** Shared **`InlineSpinner`** for buttons and controls. **Create / Save** primary actions show spinner + label, disable panel close (backdrop, Escape, header) and key fields while saving. **`patchTask`** pending: **one** top **sync ribbon** on list row + kanban card (**`task-sync-ribbon-*`** in **`globals.css`**, reuses **`task-ai-fill-indeterminate`**), tinted border/background, controls dimmed/disabled **without** multiple spinners; status pill keeps a muted chevron; priority loses overlay spinner. **`patchSubtask`** still uses tiny spinners on checklist rows. **WorkspaceSidebar:** initial-load skeleton only; per-row spinners for add level/list; no global refetch bar.
+- **Code / repo:** `apps/web/src/components/ui/InlineSpinner.tsx`, `apps/web/src/hooks/useOrgWorkspace.ts`, `apps/web/src/components/app/WorkspaceSidebar.tsx`, `apps/web/src/app/(authenticated)/[workspaceId]/work/page.tsx`, `apps/web/src/app/globals.css`.
+
+### 2026-05-05 — Retire duplicate Nest API on Vercel
+
+- **Context:** API production host moved to **Railway**; old **separate Vercel project** (e.g. `logger-api-*.vercel.app`) is redundant and risks wrong env / 404 workspace packages if mis-rooted.
+- **What we did (repo):** Documented canonical deploy in **`Topics/Infrastructure/apps-api.md`** (Railway + monorepo root) and **`00-map-overview.md`**. **Ops (you):** In Vercel → open the **API-only** project → **Settings → Delete Project** (or remove Git integration / disable deploys) **after** **`NEXT_PUBLIC_API_URL`** on the **web** project points at Railway and smoke tests pass. Remove DNS/custom domains from the old API if any. Rotate any API keys tied only to that host if applicable.
+- **Code / repo:** `second-memory/Topics/Infrastructure/apps-api.md`, `00-map-overview.md`.
+
 ### 2026-05-05 — Railway: monorepo root + explicit API build/start
 
 - **Context:** Service **root directory** was **`/apps/api`**, so install could not resolve workspace packages **`@work-ledger/db`** / **`@work-ledger/contracts`** (404 from registry).

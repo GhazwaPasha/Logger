@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useThemePreference } from "@/hooks/useThemePreference";
 import { safeReturnPath } from "@/lib/safe-return-path";
+import { LoadingScreen } from "@/components/ui/LoadingFrame";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 
@@ -24,11 +25,7 @@ export function AppAuthenticatedProviders({ children }: { children: React.ReactN
   }, [isSessionPending, session, router, pathname, searchParams]);
 
   if (isSessionPending) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-base)]">
-        <div className="text-sm text-[var(--muted)]">Loading…</div>
-      </div>
-    );
+    return <LoadingScreen label="Loading session…" />;
   }
 
   if (!session?.user) {

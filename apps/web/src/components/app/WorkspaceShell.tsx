@@ -9,6 +9,7 @@ import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
+import { LoadingScreen } from "@/components/ui/LoadingFrame";
 import { useApiSession } from "@/hooks/useApiSession";
 import type { Org } from "@/lib/ledger-types";
 import { pathAfterWorkspace, resolveOrgFromUrlSegment, workspaceUrlSegment } from "@/lib/workspace-url";
@@ -51,11 +52,7 @@ export function WorkspaceShell({
   }, [token, orgsLoading, orgs.length, resolved, workspaceSegment, pathname, searchParams, router]);
 
   if (!token || orgsLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--surface-base)]">
-        <p className="text-sm text-[var(--muted)]">Loading…</p>
-      </div>
-    );
+    return <LoadingScreen label={orgsLoading ? "Loading workspaces…" : "Loading…"} />;
   }
 
   if (!resolved) {
