@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   createOrganizationSchema,
   updateOrganizationSchema,
@@ -208,6 +208,28 @@ export class OrganizationsService {
         name: r.name,
       };
     });
+  }
+
+  async removeMember(requesterId: string, organizationId: string, targetUserId: string) {
+    const membership = await this.authz.assertOrgMember(requesterId, organizationId);
+    if (membership.role !== "owner") {
+      throw new ForbiddenException("Only owners can remove members");
+    }
+    if (requesterId === targetUserId) {
+      throw new ForbiddenException("Cannot remove yourself from the workspace");
+    }
+    const rows = await this.db
+      .select({ id: organizationMembers.id })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, targetUserId)))
+      .limit(1);
+    const member = rows[0];
+    if (!member) throw new NotFoundException("Member not found");
+    await this.db
+      .delete(organizationMemberManagedDepartments)
+      .where(eq(organizationMemberManagedDepartments.organizationMemberId, member.id));
+    await this.db.delete(organizationMembers).where(eq(organizationMembers.id, member.id));
+    this.collaboration.notifyOrgChanged(organizationId, null);
   }
 
   async upsertMemberByEmail(requesterId: string, organizationId: string, body: unknown) {
