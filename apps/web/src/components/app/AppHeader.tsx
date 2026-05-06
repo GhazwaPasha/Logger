@@ -40,6 +40,25 @@ function IconBell({ className }: { className?: string }) {
   );
 }
 
+function IconMenu({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+
 function IconSettings({ className }: { className?: string }) {
   return (
     <svg
@@ -66,9 +85,11 @@ const iconBtn =
 
 export function AppHeader({
   workspaceSlug,
+  onMenuToggle,
 }: {
   /** When set, profile and settings use this workspace slug in the URL. */
   workspaceSlug?: string;
+  onMenuToggle?: () => void;
 }) {
   const { data: session } = authClient.useSession();
   const user = session?.user;
@@ -104,6 +125,16 @@ export function AppHeader({
     <header className="ui-app-header sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150">
       <div className="flex h-14 w-full items-center justify-between gap-4 px-3 sm:px-4 lg:px-5">
         <div className="flex items-center gap-3">
+          {onMenuToggle && (
+            <button
+              type="button"
+              className={`${iconBtn} md:hidden`}
+              aria-label="Open navigation"
+              onClick={onMenuToggle}
+            >
+              <IconMenu className="size-[1.125rem]" />
+            </button>
+          )}
           <Link
             href={brandHref}
             className="group flex min-h-9 items-center gap-2 rounded-lg font-outfit font-semibold tracking-tight text-[var(--fg)] transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.98]"

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "./AppHeader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceRouteContext } from "./workspace-route-context";
@@ -32,6 +32,9 @@ export function WorkspaceShell({
     if (orgsLoading || orgs.length === 0) return undefined;
     return resolveOrgFromUrlSegment(orgs, workspaceSegment);
   }, [orgs, orgsLoading, workspaceSegment]);
+
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const closeMobileSidebar = useCallback(() => setMobileSidebarOpen(false), []);
 
   useEffect(() => {
     if (!token || orgsLoading) return;
@@ -72,9 +75,14 @@ export function WorkspaceShell({
         <WorkspaceRealtimeSubscriber workspaceId={workspaceId} />
         <WorkspaceNotificationsProvider>
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
-            <AppHeader workspaceSlug={workspaceSlug} />
-            <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row md:items-stretch">
-              <WorkspaceSidebar workspaceId={workspaceId} workspaceSlug={workspaceSlug} />
+            <AppHeader workspaceSlug={workspaceSlug} onMenuToggle={() => setMobileSidebarOpen((v) => !v)} />
+            <div className="flex min-h-0 w-full flex-1 overflow-hidden md:flex-row md:items-stretch">
+              <WorkspaceSidebar
+                workspaceId={workspaceId}
+                workspaceSlug={workspaceSlug}
+                mobileOpen={mobileSidebarOpen}
+                onMobileClose={closeMobileSidebar}
+              />
               <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
                 {children}
               </main>

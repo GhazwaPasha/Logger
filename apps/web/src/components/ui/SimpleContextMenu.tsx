@@ -10,7 +10,6 @@ export type SimpleContextMenuItem = {
   destructive?: boolean;
 };
 
-const MENU_W = 200;
 const MENU_MAX_H = 280;
 
 export function SimpleContextMenu({
@@ -68,19 +67,15 @@ export function SimpleContextMenu({
     <div
       ref={ref}
       role="menu"
-      className="fixed z-[100] min-w-[10rem] max-w-[min(100vw-1rem,14rem)] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg shadow-black/15 dark:shadow-black/50"
-      style={{ left: x, top: y, maxHeight: MENU_MAX_H, width: MENU_W }}
+      className="fixed z-[100] min-w-[8rem] max-w-[min(100vw-1rem,14rem)] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg shadow-black/15 dark:shadow-black/50"
+      style={{ left: x, top: y, maxHeight: MENU_MAX_H }}
     >
       {items.map((item) => (
         <button
           key={item.id}
           type="button"
           role="menuitem"
-          className={`flex w-full px-3 py-2 text-left text-sm font-medium transition-colors ${
-            item.destructive
-              ? "mx-1 rounded-lg bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
-              : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-          }`}
+          className="flex w-full px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
           onClick={() => {
             item.onSelect();
             onClose();

@@ -68,9 +68,13 @@ function rowBase(active: boolean) {
 export function WorkspaceSidebar({
   workspaceId,
   workspaceSlug,
+  mobileOpen = false,
+  onMobileClose,
 }: {
   workspaceId: string;
   workspaceSlug: string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -152,6 +156,11 @@ export function WorkspaceSidebar({
     () => readWorkBoardScope(workspaceId),
     [workspaceId, boardScopeRev],
   );
+
+  useEffect(() => {
+    onMobileClose?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   const toggleLevel = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -412,7 +421,22 @@ export function WorkspaceSidebar({
           ];
 
   return (
-    <aside className="ui-sidebar-chrome font-outfit flex max-h-[min(70dvh,28rem)] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-full md:w-72 md:border-b-0 md:border-r">
+    <>
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          aria-hidden
+          onClick={onMobileClose}
+        />
+      )}
+    <aside
+      className={[
+        "ui-sidebar-chrome font-outfit flex min-h-0 shrink-0 flex-col bg-[var(--surface-nav)]",
+        "fixed inset-y-0 left-0 z-50 w-72 border-r border-[var(--border-subtle)] transition-transform duration-300 ease-out",
+        mobileOpen ? "translate-x-0" : "-translate-x-full",
+        "md:relative md:h-full md:w-72 md:translate-x-0 md:border-r md:border-[var(--border-subtle)] md:transition-none",
+      ].join(" ")}
+    >
       <ConfirmDialog
         open={structureActionConfirm != null}
         options={structureActionConfirm}
@@ -865,5 +889,6 @@ export function WorkspaceSidebar({
         </div>
       </nav>
     </aside>
+    </>
   );
 }

@@ -1527,7 +1527,7 @@ function WorkItemsInner() {
             >
               <IconChevron open={expanded} className="opacity-80" />
             </button>
-            <div className="flex min-w-0 flex-1 items-center gap-x-1.5 gap-y-1">
+            <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
               <button
                 type="button"
                 onClick={() => openEditTask(task.id)}
@@ -1543,7 +1543,7 @@ function WorkItemsInner() {
               (showTaskListBadge && listBadge) ||
               showAssignedFooter ||
               showLateFooter ? (
-                <span className="flex shrink-0 flex-wrap items-center gap-1.5">
+                <span className="flex shrink-0 flex-nowrap items-center gap-1.5">
                   {showTaskLevelBadge && levelBadge ? (
                     <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
                       {levelBadge}
@@ -2140,22 +2140,24 @@ function WorkItemsInner() {
 
   function ListViewCards({ rows }: { rows: TaskRow[] }) {
     return (
-      <div className="space-y-1.5">
-        {rows.map((task) => (
-          <ListTaskCard key={task.id} task={task} />
-        ))}
-        <div className="border-t border-transparent pt-2">
-          <button
-            type="button"
-            className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-            onClick={() => {
-              setEditTaskId(null);
-              setNewTaskStatus("pending");
-              setCreateModalOpen(true);
-            }}
-          >
-            + Add task
-          </button>
+      <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+        <div className="space-y-1.5" style={{ minWidth: "36rem" }}>
+          {rows.map((task) => (
+            <ListTaskCard key={task.id} task={task} />
+          ))}
+          <div className="border-t border-transparent pt-2">
+            <button
+              type="button"
+              className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              onClick={() => {
+                setEditTaskId(null);
+                setNewTaskStatus("pending");
+                setCreateModalOpen(true);
+              }}
+            >
+              + Add task
+            </button>
+          </div>
         </div>
       </div>
     );
