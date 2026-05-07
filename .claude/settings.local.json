@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Copy-Item \"Logo\\\\logbase light theme.png\" \"apps\\\\web\\\\public\\\\Logos\\\\logbase-light.png\" -Force)",
+      "PowerShell(Copy-Item \"Logo\\\\logbase dark theme.png\" \"apps\\\\web\\\\public\\\\Logos\\\\logbase-dark.png\" -Force)",
+      "PowerShell(Copy-Item \"Logo\\\\logbase light theme.png\" \"apps\\\\mobile\\\\assets\\\\logbase-light.png\" -Force)",
+      "PowerShell(Copy-Item \"Logo\\\\logbase dark theme.png\" \"apps\\\\mobile\\\\assets\\\\logbase-dark.png\" -Force)",
+      "PowerShell(& \"c:\\\\Users\\\\Ghazw\\\\Desktop\\\\Logger\\\\apps\\\\web\\\\scripts\\\\gen-pwa-icons.ps1\")"
+    ]
+  }
+}
