@@ -581,7 +581,7 @@ function WorkItemsInner() {
         left,
         width: panelWidth,
         maxHeight: Math.max(120, maxH),
-        zIndex: 45,
+        zIndex: 60,
       };
     }
     return {
@@ -590,7 +590,7 @@ function WorkItemsInner() {
       width: panelWidth,
       bottom: window.innerHeight - r.top + gap,
       maxHeight: Math.max(120, maxH),
-      zIndex: 45,
+      zIndex: 60,
     };
   }
 
