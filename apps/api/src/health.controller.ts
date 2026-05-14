@@ -1,11 +1,17 @@
 import { Controller, Get } from "@nestjs/common";
 import { Public } from "./auth/public.decorator";
 
-@Controller("health")
+@Controller()
 export class HealthController {
   @Public()
   @Get()
-  ok() {
-    return { ok: true };
+  root() {
+    return { status: "ok" };
+  }
+
+  @Public()
+  @Get("health")
+  health() {
+    return { status: "ok" };
   }
 }
