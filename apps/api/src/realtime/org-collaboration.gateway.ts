@@ -1,6 +1,7 @@
 import { Logger, OnModuleDestroy } from "@nestjs/common";
 import {
   OnGatewayConnection,
+  OnGatewayDisconnect,
   OnGatewayInit,
   WebSocketGateway,
   WebSocketServer,
@@ -18,6 +19,9 @@ import { CollaborationService, orgSocketRoom } from "./collaboration.service";
  *
  * Global `JwtAuthGuard` skips `ws` contexts; we verify JWT here in `handleConnection`.
  */
+export type PresenceSyncPayload = { onlineUserIds: string[] };
+export type PresenceUpdatePayload = { userId: string; status: "online" | "offline" };
+
 @WebSocketGateway({
   cors: {
     origin: corsAllowedOrigins(),
@@ -25,7 +29,9 @@ import { CollaborationService, orgSocketRoom } from "./collaboration.service";
   },
   transports: ["websocket", "polling"],
 })
-export class OrgCollaborationGateway implements OnGatewayInit, OnGatewayConnection, OnModuleDestroy {
+export class OrgCollaborationGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
+{
   private readonly log = new Logger(OrgCollaborationGateway.name);
 
   @WebSocketServer()
@@ -34,11 +40,39 @@ export class OrgCollaborationGateway implements OnGatewayInit, OnGatewayConnecti
   private redisPub: RedisClientType | null = null;
   private redisSub: RedisClientType | null = null;
 
+  /** orgId → userId → Set<socketId>: tracks multiple tabs per user */
+  private readonly presence = new Map<string, Map<string, Set<string>>>();
+
   constructor(
     private readonly auth: AuthService,
     private readonly authz: AuthorizationService,
     private readonly collaboration: CollaborationService,
   ) {}
+
+  private addPresence(orgId: string, userId: string, socketId: string): void {
+    if (!this.presence.has(orgId)) this.presence.set(orgId, new Map());
+    const orgMap = this.presence.get(orgId)!;
+    if (!orgMap.has(userId)) orgMap.set(userId, new Set());
+    orgMap.get(userId)!.add(socketId);
+  }
+
+  /** Returns true when this was the user's last socket (they are now offline). */
+  private removePresence(orgId: string, userId: string, socketId: string): boolean {
+    const orgMap = this.presence.get(orgId);
+    if (!orgMap) return false;
+    const sockets = orgMap.get(userId);
+    if (!sockets) return false;
+    sockets.delete(socketId);
+    if (sockets.size === 0) {
+      orgMap.delete(userId);
+      return true;
+    }
+    return false;
+  }
+
+  private onlineUserIds(orgId: string): string[] {
+    return [...(this.presence.get(orgId)?.keys() ?? [])];
+  }
 
   async afterInit(server: Server): Promise<void> {
     this.collaboration.bindServer(server);
@@ -76,6 +110,16 @@ export class OrgCollaborationGateway implements OnGatewayInit, OnGatewayConnecti
     void this.verifyAndJoin(client);
   }
 
+  handleDisconnect(client: Socket): void {
+    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    if (!userId || !organizationId) return;
+    const wasLast = this.removePresence(organizationId, userId, client.id);
+    if (wasLast) {
+      const payload: PresenceUpdatePayload = { userId, status: "offline" };
+      this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
+    }
+  }
+
   private async verifyAndJoin(client: Socket): Promise<void> {
     try {
       const auth = client.handshake.auth as { token?: unknown; organizationId?: unknown };
@@ -95,6 +139,19 @@ export class OrgCollaborationGateway implements OnGatewayInit, OnGatewayConnecti
       }
       await this.authz.assertOrgMember(userId, organizationId);
       await client.join(orgSocketRoom(organizationId));
+
+      client.data.userId = userId;
+      client.data.organizationId = organizationId;
+
+      this.addPresence(organizationId, userId, client.id);
+
+      // Send current online snapshot to the newly connected client
+      const syncPayload: PresenceSyncPayload = { onlineUserIds: this.onlineUserIds(organizationId) };
+      client.emit("presence_sync", syncPayload);
+
+      // Notify others in the org room that this user came online
+      const updatePayload: PresenceUpdatePayload = { userId, status: "online" };
+      client.to(orgSocketRoom(organizationId)).emit("presence_update", updatePayload);
     } catch (e) {
       this.log.debug(`Socket auth failed: ${e instanceof Error ? e.message : String(e)}`);
       client.emit("collaboration_auth_error", { reason: "unauthorized" });

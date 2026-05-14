@@ -170,6 +170,7 @@ export class OrganizationsService {
         departmentId: organizationMembers.departmentId,
         email: user.email,
         name: user.name,
+        image: user.image,
       })
       .from(organizationMembers)
       .innerJoin(user, eq(organizationMembers.userId, user.id))
@@ -206,6 +207,7 @@ export class OrganizationsService {
         managedDepartmentIds,
         email: r.email,
         name: r.name,
+        image: r.image,
       };
     });
   }

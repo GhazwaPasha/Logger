@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { useOptionalWorkspaceNotifications } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { authClient } from "@/lib/auth-client";
+import { OnlineMembersAvatars } from "./OnlineMembersAvatars";
 
 function userInitials(name: string | null | undefined, email: string | null | undefined) {
   const n = name?.trim();
@@ -144,6 +145,7 @@ export function AppHeader({
           </Link>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {settingsHref && <OnlineMembersAvatars />}
           {settingsHref && notifications && (
             <button
               type="button"

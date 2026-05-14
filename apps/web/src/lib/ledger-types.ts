@@ -15,6 +15,7 @@ export type MemberRow = {
   managedDepartmentIds: string[];
   email: string;
   name: string;
+  image?: string | null;
 };
 export type SubtaskRow = {
   id: string;

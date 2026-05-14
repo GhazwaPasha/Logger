@@ -8,6 +8,7 @@ import { WorkspaceRouteContext } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
+import { OnlinePresenceProvider } from "@/components/app/OnlinePresenceProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { LoadingScreen } from "@/components/ui/LoadingFrame";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -71,6 +72,7 @@ export function WorkspaceShell({
 
   return (
     <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug }}>
+      <OnlinePresenceProvider>
       <WorkspaceDataProvider workspaceId={workspaceId}>
         <WorkspaceRealtimeSubscriber workspaceId={workspaceId} />
         <WorkspaceNotificationsProvider>
@@ -90,6 +92,7 @@ export function WorkspaceShell({
           </div>
         </WorkspaceNotificationsProvider>
       </WorkspaceDataProvider>
+      </OnlinePresenceProvider>
     </WorkspaceRouteContext.Provider>
   );
 }
