@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: logger-api
+    runtime: node
+    buildCommand: npm ci && npm run build:api
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production

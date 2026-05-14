@@ -40,7 +40,7 @@ export function OnlineMembersAvatars() {
       {shown.map((m, i) => (
         <div
           key={m.userId}
-          className={`relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
+          className={`flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
           title={m.name || m.email}
         >
           {m.image ? (
@@ -48,10 +48,6 @@ export function OnlineMembersAvatars() {
           ) : (
             <span aria-hidden>{initials(m.name, m.email)}</span>
           )}
-          <span
-            className="absolute bottom-0 right-0 size-2 rounded-full bg-green-500 ring-1 ring-[var(--bg-header)]"
-            aria-hidden
-          />
         </div>
       ))}
       {overflow > 0 && (
