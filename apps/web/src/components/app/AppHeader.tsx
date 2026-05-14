@@ -171,22 +171,28 @@ export function AppHeader({
           )}
           {user && (
             <div className="relative" ref={accountMenuRef}>
-              <button
-                type="button"
-                className={profileShell}
-                title={profileTitle}
-                aria-label={profileTitle}
-                aria-expanded={accountMenuOpen}
-                aria-haspopup="true"
-                aria-controls="account-menu"
-                onClick={() => setAccountMenuOpen((o) => !o)}
-              >
-                {user.image ? (
-                  <img src={user.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <span aria-hidden>{initials}</span>
-                )}
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  className={profileShell}
+                  title={profileTitle}
+                  aria-label={profileTitle}
+                  aria-expanded={accountMenuOpen}
+                  aria-haspopup="true"
+                  aria-controls="account-menu"
+                  onClick={() => setAccountMenuOpen((o) => !o)}
+                >
+                  {user.image ? (
+                    <img src={user.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span aria-hidden>{initials}</span>
+                  )}
+                </button>
+                <span
+                  className="pointer-events-none absolute bottom-0.5 right-0.5 size-2.5 rounded-full bg-green-500 ring-2 ring-[var(--bg-header)]"
+                  aria-hidden
+                />
+              </div>
               {accountMenuOpen && (
                 <div
                   id="account-menu"
