@@ -87,7 +87,7 @@ export default function CalendarPage() {
   const todayStr = isoDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   return (
-    <div className="mx-auto w-full max-w-screen-xl space-y-4">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Calendar</h1>

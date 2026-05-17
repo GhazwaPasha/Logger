@@ -2197,7 +2197,7 @@ function WorkItemsInner() {
   function ListViewCards({ rows }: { rows: TaskRow[] }) {
     return (
       <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
-        <div className="space-y-1.5" style={{ minWidth: "36rem" }}>
+        <div className="space-y-1.5 pt-px" style={{ minWidth: "36rem" }}>
           {rows.map((task) => (
             <ListTaskCard key={task.id} task={task} />
           ))}
@@ -2391,7 +2391,7 @@ function WorkItemsInner() {
   }, [searchParams, members]);
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl space-y-4">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
       <ConfirmDialog
         open={taskActionConfirm != null}
         options={taskActionConfirm}

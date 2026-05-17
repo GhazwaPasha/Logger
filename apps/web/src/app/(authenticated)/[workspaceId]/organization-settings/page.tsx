@@ -127,7 +127,7 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-screen-lg space-y-8">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
       <ConfirmDialog
         open={orgDeleteDialog != null}
         options={orgDeleteDialog}

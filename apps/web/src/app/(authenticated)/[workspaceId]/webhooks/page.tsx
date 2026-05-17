@@ -122,7 +122,7 @@ export default function WebhooksPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-screen-lg space-y-8">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">

@@ -179,7 +179,7 @@ export default function PeoplePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl space-y-8">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       <div>
