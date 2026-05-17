@@ -1500,8 +1500,8 @@ function WorkItemsInner() {
       <div
         className={`relative overflow-hidden rounded-xl border transition-[border-color,background-color] duration-200 ${
           taskPatchSyncing
-            ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_94%,var(--accent-muted))]"
-            : "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-hover)]/80"
+            ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
+            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-elevated)]"
         }`}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
       >
