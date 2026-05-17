@@ -1498,10 +1498,10 @@ function WorkItemsInner() {
     const showLateFooter = taskShowsLateFooter(task);
     return (
       <div
-        className={`relative overflow-hidden rounded-xl border transition-[border-color,background-color] duration-200 ${
+        className={`relative overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
           taskPatchSyncing
             ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
-            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-elevated)]"
+            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)]"
         }`}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
       >
