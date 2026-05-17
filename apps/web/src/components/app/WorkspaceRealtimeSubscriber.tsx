@@ -1,12 +1,14 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
-import { taskKeys, workspaceKeys } from "@/lib/query-keys";
+import { notificationKeys, taskKeys, workspaceKeys } from "@/lib/query-keys";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
+
+const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
 
 type WorkspaceChangedPayload = {
   type?: string;
@@ -15,13 +17,15 @@ type WorkspaceChangedPayload = {
 };
 
 type PresenceSyncPayload = { onlineUserIds: string[] };
-type PresenceUpdatePayload = { userId: string; status: "online" | "offline" };
+type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
 
 /** Subscribes to org collaboration events; invalidates workspace (and optional task) cache. */
 export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: string }) {
   const { token } = useApiSession();
   const queryClient = useQueryClient();
-  const { setOnlineUserIds } = useOnlinePresence();
+  const { setOnlineUserIds, setAwayUserIds } = useOnlinePresence();
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAwayRef = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -51,12 +55,16 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
     };
 
     const onPresenceUpdate = (payload: PresenceUpdatePayload) => {
-      setOnlineUserIds((prev) => {
-        const next = new Set(prev);
-        if (payload.status === "online") next.add(payload.userId);
-        else next.delete(payload.userId);
-        return next;
-      });
+      if (payload.status === "away") {
+        setAwayUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
+        setOnlineUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
+      } else if (payload.status === "online") {
+        setAwayUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
+        setOnlineUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
+      } else {
+        setAwayUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
+        setOnlineUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
+      }
     };
 
     const onAuthError = () => {
@@ -77,22 +85,52 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
       }
     };
 
+    const onNotificationNew = () => {
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.list(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.count(workspaceId) });
+    };
+
     socket.on("workspace_changed", onWorkspaceChanged);
     socket.on("presence_sync", onPresenceSync);
     socket.on("presence_update", onPresenceUpdate);
+    socket.on("notification_new", onNotificationNew);
     socket.on("collaboration_auth_error", onAuthError);
     socket.on("connect_error", onConnectError);
+
+    // Idle detection
+    function goAway() {
+      if (isAwayRef.current) return;
+      isAwayRef.current = true;
+      socket.emit("presence_away");
+    }
+
+    function comeBack() {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (isAwayRef.current) {
+        isAwayRef.current = false;
+        socket.emit("presence_active");
+      }
+      idleTimerRef.current = setTimeout(goAway, IDLE_AFTER_MS);
+    }
+
+    const activityEvents = ["mousemove", "keydown", "click", "touchstart"] as const;
+    activityEvents.forEach((ev) => window.addEventListener(ev, comeBack, { passive: true }));
+    idleTimerRef.current = setTimeout(goAway, IDLE_AFTER_MS);
 
     return () => {
       socket.off("workspace_changed", onWorkspaceChanged);
       socket.off("presence_sync", onPresenceSync);
       socket.off("presence_update", onPresenceUpdate);
+      socket.off("notification_new", onNotificationNew);
       socket.off("collaboration_auth_error", onAuthError);
       socket.off("connect_error", onConnectError);
       socket.disconnect();
       setOnlineUserIds(new Set());
+      setAwayUserIds(new Set());
+      activityEvents.forEach((ev) => window.removeEventListener(ev, comeBack));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [token, workspaceId, queryClient, setOnlineUserIds]);
+  }, [token, workspaceId, queryClient, setOnlineUserIds, setAwayUserIds]);
 
   return null;
 }

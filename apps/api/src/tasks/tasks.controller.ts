@@ -10,6 +10,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
+import { listTasksQuerySchema } from "@work-ledger/contracts";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { TasksService } from "./tasks.service";
@@ -22,10 +23,20 @@ export class TasksController {
   list(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
-    @Query("includeSubtasks") includeSubtasks?: string,
+    @Query() rawQuery: Record<string, string>,
   ) {
-    const withSubtasks = includeSubtasks !== "false";
-    return this.tasks.list(user.id, organizationId, { includeSubtasks: withSubtasks });
+    const query = listTasksQuerySchema.parse(rawQuery);
+    return this.tasks.list(user.id, organizationId, {
+      includeSubtasks: query.includeSubtasks,
+      status: query.status,
+      listId: query.listId,
+      departmentId: query.departmentId,
+      assigneeUserId: query.assigneeUserId,
+      dueDateFrom: query.dueDateFrom,
+      dueDateTo: query.dueDateTo,
+      limit: query.limit,
+      cursor: query.cursor,
+    });
   }
 
   @Post()

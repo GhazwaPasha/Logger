@@ -6,27 +6,63 @@ import { apiJson } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 
+export type ColumnMeta = {
+  nextCursor: string | null;
+  total: number;
+};
+
 export type WorkspaceBundle = {
   depts: Dept[];
   lists: ListRow[];
   tasks: TaskRow[];
   members: MemberRow[];
+  columnMeta: Record<string, ColumnMeta>;
 };
 
-type WorkspaceBootstrapResponse = {
+type BootstrapResponse = {
   departments: Dept[];
   lists: ListRow[];
-  tasks: TaskRow[];
   members: MemberRow[];
 };
 
+type TaskPageResponse = {
+  tasks: TaskRow[];
+  nextCursor: string | null;
+  total: number;
+};
+
 async function fetchWorkspace(token: string, orgId: string): Promise<WorkspaceBundle> {
-  const b = await apiJson<WorkspaceBootstrapResponse>(`/organizations/${orgId}/workspace`, { token });
+  const [bootstrap, pending, inProgress, done, cancelled] = await Promise.all([
+    apiJson<BootstrapResponse>(`/organizations/${orgId}/workspace`, { token }),
+    apiJson<TaskPageResponse>(
+      `/organizations/${orgId}/tasks?status=pending&limit=50&includeSubtasks=true`,
+      { token },
+    ),
+    apiJson<TaskPageResponse>(
+      `/organizations/${orgId}/tasks?status=in_progress&limit=50&includeSubtasks=true`,
+      { token },
+    ),
+    apiJson<TaskPageResponse>(
+      `/organizations/${orgId}/tasks?status=done&limit=25&includeSubtasks=true`,
+      { token },
+    ),
+    apiJson<TaskPageResponse>(
+      `/organizations/${orgId}/tasks?status=cancelled&limit=25&includeSubtasks=true`,
+      { token },
+    ),
+  ]);
+
   return {
-    depts: b.departments,
-    lists: b.lists,
-    tasks: b.tasks,
-    members: b.members,
+    depts: bootstrap.departments,
+    lists: bootstrap.lists,
+    members: bootstrap.members,
+    tasks: [...pending.tasks, ...inProgress.tasks, ...done.tasks, ...cancelled.tasks],
+    columnMeta: {
+      pending: { nextCursor: pending.nextCursor, total: pending.total },
+      in_progress: { nextCursor: inProgress.nextCursor, total: inProgress.total },
+      done: { nextCursor: done.nextCursor, total: done.total },
+      cancelled: { nextCursor: cancelled.nextCursor, total: cancelled.total },
+    },
   };
 }
 
@@ -55,9 +91,25 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     setManualError(msg);
   }, []);
 
-  const empty = useMemo(
-    (): WorkspaceBundle => ({ depts: [], lists: [], tasks: [], members: [] }),
+  const emptyColumnMeta: Record<string, ColumnMeta> = useMemo(
+    () => ({
+      pending: { nextCursor: null, total: 0 },
+      in_progress: { nextCursor: null, total: 0 },
+      done: { nextCursor: null, total: 0 },
+      cancelled: { nextCursor: null, total: 0 },
+    }),
     [],
+  );
+
+  const empty = useMemo(
+    (): WorkspaceBundle => ({
+      depts: [],
+      lists: [],
+      tasks: [],
+      members: [],
+      columnMeta: emptyColumnMeta,
+    }),
+    [emptyColumnMeta],
   );
 
   const data = q.data ?? empty;
@@ -67,6 +119,7 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     lists: data.lists,
     tasks: data.tasks,
     members: data.members,
+    columnMeta: data.columnMeta,
     error,
     setError,
     reload,

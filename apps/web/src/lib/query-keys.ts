@@ -12,3 +12,9 @@ export const taskKeys = {
   all: ["task"] as const,
   detail: (taskId: string | null | undefined) => [...taskKeys.all, taskId ?? ""] as const,
 };
+
+export const notificationKeys = {
+  all: ["notifications"] as const,
+  list: (orgId: string) => [...notificationKeys.all, orgId, "list"] as const,
+  count: (orgId: string) => [...notificationKeys.all, orgId, "count"] as const,
+};

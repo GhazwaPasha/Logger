@@ -1,6 +1,7 @@
 import { join } from "path";
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { BullModule } from "@nestjs/bullmq";
 import { AuthModule } from "./auth/auth.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { DbModule } from "./db/db.module";
@@ -9,6 +10,15 @@ import { ListsModule } from "./lists/lists.module";
 import { OrganizationsModule } from "./organizations/organizations.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { HealthController } from "./health.controller";
+import { AttachmentsModule } from "./attachments/attachments.module";
+import { CommentsModule } from "./comments/comments.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { ReportsModule } from "./reports/reports.module";
+import { SearchModule } from "./search/search.module";
+import { DependenciesModule } from "./dependencies/dependencies.module";
+import { TimeModule } from "./time/time.module";
+import { WebhooksModule } from "./webhooks/webhooks.module";
+import { TemplatesModule } from "./templates/templates.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -21,6 +31,22 @@ import { RealtimeModule } from "./realtime/realtime.module";
         join(__dirname, "..", "..", "..", ".env.local"),
       ],
     }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redisUrl = config.get<string>("REDIS_URL");
+        if (!redisUrl) return { connection: undefined as unknown as { host: string } };
+        const url = new URL(redisUrl);
+        return {
+          connection: {
+            host: url.hostname,
+            port: url.port ? parseInt(url.port, 10) : 6379,
+            password: url.password || undefined,
+            tls: url.protocol === "rediss:" ? {} : undefined,
+          },
+        };
+      },
+    }),
     DbModule,
     AuthorizationModule,
     AuthModule,
@@ -28,6 +54,15 @@ import { RealtimeModule } from "./realtime/realtime.module";
     DepartmentsModule,
     ListsModule,
     TasksModule,
+    AttachmentsModule,
+    CommentsModule,
+    NotificationsModule,
+    SearchModule,
+    ReportsModule,
+    DependenciesModule,
+    TimeModule,
+    WebhooksModule,
+    TemplatesModule,
     RealtimeModule,
   ],
   controllers: [HealthController],

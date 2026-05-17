@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.taskCapabilitiesSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.listNotificationsQuerySchema = exports.markAllNotificationsReadSchema = exports.markNotificationsReadSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
@@ -145,4 +145,39 @@ exports.taskCapabilitiesSchema = zod_1.z.object({
     canDeleteTask: zod_1.z.boolean(),
     canReschedule: zod_1.z.boolean(),
     canAppendLedger: zod_1.z.boolean(),
+});
+exports.listTasksQuerySchema = zod_1.z.object({
+    status: zod_1.z
+        .string()
+        .optional()
+        .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+    listId: zod_1.z.string().uuid().optional(),
+    departmentId: zod_1.z.string().uuid().optional(),
+    assigneeUserId: zod_1.z.string().min(1).optional(),
+    dueDateFrom: zod_1.z.string().datetime().optional(),
+    dueDateTo: zod_1.z.string().datetime().optional(),
+    limit: zod_1.z.coerce.number().int().min(1).max(100).optional().default(50),
+    cursor: zod_1.z.string().min(1).optional(),
+    includeSubtasks: zod_1.z
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v !== "false"),
+});
+exports.createCommentSchema = zod_1.z.object({
+    body: zod_1.z.string().min(1).max(4000),
+    parentCommentId: zod_1.z.string().uuid().optional(),
+});
+exports.editCommentSchema = zod_1.z.object({
+    body: zod_1.z.string().min(1).max(4000),
+});
+exports.markNotificationsReadSchema = zod_1.z.object({
+    ids: zod_1.z.array(zod_1.z.string().uuid()).min(1).max(100),
+});
+exports.markAllNotificationsReadSchema = zod_1.z.object({
+    orgId: zod_1.z.string().uuid(),
+});
+exports.listNotificationsQuerySchema = zod_1.z.object({
+    orgId: zod_1.z.string().uuid(),
+    unreadOnly: zod_1.z.enum(["true", "false"]).optional().transform((v) => v === "true"),
+    limit: zod_1.z.coerce.number().int().min(1).max(100).optional().default(50),
 });

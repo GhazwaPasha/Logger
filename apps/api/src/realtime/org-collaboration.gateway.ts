@@ -3,6 +3,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
+  SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
@@ -11,7 +12,7 @@ import type { RedisClientType } from "redis";
 import { AuthService } from "../auth/auth.service";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { corsAllowedOrigins } from "../cors-origins";
-import { CollaborationService, orgSocketRoom } from "./collaboration.service";
+import { CollaborationService, orgSocketRoom, userSocketRoom } from "./collaboration.service";
 
 /**
  * Org-scoped collaboration channel. Auth uses handshake `auth.token` (JWT) and
@@ -20,7 +21,7 @@ import { CollaborationService, orgSocketRoom } from "./collaboration.service";
  * Global `JwtAuthGuard` skips `ws` contexts; we verify JWT here in `handleConnection`.
  */
 export type PresenceSyncPayload = { onlineUserIds: string[] };
-export type PresenceUpdatePayload = { userId: string; status: "online" | "offline" };
+export type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
 
 @WebSocketGateway({
   cors: {
@@ -42,6 +43,9 @@ export class OrgCollaborationGateway
 
   /** orgId → userId → Set<socketId>: tracks multiple tabs per user */
   private readonly presence = new Map<string, Map<string, Set<string>>>();
+
+  /** orgId → Set<userId>: users who are idle (away) */
+  private readonly awayUsers = new Map<string, Set<string>>();
 
   constructor(
     private readonly auth: AuthService,
@@ -120,6 +124,25 @@ export class OrgCollaborationGateway
     }
   }
 
+  @SubscribeMessage("presence_away")
+  handleAway(client: Socket): void {
+    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    if (!userId || !organizationId) return;
+    if (!this.awayUsers.has(organizationId)) this.awayUsers.set(organizationId, new Set());
+    this.awayUsers.get(organizationId)!.add(userId);
+    const payload: PresenceUpdatePayload = { userId, status: "away" };
+    this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
+  }
+
+  @SubscribeMessage("presence_active")
+  handleActive(client: Socket): void {
+    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    if (!userId || !organizationId) return;
+    this.awayUsers.get(organizationId)?.delete(userId);
+    const payload: PresenceUpdatePayload = { userId, status: "online" };
+    this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
+  }
+
   private async verifyAndJoin(client: Socket): Promise<void> {
     try {
       const auth = client.handshake.auth as { token?: unknown; organizationId?: unknown };
@@ -138,7 +161,7 @@ export class OrgCollaborationGateway
         return;
       }
       await this.authz.assertOrgMember(userId, organizationId);
-      await client.join(orgSocketRoom(organizationId));
+      await client.join([orgSocketRoom(organizationId), userSocketRoom(userId)]);
 
       client.data.userId = userId;
       client.data.organizationId = organizationId;

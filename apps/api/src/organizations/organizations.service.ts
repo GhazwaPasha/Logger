@@ -11,6 +11,7 @@ import {
   organizationMemberManagedDepartments,
   organizationMembers,
   organizations,
+  tasks,
   user,
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
@@ -19,7 +20,6 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { ListsService } from "../lists/lists.service";
 import { CollaborationService } from "../realtime/collaboration.service";
-import { TasksService } from "../tasks/tasks.service";
 
 const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
 
@@ -30,7 +30,6 @@ export class OrganizationsService {
     private readonly authz: AuthorizationService,
     private readonly departments: DepartmentsService,
     private readonly lists: ListsService,
-    private readonly tasks: TasksService,
     private readonly collaboration: CollaborationService,
   ) {}
 
@@ -94,13 +93,17 @@ export class OrganizationsService {
         ? Math.min(Math.max(Math.floor(raw), 1), 500)
         : 150;
 
-    const taskRows = await this.tasks.list(userId, organizationId, { includeSubtasks: false });
-    const taskIds = taskRows.map((t) => t.id);
-    const tasksById = Object.fromEntries(taskRows.map((t) => [t.id, { id: t.id, title: t.title }]));
+    const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
 
     if (taskIds.length === 0) {
       return { entries: [], tasksById: {} };
     }
+
+    const taskMetaRows = await this.db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskIds));
+    const tasksById = Object.fromEntries(taskMetaRows.map((t) => [t.id, { id: t.id, title: t.title }]));
 
     const rows = await this.db
       .select({
@@ -120,16 +123,14 @@ export class OrganizationsService {
     return { entries: rows, tasksById };
   }
 
-  /** Single round-trip workspace payload for app shell (parallel DB reads). */
+  /** Single round-trip workspace payload for app shell (parallel DB reads). Tasks now fetched per-column via paginated endpoint. */
   async workspaceBootstrap(userId: string, organizationId: string) {
-    const [departments, lists, taskRows, members] = await Promise.all([
+    const [departments, lists, members] = await Promise.all([
       this.departments.list(userId, organizationId),
       this.lists.list(userId, organizationId),
-      /** One batched subtasks query (see `attachSubtasks`); avoids N+1 `GET /tasks/:id/subtasks` from the web board. */
-      this.tasks.list(userId, organizationId, { includeSubtasks: true }),
       this.listMembers(userId, organizationId),
     ]);
-    return { departments, lists, tasks: taskRows, members };
+    return { departments, lists, members };
   }
 
   async patch(userId: string, organizationId: string, body: unknown) {

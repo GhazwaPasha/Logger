@@ -11,7 +11,7 @@ import {
 } from "@work-ledger/contracts";
 import { activityLedger, organizationMembers, subtasks, taskAssignees, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
-import { AuthorizationService } from "../authorization/authorization.service";
+import { AuthorizationService, type ListTasksOpts } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
 import { PushNotificationsService } from "../push/push-notifications.service";
@@ -30,9 +30,10 @@ export class TasksService {
     private readonly collaboration: CollaborationService,
   ) {}
 
-  async list(userId: string, organizationId: string, opts?: { includeSubtasks?: boolean }) {
-    const rows = await this.authz.listTasksForUser(userId, organizationId, opts);
-    return this.syncAutomatedStatuses(rows);
+  async list(userId: string, organizationId: string, opts?: ListTasksOpts) {
+    const result = await this.authz.listTasksForUser(userId, organizationId, opts);
+    const synced = await this.syncAutomatedStatuses(result.tasks);
+    return { tasks: synced, nextCursor: result.nextCursor, total: result.total };
   }
 
   async create(userId: string, organizationId: string, body: unknown) {

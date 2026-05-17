@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, inArray, isNull, max } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, gte, inArray, isNull, lt, lte, max, or } from "drizzle-orm";
 import {
   activityLedger,
   lists,
@@ -11,6 +11,34 @@ import {
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
+
+export interface ListTasksOpts {
+  includeSubtasks?: boolean;
+  status?: string[];
+  listId?: string;
+  departmentId?: string;
+  assigneeUserId?: string;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+function encodeCursor(task: { createdAt: Date; id: string }): string {
+  return Buffer.from(JSON.stringify({ createdAt: task.createdAt.toISOString(), id: task.id })).toString("base64url");
+}
+
+function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
+  try {
+    const raw = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
+      createdAt: string;
+      id: string;
+    };
+    return { createdAt: new Date(raw.createdAt), id: raw.id };
+  } catch {
+    return null;
+  }
+}
 
 export type TaskAccess = {
   task: typeof tasks.$inferSelect;
@@ -145,12 +173,60 @@ export class AuthorizationService {
     return [...set];
   }
 
-  async listTasksForUser(
-    userId: string,
-    organizationId: string,
-    opts?: { includeSubtasks?: boolean },
-  ) {
+  /** Fast ID-only list for internal callers (activity feed, search). No filters or pagination. */
+  async listTaskIdsForUser(userId: string, organizationId: string): Promise<string[]> {
+    const orgIds = await this.listOrganizationIdsForUser(userId);
+    if (!orgIds.includes(organizationId)) {
+      throw new ForbiddenException("No access to this organization");
+    }
+
+    const memberRow = await this.db
+      .select()
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
+      .limit(1);
+    const m = memberRow[0];
+
+    if (m?.role === "owner") {
+      const rows = await this.db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(and(eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
+      return rows.map((r) => r.id);
+    }
+
+    if (m?.role === "manager") {
+      const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
+      if (managedDeptIds.length === 0) return [];
+      const managerLists = await this.db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
+      if (managerLists.length === 0) return [];
+      const rows = await this.db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.organizationId, organizationId),
+            inArray(tasks.listId, managerLists.map((l) => l.id)),
+            isNull(tasks.deletedAt),
+          ),
+        );
+      return rows.map((r) => r.id);
+    }
+
+    const assignedRows = await this.db
+      .select({ taskId: taskAssignees.taskId })
+      .from(taskAssignees)
+      .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+      .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
+    return assignedRows.map((r) => r.taskId);
+  }
+
+  async listTasksForUser(userId: string, organizationId: string, opts?: ListTasksOpts) {
     const includeSubtasks = opts?.includeSubtasks !== false;
+    const limit = Math.min(opts?.limit ?? 50, 100);
 
     const orgIds = await this.listOrganizationIdsForUser(userId);
     if (!orgIds.includes(organizationId)) {
@@ -160,69 +236,95 @@ export class AuthorizationService {
     const memberRow = await this.db
       .select()
       .from(organizationMembers)
-      .where(
-        and(
-          eq(organizationMembers.organizationId, organizationId),
-          eq(organizationMembers.userId, userId),
-        ),
-      )
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
       .limit(1);
     const m = memberRow[0];
 
-    if (m?.role === "owner") {
-      const ownerRows = await this.db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
-      return this.finalizeTaskList(ownerRows, includeSubtasks);
-    }
+    // Role-scoped base conditions
+    const roleConditions: (SQL | undefined)[] = [
+      eq(tasks.organizationId, organizationId),
+      isNull(tasks.deletedAt),
+    ];
 
     if (m?.role === "manager") {
       const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
-      if (managedDeptIds.length === 0) return [];
+      if (managedDeptIds.length === 0) return { tasks: [], nextCursor: null, total: 0 };
       const managerLists = await this.db
-        .select()
+        .select({ id: lists.id })
         .from(lists)
-        .where(
-          and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)),
-        );
-      if (managerLists.length === 0) return [];
-      const managerRows = await this.db
-        .select()
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.organizationId, organizationId),
-            inArray(
-              tasks.listId,
-              managerLists.map((x) => x.id),
-            ),
-            isNull(tasks.deletedAt),
-          ),
-        );
-      return this.finalizeTaskList(managerRows, includeSubtasks);
+        .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
+      if (managerLists.length === 0) return { tasks: [], nextCursor: null, total: 0 };
+      roleConditions.push(inArray(tasks.listId, managerLists.map((l) => l.id)));
+    } else if (!m || m.role === "member") {
+      const assignedIds = await this.db
+        .select({ taskId: taskAssignees.taskId })
+        .from(taskAssignees)
+        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
+      const ids = assignedIds.map((r) => r.taskId);
+      if (ids.length === 0) return { tasks: [], nextCursor: null, total: 0 };
+      roleConditions.push(inArray(tasks.id, ids));
     }
 
-    const assignedTaskIds = await this.db
-      .select({ taskId: taskAssignees.taskId })
-      .from(taskAssignees)
-      .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-      .where(
-        and(
-          eq(taskAssignees.userId, userId),
-          eq(tasks.organizationId, organizationId),
-          isNull(tasks.deletedAt),
-        ),
-      );
+    // Filter conditions
+    const filterConditions: (SQL | undefined)[] = [];
 
-    const ids = assignedTaskIds.map((r) => r.taskId);
-    if (ids.length === 0) return [];
+    if (opts?.status?.length) {
+      filterConditions.push(inArray(tasks.status, opts.status as (typeof tasks.$inferSelect)["status"][]));
+    }
 
-    const assigneeOnlyRows = await this.db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.organizationId, organizationId), inArray(tasks.id, ids)));
-    return this.finalizeTaskList(assigneeOnlyRows, includeSubtasks);
+    if (opts?.listId) {
+      filterConditions.push(eq(tasks.listId, opts.listId));
+    } else if (opts?.departmentId) {
+      const deptLists = await this.db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.organizationId, organizationId), eq(lists.departmentId, opts.departmentId)));
+      if (deptLists.length === 0) return { tasks: [], nextCursor: null, total: 0 };
+      filterConditions.push(inArray(tasks.listId, deptLists.map((l) => l.id)));
+    }
+
+    if (opts?.assigneeUserId) {
+      const assignedRows = await this.db
+        .select({ taskId: taskAssignees.taskId })
+        .from(taskAssignees)
+        .where(eq(taskAssignees.userId, opts.assigneeUserId));
+      const assignedIds = assignedRows.map((r) => r.taskId);
+      if (assignedIds.length === 0) return { tasks: [], nextCursor: null, total: 0 };
+      filterConditions.push(inArray(tasks.id, assignedIds));
+    }
+
+    if (opts?.dueDateFrom) filterConditions.push(gte(tasks.dueAt, new Date(opts.dueDateFrom)));
+    if (opts?.dueDateTo) filterConditions.push(lte(tasks.dueAt, new Date(opts.dueDateTo)));
+
+    const baseConditions = [...roleConditions, ...filterConditions];
+
+    // Cursor (applied to SELECT only, not COUNT)
+    const decoded = opts?.cursor ? decodeCursor(opts.cursor) : null;
+    const cursorCondition = decoded
+      ? or(lt(tasks.createdAt, decoded.createdAt), and(eq(tasks.createdAt, decoded.createdAt), lt(tasks.id, decoded.id)))
+      : undefined;
+
+    const selectConditions = cursorCondition ? [...baseConditions, cursorCondition] : baseConditions;
+
+    const [countRows, pageRows] = await Promise.all([
+      this.db.select({ value: count() }).from(tasks).where(and(...baseConditions)),
+      this.db
+        .select()
+        .from(tasks)
+        .where(and(...selectConditions))
+        .orderBy(desc(tasks.createdAt), desc(tasks.id))
+        .limit(limit + 1),
+    ]);
+
+    const total = Number(countRows[0]?.value ?? 0);
+    const hasMore = pageRows.length > limit;
+    const slicedRows = hasMore ? pageRows.slice(0, limit) : pageRows;
+    const nextCursor =
+      hasMore && slicedRows.length > 0 ? encodeCursor(slicedRows[slicedRows.length - 1]!) : null;
+
+    const finalized = await this.finalizeTaskList(slicedRows, includeSubtasks);
+    return { tasks: finalized, nextCursor, total };
   }
 
   /** Assignees always attached; subtasks loaded only when needed (saves a batched subtask query). */

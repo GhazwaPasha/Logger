@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.subtasksRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.taskTemplatesRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.webhookDeliveries = exports.webhookEndpoints = exports.taskTemplates = exports.commentMentions = exports.comments = exports.taskAttachments = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -230,6 +231,145 @@ exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     clientMutationId: (0, pg_core_1.text)("client_mutation_id"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("activity_ledger_task_created_idx").on(t.taskId, t.createdAt)]);
+/** Blocking relationship: taskId is blocked by dependsOnTaskId. */
+exports.taskDependencies = (0, pg_core_1.pgTable)("task_dependencies", {
+    taskId: (0, pg_core_1.uuid)("task_id")
+        .notNull()
+        .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    dependsOnTaskId: (0, pg_core_1.uuid)("depends_on_task_id")
+        .notNull()
+        .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.primaryKey)({ columns: [t.taskId, t.dependsOnTaskId] }),
+    (0, pg_core_1.index)("task_deps_depends_on_idx").on(t.dependsOnTaskId),
+]);
+/** Files uploaded to tasks, stored in Cloudflare R2 via presigned PUT. */
+exports.taskAttachments = (0, pg_core_1.pgTable)("task_attachments", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    taskId: (0, pg_core_1.uuid)("task_id")
+        .notNull()
+        .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    uploadedBy: (0, pg_core_1.text)("uploaded_by")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    fileName: (0, pg_core_1.text)("file_name").notNull(),
+    fileSize: (0, pg_core_1.text)("file_size").notNull(), // stored as string to avoid integer overflow on large files
+    mimeType: (0, pg_core_1.text)("mime_type").notNull(),
+    storageKey: (0, pg_core_1.text)("storage_key").notNull().unique(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("task_attachments_task_idx").on(t.taskId)]);
+/** Task comments (threaded, soft-deletable). */
+exports.comments = (0, pg_core_1.pgTable)("comments", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    taskId: (0, pg_core_1.uuid)("task_id")
+        .notNull()
+        .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    parentCommentId: (0, pg_core_1.uuid)("parent_comment_id"),
+    authorId: (0, pg_core_1.text)("author_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    body: (0, pg_core_1.text)("body").notNull(),
+    editedAt: (0, pg_core_1.timestamp)("edited_at", { withTimezone: true }),
+    deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.index)("comments_task_created_idx").on(t.taskId, t.createdAt),
+    (0, pg_core_1.index)("comments_parent_idx").on(t.parentCommentId),
+]);
+/** Mention records inside a comment — each @[name](userId) becomes a row. */
+exports.commentMentions = (0, pg_core_1.pgTable)("comment_mentions", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    commentId: (0, pg_core_1.uuid)("comment_id")
+        .notNull()
+        .references(() => exports.comments.id, { onDelete: "cascade" }),
+    mentionedUserId: (0, pg_core_1.text)("mentioned_user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("comment_mentions_user_idx").on(t.mentionedUserId)]);
+/** Reusable task blueprints saved per organization. */
+exports.taskTemplates = (0, pg_core_1.pgTable)("task_templates", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    createdBy: (0, pg_core_1.text)("created_by")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    name: (0, pg_core_1.text)("name").notNull(),
+    defaultTitle: (0, pg_core_1.text)("default_title"),
+    defaultPriority: (0, pg_core_1.text)("default_priority"),
+    defaultDueRepeat: (0, pg_core_1.text)("default_due_repeat"),
+    defaultListId: (0, pg_core_1.uuid)("default_list_id").references(() => exports.lists.id, { onDelete: "set null" }),
+    defaultSubtasks: (0, pg_core_1.jsonb)("default_subtasks").notNull().default([]),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("task_templates_org_idx").on(t.organizationId)]);
+/** Outbound webhook endpoints registered per organization. */
+exports.webhookEndpoints = (0, pg_core_1.pgTable)("webhook_endpoints", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    url: (0, pg_core_1.text)("url").notNull(),
+    secret: (0, pg_core_1.text)("secret").notNull(),
+    events: (0, pg_core_1.text)("events").array().notNull(),
+    isActive: (0, pg_core_1.boolean)("is_active").notNull().default(true),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("webhook_endpoints_org_idx").on(t.organizationId)]);
+/** Delivery log for each webhook event attempt. */
+exports.webhookDeliveries = (0, pg_core_1.pgTable)("webhook_deliveries", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    webhookEndpointId: (0, pg_core_1.uuid)("webhook_endpoint_id")
+        .notNull()
+        .references(() => exports.webhookEndpoints.id, { onDelete: "cascade" }),
+    event: (0, pg_core_1.text)("event").notNull(),
+    payload: (0, pg_core_1.jsonb)("payload").notNull(),
+    responseStatus: (0, pg_core_1.text)("response_status"),
+    responseBody: (0, pg_core_1.text)("response_body"),
+    deliveredAt: (0, pg_core_1.timestamp)("delivered_at", { withTimezone: true }),
+    failedAt: (0, pg_core_1.timestamp)("failed_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("webhook_deliveries_endpoint_idx").on(t.webhookEndpointId, t.createdAt)]);
+/** Time entries: manual or timer-based work log per task per user. */
+exports.timeEntries = (0, pg_core_1.pgTable)("time_entries", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    taskId: (0, pg_core_1.uuid)("task_id")
+        .notNull()
+        .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    startedAt: (0, pg_core_1.timestamp)("started_at", { withTimezone: true }).notNull(),
+    stoppedAt: (0, pg_core_1.timestamp)("stopped_at", { withTimezone: true }),
+    /** Duration in seconds, set when timer stops or logged manually. */
+    duration: (0, pg_core_1.text)("duration"),
+    note: (0, pg_core_1.text)("note"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.index)("time_entries_task_idx").on(t.taskId),
+    (0, pg_core_1.index)("time_entries_user_idx").on(t.userId),
+]);
+/** In-app notification inbox for users. */
+exports.notifications = (0, pg_core_1.pgTable)("notifications", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    taskId: (0, pg_core_1.uuid)("task_id").references(() => exports.tasks.id, { onDelete: "cascade" }),
+    type: (0, pg_core_1.text)("type").notNull(), // 'mention' | 'comment' | 'status_change' | 'assignment' | 'dependency_unblocked' | 'webhook_fail'
+    title: (0, pg_core_1.text)("title").notNull(),
+    body: (0, pg_core_1.text)("body").notNull(),
+    href: (0, pg_core_1.text)("href"),
+    readAt: (0, pg_core_1.timestamp)("read_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.index)("notifications_user_org_idx").on(t.userId, t.organizationId),
+    (0, pg_core_1.index)("notifications_unread_idx").on(t.readAt),
+]);
 /** Browser Web Push subscriptions (FCM/Apple/APNs via browser endpoint). */
 exports.pushSubscriptions = (0, pg_core_1.pgTable)("push_subscriptions", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -322,6 +462,46 @@ exports.activityLedgerRelations = (0, drizzle_orm_1.relations)(exports.activityL
 exports.pushSubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.pushSubscriptions, ({ one }) => ({
     user: one(exports.user, { fields: [exports.pushSubscriptions.userId], references: [exports.user.id] }),
 }));
+exports.notificationsRelations = (0, drizzle_orm_1.relations)(exports.notifications, ({ one }) => ({
+    user: one(exports.user, { fields: [exports.notifications.userId], references: [exports.user.id] }),
+    organization: one(exports.organizations, { fields: [exports.notifications.organizationId], references: [exports.organizations.id] }),
+    task: one(exports.tasks, { fields: [exports.notifications.taskId], references: [exports.tasks.id] }),
+}));
+exports.taskDependenciesRelations = (0, drizzle_orm_1.relations)(exports.taskDependencies, ({ one }) => ({
+    task: one(exports.tasks, { fields: [exports.taskDependencies.taskId], references: [exports.tasks.id], relationName: "blockedBy" }),
+    dependsOn: one(exports.tasks, { fields: [exports.taskDependencies.dependsOnTaskId], references: [exports.tasks.id], relationName: "blocking" }),
+}));
+exports.taskAttachmentsRelations = (0, drizzle_orm_1.relations)(exports.taskAttachments, ({ one }) => ({
+    task: one(exports.tasks, { fields: [exports.taskAttachments.taskId], references: [exports.tasks.id] }),
+    uploader: one(exports.user, { fields: [exports.taskAttachments.uploadedBy], references: [exports.user.id] }),
+}));
+exports.commentsRelations = (0, drizzle_orm_1.relations)(exports.comments, ({ one, many }) => ({
+    task: one(exports.tasks, { fields: [exports.comments.taskId], references: [exports.tasks.id] }),
+    author: one(exports.user, { fields: [exports.comments.authorId], references: [exports.user.id] }),
+    parent: one(exports.comments, { fields: [exports.comments.parentCommentId], references: [exports.comments.id], relationName: "replies" }),
+    replies: many(exports.comments, { relationName: "replies" }),
+    mentions: many(exports.commentMentions),
+}));
+exports.commentMentionsRelations = (0, drizzle_orm_1.relations)(exports.commentMentions, ({ one }) => ({
+    comment: one(exports.comments, { fields: [exports.commentMentions.commentId], references: [exports.comments.id] }),
+    mentionedUser: one(exports.user, { fields: [exports.commentMentions.mentionedUserId], references: [exports.user.id] }),
+}));
+exports.timeEntriesRelations = (0, drizzle_orm_1.relations)(exports.timeEntries, ({ one }) => ({
+    task: one(exports.tasks, { fields: [exports.timeEntries.taskId], references: [exports.tasks.id] }),
+    user: one(exports.user, { fields: [exports.timeEntries.userId], references: [exports.user.id] }),
+}));
+exports.taskTemplatesRelations = (0, drizzle_orm_1.relations)(exports.taskTemplates, ({ one }) => ({
+    organization: one(exports.organizations, { fields: [exports.taskTemplates.organizationId], references: [exports.organizations.id] }),
+    creator: one(exports.user, { fields: [exports.taskTemplates.createdBy], references: [exports.user.id] }),
+    list: one(exports.lists, { fields: [exports.taskTemplates.defaultListId], references: [exports.lists.id] }),
+}));
+exports.webhookEndpointsRelations = (0, drizzle_orm_1.relations)(exports.webhookEndpoints, ({ one, many }) => ({
+    organization: one(exports.organizations, { fields: [exports.webhookEndpoints.organizationId], references: [exports.organizations.id] }),
+    deliveries: many(exports.webhookDeliveries),
+}));
+exports.webhookDeliveriesRelations = (0, drizzle_orm_1.relations)(exports.webhookDeliveries, ({ one }) => ({
+    endpoint: one(exports.webhookEndpoints, { fields: [exports.webhookDeliveries.webhookEndpointId], references: [exports.webhookEndpoints.id] }),
+}));
 exports.subtasksRelations = (0, drizzle_orm_1.relations)(exports.subtasks, ({ one }) => ({
     task: one(exports.tasks, { fields: [exports.subtasks.taskId], references: [exports.tasks.id] }),
 }));
@@ -346,6 +526,15 @@ exports.appSchema = {
     taskAssignees: exports.taskAssignees,
     activityLedger: exports.activityLedger,
     pushSubscriptions: exports.pushSubscriptions,
+    notifications: exports.notifications,
+    taskDependencies: exports.taskDependencies,
+    taskAttachments: exports.taskAttachments,
+    comments: exports.comments,
+    commentMentions: exports.commentMentions,
+    timeEntries: exports.timeEntries,
+    taskTemplates: exports.taskTemplates,
+    webhookEndpoints: exports.webhookEndpoints,
+    webhookDeliveries: exports.webhookDeliveries,
     organizationsRelations: exports.organizationsRelations,
     organizationMembersRelations: exports.organizationMembersRelations,
     organizationMemberManagedDepartmentsRelations: exports.organizationMemberManagedDepartmentsRelations,
@@ -356,4 +545,13 @@ exports.appSchema = {
     taskAssigneesRelations: exports.taskAssigneesRelations,
     activityLedgerRelations: exports.activityLedgerRelations,
     pushSubscriptionsRelations: exports.pushSubscriptionsRelations,
+    notificationsRelations: exports.notificationsRelations,
+    taskDependenciesRelations: exports.taskDependenciesRelations,
+    taskAttachmentsRelations: exports.taskAttachmentsRelations,
+    commentsRelations: exports.commentsRelations,
+    commentMentionsRelations: exports.commentMentionsRelations,
+    timeEntriesRelations: exports.timeEntriesRelations,
+    taskTemplatesRelations: exports.taskTemplatesRelations,
+    webhookEndpointsRelations: exports.webhookEndpointsRelations,
+    webhookDeliveriesRelations: exports.webhookDeliveriesRelations,
 };

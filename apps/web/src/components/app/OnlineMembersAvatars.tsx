@@ -24,7 +24,7 @@ export function OnlineMembersAvatars() {
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user?.id;
   const { members } = useWorkspaceData();
-  const { onlineUserIds } = useOnlinePresence();
+  const { onlineUserIds, awayUserIds } = useOnlinePresence();
 
   const onlineMembers = members.filter(
     (m) => onlineUserIds.has(m.userId) && m.userId !== currentUserId,
@@ -37,19 +37,27 @@ export function OnlineMembersAvatars() {
 
   return (
     <div className="flex items-center">
-      {shown.map((m, i) => (
-        <div
-          key={m.userId}
-          className={`flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
-          title={m.name || m.email}
-        >
-          {m.image ? (
-            <img src={m.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-          ) : (
-            <span aria-hidden>{initials(m.name, m.email)}</span>
-          )}
-        </div>
-      ))}
+      {shown.map((m, i) => {
+        const isAway = awayUserIds.has(m.userId);
+        return (
+          <div
+            key={m.userId}
+            className={`relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
+            title={`${m.name || m.email}${isAway ? " (Away)" : ""}`}
+          >
+            {m.image ? (
+              <img src={m.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <span aria-hidden>{initials(m.name, m.email)}</span>
+            )}
+            {/* Status dot */}
+            <span
+              className={`absolute bottom-0 right-0 size-2 rounded-full ring-1 ring-[var(--bg-header)] ${isAway ? "bg-amber-400" : "bg-green-500"}`}
+              aria-hidden
+            />
+          </div>
+        );
+      })}
       {overflow > 0 && (
         <div className="-ml-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-elevated)] text-[10px] font-semibold text-[var(--muted)] ring-2 ring-[var(--bg-header)]">
           +{overflow}

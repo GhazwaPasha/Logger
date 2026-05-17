@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
+import { ExportButton } from "@/components/dashboard/ExportButton";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -38,6 +39,8 @@ export default function WorkspaceDashboardPage() {
             <span className="text-[var(--fg)]">Activity log</span> for the full ledger.
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ExportButton />
         <div
           className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
           role="group"
@@ -67,6 +70,7 @@ export default function WorkspaceDashboardPage() {
           >
             Activity log
           </button>
+        </div>
         </div>
       </div>
 

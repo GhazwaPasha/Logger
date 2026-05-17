@@ -14,6 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiJson } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
@@ -26,6 +27,13 @@ import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
+import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
+import { CommentThread } from "@/components/tasks/CommentThread";
+import { AttachmentZone } from "@/components/tasks/AttachmentZone";
+import { DependencySection } from "@/components/tasks/DependencySection";
+import { TimeTracker } from "@/components/tasks/TimeTracker";
+import { TemplatePicker } from "@/components/tasks/TemplatePicker";
+import { SaveTemplateModal } from "@/components/tasks/SaveTemplateModal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NODE_LABELS } from "@/lib/nodes";
@@ -486,7 +494,7 @@ function WorkItemsInner() {
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
-  const { tasks, lists, members, depts, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
+  const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [title, setTitle] = useState("");
   const [listId, setListId] = useState("");
   const [due, setDue] = useState("");
@@ -501,6 +509,8 @@ function WorkItemsInner() {
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
   const [editDueRepeat, setEditDueRepeat] = useState<TaskDueRepeat | null>(null);
@@ -710,6 +720,17 @@ function WorkItemsInner() {
       document.body.style.overflow = prevOverflow;
     };
   }, [taskPanelOpen]);
+
+  // 'N' keyboard shortcut from KeyboardShortcutsProvider
+  useEffect(() => {
+    function handler() {
+      setEditTaskId(null);
+      setNewTaskStatus("pending");
+      setCreateModalOpen(true);
+    }
+    window.addEventListener("wl:new-task", handler);
+    return () => window.removeEventListener("wl:new-task", handler);
+  }, []);
 
   useEffect(() => {
     if (!taskPanelOpen) return;
@@ -957,6 +978,41 @@ function WorkItemsInner() {
       });
     },
   });
+
+  const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
+
+  const loadMoreColumn = useCallback(
+    async (status: string) => {
+      if (!token || !workspaceId) return;
+      const meta = columnMeta[status];
+      if (!meta?.nextCursor) return;
+      setLoadingMoreColumn(status);
+      try {
+        const result = await apiJson<{ tasks: TaskRow[]; nextCursor: string | null; total: number }>(
+          `/organizations/${workspaceId}/tasks?status=${status}&cursor=${meta.nextCursor}&limit=25&includeSubtasks=true`,
+          { token },
+        );
+        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+          if (!old) return old;
+          const existingIds = new Set(old.tasks.map((t) => t.id));
+          const newTasks = result.tasks.filter((t) => !existingIds.has(t.id));
+          return {
+            ...old,
+            tasks: [...old.tasks, ...newTasks],
+            columnMeta: {
+              ...old.columnMeta,
+              [status]: { nextCursor: result.nextCursor, total: result.total },
+            },
+          };
+        });
+      } catch {
+        // non-critical — user can retry
+      } finally {
+        setLoadingMoreColumn(null);
+      }
+    },
+    [token, workspaceId, columnMeta, queryClient],
+  );
 
   const patchTaskPendingId =
     patchTaskMutation.isPending && patchTaskMutation.variables
@@ -2163,7 +2219,68 @@ function WorkItemsInner() {
     );
   }
 
+  type ColumnItem =
+    | { kind: "task"; task: TaskRow }
+    | { kind: "series"; seriesId: string; tasks: TaskRow[] }
+    | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
+
+  function VirtualColumnList({ items, col }: { items: ColumnItem[]; col: string }) {
+    const parentRef = useRef<HTMLDivElement>(null);
+    const virtualizer = useVirtualizer({
+      count: items.length,
+      getScrollElement: () => parentRef.current,
+      estimateSize: () => 90,
+      overscan: 5,
+      measureElement: (el) => el.getBoundingClientRect().height,
+    });
+
+    return (
+      <div ref={parentRef} className="flex-1 overflow-y-auto min-h-24">
+        <ul style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+          {virtualizer.getVirtualItems().map((vItem) => {
+            const item = items[vItem.index]!;
+            return (
+              <li
+                key={vItem.key}
+                data-index={vItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${vItem.start}px)`,
+                }}
+                className="pb-1.5"
+              >
+                {item.kind === "task" && <TaskCard task={item.task} />}
+                {item.kind === "series" && (
+                  <RecurringSeriesCard
+                    tasks={item.tasks}
+                    members={members}
+                    onOpenTask={openEditTask}
+                  />
+                )}
+                {item.kind === "load-more" && (
+                  <button
+                    type="button"
+                    onClick={() => void loadMoreColumn(item.status)}
+                    disabled={item.loading}
+                    className="w-full rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
+                  >
+                    {item.loading ? "Loading…" : `Load more · ${item.loaded} of ${item.total}`}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
   function KanbanBoard({ rows }: { rows: TaskRow[] }) {
+    // columnMeta and loadMoreColumn are captured from the outer scope
     return (
       <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
           <div
@@ -2204,14 +2321,41 @@ function WorkItemsInner() {
                   >
                     <div className="flex items-center justify-between gap-1.5">
                       <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
-                      <span className="tabular-nums text-[10px] font-medium opacity-80">{colTasks.length}</span>
+                      <span className="tabular-nums text-[10px] font-medium opacity-80">
+                        {columnMeta[col]?.total ?? colTasks.length}
+                      </span>
                     </div>
                   </div>
-                  <ul className="flex min-h-24 flex-1 flex-col gap-1.5 overflow-y-auto py-1">
-                    {colTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} />
-                    ))}
-                  </ul>
+                  {(() => {
+                    const colItems: ColumnItem[] = [];
+                    if (col === "done" || col === "cancelled") {
+                      const seriesGroups = new Map<string, TaskRow[]>();
+                      for (const task of colTasks) {
+                        if (task.recurringSeriesId) {
+                          const g = seriesGroups.get(task.recurringSeriesId) ?? [];
+                          g.push(task);
+                          seriesGroups.set(task.recurringSeriesId, g);
+                        } else {
+                          colItems.push({ kind: "task", task });
+                        }
+                      }
+                      for (const [seriesId, tasks] of seriesGroups) {
+                        colItems.push({ kind: "series", seriesId, tasks });
+                      }
+                    } else {
+                      for (const task of colTasks) colItems.push({ kind: "task", task });
+                    }
+                    if (columnMeta[col]?.nextCursor) {
+                      colItems.push({
+                        kind: "load-more",
+                        status: col,
+                        loaded: colTasks.length,
+                        total: columnMeta[col]!.total,
+                        loading: loadingMoreColumn === col,
+                      });
+                    }
+                    return <VirtualColumnList items={colItems} col={col} />;
+                  })()}
                 </div>
               );
             })}
@@ -2588,6 +2732,16 @@ function WorkItemsInner() {
                     <div className={TASK_PANEL_HEADER_ROW}>
                       <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
                       <div className={TASK_PANEL_HEADER_RIGHT}>
+                        {(editDetail.capabilities.canReschedule) && (
+                          <button
+                            type="button"
+                            className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium"
+                            disabled={editSaving}
+                            onClick={() => setShowSaveTemplate(true)}
+                          >
+                            Save as Template
+                          </button>
+                        )}
                         <StatusPillSelect
                           aria-label="Status"
                           value={editStatus}
@@ -2795,6 +2949,37 @@ function WorkItemsInner() {
                       </button>
                     </div>
                     <TaskPanelHistoryCard task={editDetail.task} ledger={editDetail.ledger} members={members} />
+                    {token && (
+                      <DependencySection
+                        taskId={editDetail.task.id}
+                        token={token}
+                        allTasks={tasks}
+                        canEdit={editDetail.capabilities.canReschedule}
+                        onOpenTask={(id) => setEditTaskId(id)}
+                      />
+                    )}
+                    {token && sessionUserId && (
+                      <TimeTracker
+                        taskId={editDetail.task.id}
+                        token={token}
+                        userId={sessionUserId}
+                      />
+                    )}
+                    {token && sessionUserId && (
+                      <AttachmentZone
+                        taskId={editDetail.task.id}
+                        token={token}
+                        userId={sessionUserId}
+                      />
+                    )}
+                    {token && sessionUserId && (
+                      <CommentThread
+                        taskId={editDetail.task.id}
+                        token={token}
+                        userId={sessionUserId}
+                        members={members}
+                      />
+                    )}
                   </>
                 ) : (
                   <>
@@ -2815,6 +3000,14 @@ function WorkItemsInner() {
             <div className={TASK_PANEL_HEADER_ROW}>
               <h2 className={TASK_PANEL_HEADER_TITLE}>New task</h2>
               <div className={TASK_PANEL_HEADER_RIGHT}>
+                <button
+                  type="button"
+                  className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium"
+                  disabled={createSaving}
+                  onClick={() => setShowTemplatePicker(true)}
+                >
+                  Use Template
+                </button>
                 <StatusPillSelect
                   aria-label="Status"
                   value={newTaskStatus}
@@ -2974,6 +3167,26 @@ function WorkItemsInner() {
           </div>,
           document.body,
         )}
+      {showTemplatePicker && token && (
+        <TemplatePicker
+          orgId={workspaceId}
+          token={token}
+          onApply={(result) => {
+            if (result.title) setTitle(result.title);
+            if (result.priority) setNewTaskPriority(result.priority as TaskPriority);
+            if (result.subtasks?.length) setSubtaskItems(result.subtasks.map((s) => s.title));
+          }}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+      {showSaveTemplate && token && editDetail && (
+        <SaveTemplateModal
+          task={editDetail.task}
+          orgId={workspaceId}
+          token={token}
+          onClose={() => setShowSaveTemplate(false)}
+        />
+      )}
     </div>
   );
 }

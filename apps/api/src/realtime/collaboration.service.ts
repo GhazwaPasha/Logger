@@ -12,6 +12,10 @@ export function orgSocketRoom(organizationId: string): string {
   return `org:${organizationId}`;
 }
 
+export function userSocketRoom(userId: string): string {
+  return `user:${userId}`;
+}
+
 @Injectable()
 export class CollaborationService {
   private server: Server | null = null;
@@ -36,6 +40,16 @@ export class CollaborationService {
   notifyOrgChanged(organizationId: string, taskId?: string | null): void {
     try {
       this.emitWorkspaceChanged(organizationId, taskId);
+    } catch {
+      /* ignore realtime failures */
+    }
+  }
+
+  /** Push a real-time event to a specific user's personal room — never throws. */
+  notifyUser(userId: string, payload: Record<string, unknown>): void {
+    try {
+      if (!this.server) return;
+      this.server.to(userSocketRoom(userId)).emit(payload["event"] as string, payload);
     } catch {
       /* ignore realtime failures */
     }

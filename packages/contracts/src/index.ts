@@ -171,5 +171,46 @@ export const taskCapabilitiesSchema = z.object({
   canAppendLedger: z.boolean(),
 });
 
+export const listTasksQuerySchema = z.object({
+  status: z
+    .string()
+    .optional()
+    .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+  listId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().optional(),
+  assigneeUserId: z.string().min(1).optional(),
+  dueDateFrom: z.string().datetime().optional(),
+  dueDateTo: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  cursor: z.string().min(1).optional(),
+  includeSubtasks: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v !== "false"),
+});
+
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 export type AppendLedgerInput = z.infer<typeof appendLedgerSchema>;
 export type RescheduleTaskInput = z.infer<typeof rescheduleTaskSchema>;
+
+export const createCommentSchema = z.object({
+  body: z.string().min(1).max(4000),
+  parentCommentId: z.string().uuid().optional(),
+});
+export const editCommentSchema = z.object({
+  body: z.string().min(1).max(4000),
+});
+export type CreateCommentInput = z.infer<typeof createCommentSchema>;
+export type EditCommentInput = z.infer<typeof editCommentSchema>;
+
+export const markNotificationsReadSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+});
+export const markAllNotificationsReadSchema = z.object({
+  orgId: z.string().uuid(),
+});
+export const listNotificationsQuerySchema = z.object({
+  orgId: z.string().uuid(),
+  unreadOnly: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+});

@@ -172,10 +172,12 @@ export function WorkspaceSidebar({
   }, []);
 
   const activeDashboard = pathname === `${base}/dashboard`;
+  const activeCalendar = pathname.startsWith(`${base}/calendar`);
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
   const activePeople = pathname.startsWith(`${base}/people`);
   const activeOrganizationSettings = pathname.startsWith(`${base}/organization-settings`);
   const activeUserSettings = pathname.startsWith(`${base}/settings`);
+  const activeWebhooks = pathname.startsWith(`${base}/webhooks`);
   const activeAddWorkspace = pathname.startsWith(`${base}/add-workspace`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
   /** Work page scoped to whole workspace (level/list live in sessionStorage, not the URL). */
@@ -199,6 +201,7 @@ export function WorkspaceSidebar({
       "/add-workspace",
       "/organization-settings",
       "/settings",
+      "/webhooks",
     ]);
     const nextTail = allowedTails.has(tail) ? tail : "/dashboard";
     const nextOrg = orgs.find((o) => o.id === nextId);
@@ -495,6 +498,9 @@ export function WorkspaceSidebar({
           <div className="mt-2 space-y-0.5 px-1">
             <Link href={`${base}/dashboard`} className={`${rowBase(activeDashboard)} pl-2`}>
               Dashboard
+            </Link>
+            <Link href={`${base}/calendar`} className={`${rowBase(activeCalendar)} pl-2`}>
+              Calendar
             </Link>
             <Link href={`${base}/my-tasks`} className={`${rowBase(activeMyTasks)} pl-2`}>
               My tasks
@@ -882,6 +888,9 @@ export function WorkspaceSidebar({
                   </Link>
                   <Link href={`${base}/organization-settings`} className={`${rowBase(activeOrganizationSettings)} pl-2`}>
                     Organization settings
+                  </Link>
+                  <Link href={`${base}/webhooks`} className={`${rowBase(activeWebhooks)} pl-2`}>
+                    Webhooks
                   </Link>
                 </div>
               </div>
