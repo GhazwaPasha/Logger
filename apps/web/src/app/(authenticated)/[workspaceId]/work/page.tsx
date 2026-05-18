@@ -2537,7 +2537,7 @@ function WorkItemsInner() {
       {taskPanelOpen &&
         toolbarMenusMounted &&
         createPortal(
-          <div className="fixed inset-0 z-[60]">
+          <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
           <div
             className="absolute inset-0 bg-black/40"
             aria-hidden

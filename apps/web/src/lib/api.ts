@@ -24,6 +24,7 @@ export async function apiFetch(
     ...rest,
     headers,
     cache: rest.cache ?? "no-store",
+    signal: rest.signal ?? AbortSignal.timeout(30_000),
   });
 }
 

@@ -8,6 +8,7 @@ import { safeReturnPath } from "@/lib/safe-return-path";
 import { LoadingScreen } from "@/components/ui/LoadingFrame";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
+import { QueryProvider } from "./QueryProvider";
 
 /** Session redirect + app preferences + organizations context for `/app` and `/<workspaceSlug|uuid>/…`. */
 export function AppAuthenticatedProviders({ children }: { children: React.ReactNode }) {
@@ -37,8 +38,10 @@ export function AppAuthenticatedProviders({ children }: { children: React.ReactN
   }
 
   return (
-    <AppPreferencesProvider theme={theme} setTheme={setTheme}>
-      <OrganizationsProvider>{children}</OrganizationsProvider>
-    </AppPreferencesProvider>
+    <QueryProvider>
+      <AppPreferencesProvider theme={theme} setTheme={setTheme}>
+        <OrganizationsProvider>{children}</OrganizationsProvider>
+      </AppPreferencesProvider>
+    </QueryProvider>
   );
 }
