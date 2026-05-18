@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
-import { taskDependencies, tasks } from "@work-ledger/db";
+import { activityLedger, taskDependencies, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -36,7 +36,7 @@ export class DependenciesService {
   async add(userId: string, taskId: string, dependsOnTaskId: string) {
     if (taskId === dependsOnTaskId) throw new BadRequestException("A task cannot depend on itself");
 
-    const [access] = await Promise.all([
+    const [access, blockerAccess] = await Promise.all([
       this.authz.getTaskAccess(userId, taskId),
       this.authz.getTaskAccess(userId, dependsOnTaskId),
     ]);
@@ -52,6 +52,13 @@ export class DependenciesService {
       .values({ taskId, dependsOnTaskId })
       .onConflictDoNothing();
 
+    await this.db.insert(activityLedger).values({
+      taskId,
+      actorId: userId,
+      type: "dependency_added",
+      payload: { dependsOnTaskId, dependsOnTaskTitle: blockerAccess.task.title },
+    });
+
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
   }
 
@@ -60,9 +67,22 @@ export class DependenciesService {
     const caps = this.authz.taskCapabilities(access, userId);
     if (!caps.canReschedule) throw new ForbiddenException("Cannot modify dependencies on this task");
 
+    const [blockerRow] = await this.db
+      .select({ title: tasks.title })
+      .from(tasks)
+      .where(eq(tasks.id, dependsOnTaskId))
+      .limit(1);
+
     await this.db
       .delete(taskDependencies)
       .where(and(eq(taskDependencies.taskId, taskId), eq(taskDependencies.dependsOnTaskId, dependsOnTaskId)));
+
+    await this.db.insert(activityLedger).values({
+      taskId,
+      actorId: userId,
+      type: "dependency_removed",
+      payload: { dependsOnTaskId, dependsOnTaskTitle: blockerRow?.title ?? dependsOnTaskId },
+    });
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
   }

@@ -234,6 +234,81 @@ export function LedgerLineDescription({ entry, members }: Props) {
         </>
       );
     }
+    case "comment_added": {
+      const preview = entry.payload.preview;
+      return (
+        <>
+          <UserName>{actor}</UserName> commented
+          {typeof preview === "string" && preview.length > 0 && (
+            <span className="text-[var(--muted)]">: "{preview}"</span>
+          )}
+        </>
+      );
+    }
+    case "comment_edited":
+      return (
+        <>
+          <UserName>{actor}</UserName> edited a comment
+        </>
+      );
+    case "comment_deleted":
+      return (
+        <>
+          <UserName>{actor}</UserName> deleted a comment
+        </>
+      );
+    case "attachment_added": {
+      const fileName = entry.payload.fileName;
+      return (
+        <>
+          <UserName>{actor}</UserName> uploaded{" "}
+          {typeof fileName === "string" ? (
+            <span className="font-medium">{fileName}</span>
+          ) : (
+            "a file"
+          )}
+        </>
+      );
+    }
+    case "attachment_deleted": {
+      const fileName = entry.payload.fileName;
+      return (
+        <>
+          <UserName>{actor}</UserName> removed{" "}
+          {typeof fileName === "string" ? (
+            <span className="font-medium">{fileName}</span>
+          ) : (
+            "a file"
+          )}
+        </>
+      );
+    }
+    case "dependency_added": {
+      const title = entry.payload.dependsOnTaskTitle;
+      return (
+        <>
+          <UserName>{actor}</UserName> added blocker{" "}
+          {typeof title === "string" ? (
+            <span className="font-medium">{title}</span>
+          ) : (
+            "a task"
+          )}
+        </>
+      );
+    }
+    case "dependency_removed": {
+      const title = entry.payload.dependsOnTaskTitle;
+      return (
+        <>
+          <UserName>{actor}</UserName> removed blocker{" "}
+          {typeof title === "string" ? (
+            <span className="font-medium">{title}</span>
+          ) : (
+            "a task"
+          )}
+        </>
+      );
+    }
     default:
       return (
         <>

@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import { and, count, eq } from "drizzle-orm";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { taskAttachments } from "@work-ledger/db";
+import { activityLedger, taskAttachments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -102,6 +102,13 @@ export class AttachmentsService {
       })
       .returning();
 
+    await this.db.insert(activityLedger).values({
+      taskId,
+      actorId: userId,
+      type: "attachment_added",
+      payload: { fileName: opts.fileName, mimeType: opts.mimeType },
+    });
+
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return row;
   }
@@ -133,6 +140,14 @@ export class AttachmentsService {
     const s3 = this.assertR2();
     await s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: attachment.storageKey }));
     await this.db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
+
+    await this.db.insert(activityLedger).values({
+      taskId: attachment.taskId,
+      actorId: userId,
+      type: "attachment_deleted",
+      payload: { fileName: attachment.fileName },
+    });
+
     this.collaboration.notifyOrgChanged(access.task.organizationId, attachment.taskId);
   }
 }

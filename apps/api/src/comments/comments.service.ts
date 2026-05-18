@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { commentMentions, comments, user } from "@work-ledger/db";
+import { activityLedger, commentMentions, comments, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -88,6 +88,13 @@ export class CommentsService {
       });
     }
 
+    await this.db.insert(activityLedger).values({
+      taskId,
+      actorId: userId,
+      type: "comment_added",
+      payload: { commentId: comment!.id, preview: body.body.slice(0, 80) },
+    });
+
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return comment;
   }
@@ -105,6 +112,12 @@ export class CommentsService {
       .returning();
 
     const access = await this.authz.getTaskAccess(userId, comment.taskId);
+    await this.db.insert(activityLedger).values({
+      taskId: comment.taskId,
+      actorId: userId,
+      type: "comment_edited",
+      payload: { commentId },
+    });
     this.collaboration.notifyOrgChanged(access.task.organizationId, comment.taskId);
     return updated;
   }
@@ -122,6 +135,13 @@ export class CommentsService {
       .update(comments)
       .set({ deletedAt: new Date() })
       .where(and(eq(comments.id, commentId), isNull(comments.deletedAt)));
+
+    await this.db.insert(activityLedger).values({
+      taskId: comment.taskId,
+      actorId: userId,
+      type: "comment_deleted",
+      payload: { commentId },
+    });
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, comment.taskId);
   }

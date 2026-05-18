@@ -32,7 +32,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      useFactory: async (config: ConfigService) => {
         const redisUrl = config.get<string>("REDIS_URL");
         if (!redisUrl) {
           const { default: IORedis } = await import("ioredis");

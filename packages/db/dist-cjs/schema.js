@@ -216,6 +216,13 @@ exports.ledgerTypeEnum = (0, pg_core_1.pgEnum)("ledger_type", [
     "status_change",
     "assignee_change",
     "archive",
+    "comment_added",
+    "comment_edited",
+    "comment_deleted",
+    "attachment_added",
+    "attachment_deleted",
+    "dependency_added",
+    "dependency_removed",
 ]);
 exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),

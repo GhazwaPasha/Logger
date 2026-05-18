@@ -9,7 +9,7 @@ import { WebhooksService } from "./webhooks.service";
     BullModule.registerQueueAsync({
       name: "webhook-delivery",
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      useFactory: async (config: ConfigService) => {
         const redisUrl = config.get<string>("REDIS_URL");
         if (!redisUrl) {
           const { default: IORedis } = await import("ioredis");
