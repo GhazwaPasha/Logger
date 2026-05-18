@@ -12,8 +12,8 @@ import { WebhooksService } from "./webhooks.service";
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>("REDIS_URL");
         if (!redisUrl) {
-          // No Redis — queue is a no-op stub; webhooks won't deliver
-          return { connection: undefined as unknown as { host: string } };
+          const { default: IORedis } = await import("ioredis");
+          return { connection: new IORedis({ lazyConnect: true, enableOfflineQueue: false }) };
         }
         const url = new URL(redisUrl);
         return {

@@ -1,5 +1,29 @@
 "use client";
 
+import {
+  Alarm,
+  ArrowLineUp,
+  ArrowsDownUp,
+  CalendarDots,
+  CalendarPlus,
+  CaretDoubleDown,
+  CaretDoubleUp,
+  CaretRight,
+  ChatCircle,
+  Check,
+  CheckSquare,
+  Clock,
+  ClockUser,
+  Columns,
+  DotsThreeVertical,
+  ListChecks,
+  Paperclip,
+  Plus,
+  Rows,
+  Timer,
+  UserPlus,
+  XSquare,
+} from "@phosphor-icons/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import {
@@ -32,8 +56,6 @@ import { CommentThread } from "@/components/tasks/CommentThread";
 import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { DependencySection } from "@/components/tasks/DependencySection";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
-import { TemplatePicker } from "@/components/tasks/TemplatePicker";
-import { SaveTemplateModal } from "@/components/tasks/SaveTemplateModal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NODE_LABELS } from "@/lib/nodes";
@@ -79,9 +101,9 @@ import {
   PENDING_WORK_URL_FILTER_LABEL,
   stageControlDropdownOptions,
   sortTasks,
+  statusLabelTextClasses,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
-  taskHasAssignees,
   taskMatchesDatePreset,
   taskMatchesDueRange,
   taskMatchesUrlStatusFilter,
@@ -91,126 +113,13 @@ import {
 
 type ViewMode = "list" | "kanban";
 
-function IconUserPlus({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M19 8v6M22 11h-6" />
-    </svg>
-  );
-}
-
-/** Task footer: has assignee (neutral icon, no label). */
-function IconTaskFooterProfile({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <circle cx="12" cy="9" r="3" />
-      <path d="M5 20v-1a7 7 0 0 1 14 0v1" />
-    </svg>
-  );
-}
-
-/** Task footer: in progress and overdue (neutral icon). */
-function IconTaskFooterStopwatch({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <line x1="10" x2="14" y1="3" y2="3" />
-      <line x1="12" x2="12" y1="3" y2="5" />
-      <circle cx="12" cy="14" r="7" />
-      <path d="M12 10v4l2 2" />
-    </svg>
-  );
-}
-
 function IconChevron({ className, open }: { className?: string; open: boolean }) {
   return (
-    <svg
+    <CaretRight
       className={`${className ?? ""} shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
+      weight="bold"
       aria-hidden
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
-  );
-}
-
-function IconLayoutList({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-    </svg>
-  );
-}
-
-function IconLayoutKanban({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <rect x="4" y="4" width="5" height="16" rx="1" />
-      <rect x="14" y="4" width="5" height="10" rx="1" />
-    </svg>
-  );
-}
-
-function IconArrowUpDown({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
-    </svg>
-  );
-}
-
-function IconCalendarDays({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
-      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
-    </svg>
-  );
-}
-
-function IconChevronMiniDown({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
-function IconEllipsisVertical({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <circle cx="12" cy="5" r="1.5" />
-      <circle cx="12" cy="12" r="1.5" />
-      <circle cx="12" cy="19" r="1.5" />
-    </svg>
+    />
   );
 }
 
@@ -308,22 +217,10 @@ const TASK_DUE_CHIP_LABEL_CLASS = "min-w-0 shrink";
 const TASK_DUE_CHIP_ICON_CLASS =
   "size-3.5 shrink-0 block opacity-80 [stroke-linecap:round] [stroke-linejoin:round]";
 
-/** Outlined shell for profile / stopwatch hints beside level/list badges (list + kanban). */
-const TASK_FOOTER_META_ICON_CHIP =
-  "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)]/30";
-
-/** List row title badges: same footprint as assignee / due / overflow (`h-8` / `size-8`). */
-const LIST_ROW_FOOTER_META_ICON_CHIP =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-muted)]/30";
-
 /** Kanban only: level + list + icon chips in the mid-footer row share height (`h-7` / `size-7`). */
 const KANBAN_SUBTASK_BELOW_BADGE_HEIGHT =
   "box-border h-7 min-h-7 max-h-7 shrink-0 items-center justify-center py-0 leading-none";
 
-/** Has assignee chip icon (sky, same hue family as former Assigned). */
-const TASK_FOOTER_ASSIGNEE_ICON_CLASS = "size-4 shrink-0 text-sky-600 dark:text-sky-400";
-/** In progress + overdue chip icon (orange, same hue family as former Late). */
-const TASK_FOOTER_LATE_ICON_CLASS = "size-4 shrink-0 text-orange-600 dark:text-orange-400";
 
 const LIST_ROW_BADGE_LABEL =
   "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
@@ -363,9 +260,9 @@ function TaskPanelScopeBadges({ level, list }: { level: string | null; list: str
 const STATUS_PILL_LAYOUT =
   "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 px-1.5";
 
-/** Kanban card meta row: status pill fills an equal-width cell (still `h-8`). */
+/** Kanban card meta row: status pill is icon-only, compact. */
 const KANBAN_STATUS_SHELL_LAYOUT =
-  "relative inline-flex h-8 w-full min-w-0 shrink-0 items-center justify-between gap-0.5 px-1.5";
+  "relative inline-flex h-6 w-auto min-w-[5.5rem] shrink-0 items-center rounded";
 
 /** Kanban card meta row: priority tile fills an equal-width cell (matches list-row tile height). */
 const KANBAN_PRIORITY_SHELL_LAYOUT =
@@ -509,8 +406,6 @@ function WorkItemsInner() {
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editTaskId, setEditTaskId] = useState<string | null>(null);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDue, setEditDue] = useState("");
   const [editDueRepeat, setEditDueRepeat] = useState<TaskDueRepeat | null>(null);
@@ -1357,8 +1252,6 @@ function WorkItemsInner() {
   }, [visibleTasks]);
 
   /** Badges on cards: all tasks → list + level; level filter only → list; single list filter → none */
-  const showTaskListBadge = !selectedList;
-  const showTaskLevelBadge = !selectedList && !selectedLevel;
 
   const filteredTasks = useMemo(() => {
     return visibleTasks.filter((t) => {
@@ -1479,7 +1372,6 @@ function WorkItemsInner() {
 
   function ListTaskCard({ task }: { task: TaskRow }) {
     const taskPatchSyncing = patchTaskPendingId === task.id;
-    const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const p = taskPriority(task);
     const storedStatus = normalizeTaskStatus(task.status);
     const flowCol = storedStatusToFlowColumn(storedStatus);
@@ -1490,15 +1382,16 @@ function WorkItemsInner() {
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
-    const listBadge = taskListName(task);
-    const levelBadge = taskLevelBadge(task);
+    const subtasksPreview =
+      Array.isArray(subtasksState) && subtasksState.length > 0
+        ? subtasksState.slice(0, KANBAN_CARD_SUBTASK_PREVIEW)
+        : [];
     const assigneeNames = assigneeNamesForTask(task, members);
     const assigneeFirstName = firstAssigneeLabel(task, members);
-    const showAssignedFooter = taskHasAssignees(task);
-    const showLateFooter = taskShowsLateFooter(task);
+    const assigneeInitial = assigneeFirstName?.trim().charAt(0).toUpperCase() ?? "";
     return (
       <div
-        className={`relative overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
+        className={`group/card relative overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
           taskPatchSyncing
             ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
             : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)]"
@@ -1510,243 +1403,168 @@ function WorkItemsInner() {
             <div className="task-sync-ribbon-thumb" />
           </div>
         ) : null}
-        <div className="px-3 py-2">
-          <div className="flex min-w-0 items-center gap-x-2">
-            <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-              <ListRowStatusPill task={task} />
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={checklistDone}
-                disabled={taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)}
-                title={
-                  taskPatchSyncing
-                    ? "Saving…"
-                    : checklistDisabled
-                      ? "Cancelled — use status menu to reopen"
-                      : checklistDone
-                        ? "Mark as not done"
-                        : advanceTo
-                          ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
-                          : "Cannot advance"
-                }
-                aria-label={
-                  checklistDisabled
-                    ? "Task cancelled"
-                    : checklistDone
-                      ? "Mark task not done"
-                      : advanceTo
-                        ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
-                        : "Cannot advance task"
-                }
-                aria-busy={taskPatchSyncing || undefined}
-                className={`flex size-7 shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                  checklistDone
-                    ? "surface-glass-primary border-solid text-[var(--fg)]"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
-                } ${
-                  taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)
-                    ? "cursor-not-allowed opacity-40"
-                    : "cursor-pointer hover:bg-[var(--surface-hover)]"
-                }`}
-                onClick={() => {
-                  if (taskPatchSyncing || checklistDisabled) return;
-                  if (checklistDone) {
-                    void patchTask(task.id, { status: "in_progress" });
-                    return;
-                  }
-                  if (advanceTo) void patchTask(task.id, { status: advanceTo });
-                }}
-              >
-                {checklistDone ? (
-                  <svg
-                    className="size-[15px] shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                ) : null}
-              </button>
-            </div>
+
+        {/* Header: checkbox + title + status + overflow */}
+        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={checklistDone}
+            disabled={taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)}
+            title={
+              taskPatchSyncing
+                ? "Saving…"
+                : checklistDisabled
+                  ? "Cancelled — use status menu to reopen"
+                  : checklistDone
+                    ? "Mark as not done"
+                    : advanceTo
+                      ? `Confirm move to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                      : "Cannot advance"
+            }
+            aria-label={
+              checklistDisabled
+                ? "Task cancelled"
+                : checklistDone
+                  ? "Mark task not done"
+                  : advanceTo
+                    ? `Confirm advancing task to ${FLOW_COLUMN_LABELS[advanceTo]}`
+                    : "Cannot advance task"
+            }
+            aria-busy={taskPatchSyncing || undefined}
+            className={`flex size-[18px] shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+              checklistDone
+                ? "surface-glass-primary border-solid text-[var(--fg)]"
+                : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
+            } ${
+              taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)
+                ? "cursor-not-allowed opacity-40"
+                : "cursor-pointer hover:bg-[var(--surface-hover)]"
+            }`}
+            onClick={() => {
+              if (taskPatchSyncing || checklistDisabled) return;
+              if (checklistDone) {
+                void patchTask(task.id, { status: "in_progress" });
+                return;
+              }
+              if (advanceTo) void patchTask(task.id, { status: advanceTo });
+            }}
+          >
+            {checklistDone ? (
+              <Check className="size-[11px] shrink-0" weight="bold" aria-hidden />
+            ) : null}
+          </button>
+
+          <div className="min-w-0 flex-1">
             <button
               type="button"
-              className="flex size-11 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-              aria-expanded={expanded}
-              aria-label={expanded ? "Hide subtasks" : "Show subtasks"}
-              onClick={() => toggleListRowExpand(task.id)}
+              onClick={() => openEditTask(task.id)}
+              className={`line-clamp-2 text-left text-sm font-medium leading-snug underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                flowCol === "cancelled"
+                  ? "text-[var(--muted)] line-through decoration-red-500"
+                  : checklistDone
+                    ? "text-[var(--muted)] line-through decoration-[var(--muted)]"
+                    : "text-[var(--fg)]"
+              }`}
             >
-              <IconChevron open={expanded} className="opacity-80" />
+              {task.title}
             </button>
-            <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+            <KanbanStatusPill task={task} />
+            <button
+              type="button"
+              onClick={() => openEditTask(task.id)}
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] group-hover/card:opacity-100"
+              title="Edit task"
+              aria-label={`More options — edit: ${task.title}`}
+            >
+              <DotsThreeVertical size={16} weight="bold" aria-hidden />
+            </button>
+          </div>
+        </div>
+
+        {/* Subtasks + meta row — always visible */}
+        <div className="border-t border-[var(--border-subtle)]/40 px-3 pb-2 pt-2" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-3">
+            {subtasksPreview.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => toggleListRowExpand(task.id)}
+                aria-expanded={expanded}
+                className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              >
+                <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                Subtasks
+                {Array.isArray(subtasksState) ? (
+                  <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
+                ) : null}
+                <IconChevron open={expanded} className="opacity-70" />
+              </button>
+            ) : (
               <button
                 type="button"
                 onClick={() => openEditTask(task.id)}
-                className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                  checklistDone
-                    ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80"
-                    : "text-[var(--fg)]"
-                }`}
+                className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                title="Add subtasks"
+                aria-label="Add subtasks"
               >
-                {task.title}
+                <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                Subtasks
+                <Plus size={16} className="opacity-60" weight="bold" aria-hidden />
               </button>
-              {(showTaskLevelBadge && levelBadge) ||
-              (showTaskListBadge && listBadge) ||
-              showAssignedFooter ||
-              showLateFooter ? (
-                <span className="flex shrink-0 flex-nowrap items-center gap-1.5">
-                  {showTaskLevelBadge && levelBadge ? (
-                    <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${levelBadge}`}>
-                      {levelBadge}
-                    </span>
-                  ) : null}
-                  {showTaskListBadge && listBadge ? (
-                    <span className={LIST_BADGE_CLASS} title={`List: ${listBadge}`}>
-                      {listBadge}
-                    </span>
-                  ) : null}
-                  {showAssignedFooter ? (
-                    <span className={LIST_ROW_FOOTER_META_ICON_CHIP} title="Has assignee" aria-label="Has assignee">
-                      <IconTaskFooterProfile className={TASK_FOOTER_ASSIGNEE_ICON_CLASS} />
-                    </span>
-                  ) : null}
-                  {showLateFooter ? (
-                    <span
-                      className={LIST_ROW_FOOTER_META_ICON_CHIP}
-                      title="In progress and past due"
-                      aria-label="In progress, past due"
-                    >
-                      <IconTaskFooterStopwatch className={TASK_FOOTER_LATE_ICON_CLASS} />
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-              <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
-                <button
-                  type="button"
-                  onClick={() => openEditTask(task.id, "assignees")}
-                  className={`${LIST_ROW_BADGE_TILE} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                    assigneeNames ? TASK_ASSIGNED_CHROME_CLASS : dueDatePillClass(false)
-                  }`}
-                  title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
-                  aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
-                >
-                  {assigneeFirstName ? (
-                    <span
-                      className="pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-tight text-[var(--fg)]"
-                      title={assigneeNames ?? assigneeFirstName}
-                    >
-                      {assigneeFirstName}
-                    </span>
-                  ) : (
-                    <IconUserPlus className="size-[18px] shrink-0 text-[var(--muted)] opacity-90" aria-hidden />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openEditTask(task.id, "due")}
-                  className={`${TASK_DUE_CHIP_CLASS} transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${dueChipChromeClass(task)}`}
-                  title={dueSummary ? `Due ${dueSummary}` : "Due (date & time)"}
-                  aria-label={dueSummary ? `Due ${dueSummary}` : "Edit due date and time"}
-                >
-                  <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
-                  <span className={TASK_DUE_CHIP_LABEL_CLASS}>
-                    {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
-                  </span>
-                </button>
-                <div
-                  className={`relative ${LIST_ROW_BADGE_TILE} border-0 bg-[var(--surface-muted)] text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-base)]`}
-                >
-                  <select
-                    className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
-                    value={p}
-                    disabled={taskPatchSyncing}
-                    onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
-                    aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
-                  >
-                    {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                      <option key={k} value={k}>
-                        {PRIORITY_LABELS[k]}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={`${LIST_ROW_BADGE_LABEL} uppercase ${taskPatchSyncing ? "opacity-45" : ""}`}>
-                    {priorityLabelShort(p)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={() => openEditTask(task.id)}
-                  className={TASK_ROW_OVERFLOW_MENU_BTN}
-                  title="Edit task"
-                  aria-label={`More options — edit: ${task.title}`}
-                >
-                  <IconEllipsisVertical className="opacity-90" />
-                </button>
-              </div>
-            </div>
+            )}
+            <div className="flex-1" />
+            <AssigneeIconBtn task={task} />
+            <DueIconBtn task={task} />
+            <PriorityIconBtn task={task} />
+            <AttachIconBtn task={task} />
           </div>
-        </div>
-        {expanded && (
-          <div className="border-t border-[var(--border-subtle)]/80 bg-[var(--surface-base)] px-3 pb-2 pt-1.5">
-              <div className={`${LIST_ROW_SUBTASK_TREE_MARGIN} border-l border-[var(--border-subtle)] pl-4`}>
-                {subtasksState === "loading" && <p className="py-2 text-xs text-[var(--muted)]">Loading subtasks…</p>}
-                {Array.isArray(subtasksState) && subtasksState.length === 0 && (
-                  <p className="py-2 text-xs text-[var(--muted)]">
-                    No subtasks.{" "}
+          {expanded && subtasksPreview.length > 0 && (
+            <ul className="mt-1.5 space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
+              {subtasksPreview.map((s) => {
+                const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
+                return (
+                  <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
                     <button
                       type="button"
-                      className="font-medium text-[var(--accent)] hover:underline"
-                      onClick={() => openEditTask(task.id)}
+                      disabled={subPending}
+                      onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
+                      aria-busy={subPending || undefined}
+                      className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
+                        s.done
+                          ? "surface-glass-primary border-solid"
+                          : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                      aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                     >
-                      Add in task
+                      {subPending ? (
+                        <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
+                      ) : s.done ? (
+                        <Check className="size-[9px] shrink-0" weight="bold" aria-hidden />
+                      ) : null}
                     </button>
-                  </p>
-                )}
-                {Array.isArray(subtasksState) && subtasksState.length > 0 && (
-                  <ul className="space-y-1 py-1">
-                    {subtasksState.map((s) => {
-                      const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
-                      return (
-                        <li key={s.id} className="flex items-start gap-2 text-sm">
-                          <button
-                            type="button"
-                            disabled={subPending}
-                            onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
-                            aria-busy={subPending || undefined}
-                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                              s.done
-                                ? "surface-glass-primary border-solid"
-                                : "border-[var(--border-subtle)] hover:border-[var(--accent)]"
-                            } disabled:cursor-not-allowed disabled:opacity-60`}
-                            aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
-                          >
-                            {subPending ? (
-                              <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
-                            ) : s.done ? (
-                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
-                                <path d="M20 6 9 17l-5-5" />
-                              </svg>
-                            ) : null}
-                          </button>
-                          <span className={`min-w-0 flex-1 leading-snug ${s.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}>{s.title}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-          </div>
-        )}
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact /> : null}
+                    <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}>
+                      {s.title}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact right={<CommentIconBtn task={task} />} /> : null}
       </div>
     );
+  }
+
+  function StatusIcon({ status, className, size }: { status: ManualTaskStatus; className?: string; size?: number }) {
+    if (status === "done") return <CheckSquare className={className} size={size} weight="fill" aria-hidden />;
+    if (status === "in_progress") return <ClockUser className={className} size={size} weight="fill" aria-hidden />;
+    if (status === "cancelled") return <XSquare className={className} size={size} weight="fill" aria-hidden />;
+    return <Clock className={className} size={size} weight="regular" aria-hidden />;
   }
 
   /** Same chrome as list-row {@link KanbanStatusPill}; options list is caller-defined (full pipeline vs board menu). */
@@ -1821,7 +1639,7 @@ function WorkItemsInner() {
 
     return (
       <div
-        className={`relative ${shellLayoutClassName} rounded-sm border border-[var(--border-subtle)] ${statusPillPaletteClasses(paletteKey)} ${pending ? "opacity-[0.88]" : ""}`}
+        className={`relative ${shellLayoutClassName} ${statusPillPaletteClasses(paletteKey)} ${pending ? "opacity-[0.88]" : ""}`}
       >
         <button
           ref={triggerRef}
@@ -1837,15 +1655,11 @@ function WorkItemsInner() {
             if (blocked) return;
             setOpen((o) => !o);
           }}
-          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-between gap-0.5 rounded-[inherit] px-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-center rounded-[inherit] px-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="pointer-events-none min-w-0 flex-1 truncate text-center text-[11px] font-semibold leading-none tracking-tight">
+          <span className="pointer-events-none truncate text-[12px] font-semibold leading-none tracking-tight">
             {FLOW_COLUMN_LABELS[value]}
           </span>
-          <IconChevronMiniDown
-            className={`pointer-events-none shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""} ${pending ? "opacity-20" : "opacity-45"}`}
-            aria-hidden
-          />
         </button>
         {open && menuPos
           ? createPortal(
@@ -1869,7 +1683,7 @@ function WorkItemsInner() {
                       role="option"
                       id={`${listboxId}-opt-${s}`}
                       aria-selected={s === value}
-                      className={`flex w-full min-w-[6.875rem] items-center rounded-md px-2 py-2 text-left text-[11px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
+                      className={`flex w-full min-w-[8rem] items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
                         s === value
                           ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
                           : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
@@ -1880,6 +1694,7 @@ function WorkItemsInner() {
                         queueMicrotask(() => triggerRef.current?.focus());
                       }}
                     >
+                      <StatusIcon status={s} size={16} className="opacity-70" />
                       {FLOW_COLUMN_LABELS[s]}
                     </button>
                   </li>
@@ -1899,7 +1714,7 @@ function WorkItemsInner() {
     const menuOptions = stageControlDropdownOptions(stored);
     return (
       <StatusPillSelect
-        aria-label="Task stage"
+        aria-label={`Task stage: ${FLOW_COLUMN_LABELS[manual]}`}
         value={manual}
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={menuOptions}
@@ -1914,7 +1729,7 @@ function WorkItemsInner() {
     const menuOptions = stageControlDropdownOptions(stored);
     return (
       <StatusPillSelect
-        aria-label="Task stage"
+        aria-label={`Task stage: ${FLOW_COLUMN_LABELS[manual]}`}
         value={manual}
         onChange={(v) => void patchTask(task.id, { status: v })}
         options={menuOptions}
@@ -1924,34 +1739,126 @@ function WorkItemsInner() {
     );
   }
 
-  /** Kanban meta row: same height as list-row priority tile (`h-8`), width follows equal flex cell. */
-  function KanbanPriorityPill({ task }: { task: TaskRow }) {
+  function PriorityIconBtn({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
     const syncing = patchTaskPendingId === task.id;
+    const color =
+      p === "high"
+        ? "text-amber-500 dark:text-amber-400"
+        : p === "low"
+          ? "text-sky-500 dark:text-sky-400"
+          : "text-[var(--muted)]";
     return (
-      <div className={`relative ${KANBAN_PRIORITY_SHELL_LAYOUT}`}>
+      <div
+        title={`Priority: ${PRIORITY_LABELS[p]}`}
+        className={`relative flex size-5 shrink-0 items-center justify-center ${color} transition-opacity hover:opacity-75 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-1 focus-within:ring-offset-[var(--surface-elevated)]`}
+      >
         <select
-          className="absolute inset-0 z-[1] h-full w-full min-w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
+          className="absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
           value={p}
           disabled={syncing}
           onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
           aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
         >
           {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-            <option key={k} value={k}>
-              {PRIORITY_LABELS[k]}
-            </option>
+            <option key={k} value={k}>{PRIORITY_LABELS[k]}</option>
           ))}
         </select>
-        <span className={`${LIST_ROW_BADGE_LABEL} uppercase ${syncing ? "opacity-45" : ""}`}>
-          {priorityLabelShort(p)}
+        <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
+          {p === "high" ? (
+            <CaretDoubleUp size={16} weight="fill" aria-hidden />
+          ) : p === "low" ? (
+            <CaretDoubleDown size={16} weight="fill" aria-hidden />
+          ) : (
+            <ArrowLineUp size={16} weight="bold" aria-hidden />
+          )}
         </span>
       </div>
     );
   }
 
+  function DueIconBtn({ task }: { task: TaskRow }) {
+    const isLate = taskShowsLateFooter(task);
+    const hasDue = Boolean(task.dueAt);
+    const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
+    const tooltip = dueSummary
+      ? `Due ${dueSummary}${isLate ? " — Overdue" : ""}`
+      : "No due date — click to set";
+    const color = isLate ? "text-red-500 dark:text-red-400" : "text-[var(--muted)]";
+    return (
+      <button
+        type="button"
+        onClick={() => openEditTask(task.id, "due")}
+        title={tooltip}
+        aria-label={tooltip}
+        className={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
+      >
+        {isLate ? (
+          <Alarm size={16} weight="fill" aria-hidden />
+        ) : hasDue ? (
+          <Timer size={16} weight="regular" aria-hidden />
+        ) : (
+          <CalendarPlus size={16} weight="regular" aria-hidden />
+        )}
+      </button>
+    );
+  }
+
+  function AssigneeIconBtn({ task }: { task: TaskRow }) {
+    const name = firstAssigneeLabel(task, members);
+    const initial = name?.trim().charAt(0).toUpperCase() ?? "";
+    const allNames = assigneeNamesForTask(task, members);
+    const tooltip = allNames ? `Assignees: ${allNames}` : "No assignee — click to assign";
+    return (
+      <button
+        type="button"
+        onClick={() => openEditTask(task.id, "assignees")}
+        title={tooltip}
+        aria-label={tooltip}
+        className="flex size-6 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+      >
+        {name ? (
+          <span className="flex size-6 items-center justify-center rounded-full bg-sky-500/25 text-[10px] font-bold leading-none tabular-nums text-sky-900 dark:bg-sky-500/20 dark:text-sky-100" aria-hidden>
+            {initial}
+          </span>
+        ) : (
+          <UserPlus size={16} className="text-[var(--muted)] opacity-80" weight="regular" aria-hidden />
+        )}
+      </button>
+    );
+  }
+
+  function CommentIconBtn({ task }: { task: TaskRow }) {
+    return (
+      <button
+        type="button"
+        onClick={() => openEditTask(task.id)}
+        title="Comments"
+        aria-label="Comments"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+      >
+        <ChatCircle size={16} weight="regular" aria-hidden />
+      </button>
+    );
+  }
+
+  function AttachIconBtn({ task }: { task: TaskRow }) {
+    return (
+      <button
+        type="button"
+        onClick={() => openEditTask(task.id)}
+        title="Attachments"
+        aria-label="Attachments"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+      >
+        <Paperclip size={16} weight="regular" aria-hidden />
+      </button>
+    );
+  }
+
   function TaskCard({ task }: { task: TaskRow }) {
     const taskPatchSyncing = patchTaskPendingId === task.id;
+    const flowCol = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
@@ -1964,12 +1871,8 @@ function WorkItemsInner() {
       Array.isArray(subtasksState) && subtasksState.length > KANBAN_CARD_SUBTASK_PREVIEW
         ? subtasksState.length - KANBAN_CARD_SUBTASK_PREVIEW
         : 0;
-    const listBadge = taskListName(task);
-    const levelBadge = taskLevelBadge(task);
     const assigneeFirstName = firstAssigneeLabel(task, members);
     const assigneeInitial = assigneeFirstName?.trim().charAt(0).toUpperCase() ?? "";
-    const showAssignedFooter = taskHasAssignees(task);
-    const showLateFooter = taskShowsLateFooter(task);
 
     return (
       <li
@@ -1991,52 +1894,78 @@ function WorkItemsInner() {
           </div>
         ) : null}
         <div className="flex flex-col gap-1.5 px-2.5 pb-2 pt-2.5">
-          <div className="flex min-w-0 items-start gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => openEditTask(task.id)}
-              className="line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight text-[var(--fg)] underline-offset-4 decoration-[var(--muted)]/40 hover:underline hover:decoration-[var(--accent)] focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)]"
+              className={`line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
+                flowCol === "cancelled"
+                  ? "text-[var(--muted)] line-through decoration-red-500"
+                  : flowCol === "done"
+                    ? "text-[var(--muted)] line-through decoration-[var(--muted)] hover:decoration-[var(--accent)]"
+                    : "text-[var(--fg)] decoration-[var(--muted)]/40 hover:decoration-[var(--accent)]"
+              }`}
             >
               {task.title}
             </button>
-            <button
-              type="button"
-              onClick={() => openEditTask(task.id)}
-              className="-mr-0.5 -mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
-              title="Edit task"
-              aria-label={`More options — edit: ${task.title}`}
-            >
-              <IconEllipsisVertical className="size-[18px] opacity-90" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+              <KanbanStatusPill task={task} />
+              <button
+                type="button"
+                onClick={() => openEditTask(task.id)}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
+                title="Edit task"
+                aria-label={`More options — edit: ${task.title}`}
+              >
+                <DotsThreeVertical size={16} weight="bold" aria-hidden />
+              </button>
+            </div>
           </div>
 
           {subtasksState === "loading" && (
             <p className="border-t border-[var(--border-subtle)]/40 pt-2 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
           )}
-          {subtasksPreview.length > 0 && (
-            <div className="border-t border-[var(--border-subtle)]/40 pt-2">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[var(--muted)]">
-                <svg
-                  className="size-3 shrink-0 opacity-70"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
+
+          {/* Subtasks + meta row — always visible */}
+          <div className="border-t border-[var(--border-subtle)]/40 pt-2" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              {subtasksPreview.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id)}
+                  className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  title="View subtasks"
+                  aria-label="View subtasks"
                 >
-                  <path d="M9 11l3 3L22 4" />
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                </svg>
-                <span className="text-[11px] font-medium tracking-tight">
+                  <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
                   Subtasks
                   {Array.isArray(subtasksState) ? (
-                    <span className="ml-1 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
+                    <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
                   ) : null}
-                </span>
-              </div>
-              <ul className="space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => openEditTask(task.id)}
+                  className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  title="Add subtasks"
+                  aria-label="Add subtasks"
+                >
+                  <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                  Subtasks
+                  <svg className="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </button>
+              )}
+              <div className="flex-1" />
+              <AssigneeIconBtn task={task} />
+              <DueIconBtn task={task} />
+              <PriorityIconBtn task={task} />
+              <AttachIconBtn task={task} />
+            </div>
+            {subtasksPreview.length > 0 && (
+              <ul className="mt-1.5 space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
                 {subtasksPreview.map((s) => {
                   const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                   return (
@@ -2062,7 +1991,7 @@ function WorkItemsInner() {
                         ) : null}
                       </button>
                       <span
-                        className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]/80" : "text-[var(--fg)]"}`}
+                        className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}
                       >
                         {s.title}
                       </span>
@@ -2083,137 +2012,61 @@ function WorkItemsInner() {
                   </li>
                 )}
               </ul>
-            </div>
-          )}
-
-          <div className="border-t border-[var(--border-subtle)]/50 pt-1.5">
-            <div
-              className="grid w-full min-w-0 grid-cols-2 gap-x-1.5 gap-y-1.5"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-            <div className="min-h-8 min-w-0">
-              <KanbanStatusPill task={task} />
-            </div>
-            <div className="min-h-8 min-w-0">
-              <KanbanPriorityPill task={task} />
-            </div>
-            <div className="flex min-h-8 min-w-0 w-full">
-              <button
-                type="button"
-                onClick={() => openEditTask(task.id, "due")}
-                className={`${TASK_DUE_CHIP_CLASS} h-8 ${KANBAN_DUE_CHIP_CELL} ${dueChipChromeClass(task)}`}
-                title={task.dueAt ? `Due ${formatDueForListPill(task.dueAt)}` : "No due — set date & time"}
-              >
-                <IconCalendarDays className={TASK_DUE_CHIP_ICON_CLASS} aria-hidden />
-                <span className={`${TASK_DUE_CHIP_LABEL_CLASS} truncate text-left`}>
-                  {task.dueAt ? formatDueForListPill(task.dueAt) : "No due"}
-                </span>
-              </button>
-            </div>
-            <div className="min-h-8 min-w-0">
-              <button
-                type="button"
-                onClick={() => openEditTask(task.id, "assignees")}
-                title={assigneeNames ? `Assignees: ${assigneeNames}` : "Assignees"}
-                aria-label={assigneeNames ? `Assignees: ${assigneeNames}` : "Edit assignees"}
-                className={`inline-flex box-border h-8 min-h-8 max-h-8 w-full min-w-0 items-center gap-1.5 rounded-lg border px-1.5 py-0 text-left text-xs font-medium leading-none transition-colors hover:opacity-95 ${
-                  assigneeNames
-                    ? TASK_ASSIGNED_CHROME_CLASS
-                    : "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)] hover:border-[var(--accent)]/40 hover:bg-[var(--surface-hover)]/60"
-                }`}
-              >
-                {assigneeFirstName ? (
-                  <>
-                    <span
-                      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-500/25 text-[10px] font-bold tabular-nums text-sky-900 dark:bg-sky-500/20 dark:text-sky-100"
-                      aria-hidden
-                    >
-                      {assigneeInitial}
-                    </span>
-                    <span className="pointer-events-none min-w-0 flex-1 truncate text-[11px] font-medium leading-tight text-[var(--fg)]">
-                      {assigneeFirstName}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-subtle)] bg-[var(--surface-muted)]/50">
-                      <IconUserPlus className="size-3 shrink-0 opacity-70" aria-hidden />
-                    </span>
-                    <span className="pointer-events-none text-[11px] font-medium text-[var(--muted)]">Assign</span>
-                  </>
-                )}
-              </button>
-            </div>
-            </div>
+            )}
           </div>
         </div>
-        {(showTaskLevelBadge && levelBadge) ||
-        (showTaskListBadge && listBadge) ||
-        showAssignedFooter ||
-        showLateFooter ? (
-          <div
-            className="flex w-full min-w-0 flex-wrap items-center gap-1.5 border-t border-[var(--border-subtle)]/50 px-2.5 py-1.5"
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label="Level, list, and assignment"
-          >
-            {showTaskLevelBadge && levelBadge ? (
-              <span
-                className={`${LEVEL_BADGE_CLASS} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT} text-[11px]`}
-                title={`${NODE_LABELS.level}: ${levelBadge}`}
-              >
-                {levelBadge}
-              </span>
-            ) : null}
-            {showTaskListBadge && listBadge ? (
-              <span className={`${LIST_BADGE_CLASS} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT} text-[11px]`} title={`List: ${listBadge}`}>
-                {listBadge}
-              </span>
-            ) : null}
-            {showAssignedFooter ? (
-              <span
-                className={`${TASK_FOOTER_META_ICON_CHIP} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT}`}
-                title="Has assignee"
-                aria-label="Has assignee"
-              >
-                <IconTaskFooterProfile className={TASK_FOOTER_ASSIGNEE_ICON_CLASS} />
-              </span>
-            ) : null}
-            {showLateFooter ? (
-              <span
-                className={`${TASK_FOOTER_META_ICON_CHIP} ${KANBAN_SUBTASK_BELOW_BADGE_HEIGHT}`}
-                title="In progress and past due"
-                aria-label="In progress, past due"
-              >
-                <IconTaskFooterStopwatch className={TASK_FOOTER_LATE_ICON_CLASS} />
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact right={<CommentIconBtn task={task} />} /> : null}
       </li>
     );
   }
 
   function ListViewCards({ rows }: { rows: TaskRow[] }) {
+    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; seriesId: string; tasks: TaskRow[] }> = [];
+    const seriesGroups = new Map<string, TaskRow[]>();
+    for (const task of rows) {
+      const col = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
+      if (task.recurringSeriesId && (col === "done" || col === "cancelled")) {
+        const g = seriesGroups.get(task.recurringSeriesId) ?? [];
+        g.push(task);
+        seriesGroups.set(task.recurringSeriesId, g);
+      } else {
+        items.push({ kind: "task", task });
+      }
+    }
+    for (const [seriesId, tasks] of seriesGroups) {
+      items.push({ kind: "series", seriesId, tasks });
+    }
     return (
-      <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
-        <div className="space-y-1.5 pt-px" style={{ minWidth: "36rem" }}>
-          {rows.map((task) => (
-            <ListTaskCard key={task.id} task={task} />
-          ))}
-          <div className="border-t border-transparent pt-2">
-            <button
-              type="button"
-              className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-              onClick={() => {
-                setEditTaskId(null);
-                setNewTaskStatus("pending");
-                setCreateModalOpen(true);
-              }}
-            >
-              + Add task
-            </button>
-          </div>
+      <div>
+        <div className="columns-1 gap-3">
+          {items.map((item) =>
+            item.kind === "task" ? (
+              <div key={item.task.id} className="mb-3 break-inside-avoid">
+                <ListTaskCard task={item.task} />
+              </div>
+            ) : (
+              <div key={item.seriesId} className="mb-3 break-inside-avoid">
+                <RecurringSeriesCard
+                  tasks={item.tasks}
+                  members={members}
+                  onOpenTask={openEditTask}
+                />
+              </div>
+            )
+          )}
+        </div>
+        <div className="pt-4">
+          <button
+            type="button"
+            className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            onClick={() => {
+              setEditTaskId(null);
+              setNewTaskStatus("pending");
+              setCreateModalOpen(true);
+            }}
+          >
+            + Add task
+          </button>
         </div>
       </div>
     );
@@ -2236,11 +2089,11 @@ function WorkItemsInner() {
 
     return (
       <div ref={parentRef} className="flex-1 overflow-y-auto min-h-24">
-        <ul style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {virtualizer.getVirtualItems().map((vItem) => {
             const item = items[vItem.index]!;
             return (
-              <li
+              <div
                 key={vItem.key}
                 data-index={vItem.index}
                 ref={virtualizer.measureElement}
@@ -2271,10 +2124,10 @@ function WorkItemsInner() {
                     {item.loading ? "Loading…" : `Load more · ${item.loaded} of ${item.total}`}
                   </button>
                 )}
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       </div>
     );
   }
@@ -2437,8 +2290,22 @@ function WorkItemsInner() {
       ) : null}
       <header className="pb-1">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-4 xl:gap-x-5 lg:gap-y-3">
-          <h1 className="min-w-0 text-2xl font-semibold leading-none tracking-tight lg:col-start-1 lg:row-start-1 lg:pt-0.5">
-            {NODE_LABELS.workItem}s
+          <h1 className="flex min-w-0 flex-wrap items-center gap-x-2 lg:col-start-1 lg:row-start-1 lg:pt-0.5">
+            <span className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]">
+              {NODE_LABELS.workItem}s
+            </span>
+            {filterScopeSegments.map((seg, i) => (
+              <span key={`${seg.kind}-${i}`} className="flex items-center gap-x-2">
+                <span className="text-sm text-[var(--muted)] opacity-40" aria-hidden>›</span>
+                <span
+                  className={`inline-flex items-center border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)] ${
+                    i === 0 ? "rounded-xl" : "rounded-full"
+                  }`}
+                >
+                  {seg.label}
+                </span>
+              </span>
+            ))}
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -2458,7 +2325,7 @@ function WorkItemsInner() {
                   aria-label="List view"
                   aria-pressed={viewMode === "list"}
                 >
-                  <IconLayoutList className="block" />
+                  <Rows size={18} weight="regular" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -2471,7 +2338,7 @@ function WorkItemsInner() {
                   aria-label="Kanban view"
                   aria-pressed={viewMode === "kanban"}
                 >
-                  <IconLayoutKanban className="block" />
+                  <Columns size={18} weight="regular" aria-hidden />
                 </button>
               </div>
               <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
@@ -2488,7 +2355,7 @@ function WorkItemsInner() {
                 aria-haspopup="menu"
                 aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
               >
-                <IconArrowUpDown className="pointer-events-none block" />
+                <ArrowsDownUp size={18} className="pointer-events-none" weight="regular" aria-hidden />
               </button>
               <button
                 ref={dateTriggerRef}
@@ -2507,7 +2374,7 @@ function WorkItemsInner() {
                     : "Due date filter"
                 }
               >
-                <IconCalendarDays className="pointer-events-none block" />
+                <CalendarDots size={18} className="pointer-events-none" weight="regular" aria-hidden />
                 {(datePreset !== "all" || dueFrom || dueTo) && (
                   <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
                 )}
@@ -2646,28 +2513,6 @@ function WorkItemsInner() {
         )}
 
       <section>
-        {filterScopeSegments.length > 0 && (
-          <div
-            className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1.5"
-            aria-label={filterScopeSegments.map((s) => s.label).join(" then ")}
-          >
-            {filterScopeSegments.map((seg, i) => (
-              <span key={`${seg.kind}-${seg.label}-${i}`} className="inline-flex items-center gap-1.5">
-                {i > 0 ? (
-                  <span className="select-none text-[11px] font-medium text-[var(--muted)]" aria-hidden>
-                    {" > "}
-                  </span>
-                ) : null}
-                <span
-                  className={seg.kind === "level" ? LEVEL_BADGE_CLASS : LIST_BADGE_CLASS}
-                  title={seg.kind === "level" ? `${NODE_LABELS.level}: ${seg.label}` : `List: ${seg.label}`}
-                >
-                  {seg.label}
-                </span>
-              </span>
-            ))}
-          </div>
-        )}
         {workspaceLoading ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
             Loading tasks…
@@ -2732,16 +2577,6 @@ function WorkItemsInner() {
                     <div className={TASK_PANEL_HEADER_ROW}>
                       <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
                       <div className={TASK_PANEL_HEADER_RIGHT}>
-                        {(editDetail.capabilities.canReschedule) && (
-                          <button
-                            type="button"
-                            className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium"
-                            disabled={editSaving}
-                            onClick={() => setShowSaveTemplate(true)}
-                          >
-                            Save as Template
-                          </button>
-                        )}
                         <StatusPillSelect
                           aria-label="Status"
                           value={editStatus}
@@ -3000,14 +2835,6 @@ function WorkItemsInner() {
             <div className={TASK_PANEL_HEADER_ROW}>
               <h2 className={TASK_PANEL_HEADER_TITLE}>New task</h2>
               <div className={TASK_PANEL_HEADER_RIGHT}>
-                <button
-                  type="button"
-                  className="btn-secondary rounded-lg px-2 py-1 text-xs font-medium"
-                  disabled={createSaving}
-                  onClick={() => setShowTemplatePicker(true)}
-                >
-                  Use Template
-                </button>
                 <StatusPillSelect
                   aria-label="Status"
                   value={newTaskStatus}
@@ -3167,26 +2994,6 @@ function WorkItemsInner() {
           </div>,
           document.body,
         )}
-      {showTemplatePicker && token && (
-        <TemplatePicker
-          orgId={workspaceId}
-          token={token}
-          onApply={(result) => {
-            if (result.title) setTitle(result.title);
-            if (result.priority) setNewTaskPriority(result.priority as TaskPriority);
-            if (result.subtasks?.length) setSubtaskItems(result.subtasks.map((s) => s.title));
-          }}
-          onClose={() => setShowTemplatePicker(false)}
-        />
-      )}
-      {showSaveTemplate && token && editDetail && (
-        <SaveTemplateModal
-          task={editDetail.task}
-          orgId={workspaceId}
-          token={token}
-          onClose={() => setShowSaveTemplate(false)}
-        />
-      )}
     </div>
   );
 }

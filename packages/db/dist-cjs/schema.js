@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.subtasksRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.taskTemplatesRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.webhookDeliveries = exports.webhookEndpoints = exports.taskTemplates = exports.commentMentions = exports.comments = exports.taskAttachments = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -288,23 +287,6 @@ exports.commentMentions = (0, pg_core_1.pgTable)("comment_mentions", {
         .references(() => exports.user.id, { onDelete: "cascade" }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("comment_mentions_user_idx").on(t.mentionedUserId)]);
-/** Reusable task blueprints saved per organization. */
-exports.taskTemplates = (0, pg_core_1.pgTable)("task_templates", {
-    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
-    organizationId: (0, pg_core_1.uuid)("organization_id")
-        .notNull()
-        .references(() => exports.organizations.id, { onDelete: "cascade" }),
-    createdBy: (0, pg_core_1.text)("created_by")
-        .notNull()
-        .references(() => exports.user.id, { onDelete: "restrict" }),
-    name: (0, pg_core_1.text)("name").notNull(),
-    defaultTitle: (0, pg_core_1.text)("default_title"),
-    defaultPriority: (0, pg_core_1.text)("default_priority"),
-    defaultDueRepeat: (0, pg_core_1.text)("default_due_repeat"),
-    defaultListId: (0, pg_core_1.uuid)("default_list_id").references(() => exports.lists.id, { onDelete: "set null" }),
-    defaultSubtasks: (0, pg_core_1.jsonb)("default_subtasks").notNull().default([]),
-    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [(0, pg_core_1.index)("task_templates_org_idx").on(t.organizationId)]);
 /** Outbound webhook endpoints registered per organization. */
 exports.webhookEndpoints = (0, pg_core_1.pgTable)("webhook_endpoints", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -490,11 +472,6 @@ exports.timeEntriesRelations = (0, drizzle_orm_1.relations)(exports.timeEntries,
     task: one(exports.tasks, { fields: [exports.timeEntries.taskId], references: [exports.tasks.id] }),
     user: one(exports.user, { fields: [exports.timeEntries.userId], references: [exports.user.id] }),
 }));
-exports.taskTemplatesRelations = (0, drizzle_orm_1.relations)(exports.taskTemplates, ({ one }) => ({
-    organization: one(exports.organizations, { fields: [exports.taskTemplates.organizationId], references: [exports.organizations.id] }),
-    creator: one(exports.user, { fields: [exports.taskTemplates.createdBy], references: [exports.user.id] }),
-    list: one(exports.lists, { fields: [exports.taskTemplates.defaultListId], references: [exports.lists.id] }),
-}));
 exports.webhookEndpointsRelations = (0, drizzle_orm_1.relations)(exports.webhookEndpoints, ({ one, many }) => ({
     organization: one(exports.organizations, { fields: [exports.webhookEndpoints.organizationId], references: [exports.organizations.id] }),
     deliveries: many(exports.webhookDeliveries),
@@ -532,7 +509,6 @@ exports.appSchema = {
     comments: exports.comments,
     commentMentions: exports.commentMentions,
     timeEntries: exports.timeEntries,
-    taskTemplates: exports.taskTemplates,
     webhookEndpoints: exports.webhookEndpoints,
     webhookDeliveries: exports.webhookDeliveries,
     organizationsRelations: exports.organizationsRelations,
@@ -551,7 +527,6 @@ exports.appSchema = {
     commentsRelations: exports.commentsRelations,
     commentMentionsRelations: exports.commentMentionsRelations,
     timeEntriesRelations: exports.timeEntriesRelations,
-    taskTemplatesRelations: exports.taskTemplatesRelations,
     webhookEndpointsRelations: exports.webhookEndpointsRelations,
     webhookDeliveriesRelations: exports.webhookDeliveriesRelations,
 };

@@ -18,7 +18,6 @@ import { SearchModule } from "./search/search.module";
 import { DependenciesModule } from "./dependencies/dependencies.module";
 import { TimeModule } from "./time/time.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
-import { TemplatesModule } from "./templates/templates.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
 @Module({
@@ -35,7 +34,10 @@ import { RealtimeModule } from "./realtime/realtime.module";
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const redisUrl = config.get<string>("REDIS_URL");
-        if (!redisUrl) return { connection: undefined as unknown as { host: string } };
+        if (!redisUrl) {
+          const { default: IORedis } = await import("ioredis");
+          return { connection: new IORedis({ lazyConnect: true, enableOfflineQueue: false }) };
+        }
         const url = new URL(redisUrl);
         return {
           connection: {
@@ -62,7 +64,6 @@ import { RealtimeModule } from "./realtime/realtime.module";
     DependenciesModule,
     TimeModule,
     WebhooksModule,
-    TemplatesModule,
     RealtimeModule,
   ],
   controllers: [HealthController],

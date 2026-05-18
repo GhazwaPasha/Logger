@@ -372,28 +372,6 @@ export const commentMentions = pgTable(
   (t) => [index("comment_mentions_user_idx").on(t.mentionedUserId)],
 );
 
-/** Reusable task blueprints saved per organization. */
-export const taskTemplates = pgTable(
-  "task_templates",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    createdBy: text("created_by")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
-    name: text("name").notNull(),
-    defaultTitle: text("default_title"),
-    defaultPriority: text("default_priority"),
-    defaultDueRepeat: text("default_due_repeat"),
-    defaultListId: uuid("default_list_id").references(() => lists.id, { onDelete: "set null" }),
-    defaultSubtasks: jsonb("default_subtasks").notNull().default([]),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("task_templates_org_idx").on(t.organizationId)],
-);
-
 /** Outbound webhook endpoints registered per organization. */
 export const webhookEndpoints = pgTable(
   "webhook_endpoints",
@@ -625,12 +603,6 @@ export const timeEntriesRelations = relations(timeEntries, ({ one }) => ({
   user: one(user, { fields: [timeEntries.userId], references: [user.id] }),
 }));
 
-export const taskTemplatesRelations = relations(taskTemplates, ({ one }) => ({
-  organization: one(organizations, { fields: [taskTemplates.organizationId], references: [organizations.id] }),
-  creator: one(user, { fields: [taskTemplates.createdBy], references: [user.id] }),
-  list: one(lists, { fields: [taskTemplates.defaultListId], references: [lists.id] }),
-}));
-
 export const webhookEndpointsRelations = relations(webhookEndpoints, ({ one, many }) => ({
   organization: one(organizations, { fields: [webhookEndpoints.organizationId], references: [organizations.id] }),
   deliveries: many(webhookDeliveries),
@@ -672,7 +644,6 @@ export const appSchema = {
   comments,
   commentMentions,
   timeEntries,
-  taskTemplates,
   webhookEndpoints,
   webhookDeliveries,
   organizationsRelations,
@@ -691,7 +662,6 @@ export const appSchema = {
   commentsRelations,
   commentMentionsRelations,
   timeEntriesRelations,
-  taskTemplatesRelations,
   webhookEndpointsRelations,
   webhookDeliveriesRelations,
 };
