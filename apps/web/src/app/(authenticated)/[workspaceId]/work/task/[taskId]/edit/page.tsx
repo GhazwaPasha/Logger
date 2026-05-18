@@ -283,6 +283,80 @@ function EditTaskInner() {
           />
         </div>
 
+        {/* Existing subtasks (read-only) */}
+        {detail.subtasks.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Existing subtasks
+            </label>
+            <div className="rounded-xl border border-[var(--border-subtle)]">
+              {detail.subtasks.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
+                >
+                  <span className={`text-sm ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}>
+                    {item.done ? "✓" : "○"}
+                  </span>
+                  <span className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}>
+                    {item.title}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Add new subtasks */}
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Add subtasks
+          </label>
+          <div className="rounded-xl border border-[var(--border-subtle)]">
+            {newSubtasks.map((item, idx) => (
+              <div
+                key={`new-${idx}`}
+                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
+              >
+                <span className="text-[var(--muted)]">+</span>
+                <span className="flex-1 text-sm text-[var(--fg)]">{item}</span>
+                <button
+                  type="button"
+                  className="text-xs text-[var(--muted)] hover:text-red-500"
+                  onClick={() => setNewSubtasks((prev) => prev.filter((_, i) => i !== idx))}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 px-3 py-2">
+              <span className="text-[var(--muted)]">+</span>
+              <input
+                className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
+                value={subtaskDraft}
+                onChange={(e) => setSubtaskDraft(e.target.value)}
+                placeholder="Add new subtask…"
+                onBlur={() => {
+                  const v = subtaskDraft.trim();
+                  if (!v) return;
+                  setNewSubtasks((prev) => [...prev, v]);
+                  setSubtaskDraft("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const v = subtaskDraft.trim();
+                    if (v) {
+                      setNewSubtasks((prev) => [...prev, v]);
+                      setSubtaskDraft("");
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Status + Priority */}
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[140px]">
@@ -378,80 +452,6 @@ function EditTaskInner() {
               />
             </div>
           )}
-        </div>
-
-        {/* Existing subtasks (read-only) */}
-        {detail.subtasks.length > 0 && (
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Existing subtasks
-            </label>
-            <div className="rounded-xl border border-[var(--border-subtle)]">
-              {detail.subtasks.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-                >
-                  <span className={`text-sm ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}>
-                    {item.done ? "✓" : "○"}
-                  </span>
-                  <span className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}>
-                    {item.title}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Add new subtasks */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Add subtasks
-          </label>
-          <div className="rounded-xl border border-[var(--border-subtle)]">
-            {newSubtasks.map((item, idx) => (
-              <div
-                key={`new-${idx}`}
-                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-              >
-                <span className="text-[var(--muted)]">+</span>
-                <span className="flex-1 text-sm text-[var(--fg)]">{item}</span>
-                <button
-                  type="button"
-                  className="text-xs text-[var(--muted)] hover:text-red-500"
-                  onClick={() => setNewSubtasks((prev) => prev.filter((_, i) => i !== idx))}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="text-[var(--muted)]">+</span>
-              <input
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
-                value={subtaskDraft}
-                onChange={(e) => setSubtaskDraft(e.target.value)}
-                placeholder="Add new subtask…"
-                onBlur={() => {
-                  const v = subtaskDraft.trim();
-                  if (!v) return;
-                  setNewSubtasks((prev) => [...prev, v]);
-                  setSubtaskDraft("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const v = subtaskDraft.trim();
-                    if (v) {
-                      setNewSubtasks((prev) => [...prev, v]);
-                      setSubtaskDraft("");
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
         </div>
 
         {/* Danger zone: delete / archive */}

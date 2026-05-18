@@ -109,6 +109,34 @@ export function TaskViewPanel({
       {/* Title */}
       <h3 className="text-base font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
 
+      {/* Subtasks — always shown, right below title */}
+      <div>
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Subtasks{subtasks.length > 0 ? ` (${subtasks.filter((s) => s.done).length}/${subtasks.length})` : ""}
+        </p>
+        {subtasks.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No subtasks</p>
+        ) : (
+          <div className="rounded-xl border border-[var(--border-subtle)]">
+            {subtasks.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
+              >
+                <span className={`text-sm ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}>
+                  {item.done ? "✓" : "○"}
+                </span>
+                <span
+                  className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
+                >
+                  {item.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Status + Priority */}
       <div className="flex flex-wrap gap-2">
         <span
@@ -157,34 +185,6 @@ export function TaskViewPanel({
         )}
       </div>
 
-      {/* Subtasks — always shown */}
-      <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Subtasks{subtasks.length > 0 ? ` (${subtasks.filter((s) => s.done).length}/${subtasks.length})` : ""}
-        </p>
-        {subtasks.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No subtasks</p>
-        ) : (
-          <div className="rounded-xl border border-[var(--border-subtle)]">
-            {subtasks.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-              >
-                <span className={`text-sm ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}>
-                  {item.done ? "✓" : "○"}
-                </span>
-                <span
-                  className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
-                >
-                  {item.title}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Dependencies — DependencySection returns null when empty with canEdit=false */}
       {token && (
         <DependencySection
@@ -211,10 +211,8 @@ export function TaskViewPanel({
         <CommentThread taskId={taskId} token={token} userId={sessionUserId} members={members} viewOnly />
       )}
 
-      {/* Activity history — only shown if there are ledger entries */}
-      {ledger.length > 0 && (
-        <TaskPanelHistoryCard task={task} ledger={ledger} members={members} />
-      )}
+      {/* Activity history — always shown */}
+      <TaskPanelHistoryCard task={task} ledger={ledger} members={members} />
     </div>
   );
 }
