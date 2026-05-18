@@ -45,33 +45,21 @@ import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/S
 import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
-import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
-import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
-import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
-import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
-import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
-import { CommentThread } from "@/components/tasks/CommentThread";
-import { AttachmentZone } from "@/components/tasks/AttachmentZone";
-import { DependencySection } from "@/components/tasks/DependencySection";
-import { TimeTracker } from "@/components/tasks/TimeTracker";
+import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
-  parseTaskDueRepeat,
   type MemberRow,
   type SubtaskRow,
   type TaskDetail,
-  type TaskDueRepeat,
   type TaskMutationResult,
   type TaskRow,
 } from "@/lib/ledger-types";
-import type { TaskAiFillResult } from "@/lib/task-ai-fill";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
-import { useTaskDetail } from "@/hooks/useTaskDetail";
 import {
   readWorkBoardScope,
   writeWorkBoardScope,
@@ -156,14 +144,6 @@ const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
 const SORT_PANEL_MIN_W = 224;
 const DATE_PANEL_MIN_W = 288;
 const MENU_VIEWPORT_GUTTER = 12;
-
-function dueAtToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function firstAssigneeLabel(task: TaskRow, memberRows: MemberRow[]): string | null {
   const ids = task.assigneeUserIds ?? [];
@@ -375,7 +355,7 @@ function WorkBoardStatsCard({
 }
 
 function WorkItemsInner() {
-  const { workspaceId } = useWorkspaceRoute();
+  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -392,47 +372,8 @@ function WorkItemsInner() {
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
-  const [title, setTitle] = useState("");
   const [listId, setListId] = useState("");
-  const [due, setDue] = useState("");
-  const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
-  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
-  const [newTaskStatus, setNewTaskStatus] = useState<ManualTaskStatus>("pending");
-  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium");
-  const [subtaskDraft, setSubtaskDraft] = useState("");
-  const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
-  const [showAssignees, setShowAssignees] = useState(false);
-  const [showDuePanel, setShowDuePanel] = useState(false);
-  const [showRepeatPanel, setShowRepeatPanel] = useState(false);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editTaskId, setEditTaskId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDue, setEditDue] = useState("");
-  const [editDueRepeat, setEditDueRepeat] = useState<TaskDueRepeat | null>(null);
-  const [editAssigneeIds, setEditAssigneeIds] = useState<string[]>([]);
-  const [editStatus, setEditStatus] = useState<ManualTaskStatus>("pending");
-  const [editPriority, setEditPriority] = useState<TaskPriority>("medium");
-  const [editShowAssignees, setEditShowAssignees] = useState(false);
-  const [editShowDuePanel, setEditShowDuePanel] = useState(false);
-  const [editShowRepeatPanel, setEditShowRepeatPanel] = useState(false);
-  const [editSubtaskDraft, setEditSubtaskDraft] = useState("");
-  const [editNewSubtasks, setEditNewSubtasks] = useState<string[]>([]);
-  const [editSaving, setEditSaving] = useState(false);
-  const [createSaving, setCreateSaving] = useState(false);
-  const editTaskFromList = useMemo(
-    () => (editTaskId ? tasks.find((t) => t.id === editTaskId) ?? null : null),
-    [editTaskId, tasks],
-  );
-  const taskDetailPlaceholderCtx = useMemo(
-    () => ({ lists, members, userId: sessionUserId }),
-    [lists, members, sessionUserId],
-  );
-  const { detail: editDetail, isLoading: editDetailLoading } = useTaskDetail(
-    token,
-    editTaskId,
-    editTaskFromList,
-    taskDetailPlaceholderCtx,
-  );
+  const [viewTaskId, setViewTaskId] = useState<string | null>(null);
   const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
     null,
   );
@@ -571,96 +512,27 @@ function WorkItemsInner() {
     });
   }, [lists, levelPref, listPref]);
 
-  function toggleAssignee(id: string) {
-    setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  useEffect(() => {
-    if (!editTaskId) {
-      setEditShowDuePanel(false);
-      setEditShowRepeatPanel(false);
-    }
-  }, [editTaskId]);
-
-  useEffect(() => {
-    if (!editTaskId) setEditShowAssignees(false);
-  }, [editTaskId]);
-
-  useEffect(() => {
-    if (!createModalOpen) {
-      setShowDuePanel(false);
-      setShowRepeatPanel(false);
-    }
-  }, [createModalOpen]);
-
-  useEffect(() => {
-    if (!createModalOpen) setShowAssignees(false);
-  }, [createModalOpen]);
-
-  useEffect(() => {
-    if (!due.trim()) setDueRepeat(null);
-  }, [due]);
-
-  useEffect(() => {
-    if (!editDue.trim()) setEditDueRepeat(null);
-  }, [editDue]);
-
-  const taskPanelOpen = createModalOpen || editTaskId != null;
-
-  useEffect(() => {
-    if (!taskPanelOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [taskPanelOpen]);
-
-  // 'N' keyboard shortcut from KeyboardShortcutsProvider
+  // 'N' keyboard shortcut → navigate to new task page
   useEffect(() => {
     function handler() {
-      setEditTaskId(null);
-      setNewTaskStatus("pending");
-      setCreateModalOpen(true);
+      router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
     }
     window.addEventListener("wl:new-task", handler);
     return () => window.removeEventListener("wl:new-task", handler);
-  }, []);
+  }, [router, workspaceSlug, listId]);
 
   useEffect(() => {
-    if (!taskPanelOpen) return;
+    if (!viewTaskId) return;
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        if (createSaving || editSaving) return;
-        setCreateModalOpen(false);
-        setEditTaskId(null);
-      }
+      if (e.key === "Escape") setViewTaskId(null);
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [taskPanelOpen, createSaving, editSaving]);
+  }, [viewTaskId]);
 
-  const openEditTask = useCallback((taskId: string, focus?: "assignees" | "due") => {
-    setCreateModalOpen(false);
-    setEditTaskId(taskId);
-    if (focus === "assignees") {
-      setEditShowAssignees(true);
-      setEditShowDuePanel(false);
-      setEditShowRepeatPanel(false);
-    } else if (focus === "due") {
-      setEditShowDuePanel(true);
-      setEditShowAssignees(false);
-      setEditShowRepeatPanel(false);
-    } else {
-      setEditShowAssignees(false);
-      setEditShowDuePanel(false);
-      setEditShowRepeatPanel(false);
-    }
+  const openViewTask = useCallback((taskId: string) => {
+    setViewTaskId(taskId);
   }, []);
-
-  function toggleEditAssignee(id: string) {
-    setEditAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
 
   /** Migrate `level` / `list` into session scope and strip; open task panel from `task=` once. Drill-down filters stay in the URL. */
   useEffect(() => {
@@ -681,7 +553,7 @@ function WorkItemsInner() {
 
     const tid = params.get("task");
     if (tid) {
-      openEditTask(tid);
+      setViewTaskId(tid);
       params.delete("task");
       changed = true;
     }
@@ -689,7 +561,7 @@ function WorkItemsInner() {
     if (!changed) return;
     const q = params.toString();
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-  }, [workspaceId, searchParams, pathname, router, openEditTask]);
+  }, [workspaceId, searchParams, pathname, router]);
 
   useEffect(() => {
     const dueRaw = searchParams.get("due");
@@ -729,17 +601,6 @@ function WorkItemsInner() {
     },
     [router, pathname, searchParams],
   );
-
-  useEffect(() => {
-    if (!editTaskId || !editDetail || editDetail.task.id !== editTaskId) return;
-    setEditTitle(editDetail.task.title);
-    setEditAssigneeIds([...editDetail.assigneeUserIds]);
-    setEditDue(dueAtToLocalInput(editDetail.task.dueAt));
-    setEditDueRepeat(parseTaskDueRepeat(editDetail.task.dueRepeat));
-    setEditStatus(manualStatusFromStored(normalizeTaskStatus(editDetail.task.status)));
-    setEditPriority(taskPriority(editDetail.task));
-    setEditNewSubtasks([]);
-  }, [editTaskId, editDetail?.task.id]);
 
   const patchTaskMutation = useMutation({
     mutationFn: async ({
@@ -936,7 +797,7 @@ function WorkItemsInner() {
         await apiJson<TaskMutationResult>(`/tasks/${taskId}/archive`, { method: "POST", token });
         await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
         queryClient.removeQueries({ queryKey: taskKeys.detail(taskId) });
-        setEditTaskId((id) => (id === taskId ? null : id));
+        setViewTaskId((id) => (id === taskId ? null : id));
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not archive task");
       }
@@ -1015,179 +876,6 @@ function WorkItemsInner() {
     },
     [token, patchSubtaskMutation],
   );
-
-  const applyAiFillToCreateForm = useCallback((r: TaskAiFillResult) => {
-    if (r.title !== null) setTitle(r.title);
-    if (r.subtasks !== null) setSubtaskItems(r.subtasks);
-    if (r.assigneeUserIds !== null) setAssigneeIds(r.assigneeUserIds);
-    if (r.status !== null) setNewTaskStatus(r.status);
-    if (r.priority !== null) setNewTaskPriority(r.priority);
-    if (r.dueLocal !== null) {
-      setDue(r.dueLocal);
-      if (!r.dueLocal.trim()) setDueRepeat(null);
-    }
-    if (r.dueRepeat !== null) {
-      if (r.dueRepeat === "none") {
-        setDueRepeat(null);
-      } else {
-        const effectiveDue = r.dueLocal !== null ? r.dueLocal : due;
-        if (effectiveDue.trim().length > 0) setDueRepeat(r.dueRepeat);
-        else setDueRepeat(null);
-      }
-    }
-  }, [due]);
-
-  const applyAiFillToEditForm = useCallback((r: TaskAiFillResult) => {
-    if (r.title !== null) setEditTitle(r.title);
-    if (r.subtasks !== null) {
-      if (r.subtasks.length === 0) setEditNewSubtasks([]);
-      else {
-        setEditNewSubtasks((prev) => {
-          const next = [...prev];
-          for (const line of r.subtasks!) {
-            if (!next.includes(line)) next.push(line);
-          }
-          return next;
-        });
-      }
-    }
-    if (r.assigneeUserIds !== null) setEditAssigneeIds(r.assigneeUserIds);
-    if (r.status !== null) setEditStatus(r.status);
-    if (r.priority !== null) setEditPriority(r.priority);
-    if (r.dueLocal !== null) {
-      setEditDue(r.dueLocal);
-      if (!r.dueLocal.trim()) setEditDueRepeat(null);
-    }
-    if (r.dueRepeat !== null) {
-      if (r.dueRepeat === "none") {
-        setEditDueRepeat(null);
-      } else {
-        const effectiveDue = r.dueLocal !== null ? r.dueLocal : editDue;
-        if (effectiveDue.trim().length > 0) setEditDueRepeat(r.dueRepeat);
-        else setEditDueRepeat(null);
-      }
-    }
-  }, [editDue]);
-
-  async function createTask() {
-    if (!token || !workspaceId || !title.trim() || !listId || createSaving) return;
-    setCreateSaving(true);
-    setError(null);
-    try {
-      const dueIso = due.trim() ? new Date(due).toISOString() : undefined;
-      const initialSubtasks = subtaskItems
-        .map((t) => ({ title: t.trim() }))
-        .filter((x) => x.title.length > 0);
-      const created = await apiJson<TaskMutationResult>(`/organizations/${workspaceId}/tasks`, {
-        method: "POST",
-        token,
-        body: JSON.stringify({
-          title: title.trim(),
-          listId,
-          assigneeUserIds: assigneeIds,
-          status: newTaskStatus,
-          priority: newTaskPriority,
-          ...(dueIso ? { dueAt: dueIso, dueRepeat: dueRepeat ?? null } : {}),
-          ...(initialSubtasks.length > 0 ? { initialSubtasks } : {}),
-        }),
-      });
-      const row: TaskRow = {
-        ...created.task,
-        assigneeUserIds: created.assigneeUserIds,
-        subtasks: created.subtasks,
-      };
-      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
-        if (!old) return old;
-        return { ...old, tasks: [row, ...old.tasks] };
-      });
-      setTitle("");
-      setDue("");
-      setDueRepeat(null);
-      setAssigneeIds([]);
-      setNewTaskStatus("pending");
-      setNewTaskPriority("medium");
-      setSubtaskDraft("");
-      setSubtaskItems([]);
-      setShowAssignees(false);
-      setShowDuePanel(false);
-      setShowRepeatPanel(false);
-      setCreateModalOpen(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create task");
-    } finally {
-      setCreateSaving(false);
-    }
-  }
-
-  async function saveEditTask() {
-    if (!token || !editTaskId || !editDetail) return;
-    const titleTrim = editTitle.trim();
-    if (!titleTrim) {
-      setError("Title is required");
-      return;
-    }
-    setEditSaving(true);
-    setError(null);
-    try {
-      const prevIso = editDetail.task.dueAt ? new Date(editDetail.task.dueAt).toISOString() : null;
-      const nextIso = editDue.trim() ? new Date(editDue).toISOString() : null;
-      const duePatch = prevIso !== nextIso ? { dueAt: nextIso === null ? null : nextIso } : {};
-      const subtasksToCreate = editNewSubtasks
-        .map((st) => st.trim())
-        .filter(Boolean)
-        .map((line) => ({ title: line }));
-      const saved = await apiJson<TaskMutationResult>(`/tasks/${editTaskId}`, {
-        method: "PATCH",
-        token,
-        body: JSON.stringify({
-          title: titleTrim,
-          status: editStatus,
-          priority: editPriority,
-          assigneeUserIds: editAssigneeIds,
-          dueRepeat: editDueRepeat,
-          ...duePatch,
-          ...(subtasksToCreate.length > 0 ? { subtasksToCreate } : {}),
-        }),
-      });
-      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks.map((t) =>
-            t.id !== editTaskId
-              ? t
-              : {
-                  ...t,
-                  ...saved.task,
-                  assigneeUserIds: saved.assigneeUserIds,
-                  subtasks: saved.subtasks,
-                },
-          ),
-        };
-      });
-      queryClient.setQueryData<TaskDetail>(taskKeys.detail(editTaskId), (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          task: { ...old.task, ...saved.task },
-          assigneeUserIds: saved.assigneeUserIds,
-          subtasks: saved.subtasks,
-          capabilities: saved.capabilities,
-          ledger: [...saved.ledgerDelta, ...old.ledger],
-        };
-      });
-      if (saved.spawnedRecurringTaskId) {
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-      }
-      setEditTaskId(null);
-      setEditNewSubtasks([]);
-      setEditSubtaskDraft("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save task");
-    } finally {
-      setEditSaving(false);
-    }
-  }
 
   const activeTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks]);
   const selectedLevel = levelPref && depts.some((d) => d.id === levelPref) ? levelPref : null;
@@ -1293,24 +981,6 @@ function WorkItemsInner() {
     const dept = depts.find((d) => d.id === list.departmentId);
     return dept?.name ?? null;
   }
-
-  const createTaskScopeBadges = useMemo(() => {
-    if (!listId) return { level: null as string | null, list: null as string | null };
-    const row = lists.find((l) => l.id === listId);
-    if (!row) return { level: null as string | null, list: null as string | null };
-    return {
-      level: depts.find((d) => d.id === row.departmentId)?.name ?? null,
-      list: row.name,
-    };
-  }, [listId, lists, depts]);
-
-  const editTaskScopeBadges = useMemo(() => {
-    if (!editDetail) return { level: null as string | null, list: null as string | null };
-    return {
-      level: taskLevelBadge(editDetail.task),
-      list: taskListName(editDetail.task),
-    };
-  }, [editDetail, lists, depts]);
 
   useEffect(() => {
     setSubtasksByTaskId((c) => {
@@ -1458,7 +1128,7 @@ function WorkItemsInner() {
           <div className="min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => openEditTask(task.id)}
+              onClick={() => openViewTask(task.id)}
               className={`line-clamp-2 text-left text-sm font-medium leading-snug underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
                 flowCol === "cancelled"
                   ? "text-[var(--muted)] line-through decoration-red-500"
@@ -1475,7 +1145,7 @@ function WorkItemsInner() {
             <KanbanStatusPill task={task} />
             <button
               type="button"
-              onClick={() => openEditTask(task.id)}
+              onClick={() => openViewTask(task.id)}
               className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] group-hover/card:opacity-100"
               title="Edit task"
               aria-label={`More options — edit: ${task.title}`}
@@ -1505,7 +1175,7 @@ function WorkItemsInner() {
             ) : (
               <button
                 type="button"
-                onClick={() => openEditTask(task.id)}
+                onClick={() => openViewTask(task.id)}
                 className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                 title="Add subtasks"
                 aria-label="Add subtasks"
@@ -1788,7 +1458,7 @@ function WorkItemsInner() {
     return (
       <button
         type="button"
-        onClick={() => openEditTask(task.id, "due")}
+        onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
         className={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
@@ -1812,7 +1482,7 @@ function WorkItemsInner() {
     return (
       <button
         type="button"
-        onClick={() => openEditTask(task.id, "assignees")}
+        onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
         className="flex size-6 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
@@ -1832,7 +1502,7 @@ function WorkItemsInner() {
     return (
       <button
         type="button"
-        onClick={() => openEditTask(task.id)}
+        onClick={() => openViewTask(task.id)}
         title="Comments"
         aria-label="Comments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
@@ -1846,7 +1516,7 @@ function WorkItemsInner() {
     return (
       <button
         type="button"
-        onClick={() => openEditTask(task.id)}
+        onClick={() => openViewTask(task.id)}
         title="Attachments"
         aria-label="Attachments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
@@ -1897,7 +1567,7 @@ function WorkItemsInner() {
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={() => openEditTask(task.id)}
+              onClick={() => openViewTask(task.id)}
               className={`line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
                 flowCol === "cancelled"
                   ? "text-[var(--muted)] line-through decoration-red-500"
@@ -1912,7 +1582,7 @@ function WorkItemsInner() {
               <KanbanStatusPill task={task} />
               <button
                 type="button"
-                onClick={() => openEditTask(task.id)}
+                onClick={() => openViewTask(task.id)}
                 className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
                 title="Edit task"
                 aria-label={`More options — edit: ${task.title}`}
@@ -1932,7 +1602,7 @@ function WorkItemsInner() {
               {subtasksPreview.length > 0 ? (
                 <button
                   type="button"
-                  onClick={() => openEditTask(task.id)}
+                  onClick={() => openViewTask(task.id)}
                   className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                   title="View subtasks"
                   aria-label="View subtasks"
@@ -1946,7 +1616,7 @@ function WorkItemsInner() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => openEditTask(task.id)}
+                  onClick={() => openViewTask(task.id)}
                   className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                   title="Add subtasks"
                   aria-label="Add subtasks"
@@ -2005,7 +1675,7 @@ function WorkItemsInner() {
                       type="button"
                       className="font-medium text-[var(--accent)] hover:underline"
                       onMouseDown={(e) => e.stopPropagation()}
-                      onClick={() => openEditTask(task.id)}
+                      onClick={() => openViewTask(task.id)}
                     >
                       open task
                     </button>
@@ -2049,7 +1719,7 @@ function WorkItemsInner() {
                 <RecurringSeriesCard
                   tasks={item.tasks}
                   members={members}
-                  onOpenTask={openEditTask}
+                  onOpenTask={openViewTask}
                 />
               </div>
             )
@@ -2060,9 +1730,7 @@ function WorkItemsInner() {
             type="button"
             className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={() => {
-              setEditTaskId(null);
-              setNewTaskStatus("pending");
-              setCreateModalOpen(true);
+              router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
             }}
           >
             + Add task
@@ -2111,7 +1779,7 @@ function WorkItemsInner() {
                   <RecurringSeriesCard
                     tasks={item.tasks}
                     members={members}
-                    onOpenTask={openEditTask}
+                    onOpenTask={openViewTask}
                   />
                 )}
                 {item.kind === "load-more" && (
@@ -2384,8 +2052,7 @@ function WorkItemsInner() {
               type="button"
               className="btn-primary !h-8 shrink-0 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
               onClick={() => {
-                setEditTaskId(null);
-                setCreateModalOpen(true);
+                router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
               }}
             >
               + New task
@@ -2534,463 +2201,28 @@ function WorkItemsInner() {
         )}
       </section>
 
-      {taskPanelOpen &&
+      {viewTaskId &&
         toolbarMenusMounted &&
         createPortal(
           <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
-          <div
-            className="absolute inset-0 bg-black/40"
-            aria-hidden
-            onClick={() => {
-              if (createSaving || editSaving) return;
-              setCreateModalOpen(false);
-              setEditTaskId(null);
-            }}
-          />
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label={editTaskId ? "Edit task" : "Create task"}
-            className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col space-y-4 overflow-y-auto border-l border-[var(--border-subtle)] p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {editTaskId ? (
-              <>
-                {editDetailLoading && !editDetail ? (
-                  <>
-                    <div className={TASK_PANEL_HEADER_ROW}>
-                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
-                      <div className={TASK_PANEL_HEADER_RIGHT}>
-                        <button
-                          type="button"
-                          className={TASK_PANEL_HEADER_CLOSE_BTN}
-                          onClick={() => setEditTaskId(null)}
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-[var(--muted)]">Loading…</p>
-                  </>
-                ) : editDetail ? (
-                  <>
-                    <div className={TASK_PANEL_HEADER_ROW}>
-                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
-                      <div className={TASK_PANEL_HEADER_RIGHT}>
-                        <StatusPillSelect
-                          aria-label="Status"
-                          value={editStatus}
-                          onChange={setEditStatus}
-                          options={TASK_FLOW_ORDER}
-                          disabled={editSaving}
-                        />
-                        <select
-                          aria-label="Priority"
-                          className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
-                          value={editPriority}
-                          disabled={editSaving}
-                          onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
-                        >
-                          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                            <option key={k} value={k}>
-                              {PRIORITY_LABELS[k]}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          className={TASK_PANEL_HEADER_CLOSE_BTN}
-                          disabled={editSaving}
-                          onClick={() => setEditTaskId(null)}
-                        >
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <TaskPanelScopeBadges level={editTaskScopeBadges.level} list={editTaskScopeBadges.list} />
-                      <TaskPanelAiFill
-                        members={members}
-                        existingDraft={{ title: editTitle, dueLocal: editDue, dueRepeat: editDueRepeat }}
-                        onApply={applyAiFillToEditForm}
-                      />
-                      <input
-                        className="input rounded-xl text-base"
-                        value={editTitle}
-                        disabled={editSaving}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        placeholder="Task title"
-                      />
-                      <div className="rounded-xl border border-[var(--border-subtle)]">
-                        {editDetail.subtasks.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-                          >
-                            <span className="text-[var(--muted)]">{item.done ? "✓" : "○"}</span>
-                            <span className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : ""}`}>{item.title}</span>
-                          </div>
-                        ))}
-                        {editNewSubtasks.map((item, idx) => (
-                          <div
-                            key={`new-${item}-${idx}`}
-                            className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-                          >
-                            <span className="text-[var(--muted)]">+</span>
-                            <span className="flex-1 text-sm">{item}</span>
-                            <button
-                              type="button"
-                              className="text-xs text-[var(--muted)] hover:text-[var(--fg)]"
-                              onClick={() => setEditNewSubtasks((prev) => prev.filter((_, i) => i !== idx))}
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-2 px-3 py-2">
-                          <span className="text-[var(--muted)]">+</span>
-                          <input
-                            className="w-full bg-transparent text-sm outline-none"
-                            value={editSubtaskDraft}
-                            onChange={(e) => setEditSubtaskDraft(e.target.value)}
-                            placeholder="Add subtask"
-                            onBlur={() => {
-                              const v = editSubtaskDraft.trim();
-                              if (!v) return;
-                              setEditNewSubtasks((prev) => [...prev, v]);
-                              setEditSubtaskDraft("");
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                const v = editSubtaskDraft.trim();
-                                if (v) {
-                                  setEditNewSubtasks((prev) => [...prev, v]);
-                                  setEditSubtaskDraft("");
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className={TASK_PANEL_ASSIGNEE_TOGGLE}
-                        title={assigneeToggleTitle(editAssigneeIds, members)}
-                        aria-expanded={editShowAssignees}
-                        aria-label={
-                          editAssigneeIds.length > 0
-                            ? `Assignees: ${assigneeToggleTitle(editAssigneeIds, members) ?? ""}`
-                            : "Choose assignees"
-                        }
-                        onClick={() => setEditShowAssignees((v) => !v)}
-                      >
-                        <span className="block truncate">{assigneeToggleLabel(editAssigneeIds, members)}</span>
-                      </button>
-                      <DueDateTimePopover
-                        open={editShowDuePanel}
-                        onOpenChange={(o) => {
-                          setEditShowDuePanel(o);
-                          if (o) setEditShowRepeatPanel(false);
-                        }}
-                        value={editDue}
-                        onChange={setEditDue}
-                        onClear={() => {
-                          setEditDue("");
-                          setEditDueRepeat(null);
-                        }}
-                      />
-                      <DueRepeatPopover
-                        open={editShowRepeatPanel}
-                        onOpenChange={(o) => {
-                          setEditShowRepeatPanel(o);
-                          if (o) setEditShowDuePanel(false);
-                        }}
-                        dueLocalValue={editDue}
-                        value={editDueRepeat}
-                        onChange={setEditDueRepeat}
-                      />
-                    </div>
-                    {editShowAssignees && (
-                      <AssigneeSearchField
-                        members={members}
-                        assigneeIds={editAssigneeIds}
-                        onToggleAssignee={toggleEditAssignee}
-                      />
-                    )}
-                    {(editDetail.capabilities.canDeleteTask || editDetail.capabilities.canArchiveTask) && (
-                      <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
-                        {editDetail.capabilities.canDeleteTask ? (
-                          <button
-                            type="button"
-                            className="rounded-xl bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 dark:hover:bg-red-500"
-                            disabled={editSaving}
-                            onClick={() =>
-                              setTaskActionConfirm({
-                                title: "Delete this task?",
-                                description:
-                                  "It will be removed from the board. You can still rely on exports or backups outside LogBase if you need a record.",
-                                confirmLabel: "Delete task",
-                                variant: "danger",
-                                onConfirm: () => void runTaskArchive(editDetail.task.id),
-                              })
-                            }
-                          >
-                            Delete task
-                          </button>
-                        ) : null}
-                        {editDetail.capabilities.canArchiveTask ? (
-                          <button
-                            type="button"
-                            className="rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-sm font-medium text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                            disabled={editSaving}
-                            onClick={() =>
-                              setTaskActionConfirm({
-                                title: "Archive this task?",
-                                description: "It will be hidden from the board and treated as archived.",
-                                confirmLabel: "Archive",
-                                variant: "default",
-                                onConfirm: () => void runTaskArchive(editDetail.task.id),
-                              })
-                            }
-                          >
-                            Archive task
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        className="btn-secondary rounded-xl px-4"
-                        onClick={() => setEditTaskId(null)}
-                        disabled={editSaving}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-primary inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-xl px-4"
-                        disabled={editSaving}
-                        aria-busy={editSaving || undefined}
-                        onClick={() => void saveEditTask()}
-                      >
-                        {editSaving ? (
-                          <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-                        ) : null}
-                        <span>{editSaving ? "Saving" : "Save"}</span>
-                      </button>
-                    </div>
-                    <TaskPanelHistoryCard task={editDetail.task} ledger={editDetail.ledger} members={members} />
-                    {token && (
-                      <DependencySection
-                        taskId={editDetail.task.id}
-                        token={token}
-                        allTasks={tasks}
-                        canEdit={editDetail.capabilities.canReschedule}
-                        onOpenTask={(id) => setEditTaskId(id)}
-                      />
-                    )}
-                    {token && sessionUserId && (
-                      <TimeTracker
-                        taskId={editDetail.task.id}
-                        token={token}
-                        userId={sessionUserId}
-                      />
-                    )}
-                    {token && sessionUserId && (
-                      <AttachmentZone
-                        taskId={editDetail.task.id}
-                        token={token}
-                        userId={sessionUserId}
-                      />
-                    )}
-                    {token && sessionUserId && (
-                      <CommentThread
-                        taskId={editDetail.task.id}
-                        token={token}
-                        userId={sessionUserId}
-                        members={members}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className={TASK_PANEL_HEADER_ROW}>
-                      <h2 className={TASK_PANEL_HEADER_TITLE}>Edit task</h2>
-                      <div className={TASK_PANEL_HEADER_RIGHT}>
-                        <button type="button" className={TASK_PANEL_HEADER_CLOSE_BTN} onClick={() => setEditTaskId(null)}>
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-[var(--muted)]">Could not load this task.</p>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-            <div className={TASK_PANEL_HEADER_ROW}>
-              <h2 className={TASK_PANEL_HEADER_TITLE}>New task</h2>
-              <div className={TASK_PANEL_HEADER_RIGHT}>
-                <StatusPillSelect
-                  aria-label="Status"
-                  value={newTaskStatus}
-                  onChange={setNewTaskStatus}
-                  options={TASK_FLOW_ORDER}
-                  disabled={createSaving}
-                />
-                <select
-                  aria-label="Priority"
-                  className={`${TASK_PANEL_HEADER_SELECT} w-[4.5rem] sm:w-[4.875rem]`}
-                  value={newTaskPriority}
-                  disabled={createSaving}
-                  onChange={(e) => setNewTaskPriority(e.target.value as TaskPriority)}
-                >
-                  {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                    <option key={k} value={k}>
-                      {PRIORITY_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className={TASK_PANEL_HEADER_CLOSE_BTN}
-                  disabled={createSaving}
-                  onClick={() => setCreateModalOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <TaskPanelScopeBadges level={createTaskScopeBadges.level} list={createTaskScopeBadges.list} />
-              <TaskPanelAiFill
-                members={members}
-                existingDraft={{ title, dueLocal: due, dueRepeat }}
-                onApply={applyAiFillToCreateForm}
+            <div
+              className="absolute inset-0 bg-black/40"
+              aria-hidden
+              onClick={() => setViewTaskId(null)}
+            />
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Task details"
+              className="surface-elevated scrollbar-hide absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-[var(--border-subtle)] p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <TaskViewPanel
+                taskId={viewTaskId}
+                onClose={() => setViewTaskId(null)}
+                onOpenTask={(id: string) => setViewTaskId(id)}
               />
-              <input
-                className="input rounded-xl text-base"
-                value={title}
-                disabled={createSaving}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Add a task"
-              />
-              <div className="rounded-xl border border-[var(--border-subtle)]">
-                {subtaskItems.map((item, idx) => (
-                  <div key={`${item}-${idx}`} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0">
-                    <span className="text-[var(--muted)]">○</span>
-                    <span className="flex-1 text-sm">{item}</span>
-                    <button
-                      type="button"
-                      className="text-xs text-[var(--muted)] hover:text-[var(--fg)]"
-                      onClick={() => setSubtaskItems((prev) => prev.filter((_, i) => i !== idx))}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <span className="text-[var(--muted)]">+</span>
-                  <input
-                    className="w-full bg-transparent text-sm outline-none"
-                    value={subtaskDraft}
-                    onChange={(e) => setSubtaskDraft(e.target.value)}
-                    placeholder="Add subtask"
-                    onBlur={() => {
-                      const v = subtaskDraft.trim();
-                      if (!v) return;
-                      setSubtaskItems((prev) => [...prev, v]);
-                      setSubtaskDraft("");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const v = subtaskDraft.trim();
-                        if (v) {
-                          setSubtaskItems((prev) => [...prev, v]);
-                          setSubtaskDraft("");
-                        }
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={TASK_PANEL_ASSIGNEE_TOGGLE}
-                title={assigneeToggleTitle(assigneeIds, members)}
-                aria-expanded={showAssignees}
-                aria-label={
-                  assigneeIds.length > 0
-                    ? `Assignees: ${assigneeToggleTitle(assigneeIds, members) ?? ""}`
-                    : "Choose assignees"
-                }
-                onClick={() => setShowAssignees((v) => !v)}
-              >
-                <span className="block truncate">{assigneeToggleLabel(assigneeIds, members)}</span>
-              </button>
-              <DueDateTimePopover
-                open={showDuePanel}
-                onOpenChange={(o) => {
-                  setShowDuePanel(o);
-                  if (o) setShowRepeatPanel(false);
-                }}
-                value={due}
-                onChange={setDue}
-                onClear={() => {
-                  setDue("");
-                  setDueRepeat(null);
-                }}
-              />
-              <DueRepeatPopover
-                open={showRepeatPanel}
-                onOpenChange={(o) => {
-                  setShowRepeatPanel(o);
-                  if (o) setShowDuePanel(false);
-                }}
-                dueLocalValue={due}
-                value={dueRepeat}
-                onChange={setDueRepeat}
-              />
-            </div>
-            {showAssignees && (
-              <AssigneeSearchField
-                members={members}
-                assigneeIds={assigneeIds}
-                onToggleAssignee={toggleAssignee}
-              />
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                className="btn-secondary rounded-xl px-4"
-                disabled={createSaving}
-                onClick={() => setCreateModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-primary inline-flex min-w-[6.5rem] items-center justify-center gap-2 rounded-xl px-4"
-                disabled={createSaving || !title.trim() || !listId}
-                aria-busy={createSaving || undefined}
-                onClick={() => void createTask()}
-              >
-                {createSaving ? (
-                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-                ) : null}
-                <span>{createSaving ? "Creating" : "Create"}</span>
-              </button>
-            </div>
-              </>
-            )}
-          </section>
+            </section>
           </div>,
           document.body,
         )}

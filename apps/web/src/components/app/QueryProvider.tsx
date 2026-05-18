@@ -4,23 +4,38 @@ import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persist
 import type { Query } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { makeQueryClient } from "@/lib/query-client";
 import { QUERY_CACHE_VERSION, QUERY_STORAGE_KEY_PREFIX } from "@/lib/query-cache-version";
 
-/** Drop cached org/workspace queries when the API reports an expired session. */
+/**
+ * When the API returns 401, refresh the JWT and then invalidate (not remove)
+ * org/workspace queries. Using invalidateQueries keeps cached data visible
+ * during the refresh so there's no loading flash, and avoids the infinite loop
+ * that removeQueries causes (wiping the cache resets React Query's retry counter,
+ * so each retry with the same expired token spawns a fresh attempt forever).
+ */
 function QueryAuthListeners() {
   const qc = useQueryClient();
+  const { refreshToken } = useApiSession();
+  const isRefreshing = useRef(false);
 
   useEffect(() => {
-    function onAuthExpired() {
-      void qc.removeQueries({ queryKey: ["organizations"] });
-      void qc.removeQueries({ queryKey: ["workspace"] });
+    async function onAuthExpired() {
+      if (isRefreshing.current) return;
+      isRefreshing.current = true;
+      try {
+        await refreshToken();
+        void qc.invalidateQueries({ queryKey: ["organizations"] });
+        void qc.invalidateQueries({ queryKey: ["workspace"] });
+      } finally {
+        isRefreshing.current = false;
+      }
     }
     window.addEventListener("wl:auth-expired", onAuthExpired);
     return () => window.removeEventListener("wl:auth-expired", onAuthExpired);
-  }, [qc]);
+  }, [qc, refreshToken]);
 
   return null;
 }

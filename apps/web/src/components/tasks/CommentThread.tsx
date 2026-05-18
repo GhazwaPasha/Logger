@@ -182,9 +182,10 @@ type Props = {
   token: string;
   userId: string;
   members: MemberRow[];
+  viewOnly?: boolean;
 };
 
-export function CommentThread({ taskId, token, userId, members }: Props) {
+export function CommentThread({ taskId, token, userId, members, viewOnly }: Props) {
   const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -273,7 +274,7 @@ export function CommentThread({ taskId, token, userId, members }: Props) {
                 <MentionHighlightedBody body={comment.body ?? ""} />
               </p>
             )}
-            {!comment.deletedAt && (
+            {!comment.deletedAt && !viewOnly && (
               <div className="mt-1 flex gap-3">
                 {!indent && (
                   <button
@@ -323,6 +324,8 @@ export function CommentThread({ taskId, token, userId, members }: Props) {
     );
   }
 
+  if (viewOnly && query.data && roots.filter((c) => !c.deletedAt).length === 0) return null;
+
   return (
     <div className="space-y-1">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Comments</h3>
@@ -330,15 +333,17 @@ export function CommentThread({ taskId, token, userId, members }: Props) {
       {query.error && <p className="text-sm text-red-600">{(query.error as Error).message}</p>}
       {query.data && (
         <div className="divide-y divide-[var(--border-subtle)]/50">
-          {roots.length === 0 && (
+          {roots.length === 0 && !viewOnly && (
             <p className="py-2 text-sm text-[var(--muted)]">No comments yet. Be the first to comment.</p>
           )}
           {roots.map((c) => <CommentRow key={c.id} comment={c} />)}
         </div>
       )}
-      <div className="pt-2">
-        <CommentInput taskId={taskId} token={token} members={members} />
-      </div>
+      {!viewOnly && (
+        <div className="pt-2">
+          <CommentInput taskId={taskId} token={token} members={members} />
+        </div>
+      )}
     </div>
   );
 }

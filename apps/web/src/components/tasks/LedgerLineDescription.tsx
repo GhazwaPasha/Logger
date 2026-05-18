@@ -309,6 +309,20 @@ export function LedgerLineDescription({ entry, members }: Props) {
         </>
       );
     }
+    case "priority_change": {
+      const oldP = entry.payload.oldPriority;
+      const newP = entry.payload.newPriority;
+      if (typeof oldP !== "string" || typeof newP !== "string") {
+        return <><UserName>{actor}</UserName> changed the priority</>;
+      }
+      return (
+        <>
+          <UserName>{actor}</UserName> changed priority from{" "}
+          <span className="mx-0.5 font-semibold text-[var(--muted)]">{oldP}</span> to{" "}
+          <span className="mx-0.5 font-semibold">{newP}</span>
+        </>
+      );
+    }
     default:
       return (
         <>

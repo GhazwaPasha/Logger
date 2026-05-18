@@ -468,6 +468,19 @@ export class TasksService {
             .returning();
           ledgerDelta.push(row!);
         }
+
+        if (priorityChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "priority_change",
+              payload: { oldPriority, newPriority: nextPriority },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
       } else if (hasSubtasksCreate) {
         await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
       }

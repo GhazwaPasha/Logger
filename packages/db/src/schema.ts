@@ -282,6 +282,7 @@ export const ledgerTypeEnum = pgEnum("ledger_type", [
   "attachment_deleted",
   "dependency_added",
   "dependency_removed",
+  "priority_change",
 ]);
 
 export const activityLedger = pgTable(

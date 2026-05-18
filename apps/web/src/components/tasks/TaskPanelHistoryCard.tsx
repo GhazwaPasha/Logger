@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useEffect, useRef, useState } from "react";
 import type { LedgerRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { LedgerLineDescription, ledgerLogUserClassName } from "@/components/tasks/LedgerLineDescription";
 import {
@@ -34,15 +34,20 @@ type Props = {
   members: MemberRow[];
 };
 
-/** Newest ledger lines first; **created** line last (first event in time). */
 export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
   const [expanded, setExpanded] = useState(false);
   const headingId = useId();
   const regionId = useId();
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const creatorName = formatCreatorDisplay(memberDisplayName(members, task.assignerId));
-  /** API returns ledger newest-first; keep that order and drop the redundant creation note. */
-  const entriesNewestFirst = ledger.filter((e) => !isTaskCreatedNote(e));
+  const entriesOldestFirst = ledger.filter((e) => !isTaskCreatedNote(e)).slice().reverse();
+
+  useEffect(() => {
+    if (expanded) {
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [expanded, ledger.length]);
 
   return (
     <div className="mt-6 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/40 px-4 py-3">
@@ -62,7 +67,12 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
           className="mt-3 space-y-2 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
           aria-label="Task activity log"
         >
-          {entriesNewestFirst.map((entry) => (
+          <p className="break-words">
+            <span className={ledgerLogUserClassName}>{creatorName}</span>
+            <span className="text-[var(--muted)]"> created this task · </span>
+            <span className="break-all text-[var(--muted)]">{task.id}</span>
+          </p>
+          {entriesOldestFirst.map((entry) => (
             <p key={entry.id}>
               <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
               <span className="text-[var(--muted)]">: </span>
@@ -71,11 +81,7 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
               </span>
             </p>
           ))}
-          <p className="break-words">
-            <span className={ledgerLogUserClassName}>{creatorName}</span>
-            <span className="text-[var(--muted)]"> created this task · </span>
-            <span className="break-all text-[var(--muted)]">{task.id}</span>
-          </p>
+          <div ref={bottomRef} />
         </div>
       </div>
     </div>

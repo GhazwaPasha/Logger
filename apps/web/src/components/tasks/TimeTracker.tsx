@@ -54,10 +54,12 @@ export function TimeTracker({
   taskId,
   token,
   userId,
+  viewOnly,
 }: {
   taskId: string;
   token: string;
   userId: string;
+  viewOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const timeKey = ["time", taskId];
@@ -149,6 +151,8 @@ export function TimeTracker({
 
   const completedEntries = entries.filter((e) => e.stoppedAt);
 
+  if (viewOnly && completedEntries.length === 0 && !runningEntry) return null;
+
   return (
     <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
       <div className="flex items-center justify-between">
@@ -158,48 +162,51 @@ export function TimeTracker({
         )}
       </div>
 
-      {/* Timer control */}
-      <div className="flex items-center gap-3">
-        {runningEntry ? (
-          <>
-            <span className="flex items-center gap-1.5 text-sm font-mono font-semibold text-red-500">
-              <span className="size-2 animate-pulse rounded-full bg-red-500" />
-              {formatSeconds(elapsed)}
-            </span>
+      {/* Timer control — hidden in view mode */}
+      {!viewOnly && (
+        <>
+          <div className="flex items-center gap-3">
+            {runningEntry ? (
+              <>
+                <span className="flex items-center gap-1.5 text-sm font-mono font-semibold text-red-500">
+                  <span className="size-2 animate-pulse rounded-full bg-red-500" />
+                  {formatSeconds(elapsed)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => stopMutation.mutate()}
+                  disabled={stopMutation.isPending}
+                  className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+                >
+                  Stop
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => startMutation.mutate()}
+                disabled={startMutation.isPending}
+                className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+              >
+                ▶ Start Timer
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => stopMutation.mutate()}
-              disabled={stopMutation.isPending}
-              className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+              onClick={() => setShowManual((v) => !v)}
+              className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--fg)]"
             >
-              Stop
+              Log manually
             </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => startMutation.mutate()}
-            disabled={startMutation.isPending}
-            className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
-          >
-            ▶ Start Timer
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setShowManual((v) => !v)}
-          className="ml-auto text-xs text-[var(--muted)] hover:text-[var(--fg)]"
-        >
-          Log manually
-        </button>
-      </div>
-
-      {startMutation.isError && (
-        <p className="text-xs text-red-500">{(startMutation.error as Error).message}</p>
+          </div>
+          {startMutation.isError && (
+            <p className="text-xs text-red-500">{(startMutation.error as Error).message}</p>
+          )}
+        </>
       )}
 
       {/* Manual log form */}
-      {showManual && (
+      {!viewOnly && showManual && (
         <div className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3">
           <div className="flex gap-2">
             <div className="flex-1">
@@ -266,7 +273,7 @@ export function TimeTracker({
                 <div className="text-[var(--muted)]">{formatDateTime(e.startedAt)}</div>
                 {e.note && <div className="mt-0.5 italic text-[var(--muted)]">{e.note}</div>}
               </div>
-              {e.userId === userId && (
+              {!viewOnly && e.userId === userId && (
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(e.id)}

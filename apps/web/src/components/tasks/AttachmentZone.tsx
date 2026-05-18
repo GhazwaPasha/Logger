@@ -34,9 +34,10 @@ type Props = {
   taskId: string;
   token: string;
   userId: string;
+  viewOnly?: boolean;
 };
 
-export function AttachmentZone({ taskId, token, userId }: Props) {
+export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -96,38 +97,43 @@ export function AttachmentZone({ taskId, token, userId }: Props) {
     [uploadFile],
   );
 
+  if (viewOnly && (!query.data || query.data.length === 0)) return null;
+
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Attachments</h3>
 
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Upload file"
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors ${dragOver ? "border-[var(--accent)] bg-[var(--accent-muted)]/20" : "border-[var(--border-subtle)] hover:border-[var(--accent)]/50"}`}
-      >
-        <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 text-[var(--muted)]" aria-hidden>
-          <path fillRule="evenodd" d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z" />
-        </svg>
-        <p className="text-xs text-[var(--muted)]">
-          {uploading ? "Uploading…" : "Drop a file here or click to browse"}
-        </p>
-        <p className="text-[10px] text-[var(--muted)]">PDF, images, text, Office docs · max 10 MB</p>
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-
-      {uploadError && <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>}
+      {!viewOnly && (
+        <>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="Upload file"
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors ${dragOver ? "border-[var(--accent)] bg-[var(--accent-muted)]/20" : "border-[var(--border-subtle)] hover:border-[var(--accent)]/50"}`}
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 text-[var(--muted)]" aria-hidden>
+              <path fillRule="evenodd" d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z" />
+            </svg>
+            <p className="text-xs text-[var(--muted)]">
+              {uploading ? "Uploading…" : "Drop a file here or click to browse"}
+            </p>
+            <p className="text-[10px] text-[var(--muted)]">PDF, images, text, Office docs · max 10 MB</p>
+            <input
+              ref={inputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </div>
+          {uploadError && <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>}
+        </>
+      )}
 
       {query.data && query.data.length > 0 && (
         <ul className="space-y-1">
@@ -145,7 +151,7 @@ export function AttachmentZone({ taskId, token, userId }: Props) {
                 </a>
                 <p className="font-mono-ledger text-[10px] text-[var(--muted)]">{formatBytes(a.fileSize)}</p>
               </div>
-              {(a.uploadedBy === userId) && (
+              {!viewOnly && (a.uploadedBy === userId) && (
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(a.id)}
