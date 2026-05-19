@@ -7,6 +7,7 @@ import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { useAppPreferences } from "@/components/app/AppPreferencesContext";
 import type { ThemePref } from "@/hooks/useThemePreference";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 import { apiJson } from "@/lib/api";
 import type { Org } from "@/lib/ledger-types";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
@@ -99,16 +100,16 @@ export function AddWorkspacePanel({
             <label className="text-xs font-medium text-[var(--muted)] sm:min-w-[4.5rem]" htmlFor="onboarding-theme">
               Theme
             </label>
-            <select
-              id="onboarding-theme"
-              className="input max-w-xs rounded-xl text-sm"
+            <SelectPopover
               value={theme}
-              onChange={(e) => setTheme(e.target.value as ThemePref)}
-            >
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+              onChange={(v) => setTheme(v as ThemePref)}
+              options={[
+                { value: "system", label: "System" },
+                { value: "light", label: "Light" },
+                { value: "dark", label: "Dark" },
+              ]}
+              aria-label="Theme"
+            />
           </div>
         )}
       </section>

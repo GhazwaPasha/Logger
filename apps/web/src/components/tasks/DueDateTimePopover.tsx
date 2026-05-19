@@ -111,7 +111,7 @@ export function DueDateTimePopover({
       <button
         ref={triggerRef}
         type="button"
-        className={`btn-secondary rounded-lg px-3 py-1.5 text-xs ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
+        className={`rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"

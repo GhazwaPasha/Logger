@@ -176,7 +176,7 @@ export function TimeTracker({
                   type="button"
                   onClick={() => stopMutation.mutate()}
                   disabled={stopMutation.isPending}
-                  className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-50"
                 >
                   Stop
                 </button>
@@ -186,7 +186,7 @@ export function TimeTracker({
                 type="button"
                 onClick={() => startMutation.mutate()}
                 disabled={startMutation.isPending}
-                className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
               >
                 ▶ Start Timer
               </button>
@@ -245,14 +245,14 @@ export function TimeTracker({
                 logManualMutation.mutate();
               }}
               disabled={logManualMutation.isPending}
-              className="btn-primary rounded-lg px-3 py-1 text-xs font-medium"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
             >
               Log
             </button>
             <button
               type="button"
               onClick={() => { setShowManual(false); setManualError(""); }}
-              className="btn-secondary rounded-lg px-3 py-1 text-xs font-medium"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             >
               Cancel
             </button>

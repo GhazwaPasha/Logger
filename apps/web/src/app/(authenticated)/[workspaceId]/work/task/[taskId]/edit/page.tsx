@@ -3,7 +3,7 @@
 import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "@phosphor-icons/react";
+import { ArrowLeft, CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -20,10 +20,12 @@ import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
 import {
   TASK_FLOW_ORDER,
   PRIORITY_LABELS,
+  statusPillPaletteClasses,
   type ManualTaskStatus,
   type TaskPriority,
   manualStatusFromStored,
@@ -35,13 +37,25 @@ import {
   type TaskDueRepeat,
   type TaskDetail,
   type TaskMutationResult,
+  type MemberRow,
 } from "@/lib/ledger-types";
+
+function memberInitials(m: MemberRow): string {
+  const n = m.name?.trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    return parts.length >= 2
+      ? (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase()
+      : n.slice(0, 2).toUpperCase();
+  }
+  return (m.email ?? "??").slice(0, 2).toUpperCase();
+}
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import type { TaskAiFillResult } from "@/lib/task-ai-fill";
 
 const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   pending: "Pending",
-  in_progress: "In Progress",
+  in_progress: "In progress",
   done: "Done",
   cancelled: "Cancelled",
 };
@@ -255,10 +269,6 @@ function EditTaskInner() {
   }
 
   const caps = taskArchiveDeleteCaps(detail.task, lists, sessionUserId, members);
-  const assigneeNames = assigneeIds.map((id) => {
-    const m = members.find((r) => r.userId === id);
-    return (m?.name ?? "").trim() || (m?.email ?? "").trim() || "Unknown";
-  });
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-5">
@@ -329,7 +339,7 @@ function EditTaskInner() {
               disabled={saving}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Task title"
-              className="w-full resize-none bg-transparent p-0 text-2xl font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] border-b border-[var(--border-subtle)]"
+              className="w-full resize-none overflow-hidden bg-transparent p-0 text-2xl font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] border-b border-[var(--border-subtle)] [&::-webkit-scrollbar]:hidden"
             />
 
             {/* Subtasks — flat checklist */}
@@ -478,14 +488,12 @@ function EditTaskInner() {
 
           {/* Comments */}
           {token && sessionUserId && (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5">
-              <CommentThread
-                taskId={taskId}
-                token={token}
-                userId={sessionUserId}
-                members={members}
-              />
-            </div>
+            <CommentThread
+              taskId={taskId}
+              token={token}
+              userId={sessionUserId}
+              members={members}
+            />
           )}
         </div>
 
@@ -495,38 +503,45 @@ function EditTaskInner() {
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-4">
             <h2 className="text-sm font-semibold text-[var(--fg)]">Properties</h2>
 
-            {/* Status */}
+            {/* Status + Priority */}
             <div>
-              <SectionLabel>Status</SectionLabel>
-              <select
-                className="input h-10 w-full rounded-xl text-sm"
-                value={status}
-                disabled={saving}
-                onChange={(e) => setStatus(e.target.value as ManualTaskStatus)}
-              >
-                {TASK_FLOW_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABELS_FORM[s as ManualTaskStatus] ?? s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Priority */}
-            <div>
-              <SectionLabel>Priority</SectionLabel>
-              <select
-                className="input h-10 w-full rounded-xl text-sm"
-                value={priority}
-                disabled={saving}
-                onChange={(e) => setPriority(e.target.value as TaskPriority)}
-              >
-                {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                  <option key={k} value={k}>
-                    {PRIORITY_LABELS[k]}
-                  </option>
-                ))}
-              </select>
+              <SectionLabel>Status &amp; Priority</SectionLabel>
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectPopover
+                  value={status}
+                  onChange={(v) => setStatus(v as ManualTaskStatus)}
+                  options={TASK_FLOW_ORDER.map((s) => ({ value: s, label: STATUS_LABELS_FORM[s as ManualTaskStatus] ?? s }))}
+                  disabled={saving}
+                  triggerClassName={`inline-flex min-w-[7.5rem] justify-center rounded-lg px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${statusPillPaletteClasses(status)}`}
+                  showChevron={false}
+                  aria-label="Status"
+                />
+                {(() => {
+                  const color = priority === "high"
+                    ? "text-amber-500 dark:text-amber-400"
+                    : priority === "low"
+                      ? "text-sky-500 dark:text-sky-400"
+                      : "text-[var(--muted)]";
+                  const icon = priority === "high" ? <CaretDoubleUp size={14} weight="fill" /> : priority === "low" ? <CaretDoubleDown size={14} weight="fill" /> : <ArrowLineUp size={14} weight="bold" />;
+                  return (
+                    <SelectPopover
+                      value={priority}
+                      onChange={(v) => setPriority(v as TaskPriority)}
+                      options={(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => ({ value: k, label: PRIORITY_LABELS[k] }))}
+                      disabled={saving}
+                      triggerClassName={`inline-flex min-w-[6rem] items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50 ${color}`}
+                      triggerContent={
+                        <>
+                          <span aria-hidden>{icon}</span>
+                          <span className="text-sm font-semibold">{PRIORITY_LABELS[priority]}</span>
+                        </>
+                      }
+                      showChevron={false}
+                      aria-label="Priority"
+                    />
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Due date */}
@@ -562,17 +577,44 @@ function EditTaskInner() {
             {/* Assignees */}
             <div>
               <SectionLabel>Assignees</SectionLabel>
-              <button
-                type="button"
-                className="btn-secondary min-w-0 max-w-full rounded-lg px-3 py-1.5 text-left text-sm font-medium"
-                onClick={() => setShowAssignees((v) => !v)}
-              >
-                {assigneeNames.length === 0
-                  ? "Add assignee"
-                  : assigneeNames.length === 1
-                    ? assigneeNames[0]
-                    : `${assigneeNames[0]} +${assigneeNames.length - 1}`}
-              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {assigneeIds.map((id) => {
+                  const m = members.find((r) => r.userId === id);
+                  if (!m) return null;
+                  const name = (m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown";
+                  const initials = memberInitials(m);
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2 text-sm font-medium text-[var(--fg)]"
+                    >
+                      {m.image ? (
+                        <img src={m.image} alt="" className="size-5 shrink-0 rounded-full object-cover" aria-hidden />
+                      ) : (
+                        <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]" aria-hidden>
+                          {initials}
+                        </span>
+                      )}
+                      {name}
+                      <button
+                        type="button"
+                        className="shrink-0 leading-none text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                        onClick={() => toggleAssignee(id)}
+                        aria-label={`Remove ${name}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-full border border-dashed border-[var(--border-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  onClick={() => setShowAssignees((v) => !v)}
+                >
+                  {assigneeIds.length === 0 ? "Add assignee" : "+ Add"}
+                </button>
+              </div>
               {showAssignees && (
                 <div className="mt-2">
                   <AssigneeSearchField
@@ -587,9 +629,7 @@ function EditTaskInner() {
 
           {/* Time tracking */}
           {token && sessionUserId && (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5">
-              <TimeTracker taskId={taskId} token={token} userId={sessionUserId} />
-            </div>
+            <TimeTracker taskId={taskId} token={token} userId={sessionUserId} />
           )}
 
           {/* Attachments */}
@@ -599,15 +639,14 @@ function EditTaskInner() {
             </div>
           )}
 
-          {/* Danger zone */}
+          {/* Delete / Archive */}
           {(caps.canDeleteTask || caps.canArchiveTask) && (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-2">
-              <h2 className="text-sm font-semibold text-[var(--fg)]">Danger zone</h2>
+            <div className="flex flex-wrap gap-2">
               {caps.canArchiveTask && (
                 <button
                   type="button"
                   disabled={saving}
-                  className="w-full rounded-xl border border-[var(--border-subtle)] px-3 py-2 text-left text-sm font-medium text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-50"
                   onClick={() =>
                     setConfirm({
                       title: "Archive this task?",
@@ -625,7 +664,7 @@ function EditTaskInner() {
                 <button
                   type="button"
                   disabled={saving}
-                  className="w-full rounded-xl bg-red-600 px-3 py-2 text-left text-sm font-semibold text-white hover:bg-red-700 dark:hover:bg-red-500"
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                   onClick={() =>
                     setConfirm({
                       title: "Delete this task?",

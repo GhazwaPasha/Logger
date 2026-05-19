@@ -111,7 +111,7 @@ export function DueRepeatPopover({
         ref={triggerRef}
         type="button"
         disabled={!dueSet}
-        className={`btn-secondary min-w-0 max-w-[min(100%,18rem)] rounded-lg px-3 py-1.5 text-left text-xs font-medium disabled:pointer-events-none disabled:opacity-45 ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
+        className={`min-w-0 max-w-[min(100%,18rem)] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-left text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:pointer-events-none disabled:opacity-45 ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"

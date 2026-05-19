@@ -6,6 +6,7 @@ import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { useOptionalWorkspaceNotifications } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { authClient } from "@/lib/auth-client";
+import { HeaderLiveIsland } from "./live-island";
 import { OnlineMembersAvatars } from "./OnlineMembersAvatars";
 
 function userInitials(name: string | null | undefined, email: string | null | undefined) {
@@ -125,8 +126,8 @@ export function AppHeader({
 
   return (
     <header className="ui-app-header sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150">
-      <div className="flex h-14 w-full items-center justify-between gap-4 px-3 sm:px-4 lg:px-5">
-        <div className="flex items-center gap-3">
+      <div className="grid h-14 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-5">
+        <div className="flex min-w-0 items-center gap-3 justify-self-start">
           {onMenuToggle && (
             <button
               type="button"
@@ -145,7 +146,10 @@ export function AppHeader({
             <span className="hidden text-lg leading-none sm:inline">LogBase</span>
           </Link>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="pointer-events-none z-50 flex max-w-[min(100vw-8rem,22rem)] justify-center justify-self-center px-1 sm:max-w-[min(100vw-10rem,26rem)]">
+          <HeaderLiveIsland />
+        </div>
+        <div className="flex min-w-0 items-center justify-end gap-2 justify-self-end sm:gap-3">
           {settingsHref && <GlobalSearch />}
           {settingsHref && <OnlineMembersAvatars />}
           {settingsHref && notifications && (

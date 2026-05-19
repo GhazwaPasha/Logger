@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
-import { AppToaster } from "@/components/app/AppToaster";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import "./globals.css";
@@ -61,7 +60,6 @@ export default function RootLayout({
     <html lang="en" data-theme="system" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${jetbrains.variable} ${outfit.variable} antialiased`}>
         <ServiceWorkerRegister />
-        <AppToaster />
         {children}
       </body>
     </html>

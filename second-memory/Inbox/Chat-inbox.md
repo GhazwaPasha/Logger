@@ -4,6 +4,26 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-20 — Auto browser notification permission (no Enable push)
+
+- **Context:** “Enable push” in the notification panel felt redundant; product should trigger the **browser permission prompt** directly.
+- **What we did:** Removed push UI block from **`WorkspaceNotificationsProvider`** panel. On workspace entry, if permission is **`default`**, call **`Notification.requestPermission()`** once ( **`wl:push:permission`** in localStorage after grant/deny). If already **`granted`**, subscribe silently via **`subscribeWebPush`**. Opening the **bell** retries when mount-time prompt was blocked (no user gesture). Errors still use **`liveIsland`**.
+- **Code / repo:** `apps/web/src/components/notifications/WorkspaceNotificationsProvider.tsx`.
+
+### 2026-05-20 — Header live island (Dynamic Island–style toasts)
+
+- **Context:** User wanted live notifications in the **center of the app header**, Apple Dynamic Island–inspired but on LogBase theme—not floating Sonner cards at the top of the viewport.
+- **What we did:** **`HeaderLiveIsland`** + imperative **`liveIsland`** store (`apps/web/src/components/app/live-island/`). **AppHeader** — 3-column grid: brand | island | actions. Pill animates **compact → expanded → compact → dismiss**; tap toggles expand; optional action + dismiss. **WorkspaceNotificationsProvider** — activity + push feedback use **`liveIsland`** instead of Sonner. Removed **`AppToaster`** from root layout; island styles in **`globals.css`** (`.header-live-island*`).
+- **Takeaway:** Island only renders when **`AppHeader`** mounts (authenticated chrome). Queue shows one alert at a time. Sonner CSS left commented as legacy if reintroduced elsewhere.
+- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `live-island/*`, `WorkspaceNotificationsProvider.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/app/layout.tsx`.
+
+### 2026-05-20 — R2 public URL for attachment downloads
+
+- **Context:** Task attachments list builds download URLs as `R2_PUBLIC_URL` + `storageKey`; bucket exposes public reads via Cloudflare `r2.dev` (S3 API still used for presigned PUT / delete).
+- **What we did:** Set **`R2_PUBLIC_URL`** in root **`.env`** (no trailing slash). Left commented placeholders for **`R2_ACCOUNT_ID`**, **`R2_ACCESS_KEY_ID`**, **`R2_SECRET_ACCESS_KEY`**, **`R2_BUCKET_NAME`** — required for presign/upload/delete.
+- **Takeaway:** Restart **`npm run dev:api`** after env changes; mirror vars on Render/production. Upload fails until S3 credentials are filled.
+- **Code / repo:** `apps/api/src/attachments/attachments.service.ts`, `.env`.
+
 ### 2026-05-05 — Delete / archive: API + context menus + org danger zone
 
 - **Context:** Product rule: **owners** delete org / levels / lists / tasks; **managers** archive tasks in their levels only; **members** no structural or archive rights. UI: right-click menus on sidebar + work board; org delete in settings.

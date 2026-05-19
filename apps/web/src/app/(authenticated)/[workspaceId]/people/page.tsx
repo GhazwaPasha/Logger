@@ -10,6 +10,7 @@ import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 
 type EditState = {
   role: "owner" | "manager" | "member";
@@ -235,16 +236,17 @@ export default function PeoplePage() {
                   <div className="space-y-3 border-t border-[var(--border-subtle)] pt-3">
                     <div>
                       <label className="mb-1 block text-xs text-[var(--muted)]">Role</label>
-                      <select
-                        className="input rounded-xl text-sm"
+                      <SelectPopover
                         value={editing.role}
-                        onChange={(e) => updateEditRole(m.userId, e.target.value as EditState["role"])}
+                        onChange={(v) => updateEditRole(m.userId, v as EditState["role"])}
+                        options={[
+                          { value: "member", label: "Member" },
+                          { value: "manager", label: "Manager" },
+                          { value: "owner", label: "Owner" },
+                        ]}
                         disabled={editing.saving}
-                      >
-                        <option value="member">Member</option>
-                        <option value="manager">Manager</option>
-                        <option value="owner">Owner</option>
-                      </select>
+                        aria-label="Role"
+                      />
                     </div>
                     {editing.role === "manager" && (
                       <div>
@@ -352,15 +354,16 @@ export default function PeoplePage() {
           </div>
           <div>
             <label className="mb-1.5 block text-xs text-[var(--muted)]">Role</label>
-            <select
-              className="input rounded-xl"
+            <SelectPopover
               value={memberRole}
-              onChange={(e) => setMemberRole(e.target.value as typeof memberRole)}
-            >
-              <option value="member">Member</option>
-              <option value="manager">Manager</option>
-              <option value="owner">Owner</option>
-            </select>
+              onChange={(v) => setMemberRole(v as typeof memberRole)}
+              options={[
+                { value: "member", label: "Member" },
+                { value: "manager", label: "Manager" },
+                { value: "owner", label: "Owner" },
+              ]}
+              aria-label="Role"
+            />
           </div>
           {memberRole === "manager" && (
             <div className="sm:col-span-2">

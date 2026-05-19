@@ -10,8 +10,20 @@ import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
-import { statusPillPaletteClasses, STATUS_LABELS, PRIORITY_LABELS } from "@/lib/task-board";
-import { parseTaskDueRepeat } from "@/lib/ledger-types";
+import { statusPillPaletteClasses, STATUS_LABELS, PRIORITY_LABELS, type TaskPriority } from "@/lib/task-board";
+import { CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
+import { parseTaskDueRepeat, type MemberRow } from "@/lib/ledger-types";
+
+function memberInitials(m: MemberRow): string {
+  const n = m.name?.trim();
+  if (n) {
+    const parts = n.split(/\s+/).filter(Boolean);
+    return parts.length >= 2
+      ? (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase()
+      : n.slice(0, 2).toUpperCase();
+  }
+  return (m.email ?? "??").slice(0, 2).toUpperCase();
+}
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -78,10 +90,6 @@ export function TaskViewPanel({
   const { task, subtasks, assigneeUserIds, ledger } = detail;
   const dueRepeat = parseTaskDueRepeat(task.dueRepeat);
   const dueFormatted = formatDueDate(task.dueAt);
-  const assigneeNames = assigneeUserIds.map((id) => {
-    const m = members.find((r) => r.userId === id);
-    return ((m?.name ?? "").trim() || (m?.email ?? "").trim() || "Unknown");
-  });
 
   return (
     <div className="flex flex-col gap-5">
@@ -144,26 +152,49 @@ export function TaskViewPanel({
         >
           {STATUS_LABELS[task.status as keyof typeof STATUS_LABELS] ?? task.status}
         </span>
-        <span className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--fg)]">
-          {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS] ?? "Medium"} priority
-        </span>
+        {(() => {
+          const p = task.priority as TaskPriority;
+          const color = p === "high"
+            ? "text-amber-500 dark:text-amber-400"
+            : p === "low"
+              ? "text-sky-500 dark:text-sky-400"
+              : "text-[var(--muted)]";
+          return (
+            <span className={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}>
+              {p === "high" ? <CaretDoubleUp size={12} weight="fill" /> : p === "low" ? <CaretDoubleDown size={12} weight="fill" /> : <ArrowLineUp size={12} weight="bold" />}
+              {PRIORITY_LABELS[p] ?? "Medium"}
+            </span>
+          );
+        })()}
       </div>
 
       {/* Assignees */}
       <div>
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Assignees</p>
-        {assigneeNames.length === 0 ? (
+        {assigneeUserIds.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">Unassigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
-            {assigneeNames.map((name, i) => (
-              <span
-                key={i}
-                className="inline-flex items-center rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--fg)]"
-              >
-                {name}
-              </span>
-            ))}
+            {assigneeUserIds.map((id) => {
+              const m = members.find((r) => r.userId === id);
+              const name = m ? ((m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown") : "Unknown";
+              const initials = m ? memberInitials(m) : "?";
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
+                >
+                  {m?.image ? (
+                    <img src={m.image} alt="" className="size-5 shrink-0 rounded-full object-cover" aria-hidden />
+                  ) : (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]" aria-hidden>
+                      {initials}
+                    </span>
+                  )}
+                  {name}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { toast } from "sonner";
+import { liveIsland } from "@/components/app/live-island";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
@@ -12,7 +12,7 @@ import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription"
 import type { OrgActivityLedgerRow } from "@/lib/ledger-types";
 import { isLedgerEntryNotifiableToUser } from "@/lib/notification-eligibility";
 import { isTaskCreatedNote, formatLogTimestamp } from "@/lib/task-activity-log";
-import { subscribeWebPush, unsubscribeWebPush } from "@/lib/web-push-client";
+import { subscribeWebPush } from "@/lib/web-push-client";
 
 const NOTIF_PANEL_HEADER_ROW =
   "-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 pt-0 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-0";
@@ -27,6 +27,7 @@ const NOTIF_PANEL_CLOSE_BTN =
   "btn-secondary shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium leading-none";
 
 const LAST_SEEN_PREFIX = "wl:notif:lastSeen:";
+const PUSH_PERMISSION_KEY = "wl:push:permission";
 
 function lastSeenStorageKey(workspaceId: string) {
   return `${LAST_SEEN_PREFIX}${workspaceId}`;
@@ -36,11 +37,6 @@ export type WorkspaceNotificationsContextValue = {
   panelOpen: boolean;
   setPanelOpen: (open: boolean) => void;
   unreadCount: number;
-  pushSupported: boolean;
-  pushSubscribed: boolean;
-  pushBusy: boolean;
-  enablePush: () => Promise<void>;
-  disablePush: () => Promise<void>;
 };
 
 const WorkspaceNotificationsContext = createContext<WorkspaceNotificationsContextValue | null>(null);
@@ -58,8 +54,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   const [panelOpen, setPanelOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lastSeenTs, setLastSeenTs] = useState(0);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushBusy, setPushBusy] = useState(false);
+  const pushSyncInFlightRef = useRef(false);
 
   const activityQuery = useOrgActivityFeed(
     token,
@@ -139,7 +134,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
       if (panelOpen) continue;
 
       const taskTitle = activityQuery.data?.tasksById[e.taskId]?.title ?? "Task";
-      toast.info(taskTitle, {
+      liveIsland.info(taskTitle, {
         description: "New activity on a task you follow.",
         duration: 6500,
         action: {
@@ -153,75 +148,80 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   const pushSupported =
     typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
-  useEffect(() => {
-    if (!pushSupported) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!cancelled) setPushSubscribed(Boolean(sub));
-      } catch {
-        if (!cancelled) setPushSubscribed(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pushSupported]);
+  const syncWebPush = useCallback(
+    async (opts: { requestPermission: boolean; notifyOnBlock?: boolean }) => {
+      if (!token || !pushSupported || pushSyncInFlightRef.current) return;
+      if (typeof window === "undefined") return;
 
-  const enablePush = useCallback(async () => {
-    if (!token || !pushSupported) return;
-    setPushBusy(true);
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        toast.error("Notifications blocked", {
-          description: "Allow notifications in your browser settings to enable push.",
-        });
+      let permission = Notification.permission;
+      if (permission === "denied") return;
+
+      if (permission === "default" && opts.requestPermission) {
+        permission = await Notification.requestPermission();
+        if (permission !== "default") {
+          localStorage.setItem(PUSH_PERMISSION_KEY, permission);
+        }
+      }
+
+      if (permission !== "granted") {
+        if (opts.notifyOnBlock && permission === "denied") {
+          liveIsland.error("Notifications blocked", {
+            description: "Allow notifications in your browser settings to get task alerts.",
+          });
+        }
         return;
       }
-      const ok = await subscribeWebPush(token);
-      setPushSubscribed(ok);
-      if (ok) toast.success("Push enabled", { description: "You will get alerts for task activity." });
-      else toast.error("Push unavailable", { description: "The server may not be configured for web push yet." });
-    } catch (e) {
-      toast.error("Could not enable push", {
-        description: e instanceof Error ? e.message : "Unknown error",
-      });
-    } finally {
-      setPushBusy(false);
-    }
-  }, [token, pushSupported]);
 
-  const disablePush = useCallback(async () => {
-    if (!token) return;
-    setPushBusy(true);
-    try {
-      await unsubscribeWebPush(token);
-      setPushSubscribed(false);
-      toast.success("Push disabled");
-    } catch (e) {
-      toast.error("Could not disable push", {
-        description: e instanceof Error ? e.message : "Unknown error",
-      });
-    } finally {
-      setPushBusy(false);
+      pushSyncInFlightRef.current = true;
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) return;
+
+        const ok = await subscribeWebPush(token);
+        if (!ok) {
+          liveIsland.error("Push unavailable", {
+            description: "The server may not be configured for web push yet.",
+          });
+        }
+      } catch (e) {
+        liveIsland.error("Could not enable notifications", {
+          description: e instanceof Error ? e.message : "Unknown error",
+        });
+      } finally {
+        pushSyncInFlightRef.current = false;
+      }
+    },
+    [token, pushSupported],
+  );
+
+  /** Ask for browser notification permission when entering a workspace (once while still `default`). */
+  useEffect(() => {
+    if (!token || !pushSupported) return;
+    if (Notification.permission === "denied") return;
+    if (Notification.permission === "granted") {
+      void syncWebPush({ requestPermission: false });
+      return;
     }
-  }, [token]);
+    if (localStorage.getItem(PUSH_PERMISSION_KEY)) return;
+    void syncWebPush({ requestPermission: true, notifyOnBlock: true });
+  }, [workspaceId, token, pushSupported, syncWebPush]);
+
+  /** Fallback: some browsers only show the prompt after a user gesture (e.g. opening the bell). */
+  useEffect(() => {
+    if (!panelOpen || !token || !pushSupported) return;
+    if (Notification.permission !== "default") return;
+    if (localStorage.getItem(PUSH_PERMISSION_KEY)) return;
+    void syncWebPush({ requestPermission: true, notifyOnBlock: true });
+  }, [panelOpen, token, pushSupported, syncWebPush]);
 
   const ctx = useMemo(
     (): WorkspaceNotificationsContextValue => ({
       panelOpen,
       setPanelOpen,
       unreadCount,
-      pushSupported,
-      pushSubscribed,
-      pushBusy,
-      enablePush,
-      disablePush,
     }),
-    [panelOpen, unreadCount, pushSupported, pushSubscribed, pushBusy, enablePush, disablePush],
+    [panelOpen, unreadCount],
   );
 
   const basePath = `/${workspaceSlug}`;
@@ -258,36 +258,6 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                   Updates on tasks where you are an assignee (plus assignment changes that involve you). Matches your
                   workspace activity feed, filtered for you.
                 </p>
-
-                {pushSupported ? (
-                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/40 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Mobile web push</p>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      Get system notifications when teammates update tasks you follow (requires permission).
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {pushSubscribed ? (
-                        <button
-                          type="button"
-                          className="btn-secondary rounded-xl px-3 py-1.5 text-xs font-medium"
-                          disabled={pushBusy}
-                          onClick={() => void disablePush()}
-                        >
-                          {pushBusy ? "Working…" : "Turn off push"}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn-primary rounded-xl px-3 py-1.5 text-xs font-medium"
-                          disabled={pushBusy}
-                          onClick={() => void enablePush()}
-                        >
-                          {pushBusy ? "Working…" : "Enable push"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
 
                 {activityQuery.isPending ? (
                   <p className="text-sm text-[var(--muted)]">Loading…</p>

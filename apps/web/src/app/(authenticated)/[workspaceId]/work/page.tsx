@@ -50,6 +50,7 @@ import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
   type MemberRow,
@@ -2114,27 +2115,23 @@ function WorkItemsInner() {
           >
             <div className="max-h-[min(420px,85vh)] overflow-y-auto p-3">
               <div className="flex items-start justify-between gap-2">
-                <label className="block min-w-0 flex-1">
+                <div className="min-w-0 flex-1">
                   <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Preset</span>
-                  <select
-                    className="input h-10 w-full rounded-lg text-sm"
+                  <SelectPopover
                     value={datePreset}
-                    onChange={(e) => {
-                      const v = e.target.value as DatePreset;
-                      setDatePreset(v);
+                    onChange={(v) => {
+                      const vt = v as DatePreset;
+                      setDatePreset(vt);
                       replaceWorkQuery((p) => {
-                        if (v === "all") p.delete("due");
-                        else p.set("due", v);
+                        if (vt === "all") p.delete("due");
+                        else p.set("due", vt);
                       });
                     }}
-                  >
-                    {DATE_PRESET_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={DATE_PRESET_OPTIONS}
+                    triggerClassName="inline-flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                    aria-label="Date preset"
+                  />
+                </div>
               </div>
               <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Due date range</p>
               <div className="mt-1 flex flex-col gap-2 sm:flex-row">

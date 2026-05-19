@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PaperPlaneTilt, PencilSimple, Trash, ChatCircle } from "@phosphor-icons/react";
 import { apiFetch, apiJson } from "@/lib/api";
 import type { MemberRow } from "@/lib/ledger-types";
 
@@ -63,28 +64,57 @@ type CommentInputProps = {
   token: string;
   members: MemberRow[];
   parentCommentId?: string;
+  initialBody?: string;
   onSuccess?: () => void;
   placeholder?: string;
+  authorId: string;
+  authorName: string | null;
+  authorEmail: string;
+  authorImage: string | null;
 };
 
-function CommentInput({ taskId, token, members, parentCommentId, onSuccess, placeholder }: CommentInputProps) {
+function CommentInput({ taskId, token, members, parentCommentId, initialBody, onSuccess, placeholder, authorId, authorName, authorEmail, authorImage }: CommentInputProps) {
   const queryClient = useQueryClient();
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody ?? "");
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (currentBody: string) =>
       apiFetch(`/tasks/${taskId}/comments`, {
         token,
         method: "POST",
-        body: JSON.stringify({ body, parentCommentId }),
+        body: JSON.stringify({ body: currentBody, parentCommentId }),
       }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["comments", taskId] });
+    onMutate: async (currentBody) => {
+      await queryClient.cancelQueries({ queryKey: ["comments", taskId] });
+      const snapshot = queryClient.getQueryData<CommentRow[]>(["comments", taskId]);
+      queryClient.setQueryData<CommentRow[]>(["comments", taskId], (old) => [
+        ...(old ?? []),
+        {
+          id: `optimistic-${Date.now()}`,
+          taskId,
+          parentCommentId: parentCommentId ?? null,
+          authorId,
+          authorName,
+          authorEmail,
+          authorImage,
+          body: currentBody,
+          editedAt: null,
+          deletedAt: null,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
       setBody("");
       onSuccess?.();
+      return { snapshot };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.snapshot) queryClient.setQueryData(["comments", taskId], ctx.snapshot);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["comments", taskId] });
     },
   });
 
@@ -95,7 +125,7 @@ function CommentInput({ taskId, token, members, parentCommentId, onSuccess, plac
     }
     if (e.key === "Enter" && !e.shiftKey && !showMentionPicker) {
       e.preventDefault();
-      if (body.trim()) mutation.mutate();
+      if (body.trim()) mutation.mutate(body);
     }
   };
 
@@ -132,23 +162,14 @@ function CommentInput({ taskId, token, members, parentCommentId, onSuccess, plac
   });
 
   return (
-    <div className="relative">
-      <textarea
-        ref={textareaRef}
-        value={body}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder ?? "Add a comment… (Enter to send, Shift+Enter for newline)"}
-        rows={2}
-        className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none"
-      />
+    <div className="relative flex items-end gap-2">
       {showMentionPicker && filteredMembers.length > 0 && (
-        <ul className="absolute bottom-full left-0 z-50 mb-1 max-h-40 w-56 overflow-y-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg">
+        <ul className="absolute bottom-full left-0 z-50 mb-2 max-h-40 w-56 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg">
           {filteredMembers.map((m) => (
             <li key={m.userId}>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-[var(--surface-hover)]"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   insertMention(m);
@@ -157,22 +178,31 @@ function CommentInput({ taskId, token, members, parentCommentId, onSuccess, plac
                 <span className="size-5 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[10px] font-semibold leading-5 text-[var(--fg)]">
                   {authorInitials(m.name ?? null, m.email)}
                 </span>
-                <span className="truncate text-[var(--fg)]">{m.name ?? m.email}</span>
+                <span className="truncate">{m.name ?? m.email}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-1.5 flex justify-end">
-        <button
-          type="button"
-          onClick={() => mutation.mutate()}
-          disabled={!body.trim() || mutation.isPending}
-          className="btn-primary rounded-lg px-3 py-1 text-xs font-medium disabled:opacity-50"
-        >
-          {mutation.isPending ? "Sending…" : "Send"}
-        </button>
-      </div>
+      <textarea
+        ref={textareaRef}
+        value={body}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder ?? "Add a comment… (Enter to send)"}
+        rows={1}
+        className="flex-1 resize-none rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-4 py-2.5 text-sm text-[var(--fg)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:outline-none transition-colors"
+        style={{ minHeight: "40px", maxHeight: "120px" }}
+      />
+      <button
+        type="button"
+        onClick={() => mutation.mutate(body)}
+        disabled={!body.trim() || mutation.isPending}
+        className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-neutral-700 hover:bg-neutral-600 disabled:opacity-30 transition-colors"
+        aria-label="Send"
+      >
+        <PaperPlaneTilt size={15} weight="fill" color="white" />
+      </button>
     </div>
   );
 }
@@ -188,6 +218,9 @@ type Props = {
 export function CommentThread({ taskId, token, userId, members, viewOnly }: Props) {
   const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyMention, setReplyMention] = useState("");
+  const [showInput, setShowInput] = useState(false);
+  const currentMember = members.find((m) => m.userId === userId);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
 
@@ -224,39 +257,65 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
     const replies = repliesFor(comment.id);
 
     return (
-      <div className={`${indent ? "ml-6 border-l border-[var(--border-subtle)] pl-3" : ""}`}>
-        <div className="flex gap-2.5 py-2">
-          <div className="mt-0.5 size-7 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[10px] font-semibold leading-7 text-[var(--fg)] overflow-hidden">
+      <div className={indent ? "ml-8" : ""}>
+        <div className="group flex items-start gap-3 rounded-xl bg-[var(--surface-elevated)] px-3 py-2">
+          {/* Avatar */}
+          <div className="mt-0.5 size-8 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[11px] font-semibold leading-8 text-[var(--fg)] overflow-hidden">
             {comment.authorImage ? (
               <img src={comment.authorImage} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               authorInitials(comment.authorName, comment.authorEmail)
             )}
           </div>
+
+          {/* Content */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs font-semibold text-[var(--fg)]">
+            {/* Name + time + edit/delete icons */}
+            <div className="mb-0.5 flex items-center gap-1.5">
+              <span className={`text-xs font-semibold ${isOwn ? "text-[var(--accent)]" : "text-[var(--fg)]"}`}>
                 {comment.authorName ?? comment.authorEmail}
               </span>
               <span className="text-[10px] text-[var(--muted)]">{formatRelative(comment.createdAt)}</span>
               {comment.editedAt && <span className="text-[10px] text-[var(--muted)]">(edited)</span>}
+              {isOwn && !comment.deletedAt && !viewOnly && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingId(comment.id); setEditBody(comment.body ?? ""); }}
+                    className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
+                    aria-label="Edit"
+                  >
+                    <PencilSimple size={11} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMutation.mutate(comment.id)}
+                    className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-red-500 transition-opacity"
+                    aria-label="Delete"
+                  >
+                    <Trash size={11} />
+                  </button>
+                </>
+              )}
             </div>
+
+            {/* Body */}
             {comment.deletedAt ? (
-              <p className="mt-0.5 text-sm italic text-[var(--muted)]">Comment removed.</p>
+              <p className="text-sm italic text-[var(--muted)]">Comment removed.</p>
             ) : editingId === comment.id ? (
-              <div className="mt-1">
+              <div>
                 <textarea
                   value={editBody}
                   onChange={(e) => setEditBody(e.target.value)}
                   rows={2}
                   className="w-full resize-none rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--fg)] focus:outline-none"
                 />
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1.5 flex gap-2">
                   <button
                     type="button"
                     onClick={() => editMutation.mutate({ id: comment.id, body: editBody })}
                     disabled={!editBody.trim() || editMutation.isPending}
-                    className="btn-primary rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-50"
+                    className="rounded-lg bg-[var(--accent)] px-2.5 py-1 text-xs font-medium text-white disabled:opacity-40"
                   >
                     Save
                   </button>
@@ -270,52 +329,56 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                 </div>
               </div>
             ) : (
-              <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--fg)]">
-                <MentionHighlightedBody body={comment.body ?? ""} />
-              </p>
-            )}
-            {!comment.deletedAt && !viewOnly && (
-              <div className="mt-1 flex gap-3">
-                {!indent && (
+              <div className="flex items-end justify-between gap-2">
+                <p className="whitespace-pre-wrap text-sm text-[var(--fg)]">
+                  <MentionHighlightedBody body={comment.body ?? ""} />
+                </p>
+                {!viewOnly && (
                   <button
                     type="button"
-                    onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                    className="text-[10px] text-[var(--muted)] hover:text-[var(--fg)]"
+                    onClick={() => {
+                      const rootId = comment.parentCommentId ?? comment.id;
+                      const mention = `@${comment.authorName ?? comment.authorEmail} `;
+                      if (replyingTo === rootId && replyMention === mention) {
+                        setReplyingTo(null);
+                        setReplyMention("");
+                      } else {
+                        setReplyingTo(rootId);
+                        setReplyMention(mention);
+                      }
+                    }}
+                    className="shrink-0 text-[10px] text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
                   >
                     Reply
-                  </button>
-                )}
-                {isOwn && (
-                  <button
-                    type="button"
-                    onClick={() => { setEditingId(comment.id); setEditBody(comment.body ?? ""); }}
-                    className="text-[10px] text-[var(--muted)] hover:text-[var(--fg)]"
-                  >
-                    Edit
-                  </button>
-                )}
-                {isOwn && (
-                  <button
-                    type="button"
-                    onClick={() => deleteMutation.mutate(comment.id)}
-                    className="text-[10px] text-[var(--muted)] hover:text-red-500"
-                  >
-                    Delete
                   </button>
                 )}
               </div>
             )}
           </div>
         </div>
-        {replies.map((r) => <CommentRow key={r.id} comment={r} indent />)}
-        {replyingTo === comment.id && (
-          <div className="ml-6 mt-1">
+
+        {/* Replies */}
+        {replies.length > 0 && (
+          <div className="mt-1 space-y-1 ml-11 border-l border-[var(--border-subtle)] pl-3">
+            {replies.map((r) => <CommentRow key={r.id} comment={r} indent />)}
+          </div>
+        )}
+
+        {/* Reply input — only on root comments */}
+        {!indent && replyingTo === comment.id && (
+          <div className="ml-11 mt-1">
             <CommentInput
+              key={replyMention}
               taskId={taskId}
               token={token}
               members={members}
               parentCommentId={comment.id}
-              onSuccess={() => setReplyingTo(null)}
+              initialBody={replyMention}
+              authorId={userId}
+              authorName={currentMember?.name ?? null}
+              authorEmail={currentMember?.email ?? ""}
+              authorImage={currentMember?.image ?? null}
+              onSuccess={() => { setReplyingTo(null); setReplyMention(""); }}
               placeholder="Reply… (Enter to send)"
             />
           </div>
@@ -327,21 +390,46 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
   if (viewOnly && query.data && roots.filter((c) => !c.deletedAt).length === 0) return null;
 
   return (
-    <div className="space-y-1">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Comments</h3>
-      {query.isPending && <p className="text-sm text-[var(--muted)]">Loading…</p>}
-      {query.error && <p className="text-sm text-red-600">{(query.error as Error).message}</p>}
-      {query.data && (
-        <div className="divide-y divide-[var(--border-subtle)]/50">
-          {roots.length === 0 && !viewOnly && (
-            <p className="py-2 text-sm text-[var(--muted)]">No comments yet. Be the first to comment.</p>
-          )}
-          {roots.map((c) => <CommentRow key={c.id} comment={c} />)}
-        </div>
-      )}
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]">
+      {/* Header */}
+      <div className="shrink-0 px-4 pt-4 pb-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Comments</h3>
+      </div>
+
+      {/* Comment list */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5" style={{ maxHeight: "420px" }}>
+        {query.isPending && <p className="text-sm text-[var(--muted)]">Loading…</p>}
+        {query.error && <p className="text-sm text-red-600">{(query.error as Error).message}</p>}
+        {query.data && roots.length === 0 && !viewOnly && (
+          <p className="py-2 text-sm text-[var(--muted)]">No comments yet. Be the first to comment.</p>
+        )}
+        {query.data && roots.map((c) => <CommentRow key={c.id} comment={c} />)}
+      </div>
+
+      {/* Input */}
       {!viewOnly && (
-        <div className="pt-2">
-          <CommentInput taskId={taskId} token={token} members={members} />
+        <div className="shrink-0 border-t border-[var(--border-subtle)] px-4 py-2.5">
+          {showInput ? (
+            <CommentInput
+              taskId={taskId}
+              token={token}
+              members={members}
+              authorId={userId}
+              authorName={currentMember?.name ?? null}
+              authorEmail={currentMember?.email ?? ""}
+              authorImage={currentMember?.image ?? null}
+              onSuccess={() => setShowInput(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowInput(true)}
+              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
+            >
+              <ChatCircle size={16} />
+              <span>Add a comment…</span>
+            </button>
+          )}
         </div>
       )}
     </div>
