@@ -52,7 +52,7 @@ export function TaskViewPanel({
       <div className="flex flex-col gap-4">
         <div className="-mx-6 flex items-center justify-between border-b border-[var(--border-subtle)] px-6 pb-3">
           <h2 className="text-sm font-semibold text-[var(--fg)]">Task</h2>
-          <button type="button" className="btn-secondary rounded-md px-2.5 py-1.5 text-xs" onClick={onClose}>
+          <button type="button" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]" onClick={onClose}>
             Close
           </button>
         </div>
@@ -66,7 +66,7 @@ export function TaskViewPanel({
       <div className="flex flex-col gap-4">
         <div className="-mx-6 flex items-center justify-between border-b border-[var(--border-subtle)] px-6 pb-3">
           <h2 className="text-sm font-semibold text-[var(--fg)]">Task</h2>
-          <button type="button" className="btn-secondary rounded-md px-2.5 py-1.5 text-xs" onClick={onClose}>
+          <button type="button" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]" onClick={onClose}>
             Close
           </button>
         </div>
@@ -91,14 +91,14 @@ export function TaskViewPanel({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="btn-primary rounded-md px-3 py-1.5 text-xs font-medium"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)]"
             onClick={navigateToEdit}
           >
             Edit
           </button>
           <button
             type="button"
-            className="btn-secondary rounded-md px-2.5 py-1.5 text-xs font-medium"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={onClose}
           >
             Close
