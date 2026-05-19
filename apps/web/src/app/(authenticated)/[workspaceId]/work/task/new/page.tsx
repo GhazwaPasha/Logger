@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback, useEffect } from "react";
+import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "@phosphor-icons/react";
@@ -31,6 +31,14 @@ const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   cancelled: "Cancelled",
 };
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+      {children}
+    </label>
+  );
+}
+
 function NewTaskInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,6 +46,7 @@ function NewTaskInner() {
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const queryClient = useQueryClient();
   const { lists, members, depts } = useWorkspaceData();
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const initialListId = searchParams.get("listId") ?? "";
 
@@ -50,6 +59,8 @@ function NewTaskInner() {
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const [subtaskItems, setSubtaskItems] = useState<string[]>([]);
+  const [editingSubtaskIdx, setEditingSubtaskIdx] = useState<number | null>(null);
+  const [editingSubtaskVal, setEditingSubtaskVal] = useState("");
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
@@ -57,10 +68,16 @@ function NewTaskInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
+
+  useEffect(() => {
     if (!due.trim()) setDueRepeat(null);
   }, [due]);
 
-  // Ensure listId is valid when lists load
   useEffect(() => {
     if (lists.length === 0) return;
     if (listId && lists.some((l) => l.id === listId)) return;
@@ -134,234 +151,32 @@ function NewTaskInner() {
     }
   }
 
-  const selectedList = lists.find((l) => l.id === listId);
-  const selectedDept = selectedList ? depts.find((d) => d.id === selectedList.departmentId) : null;
-
   const assigneeNames = assigneeIds.map((id) => {
     const m = members.find((r) => r.userId === id);
-    return ((m?.name ?? "").trim() || (m?.email ?? "").trim() || "Unknown");
+    return (m?.name ?? "").trim() || (m?.email ?? "").trim() || "Unknown";
   });
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6 py-6">
-      {/* Back nav */}
-      <button
-        type="button"
-        className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
-        onClick={() => router.push(`/${workspaceSlug}/work`)}
-      >
-        <ArrowLeft weight="bold" className="size-4" />
-        Back to board
-      </button>
-
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 space-y-5">
-        <h1 className="text-lg font-semibold text-[var(--fg)]">New task</h1>
-
-        {error && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
-            {error}
-          </p>
-        )}
-
-        {/* AI fill */}
-        <TaskPanelAiFill
-          members={members}
-          existingDraft={{ title, dueLocal: due, dueRepeat }}
-          onApply={applyAiFill}
-        />
-
-        {/* Title */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Title <span className="text-red-500">*</span>
-          </label>
-          <input
-            className="input rounded-xl text-base"
-            value={title}
-            disabled={saving}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) void handleCreate();
-            }}
-          />
-        </div>
-
-        {/* Status + Priority row */}
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-[140px]">
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Status
-            </label>
-            <select
-              className="input h-10 w-full rounded-xl text-sm"
-              value={status}
-              disabled={saving}
-              onChange={(e) => setStatus(e.target.value as ManualTaskStatus)}
-            >
-              {TASK_FLOW_ORDER.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS_FORM[s]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[140px]">
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              Priority
-            </label>
-            <select
-              className="input h-10 w-full rounded-xl text-sm"
-              value={priority}
-              disabled={saving}
-              onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            >
-              {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-                <option key={k} value={k}>
-                  {PRIORITY_LABELS[k]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* List selector */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            List <span className="text-red-500">*</span>
-          </label>
-          <select
-            className="input h-10 w-full rounded-xl text-sm"
-            value={listId}
-            disabled={saving}
-            onChange={(e) => setListId(e.target.value)}
-          >
-            {lists.map((l) => {
-              const dept = depts.find((d) => d.id === l.departmentId);
-              return (
-                <option key={l.id} value={l.id}>
-                  {dept ? `${dept.name} · ` : ""}{l.name}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-
-        {/* Due date + repeat */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Due date
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <DueDateTimePopover
-              open={showDuePanel}
-              onOpenChange={(o) => {
-                setShowDuePanel(o);
-                if (o) setShowRepeatPanel(false);
-              }}
-              value={due}
-              onChange={setDue}
-              onClear={() => {
-                setDue("");
-                setDueRepeat(null);
-              }}
-            />
-            <DueRepeatPopover
-              open={showRepeatPanel}
-              onOpenChange={(o) => {
-                setShowRepeatPanel(o);
-                if (o) setShowDuePanel(false);
-              }}
-              dueLocalValue={due}
-              value={dueRepeat}
-              onChange={setDueRepeat}
-            />
-          </div>
-        </div>
-
-        {/* Assignees */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Assignees
-          </label>
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-5">
+      {/* Top bar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="btn-secondary min-w-0 max-w-full rounded-lg px-3 py-1.5 text-left text-sm font-medium"
-            onClick={() => setShowAssignees((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            onClick={() => router.push(`/${workspaceSlug}/work`)}
           >
-            {assigneeNames.length === 0
-              ? "Add assignee"
-              : assigneeNames.length === 1
-                ? assigneeNames[0]
-                : `${assigneeNames[0]} +${assigneeNames.length - 1}`}
+            <ArrowLeft weight="bold" className="size-4" />
+            Back
           </button>
-          {showAssignees && (
-            <div className="mt-2">
-              <AssigneeSearchField
-                members={members}
-                assigneeIds={assigneeIds}
-                onToggleAssignee={toggleAssignee}
-              />
-            </div>
-          )}
+          <span className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
+            Create Task
+          </span>
         </div>
-
-        {/* Subtasks */}
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Subtasks
-          </label>
-          <div className="rounded-xl border border-[var(--border-subtle)]">
-            {subtaskItems.map((item, idx) => (
-              <div
-                key={`${item}-${idx}`}
-                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-              >
-                <span className="text-[var(--muted)]">○</span>
-                <span className="flex-1 text-sm text-[var(--fg)]">{item}</span>
-                <button
-                  type="button"
-                  className="text-xs text-[var(--muted)] hover:text-red-500"
-                  onClick={() => setSubtaskItems((prev) => prev.filter((_, i) => i !== idx))}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-            <div className="flex items-center gap-2 px-3 py-2">
-              <span className="text-[var(--muted)]">+</span>
-              <input
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
-                value={subtaskDraft}
-                onChange={(e) => setSubtaskDraft(e.target.value)}
-                placeholder="Add subtask…"
-                onBlur={() => {
-                  const v = subtaskDraft.trim();
-                  if (!v) return;
-                  setSubtaskItems((prev) => [...prev, v]);
-                  setSubtaskDraft("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const v = subtaskDraft.trim();
-                    if (v) {
-                      setSubtaskItems((prev) => [...prev, v]);
-                      setSubtaskDraft("");
-                    }
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 border-t border-[var(--border-subtle)] pt-4">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="btn-secondary rounded-xl px-5"
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             disabled={saving}
             onClick={() => router.push(`/${workspaceSlug}/work`)}
           >
@@ -369,13 +184,252 @@ function NewTaskInner() {
           </button>
           <button
             type="button"
-            className="btn-primary inline-flex min-w-[7rem] items-center justify-center gap-2 rounded-xl px-5"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
             disabled={saving || !title.trim() || !listId}
             onClick={() => void handleCreate()}
           >
             {saving && <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />}
             <span>{saving ? "Creating…" : "Create task"}</span>
           </button>
+        </div>
+      </div>
+
+      {error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+          {error}
+        </p>
+      )}
+
+      {/* Two-column layout */}
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        {/* Left: main content */}
+        <div className="min-w-0 flex-1 space-y-6">
+          {/* AI fill — no card wrapper */}
+          <TaskPanelAiFill
+            members={members}
+            existingDraft={{ title, dueLocal: due, dueRepeat }}
+            onApply={applyAiFill}
+          />
+
+          {/* Title + subtasks — bordered section */}
+          <div className="space-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Task</h3>
+
+            {/* Title — inline editing */}
+            <textarea
+              ref={titleRef}
+              rows={1}
+              value={title}
+              disabled={saving}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What needs to be done?"
+              autoFocus
+              className="w-full resize-none bg-transparent p-0 text-2xl font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] border-b border-[var(--border-subtle)]"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleCreate();
+                }
+              }}
+            />
+
+            {/* Subtasks — flat checklist */}
+            <div>
+              <SectionLabel>
+                Subtasks{subtaskItems.length > 0 ? ` (${subtaskItems.length})` : ""}
+              </SectionLabel>
+              <div className="space-y-0.5">
+                {subtaskItems.map((item, idx) => (
+                <div
+                  key={`${item}-${idx}`}
+                  className="group flex items-center gap-2.5 py-1.5"
+                >
+                  <span className="text-sm text-[var(--muted)]">○</span>
+                  {editingSubtaskIdx === idx ? (
+                    <input
+                      autoFocus
+                      className="flex-1 bg-transparent text-sm text-[var(--fg)] outline-none"
+                      value={editingSubtaskVal}
+                      onChange={(e) => setEditingSubtaskVal(e.target.value)}
+                      onBlur={() => {
+                        const v = editingSubtaskVal.trim();
+                        if (v) setSubtaskItems((prev) => prev.map((s, i) => i === idx ? v : s));
+                        else setSubtaskItems((prev) => prev.filter((_, i) => i !== idx));
+                        setEditingSubtaskIdx(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const v = editingSubtaskVal.trim();
+                          if (v) setSubtaskItems((prev) => prev.map((s, i) => i === idx ? v : s));
+                          else setSubtaskItems((prev) => prev.filter((_, i) => i !== idx));
+                          setEditingSubtaskIdx(null);
+                        }
+                        if (e.key === "Escape") setEditingSubtaskIdx(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className="flex-1 cursor-text text-sm text-[var(--fg)]"
+                      onClick={() => { setEditingSubtaskIdx(idx); setEditingSubtaskVal(item); }}
+                    >
+                      {item}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                    onClick={() => setSubtaskItems((prev) => prev.filter((_, i) => i !== idx))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2.5 py-1.5">
+                <span className="text-sm text-[var(--muted)]">+</span>
+                <input
+                  className="flex-1 bg-transparent text-sm text-[var(--fg)] outline-none placeholder:text-[var(--muted)]"
+                  value={subtaskDraft}
+                  onChange={(e) => setSubtaskDraft(e.target.value)}
+                  placeholder="Add a subtask…"
+                  onBlur={() => {
+                    const v = subtaskDraft.trim();
+                    if (!v) return;
+                    setSubtaskItems((prev) => [...prev, v]);
+                    setSubtaskDraft("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const v = subtaskDraft.trim();
+                      if (v) {
+                        setSubtaskItems((prev) => [...prev, v]);
+                        setSubtaskDraft("");
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          </div>
+
+        </div>
+
+        {/* Right: properties */}
+        <div className="w-full space-y-4 lg:w-72 lg:shrink-0">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-[var(--fg)]">Properties</h2>
+
+            {/* Status */}
+            <div>
+              <SectionLabel>Status</SectionLabel>
+              <select
+                className="input h-10 w-full rounded-xl text-sm"
+                value={status}
+                disabled={saving}
+                onChange={(e) => setStatus(e.target.value as ManualTaskStatus)}
+              >
+                {TASK_FLOW_ORDER.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS_FORM[s as ManualTaskStatus] ?? s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <SectionLabel>Priority</SectionLabel>
+              <select
+                className="input h-10 w-full rounded-xl text-sm"
+                value={priority}
+                disabled={saving}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
+              >
+                {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+                  <option key={k} value={k}>
+                    {PRIORITY_LABELS[k]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* List */}
+            <div>
+              <SectionLabel>List <span className="text-red-500">*</span></SectionLabel>
+              <select
+                className="input h-10 w-full rounded-xl text-sm"
+                value={listId}
+                disabled={saving}
+                onChange={(e) => setListId(e.target.value)}
+              >
+                {lists.map((l) => {
+                  const dept = depts.find((d) => d.id === l.departmentId);
+                  return (
+                    <option key={l.id} value={l.id}>
+                      {dept ? `${dept.name} · ` : ""}{l.name}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Due date */}
+            <div>
+              <SectionLabel>Due date</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                <DueDateTimePopover
+                  open={showDuePanel}
+                  onOpenChange={(o) => {
+                    setShowDuePanel(o);
+                    if (o) setShowRepeatPanel(false);
+                  }}
+                  value={due}
+                  onChange={setDue}
+                  onClear={() => {
+                    setDue("");
+                    setDueRepeat(null);
+                  }}
+                />
+                <DueRepeatPopover
+                  open={showRepeatPanel}
+                  onOpenChange={(o) => {
+                    setShowRepeatPanel(o);
+                    if (o) setShowDuePanel(false);
+                  }}
+                  dueLocalValue={due}
+                  value={dueRepeat}
+                  onChange={setDueRepeat}
+                />
+              </div>
+            </div>
+
+            {/* Assignees */}
+            <div>
+              <SectionLabel>Assignees</SectionLabel>
+              <button
+                type="button"
+                className="btn-secondary min-w-0 max-w-full rounded-lg px-3 py-1.5 text-left text-sm font-medium"
+                onClick={() => setShowAssignees((v) => !v)}
+              >
+                {assigneeNames.length === 0
+                  ? "Add assignee"
+                  : assigneeNames.length === 1
+                    ? assigneeNames[0]
+                    : `${assigneeNames[0]} +${assigneeNames.length - 1}`}
+              </button>
+              {showAssignees && (
+                <div className="mt-2">
+                  <AssigneeSearchField
+                    members={members}
+                    assigneeIds={assigneeIds}
+                    onToggleAssignee={toggleAssignee}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
