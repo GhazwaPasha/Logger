@@ -257,7 +257,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
     const replies = repliesFor(comment.id);
 
     return (
-      <div className={indent ? "ml-8" : ""}>
+      <div>
         <div className="group flex items-start gap-3 rounded-xl bg-[var(--surface-elevated)] px-3 py-2">
           {/* Avatar */}
           <div className="mt-0.5 size-8 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[11px] font-semibold leading-8 text-[var(--fg)] overflow-hidden">

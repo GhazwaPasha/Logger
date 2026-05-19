@@ -146,11 +146,19 @@ export const patchTaskSchema = z
     dueRepeat: taskDueRepeatSchema.nullable().optional(),
     /** New checklist lines inserted in the same transaction as task field updates. */
     subtasksToCreate: z.array(createSubtaskSchema).max(MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
+    /** Existing subtask title edits applied in the same transaction. */
+    subtasksToUpdate: z
+      .array(z.object({ id: z.string().uuid(), title: z.string().min(1).max(512) }))
+      .max(MAX_SUBTASKS_PER_TASK_MUTATION)
+      .optional(),
+    /** IDs of existing subtasks to delete in the same transaction. */
+    subtasksToDelete: z.array(z.string().uuid()).max(MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
   })
   .refine(
     (d) => {
-      const subs = d.subtasksToCreate;
-      const hasSubs = subs != null && subs.length > 0;
+      const hasSubCreate = (d.subtasksToCreate?.length ?? 0) > 0;
+      const hasSubUpdate = (d.subtasksToUpdate?.length ?? 0) > 0;
+      const hasSubDelete = (d.subtasksToDelete?.length ?? 0) > 0;
       return (
         d.status !== undefined ||
         d.priority !== undefined ||
@@ -158,7 +166,7 @@ export const patchTaskSchema = z
         d.assigneeUserIds !== undefined ||
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
-        hasSubs
+        hasSubCreate || hasSubUpdate || hasSubDelete
       );
     },
     { message: "Provide at least one field to update" },

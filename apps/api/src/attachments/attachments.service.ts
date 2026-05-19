@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, count, eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { randomUUID } from "node:crypto";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { activityLedger, taskAttachments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
@@ -21,6 +22,34 @@ const ALLOWED_MIME_EXACT = new Set([
 function isAllowedMime(mime: string): boolean {
   return ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p)) || ALLOWED_MIME_EXACT.has(mime);
 }
+
+const EXT_MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  txt: "text/plain",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+function resolveMime(fileName: string, mimeType: string): string {
+  const trimmed = mimeType.trim();
+  if (trimmed) return trimmed;
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  return (ext && EXT_MIME[ext]) || "application/octet-stream";
+}
+
+export type AttachmentUploadFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
 
 function buildS3Client(): S3Client | null {
   const accountId = process.env.R2_ACCOUNT_ID;
@@ -51,13 +80,22 @@ export class AttachmentsService {
     return this.s3;
   }
 
-  async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
+  private newStorageKey(taskId: string, fileName: string): string {
+    return `attachments/${taskId}/${randomUUID()}/${fileName}`;
+  }
+
+  private async assertCanUpload(
+    userId: string,
+    taskId: string,
+    mimeType: string,
+    fileSize: number,
+  ): Promise<Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>> {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
     if (!caps.canAppendLedger) throw new ForbiddenException("Cannot upload files to this task");
 
-    if (!isAllowedMime(opts.mimeType)) throw new BadRequestException("File type not allowed");
-    if (opts.fileSize > MAX_FILE_SIZE) throw new BadRequestException("File exceeds 10 MB limit");
+    if (!isAllowedMime(mimeType)) throw new BadRequestException("File type not allowed");
+    if (fileSize > MAX_FILE_SIZE) throw new BadRequestException("File exceeds 10 MB limit");
 
     const [{ attachmentCount }] = await this.db
       .select({ attachmentCount: count() })
@@ -67,29 +105,15 @@ export class AttachmentsService {
       throw new BadRequestException(`Task already has ${MAX_FILES_PER_TASK} attachments (maximum)`);
     }
 
-    const s3 = this.assertR2();
-    const { randomUUID } = await import("node:crypto");
-    const storageKey = `attachments/${taskId}/${randomUUID()}/${opts.fileName}`;
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: storageKey,
-      ContentType: opts.mimeType,
-      ContentLength: opts.fileSize,
-    });
-    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
-    return { presignedUrl, storageKey };
+    return access;
   }
 
-  async confirm(userId: string, taskId: string, opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string }) {
-    const access = await this.authz.getTaskAccess(userId, taskId);
-    const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot add attachments to this task");
-
-    if (!opts.storageKey.startsWith(`attachments/${taskId}/`)) {
-      throw new BadRequestException("Invalid storage key");
-    }
-
+  private async recordAttachment(
+    userId: string,
+    taskId: string,
+    access: Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>,
+    opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string },
+  ) {
     const [row] = await this.db
       .insert(taskAttachments)
       .values({
@@ -111,6 +135,65 @@ export class AttachmentsService {
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return row;
+  }
+
+  /** Server-side upload (avoids browser CORS to R2). */
+  async upload(userId: string, taskId: string, file: AttachmentUploadFile) {
+    const fileName = file.originalname.trim() || "upload";
+    const mimeType = resolveMime(fileName, file.mimetype);
+    const access = await this.assertCanUpload(userId, taskId, mimeType, file.size);
+
+    const s3 = this.assertR2();
+    const storageKey = this.newStorageKey(taskId, fileName);
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: storageKey,
+        Body: file.buffer,
+        ContentType: mimeType,
+        ContentLength: file.size,
+      }),
+    );
+
+    return this.recordAttachment(userId, taskId, access, {
+      storageKey,
+      fileName,
+      fileSize: file.size,
+      mimeType,
+    });
+  }
+
+  async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
+    const mimeType = resolveMime(opts.fileName, opts.mimeType);
+    await this.assertCanUpload(userId, taskId, mimeType, opts.fileSize);
+
+    const s3 = this.assertR2();
+    const storageKey = this.newStorageKey(taskId, opts.fileName);
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: storageKey,
+      ContentType: mimeType,
+      ContentLength: opts.fileSize,
+    });
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
+    return { presignedUrl, storageKey };
+  }
+
+  async confirm(userId: string, taskId: string, opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string }) {
+    const mimeType = resolveMime(opts.fileName, opts.mimeType);
+    const access = await this.assertCanUpload(userId, taskId, mimeType, opts.fileSize);
+
+    if (!opts.storageKey.startsWith(`attachments/${taskId}/`)) {
+      throw new BadRequestException("Invalid storage key");
+    }
+
+    return this.recordAttachment(userId, taskId, access, {
+      storageKey: opts.storageKey,
+      fileName: opts.fileName,
+      fileSize: opts.fileSize,
+      mimeType,
+    });
   }
 
   async listForTask(userId: string, taskId: string) {

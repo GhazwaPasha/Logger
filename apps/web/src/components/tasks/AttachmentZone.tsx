@@ -61,24 +61,21 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
       setUploadError(null);
       setUploading(true);
       try {
-        const { presignedUrl, storageKey } = await apiJson<{ presignedUrl: string; storageKey: string }>(
-          `/tasks/${taskId}/attachments/presign`,
-          {
-            token,
-            method: "POST",
-            body: JSON.stringify({ fileName: file.name, mimeType: file.type, fileSize: file.size }),
-          },
-        );
-        await fetch(presignedUrl, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type },
-        });
-        await apiFetch(`/tasks/${taskId}/attachments/confirm`, {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await apiFetch(`/tasks/${taskId}/attachments/upload`, {
           token,
           method: "POST",
-          body: JSON.stringify({ storageKey, fileName: file.name, fileSize: file.size, mimeType: file.type }),
+          body: form,
+          signal: AbortSignal.timeout(120_000),
         });
+        if (res.status === 401 && typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("wl:auth-expired"));
+        }
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || res.statusText);
+        }
         void queryClient.invalidateQueries({ queryKey: ["attachments", taskId] });
       } catch (e) {
         setUploadError(e instanceof Error ? e.message : "Upload failed");

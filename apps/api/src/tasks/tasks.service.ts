@@ -332,7 +332,12 @@ export class TasksService {
     const orgId = task.organizationId;
 
     const subtasksToCreate = parsed.subtasksToCreate ?? [];
+    const subtasksToUpdate = parsed.subtasksToUpdate ?? [];
+    const subtasksToDelete = parsed.subtasksToDelete ?? [];
     const hasSubtasksCreate = subtasksToCreate.length > 0;
+    const hasSubtasksUpdate = subtasksToUpdate.length > 0;
+    const hasSubtasksDelete = subtasksToDelete.length > 0;
+    const hasSubtasksChange = hasSubtasksCreate || hasSubtasksUpdate || hasSubtasksDelete;
 
     const oldStatus = task.status;
     const oldPriority = task.priority;
@@ -358,7 +363,7 @@ export class TasksService {
     const hasTaskFieldUpdates =
       statusChanged || priorityChanged || titleChanged || assigneesChanged || dueChanged || repeatChanged;
 
-    if (!hasTaskFieldUpdates && !hasSubtasksCreate) {
+    if (!hasTaskFieldUpdates && !hasSubtasksChange) {
       return this.taskMutationResult(userId, taskId, []);
     }
 
@@ -481,12 +486,27 @@ export class TasksService {
             .returning();
           ledgerDelta.push(row!);
         }
-      } else if (hasSubtasksCreate) {
+      } else if (hasSubtasksChange) {
         await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
       }
 
       if (hasSubtasksCreate) {
         await tx.insert(subtasks).values(subtasksToCreate.map((s) => ({ taskId, title: s.title })));
+      }
+
+      if (hasSubtasksUpdate) {
+        for (const s of subtasksToUpdate) {
+          await tx
+            .update(subtasks)
+            .set({ title: s.title })
+            .where(and(eq(subtasks.id, s.id), eq(subtasks.taskId, taskId)));
+        }
+      }
+
+      if (hasSubtasksDelete) {
+        await tx
+          .delete(subtasks)
+          .where(and(eq(subtasks.taskId, taskId), inArray(subtasks.id, subtasksToDelete)));
       }
 
       if (

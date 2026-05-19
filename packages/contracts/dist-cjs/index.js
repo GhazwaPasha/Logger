@@ -128,17 +128,25 @@ exports.patchTaskSchema = zod_1.z
     dueRepeat: exports.taskDueRepeatSchema.nullable().optional(),
     /** New checklist lines inserted in the same transaction as task field updates. */
     subtasksToCreate: zod_1.z.array(exports.createSubtaskSchema).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
+    /** Existing subtask title edits applied in the same transaction. */
+    subtasksToUpdate: zod_1.z
+        .array(zod_1.z.object({ id: zod_1.z.string().uuid(), title: zod_1.z.string().min(1).max(512) }))
+        .max(exports.MAX_SUBTASKS_PER_TASK_MUTATION)
+        .optional(),
+    /** IDs of existing subtasks to delete in the same transaction. */
+    subtasksToDelete: zod_1.z.array(zod_1.z.string().uuid()).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
 })
     .refine((d) => {
-    const subs = d.subtasksToCreate;
-    const hasSubs = subs != null && subs.length > 0;
+    const hasSubCreate = (d.subtasksToCreate?.length ?? 0) > 0;
+    const hasSubUpdate = (d.subtasksToUpdate?.length ?? 0) > 0;
+    const hasSubDelete = (d.subtasksToDelete?.length ?? 0) > 0;
     return (d.status !== undefined ||
         d.priority !== undefined ||
         d.title !== undefined ||
         d.assigneeUserIds !== undefined ||
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
-        hasSubs);
+        hasSubCreate || hasSubUpdate || hasSubDelete);
 }, { message: "Provide at least one field to update" });
 exports.taskCapabilitiesSchema = zod_1.z.object({
     canArchiveTask: zod_1.z.boolean(),

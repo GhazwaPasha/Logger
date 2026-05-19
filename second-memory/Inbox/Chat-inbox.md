@@ -17,6 +17,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 - **Takeaway:** Island only renders when **`AppHeader`** mounts (authenticated chrome). Queue shows one alert at a time. Sonner CSS left commented as legacy if reintroduced elsewhere.
 - **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `live-island/*`, `WorkspaceNotificationsProvider.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/app/layout.tsx`.
 
+### 2026-05-20 — Attachment upload: API proxy (fix “Failed to fetch” / R2 CORS)
+
+- **Context:** Browser presigned PUT to `*.r2.cloudflarestorage.com` from `localhost:3000` / Vercel failed with **Failed to fetch** (typical R2 bucket CORS gap).
+- **What we did:** **`POST /tasks/:taskId/attachments/upload`** — multipart `file` → API **`PutObject`** to R2 + DB row (same limits/MIME rules). **Web** `AttachmentZone` uses `FormData` instead of presign→PUT→confirm. **`apiFetch`** skips `Content-Type` for `FormData`. Presign/confirm endpoints kept for optional direct upload if bucket CORS is configured later.
+- **Takeaway:** Redeploy **Render** after pull; restart local **`dev:api`**. Optional: R2 bucket CORS for `PUT` from app origins if reverting to browser-direct upload.
+- **Code / repo:** `apps/api/src/attachments/*`, `apps/web/src/components/tasks/AttachmentZone.tsx`, `apps/web/src/lib/api.ts`.
+
 ### 2026-05-20 — R2 public URL for attachment downloads
 
 - **Context:** Task attachments list builds download URLs as `R2_PUBLIC_URL` + `storageKey`; bucket exposes public reads via Cloudflare `r2.dev` (S3 API still used for presigned PUT / delete).
