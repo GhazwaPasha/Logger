@@ -96,7 +96,7 @@ export type TaskMutationResult = {
 };
 
 /** `GET /organizations/:id/activity` — ledger rows for tasks visible to the user (newest first). */
-export type OrgActivityTaskMeta = { id: string; title: string };
+export type OrgActivityTaskMeta = { id: string; title: string; assignerId: string };
 export type OrgActivityLedgerRow = LedgerRow & { taskId: string };
 export type OrgActivityFeedResponse = {
   entries: OrgActivityLedgerRow[];

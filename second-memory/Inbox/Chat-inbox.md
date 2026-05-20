@@ -4,6 +4,12 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-20 — Notifications for assigner (not only assignees)
+
+- **Context:** Task updates only notified assignees; assigner (task creator) saw nothing.
+- **What we did:** **`isLedgerEntryNotifiableToUser`** + push **`notifyLedgerActivity`** include **`assignerId`**. Activity **`tasksById`** returns **`assignerId`**. Panel copy updated. Actor still excluded from their own edits.
+- **Code / repo:** `notification-eligibility.ts`, `push-notifications.service.ts`, `tasks.service.ts`, `organizations.service.ts`, `ledger-types.ts`, `WorkspaceNotificationsProvider.tsx`.
+
 ### 2026-05-20 — Missing task update notifications (assignee map + ledger gaps)
 
 - **Context:** Many task-update notifications stopped appearing (bell, live island, push); used to work.

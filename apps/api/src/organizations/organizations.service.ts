@@ -101,10 +101,12 @@ export class OrganizationsService {
     }
 
     const taskMetaRows = await this.db
-      .select({ id: tasks.id, title: tasks.title })
+      .select({ id: tasks.id, title: tasks.title, assignerId: tasks.assignerId })
       .from(tasks)
       .where(inArray(tasks.id, taskIds));
-    const tasksById = Object.fromEntries(taskMetaRows.map((t) => [t.id, { id: t.id, title: t.title }]));
+    const tasksById = Object.fromEntries(
+      taskMetaRows.map((t) => [t.id, { id: t.id, title: t.title, assignerId: t.assignerId }]),
+    );
 
     const rows = await this.db
       .select({

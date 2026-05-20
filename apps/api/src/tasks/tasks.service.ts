@@ -248,6 +248,7 @@ export class TasksService {
         actorUserId: userId,
         taskId,
         taskTitle: access.task.title,
+        assignerUserId: access.task.assignerId,
         assigneeUserIds: assigneesAfter.map((a) => a.userId),
         ledgerDelta: [entry!],
       })
@@ -670,6 +671,7 @@ export class TasksService {
           actorUserId: userId,
           taskId,
           taskTitle: access.task.title,
+          assignerUserId: access.task.assignerId,
           assigneeUserIds: assignees.map((a) => a.userId),
           ledgerDelta,
         })
@@ -714,6 +716,7 @@ export class TasksService {
         actorUserId: userId,
         taskId,
         taskTitle: access.task.title,
+        assignerUserId: access.task.assignerId,
         assigneeUserIds: assignees.map((a) => a.userId),
         ledgerDelta: [entry!],
       })

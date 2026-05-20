@@ -89,12 +89,15 @@ export class PushNotificationsService implements OnModuleInit {
     actorUserId: string;
     taskId: string;
     taskTitle: string;
+    assignerUserId: string;
     assigneeUserIds: string[];
     ledgerDelta: LedgerInsertRow[];
   }) {
     if (!this.vapidConfigured || opts.ledgerDelta.length === 0) return;
 
-    const recipients = [...new Set(opts.assigneeUserIds)].filter((id) => id !== opts.actorUserId);
+    const recipients = [...new Set([opts.assignerUserId, ...opts.assigneeUserIds])].filter(
+      (id) => id !== opts.actorUserId,
+    );
     if (recipients.length === 0) return;
 
     const subs = await this.db

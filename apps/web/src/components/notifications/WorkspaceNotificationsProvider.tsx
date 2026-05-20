@@ -27,10 +27,15 @@ const NOTIF_PANEL_CLOSE_BTN =
   "btn-secondary shrink-0 rounded-md px-2.5 py-1.5 text-xs font-medium leading-none";
 
 const LAST_SEEN_PREFIX = "wl:notif:lastSeen:";
+const CLEARED_BEFORE_PREFIX = "wl:notif:clearedBefore:";
 const PUSH_PERMISSION_KEY = "wl:push:permission";
 
 function lastSeenStorageKey(workspaceId: string) {
   return `${LAST_SEEN_PREFIX}${workspaceId}`;
+}
+
+function clearedBeforeStorageKey(workspaceId: string) {
+  return `${CLEARED_BEFORE_PREFIX}${workspaceId}`;
 }
 
 export type WorkspaceNotificationsContextValue = {
@@ -54,6 +59,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   const [panelOpen, setPanelOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lastSeenTs, setLastSeenTs] = useState(0);
+  const [clearedBeforeTs, setClearedBeforeTs] = useState(0);
   const pushSyncInFlightRef = useRef(false);
 
   const activityQuery = useOrgActivityFeed(
@@ -77,14 +83,17 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     const entries = activityQuery.data?.entries;
     if (!userId || !entries) return [];
     const list: OrgActivityLedgerRow[] = [];
+    const tasksById = activityQuery.data?.tasksById;
     for (const e of entries) {
       if (isTaskCreatedNote(e)) continue;
       const assignees = assigneesByTaskId[e.taskId] ?? [];
-      if (!isLedgerEntryNotifiableToUser(e, userId, assignees)) continue;
+      const assignerId =
+        tasksById?.[e.taskId]?.assignerId ?? tasks.find((t) => t.id === e.taskId)?.assignerId ?? null;
+      if (!isLedgerEntryNotifiableToUser(e, userId, assignees, assignerId)) continue;
       list.push(e);
     }
     return list;
-  }, [activityQuery.data?.entries, userId, assigneesByTaskId]);
+  }, [activityQuery.data?.entries, activityQuery.data?.tasksById, userId, assigneesByTaskId, tasks]);
 
   useEffect(() => {
     setMounted(true);
@@ -92,15 +101,20 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const key = lastSeenStorageKey(workspaceId);
-    const raw = localStorage.getItem(key);
-    if (raw && !Number.isNaN(Number(raw))) {
-      setLastSeenTs(Number(raw));
-      return;
+    const lastSeenRaw = localStorage.getItem(lastSeenStorageKey(workspaceId));
+    if (lastSeenRaw && !Number.isNaN(Number(lastSeenRaw))) {
+      setLastSeenTs(Number(lastSeenRaw));
+    } else {
+      // Do not seed last-seen to "now" on first visit — that marks the entire existing feed as read
+      // before the user opens the panel, so the bell badge stays at 0 while the panel still lists items.
+      setLastSeenTs(0);
     }
-    // Do not seed last-seen to "now" on first visit — that marks the entire existing feed as read
-    // before the user opens the panel, so the bell badge stays at 0 while the panel still lists items.
-    setLastSeenTs(0);
+    const clearedRaw = localStorage.getItem(clearedBeforeStorageKey(workspaceId));
+    if (clearedRaw && !Number.isNaN(Number(clearedRaw))) {
+      setClearedBeforeTs(Number(clearedRaw));
+    } else {
+      setClearedBeforeTs(0);
+    }
   }, [workspaceId]);
 
   useEffect(() => {
@@ -110,11 +124,28 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     setLastSeenTs(ts);
   }, [panelOpen, workspaceId]);
 
+  const panelEntries = useMemo(() => {
+    return notifiableEntries.filter((e) => new Date(e.createdAt).getTime() > clearedBeforeTs);
+  }, [notifiableEntries, clearedBeforeTs]);
+
   const unreadCount = useMemo(() => {
-    return notifiableEntries.filter((e) => new Date(e.createdAt).getTime() > lastSeenTs).length;
-  }, [notifiableEntries, lastSeenTs]);
+    return panelEntries.filter((e) => new Date(e.createdAt).getTime() > lastSeenTs).length;
+  }, [panelEntries, lastSeenTs]);
 
   const hydratedIdsRef = useRef<Set<string> | null>(null);
+
+  const clearNotifications = useCallback(() => {
+    const newest = panelEntries.reduce(
+      (max, e) => Math.max(max, new Date(e.createdAt).getTime()),
+      0,
+    );
+    const ts = Math.max(newest, Date.now());
+    localStorage.setItem(clearedBeforeStorageKey(workspaceId), String(ts));
+    localStorage.setItem(lastSeenStorageKey(workspaceId), String(ts));
+    setClearedBeforeTs(ts);
+    setLastSeenTs(ts);
+    hydratedIdsRef.current = new Set(notifiableEntries.map((e) => e.id));
+  }, [workspaceId, panelEntries, notifiableEntries]);
 
   useEffect(() => {
     hydratedIdsRef.current = null;
@@ -251,14 +282,22 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                 <div className={NOTIF_PANEL_HEADER_ROW}>
                   <h2 className={NOTIF_PANEL_HEADER_TITLE}>Notifications</h2>
                   <div className={NOTIF_PANEL_HEADER_RIGHT}>
+                    <button
+                      type="button"
+                      className={NOTIF_PANEL_CLOSE_BTN}
+                      disabled={panelEntries.length === 0}
+                      onClick={clearNotifications}
+                    >
+                      Clear all
+                    </button>
                     <button type="button" className={NOTIF_PANEL_CLOSE_BTN} onClick={() => setPanelOpen(false)}>
                       Close
                     </button>
                   </div>
                 </div>
                 <p className="text-sm text-[var(--muted)]">
-                  Updates on tasks where you are an assignee (plus assignment changes that involve you). Matches your
-                  workspace activity feed, filtered for you.
+                  Updates on tasks you assigned or are assigned to (plus assignment changes that involve you). Matches
+                  your workspace activity feed, filtered for you.
                 </p>
 
                 {activityQuery.isPending ? (
@@ -267,11 +306,11 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                   <p className="text-sm text-red-600 dark:text-red-400">
                     {(activityQuery.error as Error).message || "Could not load notifications"}
                   </p>
-                ) : notifiableEntries.length === 0 ? (
+                ) : panelEntries.length === 0 ? (
                   <p className="text-sm text-[var(--muted)]">You are all caught up.</p>
                 ) : (
                   <ul className="space-y-3">
-                    {notifiableEntries.map((e) => {
+                    {panelEntries.map((e) => {
                       const title = activityQuery.data?.tasksById[e.taskId]?.title ?? "Task";
                       const href = `${basePath}/work?task=${encodeURIComponent(e.taskId)}`;
                       return (

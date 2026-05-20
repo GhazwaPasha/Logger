@@ -5,8 +5,11 @@ export function isLedgerEntryNotifiableToUser(
   entry: LedgerRow,
   userId: string,
   taskAssigneeUserIds: string[],
+  taskAssignerId?: string | null,
 ): boolean {
   if (entry.actorId === userId) return false;
+
+  const isAssigner = Boolean(taskAssignerId && taskAssignerId === userId);
 
   if (entry.type === "assignee_change") {
     const payload = entry.payload as {
@@ -19,8 +22,8 @@ export function isLedgerEntryNotifiableToUser(
     const next = Array.isArray(payload.assigneeUserIds)
       ? payload.assigneeUserIds.filter((x): x is string => typeof x === "string")
       : [];
-    return prev.includes(userId) || next.includes(userId);
+    return prev.includes(userId) || next.includes(userId) || isAssigner;
   }
 
-  return taskAssigneeUserIds.includes(userId);
+  return taskAssigneeUserIds.includes(userId) || isAssigner;
 }
