@@ -41,6 +41,7 @@ import {
   TASK_TITLE_PLACEHOLDER,
 } from "@/lib/task-default-title";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
+import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 
 const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   pending: "Pending",
@@ -105,10 +106,17 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const handleArchive = useCallback(
     async (id: string) => {
       if (!token) return;
-      await apiJson<TaskMutationResult>(`/tasks/${id}/archive`, { method: "POST", token });
-      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return { ...old, tasks: old.tasks.filter((t) => t.id !== id) };
+      });
       queryClient.removeQueries({ queryKey: taskKeys.detail(id) });
       goToWork();
+      try {
+        await apiJson<TaskMutationResult>(`/tasks/${id}/archive`, { method: "POST", token });
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      }
     },
     [token, queryClient, workspaceId, goToWork],
   );
@@ -116,10 +124,17 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const handleDelete = useCallback(
     async (id: string) => {
       if (!token) return;
-      await apiVoid(`/tasks/${id}`, { method: "DELETE", token });
-      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+        if (!old) return old;
+        return { ...old, tasks: old.tasks.filter((t) => t.id !== id) };
+      });
       queryClient.removeQueries({ queryKey: taskKeys.detail(id) });
       goToWork();
+      try {
+        await apiVoid(`/tasks/${id}`, { method: "DELETE", token });
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      }
     },
     [token, queryClient, workspaceId, goToWork],
   );

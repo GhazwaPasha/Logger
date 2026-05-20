@@ -94,6 +94,8 @@ export const updateSubtaskSchema = z.object({
 export const MAX_SUBTASKS_PER_TASK_MUTATION = 100;
 
 export const createTaskSchema = z.object({
+  /** Client-generated UUID; server uses it as-is when provided. */
+  id: z.string().uuid().optional(),
   title: z.string().min(1).max(512),
   listId: z.string().uuid(),
   assigneeUserIds: z.array(z.string().min(1)).optional().default([]),

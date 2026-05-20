@@ -82,6 +82,8 @@ exports.updateSubtaskSchema = zod_1.z.object({
 /** Max checklist lines accepted on create / PATCH in one request (server-enforced). */
 exports.MAX_SUBTASKS_PER_TASK_MUTATION = 100;
 exports.createTaskSchema = zod_1.z.object({
+    /** Client-generated UUID; server uses it as-is when provided. */
+    id: zod_1.z.string().uuid().optional(),
     title: zod_1.z.string().min(1).max(512),
     listId: zod_1.z.string().uuid(),
     assigneeUserIds: zod_1.z.array(zod_1.z.string().min(1)).optional().default([]),

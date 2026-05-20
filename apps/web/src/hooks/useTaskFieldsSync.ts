@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@/lib/api";
 import { applyTaskMutationToCache } from "@/lib/task-mutation-cache";
 import { useTaskAutoSync } from "@/hooks/useTaskAutoSync";
+import { getPendingCreation } from "@/lib/create-draft-task";
 import type { TaskMutationResult } from "@/lib/ledger-types";
 
 export type TaskFieldPatchBody = {
@@ -35,6 +36,8 @@ export function useTaskFieldsSync(options: {
   const persistPatch = useCallback(
     async (body: TaskFieldPatchBody) => {
       if (!token || !body) return;
+      const pending = getPendingCreation(taskId);
+      if (pending) await pending;
       const saved = await apiJson<TaskMutationResult>(`/tasks/${taskId}`, {
         method: "PATCH",
         token,

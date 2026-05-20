@@ -52,6 +52,7 @@ export class TasksService {
       const [task] = await tx
         .insert(tasks)
         .values({
+          ...(parsed.id !== undefined ? { id: parsed.id } : {}),
           organizationId,
           listId: parsed.listId,
           assignerId: userId,

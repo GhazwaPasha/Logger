@@ -375,7 +375,7 @@ function WorkItemsInner() {
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
-  const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
+  const { openNewTask } = useOpenNewTask();
   const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
@@ -520,7 +520,7 @@ function WorkItemsInner() {
   // 'N' keyboard shortcut → create draft task, then open editor
   useEffect(() => {
     function handler() {
-      void openNewTask(listId || undefined);
+      openNewTask(listId || undefined);
     }
     window.addEventListener("wl:new-task", handler);
     return () => window.removeEventListener("wl:new-task", handler);
@@ -1742,14 +1742,10 @@ function WorkItemsInner() {
         <div className="pt-4">
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void openNewTask(listId || undefined)}
-            disabled={isOpeningNewTask}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            onClick={() => openNewTask(listId || undefined)}
           >
-            {isOpeningNewTask ? (
-              <InlineSpinner className="size-3 shrink-0 animate-spin motion-reduce:animate-none" />
-            ) : null}
-            <span>{isOpeningNewTask ? "Opening…" : "+ Add task"}</span>
+            <span>+ Add task</span>
           </button>
         </div>
       </div>
@@ -2067,13 +2063,9 @@ function WorkItemsInner() {
             <button
               type="button"
               className="btn-primary !h-8 inline-flex shrink-0 items-center gap-1.5 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-              onClick={() => void openNewTask(listId || undefined)}
-              disabled={isOpeningNewTask}
+              onClick={() => openNewTask(listId || undefined)}
             >
-              {isOpeningNewTask ? (
-                <InlineSpinner className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
-              ) : null}
-              <span>{isOpeningNewTask ? "Opening…" : "+ New task"}</span>
+              <span>+ New task</span>
             </button>
           </div>
           <WorkBoardStatsCard
