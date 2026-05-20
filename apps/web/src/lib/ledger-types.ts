@@ -101,4 +101,6 @@ export type OrgActivityLedgerRow = LedgerRow & { taskId: string };
 export type OrgActivityFeedResponse = {
   entries: OrgActivityLedgerRow[];
   tasksById: Record<string, OrgActivityTaskMeta>;
+  /** Assignees for tasks referenced in `entries` (authoritative for notification eligibility). */
+  assigneesByTaskId: Record<string, string[]>;
 };

@@ -42,7 +42,7 @@ export function OnlineMembersAvatars() {
         return (
           <div
             key={m.userId}
-            className={`relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
+            className={`flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
             title={`${m.name || m.email}${isAway ? " (Away)" : ""}`}
           >
             {m.image ? (
@@ -50,11 +50,6 @@ export function OnlineMembersAvatars() {
             ) : (
               <span aria-hidden>{initials(m.name, m.email)}</span>
             )}
-            {/* Status dot */}
-            <span
-              className={`absolute bottom-0 right-0 size-2 rounded-full ring-1 ring-[var(--bg-header)] ${isAway ? "bg-amber-400" : "bg-green-500"}`}
-              aria-hidden
-            />
           </div>
         );
       })}

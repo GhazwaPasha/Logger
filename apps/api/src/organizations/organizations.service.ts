@@ -11,6 +11,7 @@ import {
   organizationMemberManagedDepartments,
   organizationMembers,
   organizations,
+  taskAssignees,
   tasks,
   user,
 } from "@work-ledger/db";
@@ -96,7 +97,7 @@ export class OrganizationsService {
     const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
 
     if (taskIds.length === 0) {
-      return { entries: [], tasksById: {} };
+      return { entries: [], tasksById: {}, assigneesByTaskId: {} };
     }
 
     const taskMetaRows = await this.db
@@ -120,7 +121,21 @@ export class OrganizationsService {
       .orderBy(desc(activityLedger.createdAt))
       .limit(limit);
 
-    return { entries: rows, tasksById };
+    const taskIdsInFeed = [...new Set(rows.map((r) => r.taskId))];
+    const assigneesByTaskId: Record<string, string[]> = {};
+    if (taskIdsInFeed.length > 0) {
+      const assigneeRows = await this.db
+        .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(inArray(taskAssignees.taskId, taskIdsInFeed));
+      for (const r of assigneeRows) {
+        const list = assigneesByTaskId[r.taskId] ?? [];
+        list.push(r.userId);
+        assigneesByTaskId[r.taskId] = list;
+      }
+    }
+
+    return { entries: rows, tasksById, assigneesByTaskId };
   }
 
   /** Single round-trip workspace payload for app shell (parallel DB reads). Tasks now fetched per-column via paginated endpoint. */

@@ -165,7 +165,7 @@ export class TasksService {
         title: parsed.title,
       })
       .returning();
-    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    await this.recordTaskActivityNote(userId, taskId, "Subtask added.", { subtaskTitle: parsed.title });
     return row!;
   }
 
@@ -184,7 +184,9 @@ export class TasksService {
       .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
       .returning();
     if (!row) throw new ForbiddenException("Subtask not found");
-    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    const message =
+      parsed.done === true ? "Subtask completed." : parsed.done === false ? "Subtask reopened." : "Subtask updated.";
+    await this.recordTaskActivityNote(userId, taskId, message, { subtaskTitle: row.title });
     return row;
   }
 
@@ -197,7 +199,7 @@ export class TasksService {
       .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
       .returning();
     if (!row) throw new ForbiddenException("Subtask not found");
-    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    await this.recordTaskActivityNote(userId, taskId, "Subtask removed.", { subtaskTitle: row.title });
     return row;
   }
 
@@ -514,6 +516,19 @@ export class TasksService {
             .returning();
           ledgerDelta.push(row!);
         }
+
+        if (titleChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "note",
+              payload: { message: "Title updated." },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
       } else if (hasSubtasksChange) {
         await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
       }
@@ -668,6 +683,44 @@ export class TasksService {
       subtasks: taskSubtasks,
       ledgerDelta,
     };
+  }
+
+  /** Ledger note + push for subtask-only updates (and similar lightweight activity). */
+  private async recordTaskActivityNote(
+    userId: string,
+    taskId: string,
+    message: string,
+    extra?: Record<string, unknown>,
+  ) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId,
+        actorId: userId,
+        type: "note",
+        payload: { message, ...extra },
+      })
+      .returning();
+
+    const assignees = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    void this.pushNotifications
+      .notifyLedgerActivity({
+        organizationId: access.task.organizationId,
+        actorUserId: userId,
+        taskId,
+        taskTitle: access.task.title,
+        assigneeUserIds: assignees.map((a) => a.userId),
+        ledgerDelta: [entry!],
+      })
+      .catch(() => {});
+
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    return entry!;
   }
 
   /** One-off normalize of legacy `assigned` / `late` rows (no ledger rows). */

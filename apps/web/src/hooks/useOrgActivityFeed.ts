@@ -13,7 +13,8 @@ export function useOrgActivityFeed(
 ) {
   return useQuery({
     queryKey: workspaceKeys.activity(organizationId ?? ""),
-    queryFn: () => apiJson<OrgActivityFeedResponse>(`/organizations/${organizationId}/activity`, { token }),
+    queryFn: () =>
+      apiJson<OrgActivityFeedResponse>(`/organizations/${organizationId}/activity?limit=500`, { token }),
     enabled: Boolean(token && organizationId && enabled),
     staleTime: 30_000,
     refetchOnWindowFocus: false,

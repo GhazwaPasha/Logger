@@ -64,12 +64,14 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   );
 
   const assigneesByTaskId = useMemo(() => {
-    const m = new Map<string, string[]>();
+    const fromFeed = activityQuery.data?.assigneesByTaskId;
+    if (fromFeed) return fromFeed;
+    const fallback: Record<string, string[]> = {};
     for (const t of tasks) {
-      m.set(t.id, t.assigneeUserIds ?? []);
+      fallback[t.id] = t.assigneeUserIds ?? [];
     }
-    return m;
-  }, [tasks]);
+    return fallback;
+  }, [activityQuery.data?.assigneesByTaskId, tasks]);
 
   const notifiableEntries = useMemo(() => {
     const entries = activityQuery.data?.entries;
@@ -77,12 +79,12 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     const list: OrgActivityLedgerRow[] = [];
     for (const e of entries) {
       if (isTaskCreatedNote(e)) continue;
-      const assignees = assigneesByTaskId.get(e.taskId) ?? [];
+      const assignees = assigneesByTaskId[e.taskId] ?? [];
       if (!isLedgerEntryNotifiableToUser(e, userId, assignees)) continue;
       list.push(e);
     }
     return list;
-  }, [activityQuery.data, userId, assigneesByTaskId]);
+  }, [activityQuery.data?.entries, userId, assigneesByTaskId]);
 
   useEffect(() => {
     setMounted(true);

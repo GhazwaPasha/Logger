@@ -4,6 +4,20 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-20 — Missing task update notifications (assignee map + ledger gaps)
+
+- **Context:** Many task-update notifications stopped appearing (bell, live island, push); used to work.
+- **Root causes:** (1) **`WorkspaceNotificationsProvider`** filtered activity using **`assigneeUserIds` from workspace board cache** (~150 paginated tasks), but **`GET …/activity`** includes ledger for **all** visible tasks — tasks off the loaded board had **empty assignees** → filtered out. (2) **Title-only** PATCH and **subtask** CRUD (per-item API) wrote **no `activity_ledger` rows** → no feed entry and no push.
+- **What we did:** Activity API returns **`assigneesByTaskId`** for tasks in the feed; web uses it (board map as fallback). Client requests **`?limit=500`**. **`TasksService`**: ledger note + push for title change; **`recordTaskActivityNote`** for subtask add/update/complete/remove.
+- **Deploy:** API + web.
+- **Code / repo:** `organizations.service.ts`, `tasks.service.ts`, `ledger-types.ts`, `useOrgActivityFeed.ts`, `WorkspaceNotificationsProvider.tsx`.
+
+### 2026-05-20 — Header: online teammates left, no status dots
+
+- **Context:** Online member avatars sat right of search; green/amber status dots on stacked circles.
+- **What we did:** Moved **`OnlineMembersAvatars`** to left header cluster (after LogBase logo). Removed status dot spans from teammate circles; away still in `title` tooltip.
+- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `OnlineMembersAvatars.tsx`.
+
 ### 2026-05-20 — Push notification click opens production (not localhost)
 
 - **Context:** Opening a push notification sent users to **`http://localhost:3000`** instead of the live site.

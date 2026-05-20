@@ -145,13 +145,13 @@ export function AppHeader({
             <LogBaseMark variant="chrome" decorative />
             <span className="hidden text-lg leading-none sm:inline">LogBase</span>
           </Link>
+          {settingsHref && <OnlineMembersAvatars />}
         </div>
         <div className="pointer-events-none z-50 flex max-w-[min(100vw-8rem,22rem)] justify-center justify-self-center px-1 sm:max-w-[min(100vw-10rem,26rem)]">
           <HeaderLiveIsland />
         </div>
         <div className="flex min-w-0 items-center justify-end gap-2 justify-self-end sm:gap-3">
           {settingsHref && <GlobalSearch />}
-          {settingsHref && <OnlineMembersAvatars />}
           {settingsHref && notifications && (
             <button
               type="button"
