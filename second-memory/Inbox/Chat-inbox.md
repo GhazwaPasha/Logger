@@ -15,7 +15,7 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 ### 2026-05-20 — Header: online teammates by search, no status dots
 
 - **Context:** Teammate avatars placement + remove green/amber dots on stacked circles.
-- **What we did:** **`OnlineMembersAvatars`** in a flex group **immediately left of** **`GlobalSearch`** (right header cluster, not by logo). **`GlobalSearch`** reserves `w-[22rem] sm:w-[28rem]` when open so expand/collapse does not collapse layout or shift bell/settings. No status dots on teammate circles.
+- **What we did:** **`OnlineMembersAvatars`** in a flex group **immediately left of** **`GlobalSearch`** (right header cluster, not by logo). **`GlobalSearch`** reserves width when open. No status dots. Avatars use **`gap-1.5`** + border (no overlapping `-ml-2` stack).
 - **Code / repo:** `AppHeader.tsx`, `OnlineMembersAvatars.tsx`, `GlobalSearch.tsx`.
 
 ### 2026-05-20 — Push notification click opens production (not localhost)

@@ -36,13 +36,14 @@ export function OnlineMembersAvatars() {
   const overflow = onlineMembers.length - MAX_SHOWN;
 
   return (
-    <div className="flex items-center">
-      {shown.map((m, i) => {
+    <div className="flex items-center gap-1.5" role="list" aria-label={`${onlineMembers.length} teammate${onlineMembers.length === 1 ? "" : "s"} online`}>
+      {shown.map((m) => {
         const isAway = awayUserIds.has(m.userId);
         return (
           <div
             key={m.userId}
-            className={`flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-2 ring-[var(--bg-header)]${i > 0 ? " -ml-2" : ""}`}
+            role="listitem"
+            className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]"
             title={`${m.name || m.email}${isAway ? " (Away)" : ""}`}
           >
             {m.image ? (
@@ -54,7 +55,10 @@ export function OnlineMembersAvatars() {
         );
       })}
       {overflow > 0 && (
-        <div className="-ml-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-elevated)] text-[10px] font-semibold text-[var(--muted)] ring-2 ring-[var(--bg-header)]">
+        <div
+          className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[10px] font-semibold text-[var(--muted)]"
+          title={`${overflow} more online`}
+        >
           +{overflow}
         </div>
       )}
