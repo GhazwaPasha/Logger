@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -321,7 +322,21 @@ export const taskDependencies = pgTable(
   ],
 );
 
-/** Files uploaded to tasks, stored in Cloudflare R2 via presigned PUT. */
+/** Deduplicated binary payload in R2 (content-addressed or legacy key). */
+export const attachmentBlobs = pgTable(
+  "attachment_blobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    contentSha256: text("content_sha256").notNull().unique(),
+    storageKey: text("storage_key").notNull().unique(),
+    mimeType: text("mime_type").notNull(),
+    byteSize: text("byte_size").notNull(),
+    refCount: integer("ref_count").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
+/** Files uploaded to tasks; each row references one shared blob. */
 export const taskAttachments = pgTable(
   "task_attachments",
   {
@@ -329,16 +344,18 @@ export const taskAttachments = pgTable(
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
+    blobId: uuid("blob_id")
+      .notNull()
+      .references(() => attachmentBlobs.id, { onDelete: "restrict" }),
     uploadedBy: text("uploaded_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     fileName: text("file_name").notNull(),
-    fileSize: text("file_size").notNull(), // stored as string to avoid integer overflow on large files
+    fileSize: text("file_size").notNull(), // display size (original upload); blob may be smaller when compressed
     mimeType: text("mime_type").notNull(),
-    storageKey: text("storage_key").notNull().unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("task_attachments_task_idx").on(t.taskId)],
+  (t) => [index("task_attachments_task_idx").on(t.taskId), index("task_attachments_blob_idx").on(t.blobId)],
 );
 
 /** Task comments (threaded, soft-deletable). */
@@ -588,8 +605,13 @@ export const taskDependenciesRelations = relations(taskDependencies, ({ one }) =
   dependsOn: one(tasks, { fields: [taskDependencies.dependsOnTaskId], references: [tasks.id], relationName: "blocking" }),
 }));
 
+export const attachmentBlobsRelations = relations(attachmentBlobs, ({ many }) => ({
+  attachments: many(taskAttachments),
+}));
+
 export const taskAttachmentsRelations = relations(taskAttachments, ({ one }) => ({
   task: one(tasks, { fields: [taskAttachments.taskId], references: [tasks.id] }),
+  blob: one(attachmentBlobs, { fields: [taskAttachments.blobId], references: [attachmentBlobs.id] }),
   uploader: one(user, { fields: [taskAttachments.uploadedBy], references: [user.id] }),
 }));
 
@@ -648,6 +670,7 @@ export const appSchema = {
   pushSubscriptions,
   notifications,
   taskDependencies,
+  attachmentBlobs,
   taskAttachments,
   comments,
   commentMentions,
@@ -666,6 +689,7 @@ export const appSchema = {
   pushSubscriptionsRelations,
   notificationsRelations,
   taskDependenciesRelations,
+  attachmentBlobsRelations,
   taskAttachmentsRelations,
   commentsRelations,
   commentMentionsRelations,

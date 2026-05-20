@@ -424,7 +424,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
             <button
               type="button"
               onClick={() => setShowInput(true)}
-              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
             >
               <ChatCircle size={16} />
               <span>Add a comment…</span>

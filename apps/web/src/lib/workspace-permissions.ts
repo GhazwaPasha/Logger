@@ -17,6 +17,7 @@ export function taskArchiveDeleteCaps(
   const me = members.find((m) => m.userId === userId);
   if (!me) return { canArchiveTask: false, canDeleteTask: false };
   if (me.role === "owner") return { canArchiveTask: false, canDeleteTask: true };
+  if (task.assignerId === userId) return { canArchiveTask: false, canDeleteTask: true };
   if (me.role !== "manager") return { canArchiveTask: false, canDeleteTask: false };
   const list = lists.find((l) => l.id === task.listId);
   const deptId = list?.departmentId;

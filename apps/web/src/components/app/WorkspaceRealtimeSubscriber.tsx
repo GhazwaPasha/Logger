@@ -5,10 +5,12 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
-import { notificationKeys, taskKeys, workspaceKeys } from "@/lib/query-keys";
+import { notificationKeys, workspaceKeys } from "@/lib/query-keys";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
+/** Coalesce rapid workspace_changed events (e.g. autosave) into one list refetch. */
+const WORKSPACE_INVALIDATE_DEBOUNCE_MS = 1500;
 
 type WorkspaceChangedPayload = {
   type?: string;
@@ -25,6 +27,7 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
   const queryClient = useQueryClient();
   const { setOnlineUserIds, setAwayUserIds } = useOnlinePresence();
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workspaceInvalidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAwayRef = useRef(false);
 
   useEffect(() => {
@@ -40,14 +43,16 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
 
     const onWorkspaceChanged = (payload: WorkspaceChangedPayload) => {
       if (payload?.organizationId !== workspaceId) return;
-      void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-      void queryClient.invalidateQueries({
-        queryKey: workspaceKeys.activity(workspaceId),
-      });
-      const tid = payload?.taskId;
-      if (tid) {
-        void queryClient.invalidateQueries({ queryKey: taskKeys.detail(tid) });
+      if (workspaceInvalidateTimerRef.current) {
+        clearTimeout(workspaceInvalidateTimerRef.current);
       }
+      workspaceInvalidateTimerRef.current = setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+        void queryClient.invalidateQueries({
+          queryKey: workspaceKeys.activity(workspaceId),
+        });
+      }, WORKSPACE_INVALIDATE_DEBOUNCE_MS);
+      // Task detail is updated by mutation handlers (PATCH / subtask APIs).
     };
 
     const onPresenceSync = (payload: PresenceSyncPayload) => {
@@ -129,6 +134,7 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
       setAwayUserIds(new Set());
       activityEvents.forEach((ev) => window.removeEventListener(ev, comeBack));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (workspaceInvalidateTimerRef.current) clearTimeout(workspaceInvalidateTimerRef.current);
     };
   }, [token, workspaceId, queryClient, setOnlineUserIds, setAwayUserIds]);
 

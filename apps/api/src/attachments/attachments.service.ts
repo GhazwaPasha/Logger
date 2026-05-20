@@ -1,13 +1,19 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { count, eq } from "drizzle-orm";
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { randomUUID } from "node:crypto";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { activityLedger, taskAttachments } from "@work-ledger/db";
+import { randomUUID } from "node:crypto";
+import { activityLedger, attachmentBlobs, taskAttachments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { CollaborationService } from "../realtime/collaboration.service";
+import {
+  acquireLegacyBlob,
+  cleanupOrphanR2Objects,
+  releaseBlobRef,
+  storeBlobFromBuffer,
+} from "./attachments-storage.util";
 
 const MAX_FILES_PER_TASK = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -75,12 +81,16 @@ export class AttachmentsService {
     private readonly collaboration: CollaborationService,
   ) {}
 
+  isR2Configured(): boolean {
+    return Boolean(this.s3 && this.bucket);
+  }
+
   private assertR2(): S3Client {
     if (!this.s3) throw new BadRequestException("File storage is not configured (R2 credentials missing)");
     return this.s3;
   }
 
-  private newStorageKey(taskId: string, fileName: string): string {
+  private newPresignStorageKey(taskId: string, fileName: string): string {
     return `attachments/${taskId}/${randomUUID()}/${fileName}`;
   }
 
@@ -112,17 +122,17 @@ export class AttachmentsService {
     userId: string,
     taskId: string,
     access: Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>,
-    opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string },
+    opts: { blobId: string; fileName: string; fileSize: number; mimeType: string },
   ) {
     const [row] = await this.db
       .insert(taskAttachments)
       .values({
         taskId,
+        blobId: opts.blobId,
         uploadedBy: userId,
         fileName: opts.fileName,
         fileSize: String(opts.fileSize),
         mimeType: opts.mimeType,
-        storageKey: opts.storageKey,
       })
       .returning();
 
@@ -137,30 +147,23 @@ export class AttachmentsService {
     return row;
   }
 
-  /** Server-side upload (avoids browser CORS to R2). */
+  /** Server-side upload with image compression and content-hash deduplication. */
   async upload(userId: string, taskId: string, file: AttachmentUploadFile) {
     const fileName = file.originalname.trim() || "upload";
     const mimeType = resolveMime(fileName, file.mimetype);
     const access = await this.assertCanUpload(userId, taskId, mimeType, file.size);
 
     const s3 = this.assertR2();
-    const storageKey = this.newStorageKey(taskId, fileName);
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: storageKey,
-        Body: file.buffer,
-        ContentType: mimeType,
-        ContentLength: file.size,
-      }),
-    );
+    const stored = await storeBlobFromBuffer(this.db, s3, this.bucket, file.buffer, mimeType);
 
-    return this.recordAttachment(userId, taskId, access, {
-      storageKey,
+    const row = await this.recordAttachment(userId, taskId, access, {
+      blobId: stored.blobId,
       fileName,
       fileSize: file.size,
       mimeType,
     });
+
+    return { ...row, storageKey: stored.storageKey, deduplicated: stored.deduplicated };
   }
 
   async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
@@ -168,7 +171,7 @@ export class AttachmentsService {
     await this.assertCanUpload(userId, taskId, mimeType, opts.fileSize);
 
     const s3 = this.assertR2();
-    const storageKey = this.newStorageKey(taskId, opts.fileName);
+    const storageKey = this.newPresignStorageKey(taskId, opts.fileName);
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
@@ -188,8 +191,14 @@ export class AttachmentsService {
       throw new BadRequestException("Invalid storage key");
     }
 
-    return this.recordAttachment(userId, taskId, access, {
+    const blobId = await acquireLegacyBlob(this.db, {
       storageKey: opts.storageKey,
+      mimeType,
+      byteSize: opts.fileSize,
+    });
+
+    return this.recordAttachment(userId, taskId, access, {
+      blobId,
       fileName: opts.fileName,
       fileSize: opts.fileSize,
       mimeType,
@@ -199,9 +208,21 @@ export class AttachmentsService {
   async listForTask(userId: string, taskId: string) {
     await this.authz.getTaskAccess(userId, taskId);
     const rows = await this.db
-      .select()
+      .select({
+        id: taskAttachments.id,
+        taskId: taskAttachments.taskId,
+        blobId: taskAttachments.blobId,
+        uploadedBy: taskAttachments.uploadedBy,
+        fileName: taskAttachments.fileName,
+        fileSize: taskAttachments.fileSize,
+        mimeType: taskAttachments.mimeType,
+        createdAt: taskAttachments.createdAt,
+        storageKey: attachmentBlobs.storageKey,
+      })
       .from(taskAttachments)
+      .innerJoin(attachmentBlobs, eq(taskAttachments.blobId, attachmentBlobs.id))
       .where(eq(taskAttachments.taskId, taskId));
+
     return rows.map((r) => ({
       ...r,
       url: `${this.publicUrl}/${r.storageKey}`,
@@ -220,9 +241,10 @@ export class AttachmentsService {
     const isUploader = attachment.uploadedBy === userId;
     if (!isUploader && !access.isOwner) throw new ForbiddenException("Cannot delete this attachment");
 
-    const s3 = this.assertR2();
-    await s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: attachment.storageKey }));
     await this.db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
+
+    const s3 = this.assertR2();
+    await releaseBlobRef(this.db, s3, this.bucket, attachment.blobId);
 
     await this.db.insert(activityLedger).values({
       taskId: attachment.taskId,
@@ -232,5 +254,10 @@ export class AttachmentsService {
     });
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, attachment.taskId);
+  }
+
+  async runOrphanCleanup(): Promise<{ scanned: number; deleted: number } | null> {
+    if (!this.isR2Configured()) return null;
+    return cleanupOrphanR2Objects(this.db, this.assertR2(), this.bucket);
   }
 }

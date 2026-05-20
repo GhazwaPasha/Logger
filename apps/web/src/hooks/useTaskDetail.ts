@@ -32,6 +32,14 @@ function taskRowToPlaceholderDetail(row: TaskRow, ctx?: PlaceholderContext): Tas
   };
 }
 
+export type UseTaskDetailOptions = {
+  /**
+   * Active task form session: avoid refetch-on-focus and background refetches
+   * that fight local form state and subtask optimistic updates.
+   */
+  formSession?: boolean;
+};
+
 export function useTaskDetail(
   token: string | null,
   taskId: string | null,
@@ -39,7 +47,9 @@ export function useTaskDetail(
   listTaskRow?: TaskRow | null,
   /** When set, placeholder capabilities match server rules until GET /tasks/:id returns. */
   placeholderContext?: PlaceholderContext,
+  options?: UseTaskDetailOptions,
 ) {
+  const formSession = options?.formSession ?? false;
   const [manualError, setManualError] = useState<string | null>(null);
 
   const placeholderData = useMemo((): TaskDetail | undefined => {
@@ -51,9 +61,11 @@ export function useTaskDetail(
     queryKey: taskKeys.detail(taskId),
     queryFn: () => apiJson<TaskDetail>(`/tasks/${taskId}`, { token }),
     enabled: Boolean(token && taskId),
-    staleTime: 15_000,
+    staleTime: formSession ? Number.POSITIVE_INFINITY : 15_000,
     placeholderData,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: !formSession,
+    refetchOnMount: formSession ? false : true,
+    refetchOnReconnect: !formSession,
   });
 
   const error = useMemo(

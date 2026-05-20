@@ -4,6 +4,95 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-20 — Task delete/archive fixes + context menu Edit
+
+- **Context:** Delete showed no loading; editor/board right-click delete seemed broken; slow disappear from board.
+- **Fixes:** Shared **`useArchiveTask`** (optimistic cache remove + **`Working…`** on confirm). Context menu defers actions via **`queueMicrotask`** (confirm dialog race). **Edit task** on right-click. API + caps: **task creator** may delete (assigner). Errors surface in banner; dialog stays open on failure.
+- **Code / repo:** `useArchiveTask.ts`, `task-mutation-cache.ts`, `ConfirmDialog.tsx`, `SimpleContextMenu.tsx`, `TaskEditor.tsx`, `work/page.tsx`, `tasks.service.ts`, `authorization.service.ts`, `workspace-permissions.ts`.
+
+### 2026-05-20 — Mandatory task title (frontend gate)
+
+- **What we did:** Placeholder **Untitled Task**; label **Task title** with red `*`. Leaving without a real title → dialog **Keep editing** / **Delete task** (archives draft, removes from board). Uses `hasMeaningfulTitle` + extended `useTaskFormNavigationGuard`.
+- **Code / repo:** `task-default-title.ts`, `TaskEditor.tsx`, `useTaskFormNavigationGuard.ts`.
+
+### 2026-05-20 — New task: create before opening editor (no Saving on open)
+
+- **Context:** Auto-mint on the create form showed **Saving** as soon as the page opened — felt wrong.
+- **What we did:** **`createDraftTask`** + **`useOpenNewTask`**: POST draft task **before** `router.push` to `/work/task/{id}`. Work board **+ New task** / **N** shortcut use the hook. `/work/task/new` redirects via same hook. **`TaskEditor`** is **existing-only** (`taskId` prop); no on-page mint. **`useLayoutEffect`** establishes sync baseline on open to avoid spurious pending state.
+- **Code / repo:** `lib/create-draft-task.ts`, `hooks/useOpenNewTask.ts`, `work/page.tsx`, `work/task/new/page.tsx`, `TaskEditor.tsx`.
+
+### 2026-05-20 — New task: auto-mint with sentinel title
+
+- **Context:** User wanted Todoist-style flow — no blocking UI until title commit; invisible prepopulation for API.
+- **What we did:** **`TASK_DEFAULT_TITLE`** (`"Untitled task"`) in `task-default-title.ts`. On new task open (when **list** is set), **auto-POST** with sentinel if title empty; title field stays **empty** (placeholder only). First keystroke **PATCH**es real title. Removed Enter/blur mint and “save title first” hints. **`history.replaceState`** after mint (no remount).
+- **Code / repo:** `lib/task-default-title.ts`, `TaskEditor.tsx`.
+
+### 2026-05-20 — Task editor: instant title save + stable subtask rows
+
+- **Context:** Title save felt slow; subtasks jumped up/down while toggling/editing, then snapped back when saved.
+- **Root causes:** **`router.replace`** after mint remounted the editor; **`TaskSubtaskList`** re-sorted on every render; cache patches used **`sortSubtasksChronological`**; React **`key`** changed when optimistic id → server id.
+- **What we did:** Mint updates URL with **`history.replaceState`** + **`mintedTaskId`** state (no remount). **`patchTaskSubtasksInCache({ preserveOrder: true })`**; list displays cache order as-is. **`useTaskSubtasks`** stable keys via **`getStableKey`**. Title edits call **`scheduleSave()`** when task exists.
+- **Code / repo:** `TaskEditor.tsx`, `TaskSubtaskList.tsx`, `useTaskSubtasks.ts`, `task-subtask-cache.ts`.
+
+### 2026-05-20 — New task: mint on title commit (fix 1-char title bug)
+
+- **Context:** New task autosaved after 400ms with only the first typed character; navigation re-hydrated form from server → one-letter title.
+- **What we did:** **No debounced POST while typing.** Create runs on **title blur or Enter** via `mintCreate()`. Full title stored in `sessionStorage` before `router.replace` as backup on hydrate. Hint: “Press Enter or leave title to save.”
+- **Code / repo:** `useTaskFieldsSync.ts` (`autoCreate: false`, `mintCreate`), `TaskEditor.tsx`.
+
+### 2026-05-20 — Task editor Phase 1+2: unified Todoist-style flow
+
+- **Context:** User asked to implement unified task create/edit (Phase 1) and hardening (Phase 2) — one real-time edit model, not separate create/edit stacks.
+- **What we did:** **`TaskEditor`** component (`mode: new | existing`) — single UI, header **Task**, one **`useTaskFieldsSync`** (POST mint once → PATCH only). **Routes:** canonical `work/task/[taskId]`; `work/task/new` thin wrapper; `work/task/[taskId]/edit` → redirect. After mint: **`router.replace`** to `/work/task/{id}` (not `/edit`). Removed **`TaskSubtaskDraftList`** — pre-mint subtasks = pending list in POST `initialSubtasks`; after mint = **`TaskSubtaskList`** only. **Phase 2:** debounced workspace invalidation (1.5s) in **`WorkspaceRealtimeSubscriber`**; kept detail cache rules.
+- **Code / repo:** `components/tasks/TaskEditor.tsx`, `hooks/useTaskFieldsSync.ts`, `work/task/[taskId]/page.tsx`, `work/task/new/page.tsx`, `work/task/[taskId]/edit/page.tsx`, `TaskViewPanel.tsx`.
+
+### 2026-05-20 — MCP test: create task + 5 subtasks; duplicate POST fix
+
+- **Context:** Chrome DevTools MCP test with `test-workledger-mcp@example.local` on MCP Test Org.
+- **Found:** (1) **Duplicate POST** on create — drain loop fired second create before `taskIdRef` set. (2) Sync pill showed **“Saved”** on empty form (idle mislabeled). (3) Spurious PATCH right after create before baseline.
+- **Fixed:** `creatingRef` + set `taskIdRef` immediately after POST; `establishBaseline` after create in `useTaskFormPersistence`; idle indicator → **“Auto-save”**; removed redundant `formReady` on new page.
+- **Verified:** One POST with 5 `initialSubtasks`, all subtasks in order, delete subtask + title PATCH kept 4 subtasks (no zombie reappear).
+
+### 2026-05-20 — Task form autosave rework (standard local-first)
+
+- **Context:** Autosave felt broken — refetches, UI blink, deleted subtasks reappearing; dual POST/PATCH hooks on create fought each other.
+- **Root causes:** (1) `applyTaskMutationToCache` replaced `subtasks` on every field PATCH, racing subtask API/optimistic cache. (2) `workspace_changed` socket invalidated `taskKeys.detail`, triggering GET refetches during edits. (3) Create page used two `useTaskAutoSync` instances + `useTaskDetail` refetch-on-focus.
+- **What we did:** **`applyTaskMutationToCache`** — field PATCH updates task/assignees/ledger only; subtasks unchanged unless `syncSubtasks: true` (POST seed). **Realtime** — stop invalidating task detail on `workspace_changed`. **`useTaskDetail({ formSession: true })`** — no refetch on focus/mount while editing. **`useTaskFormPersistence`** — single debounced save (POST until `taskId`, then PATCH); due baseline ref avoids cache-driven due flicker. **Create** — one hook, draft subtasks not in fingerprint (avoid duplicate POSTs).
+- **Code / repo:** `task-mutation-cache.ts`, `useTaskFormPersistence.ts`, `useTaskDetail.ts`, `WorkspaceRealtimeSubscriber.tsx`, `work/task/new/page.tsx`, `work/task/[taskId]/edit/page.tsx`.
+
+### 2026-05-20 — Create task: stay on create page after first autosave
+
+- **Context:** First autosave on **Create Task** called `router.replace` to the edit route, remounting the page and flipping UX into “edit mode” (jarring refresh, wrong mental model).
+- **What we did:** After first POST, set `createdTaskId`, seed React Query cache, enable PATCH autosync — **no Next.js navigation**. URL only updates via `window.history.replaceState` to the edit path (bookmarkable) while UI stays **“Create Task”**. Subtasks switch from draft list to API list once detail exists. List selector disabled after create. `useTaskSubtasks` no-ops when `taskId` empty.
+- **Takeaway:** Create flow = one continuous screen; POST once then PATCH; URL can change without remount.
+- **Code / repo:** `apps/web/src/app/(authenticated)/[workspaceId]/work/task/new/page.tsx`, `useTaskSubtasks.ts`.
+
+### 2026-05-20 — Subtasks: chronological order + instant optimistic saves
+
+- **Context:** New subtasks appeared at top (wrong checklist order); saves felt slow (awaiting network + spinners).
+- **What we did:** API + cache sort **oldest-first** (`asc(createdAt)`); optimistic create **appends**; `sortSubtasksChronological` in UI/cache. **TaskSubtaskList** uses fire-and-forget `mutate` (no `await`, no row spinners) — optimistic cache updates feel immediate.
+- **Code / repo:** `tasks.service.ts`, `useTaskSubtasks.ts`, `TaskSubtaskList.tsx`, `task-subtask-cache.ts`, `lib/subtask-order.ts`.
+
+### 2026-05-20 — Subtasks: per-item API mutations (not task PATCH autosave)
+
+- **Context:** Bundling subtasks into debounced task PATCH caused duplicates, glitches, and slow saves; user asked for a standard approach, not more stitching.
+- **What we did:** **Edit** — `TaskSubtaskList` + `useTaskSubtasks` (React Query): `POST/PATCH/DELETE /tasks/:id/subtasks[/:subtaskId]` with optimistic cache updates via `task-subtask-cache.ts`. Removed subtasks from `useTaskAutoSync` fingerprint. **Create** — local `TaskSubtaskDraftList` only until first POST (subtasks in `initialSubtasks` once via ref, not in autosave fingerprint). **API** — `DELETE :taskId/subtasks/:subtaskId`.
+- **Takeaway:** Task autosave = title, status, priority, due, assignees only. Each subtask action = one immediate API call (same pattern as work board checklist).
+- **Code / repo:** `useTaskSubtasks.ts`, `TaskSubtaskList.tsx`, `TaskSubtaskDraftList.tsx`, `task-subtask-cache.ts`, `tasks.controller.ts`, `tasks.service.ts`, `edit/page.tsx`, `new/page.tsx`.
+
+### 2026-05-20 — Task auto-save: queue drain, faster sync, pill UI
+
+- **Context:** Follow-up — concurrent edits dropped during save; 700ms debounce felt slow; sync indicator layout weak.
+- **What we did:** **`useTaskAutoSync`** — drain loop saves until fingerprint matches; only marks saved if no newer edits during request; chains saves without extra debounce. **350ms** debounce for text; **`scheduleSave`** (microtask) on status/priority/due/list/assignees for instant flush. **Edit** — `onSaved` clears only subtasks that were in the PATCH payload (not all pending). **`TaskFormSyncIndicator`** — compact right-aligned pill (`h-7`, uppercase labels: Pending / Saving / Saved / Draft), error detail below.
+- **Code / repo:** `useTaskAutoSync.ts`, `TaskFormSyncIndicator.tsx`, `edit/page.tsx`, `new/page.tsx`.
+
+### 2026-05-20 — Task create/edit: auto-save, sync indicator, leave warning
+
+- **Context:** User wanted task create and edit pages to save automatically (no Save/Cancel), show sync status on the right, and warn when leaving with unsaved changes.
+- **What we did:** Shared **`useTaskAutoSync`** (700ms debounce, queue while in flight), **`TaskFormSyncIndicator`**, **`useTaskFormNavigationGuard`** (confirm dialog + `beforeunload`). **Edit** — PATCH all form fields (title, status, priority, due, repeat, assignees, subtask create/update/delete); stay on page after save. **Create** — auto-POST when title + list, then **`router.replace`** to edit URL; draft-only leave warning when list/title missing. Removed manual save/cancel buttons; Back uses guard.
+- **Takeaway:** Comments, attachments, dependencies, time tracker still save via their own components (unchanged).
+- **Code / repo:** `apps/web/src/hooks/useTaskAutoSync.ts`, `useTaskFormNavigationGuard.ts`, `useDebounce.ts`, `components/tasks/TaskFormSyncIndicator.tsx`, `lib/task-mutation-cache.ts`, `work/task/new/page.tsx`, `work/task/[taskId]/edit/page.tsx`.
+
 ### 2026-05-20 — Auto browser notification permission (no Enable push)
 
 - **Context:** “Enable push” in the notification panel felt redundant; product should trigger the **browser permission prompt** directly.
@@ -16,6 +105,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 - **What we did:** **`HeaderLiveIsland`** + imperative **`liveIsland`** store (`apps/web/src/components/app/live-island/`). **AppHeader** — 3-column grid: brand | island | actions. Pill animates **compact → expanded → compact → dismiss**; tap toggles expand; optional action + dismiss. **WorkspaceNotificationsProvider** — activity + push feedback use **`liveIsland`** instead of Sonner. Removed **`AppToaster`** from root layout; island styles in **`globals.css`** (`.header-live-island*`).
 - **Takeaway:** Island only renders when **`AppHeader`** mounts (authenticated chrome). Queue shows one alert at a time. Sonner CSS left commented as legacy if reintroduced elsewhere.
 - **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `live-island/*`, `WorkspaceNotificationsProvider.tsx`, `apps/web/src/app/globals.css`, `apps/web/src/app/layout.tsx`.
+
+### 2026-05-20 — Attachments: image compression, dedup blobs, orphan cleanup
+
+- **Context:** Storage efficiency — compress images, deduplicate identical files, remove stale R2 keys.
+- **What we did:** **`attachment_blobs`** table (`content_sha256`, `storage_key`, `ref_count`) + **`task_attachments.blob_id`** (migration **`0021_attachment_blobs`**). Upload path: **sharp** resize/WebP → SHA-256 → reuse blob or **`attachments/blobs/{aa}/{hash}.webp`** in R2. Delete decrements **`ref_count`**; R2 delete when 0. **Orphan job** `@Cron` 03:00 daily — `ListObjects` under `attachments/` vs DB, delete unknown keys older than 24h (`ATTACHMENT_ORPHAN_CLEANUP=false` to disable). Presign/confirm unchanged (legacy blob rows).
+- **Code / repo:** `packages/db/drizzle/0021_attachment_blobs.sql`, `apps/api/src/attachments/attachment-image.util.ts`, `attachments-storage.util.ts`, `attachments-orphan-cleanup.service.ts`, `attachments.service.ts`, `sharp`, `@nestjs/schedule`.
+- **Takeaway:** Run **`npm run migrate -w @work-ledger/db`** on each environment before deploy.
 
 ### 2026-05-20 — Attachment upload: API proxy (fix “Failed to fetch” / R2 CORS)
 

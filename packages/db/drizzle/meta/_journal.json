@@ -148,6 +148,13 @@
       "when": 1747440009000,
       "tag": "0020_ledger_priority_change",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1747440010000,
+      "tag": "0021_attachment_blobs",
+      "breakpoints": true
     }
   ]
 }

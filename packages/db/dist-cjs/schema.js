@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.subtasksRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -251,21 +252,33 @@ exports.taskDependencies = (0, pg_core_1.pgTable)("task_dependencies", {
     (0, pg_core_1.primaryKey)({ columns: [t.taskId, t.dependsOnTaskId] }),
     (0, pg_core_1.index)("task_deps_depends_on_idx").on(t.dependsOnTaskId),
 ]);
-/** Files uploaded to tasks, stored in Cloudflare R2 via presigned PUT. */
+/** Deduplicated binary payload in R2 (content-addressed or legacy key). */
+exports.attachmentBlobs = (0, pg_core_1.pgTable)("attachment_blobs", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    contentSha256: (0, pg_core_1.text)("content_sha256").notNull().unique(),
+    storageKey: (0, pg_core_1.text)("storage_key").notNull().unique(),
+    mimeType: (0, pg_core_1.text)("mime_type").notNull(),
+    byteSize: (0, pg_core_1.text)("byte_size").notNull(),
+    refCount: (0, pg_core_1.integer)("ref_count").notNull().default(1),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+/** Files uploaded to tasks; each row references one shared blob. */
 exports.taskAttachments = (0, pg_core_1.pgTable)("task_attachments", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
     taskId: (0, pg_core_1.uuid)("task_id")
         .notNull()
         .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    blobId: (0, pg_core_1.uuid)("blob_id")
+        .notNull()
+        .references(() => exports.attachmentBlobs.id, { onDelete: "restrict" }),
     uploadedBy: (0, pg_core_1.text)("uploaded_by")
         .notNull()
         .references(() => exports.user.id, { onDelete: "restrict" }),
     fileName: (0, pg_core_1.text)("file_name").notNull(),
-    fileSize: (0, pg_core_1.text)("file_size").notNull(), // stored as string to avoid integer overflow on large files
+    fileSize: (0, pg_core_1.text)("file_size").notNull(), // display size (original upload); blob may be smaller when compressed
     mimeType: (0, pg_core_1.text)("mime_type").notNull(),
-    storageKey: (0, pg_core_1.text)("storage_key").notNull().unique(),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [(0, pg_core_1.index)("task_attachments_task_idx").on(t.taskId)]);
+}, (t) => [(0, pg_core_1.index)("task_attachments_task_idx").on(t.taskId), (0, pg_core_1.index)("task_attachments_blob_idx").on(t.blobId)]);
 /** Task comments (threaded, soft-deletable). */
 exports.comments = (0, pg_core_1.pgTable)("comments", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -461,8 +474,12 @@ exports.taskDependenciesRelations = (0, drizzle_orm_1.relations)(exports.taskDep
     task: one(exports.tasks, { fields: [exports.taskDependencies.taskId], references: [exports.tasks.id], relationName: "blockedBy" }),
     dependsOn: one(exports.tasks, { fields: [exports.taskDependencies.dependsOnTaskId], references: [exports.tasks.id], relationName: "blocking" }),
 }));
+exports.attachmentBlobsRelations = (0, drizzle_orm_1.relations)(exports.attachmentBlobs, ({ many }) => ({
+    attachments: many(exports.taskAttachments),
+}));
 exports.taskAttachmentsRelations = (0, drizzle_orm_1.relations)(exports.taskAttachments, ({ one }) => ({
     task: one(exports.tasks, { fields: [exports.taskAttachments.taskId], references: [exports.tasks.id] }),
+    blob: one(exports.attachmentBlobs, { fields: [exports.taskAttachments.blobId], references: [exports.attachmentBlobs.id] }),
     uploader: one(exports.user, { fields: [exports.taskAttachments.uploadedBy], references: [exports.user.id] }),
 }));
 exports.commentsRelations = (0, drizzle_orm_1.relations)(exports.comments, ({ one, many }) => ({
@@ -513,6 +530,7 @@ exports.appSchema = {
     pushSubscriptions: exports.pushSubscriptions,
     notifications: exports.notifications,
     taskDependencies: exports.taskDependencies,
+    attachmentBlobs: exports.attachmentBlobs,
     taskAttachments: exports.taskAttachments,
     comments: exports.comments,
     commentMentions: exports.commentMentions,
@@ -531,6 +549,7 @@ exports.appSchema = {
     pushSubscriptionsRelations: exports.pushSubscriptionsRelations,
     notificationsRelations: exports.notificationsRelations,
     taskDependenciesRelations: exports.taskDependenciesRelations,
+    attachmentBlobsRelations: exports.attachmentBlobsRelations,
     taskAttachmentsRelations: exports.taskAttachmentsRelations,
     commentsRelations: exports.commentsRelations,
     commentMentionsRelations: exports.commentMentionsRelations,

@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import {
   appendLedgerSchema,
   createSubtaskSchema,
@@ -135,7 +135,7 @@ export class TasksService {
         .from(activityLedger)
         .where(eq(activityLedger.taskId, taskId))
         .orderBy(desc(activityLedger.createdAt)),
-      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt)),
+      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(asc(subtasks.createdAt)),
     ]);
 
     return {
@@ -149,7 +149,7 @@ export class TasksService {
 
   async listSubtasks(userId: string, taskId: string) {
     await this.authz.getTaskAccess(userId, taskId);
-    return this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt));
+    return this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(asc(subtasks.createdAt));
   }
 
   async createSubtask(userId: string, taskId: string, body: unknown) {
@@ -180,6 +180,19 @@ export class TasksService {
         ...(parsed.done !== undefined ? { done: parsed.done } : {}),
         updatedAt: new Date(),
       })
+      .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
+      .returning();
+    if (!row) throw new ForbiddenException("Subtask not found");
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    return row;
+  }
+
+  async deleteSubtask(userId: string, taskId: string, subtaskId: string) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot delete subtask");
+    const [row] = await this.db
+      .delete(subtasks)
       .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
       .returning();
     if (!row) throw new ForbiddenException("Subtask not found");
@@ -289,8 +302,11 @@ export class TasksService {
     if (access.task.deletedAt) {
       throw new ForbiddenException("Task already archived");
     }
-    if (!access.isOwner && !access.isDeptManager) {
-      throw new ForbiddenException("Only owners and department managers can archive tasks");
+    const isAssigner = access.task.assignerId === userId;
+    if (!access.isOwner && !access.isDeptManager && !isAssigner) {
+      throw new ForbiddenException(
+        "Only owners, department managers, or the task creator can delete tasks",
+      );
     }
 
     const now = new Date();
@@ -315,6 +331,17 @@ export class TasksService {
     const archived = await this.taskMutationResult(userId, taskId, ledgerDelta);
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return archived;
+  }
+
+  async deleteTask(userId: string, taskId: string) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    const caps = this.authz.taskCapabilities(access, userId);
+    if (!caps.canDeleteTask) {
+      throw new ForbiddenException("Only owners and task creators can permanently delete tasks");
+    }
+    const orgId = access.task.organizationId;
+    await this.db.delete(tasks).where(eq(tasks.id, taskId));
+    this.collaboration.notifyOrgChanged(orgId, taskId);
   }
 
   async updateStatus(userId: string, taskId: string, body: unknown) {
@@ -609,7 +636,7 @@ export class TasksService {
         .select({ userId: taskAssignees.userId })
         .from(taskAssignees)
         .where(eq(taskAssignees.taskId, taskId)),
-      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(desc(subtasks.createdAt)),
+      this.db.select().from(subtasks).where(eq(subtasks.taskId, taskId)).orderBy(asc(subtasks.createdAt)),
       this.db
         .select()
         .from(activityLedger)

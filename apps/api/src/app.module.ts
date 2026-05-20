@@ -1,6 +1,7 @@
 import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "./auth/auth.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { DbModule } from "./db/db.module";
@@ -27,6 +28,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
         join(__dirname, "..", "..", "..", ".env.local"),
       ],
     }),
+    ScheduleModule.forRoot(),
     DbModule,
     AuthorizationModule,
     AuthModule,

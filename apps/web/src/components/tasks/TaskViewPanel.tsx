@@ -12,18 +12,8 @@ import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { statusPillPaletteClasses, STATUS_LABELS, PRIORITY_LABELS, type TaskPriority } from "@/lib/task-board";
 import { CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
-import { parseTaskDueRepeat, type MemberRow } from "@/lib/ledger-types";
-
-function memberInitials(m: MemberRow): string {
-  const n = m.name?.trim();
-  if (n) {
-    const parts = n.split(/\s+/).filter(Boolean);
-    return parts.length >= 2
-      ? (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase()
-      : n.slice(0, 2).toUpperCase();
-  }
-  return (m.email ?? "??").slice(0, 2).toUpperCase();
-}
+import { parseTaskDueRepeat } from "@/lib/ledger-types";
+import { memberInitials } from "@/lib/member-utils";
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -56,7 +46,7 @@ export function TaskViewPanel({
   const { detail, isLoading } = useTaskDetail(token, taskId, taskFromList);
 
   function navigateToEdit() {
-    router.push(`/${workspaceSlug}/work/task/${taskId}/edit`);
+    router.push(`/${workspaceSlug}/work/task/${taskId}`);
   }
 
   if (isLoading && !detail) {

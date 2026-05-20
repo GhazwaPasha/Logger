@@ -208,23 +208,23 @@ export function TimeTracker({
       {/* Manual log form */}
       {!viewOnly && showManual && (
         <div className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3">
-          <div className="flex gap-2">
-            <div className="flex-1">
+          <div className="space-y-1.5">
+            <div>
               <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">Start</label>
               <input
                 type="datetime-local"
                 value={manualStart}
                 onChange={(e) => setManualStart(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1 text-xs outline-none"
+                className="w-full min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1.5 text-xs outline-none"
               />
             </div>
-            <div className="flex-1">
+            <div>
               <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">End</label>
               <input
                 type="datetime-local"
                 value={manualEnd}
                 onChange={(e) => setManualEnd(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1 text-xs outline-none"
+                className="w-full min-w-0 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1.5 text-xs outline-none"
               />
             </div>
           </div>
@@ -245,14 +245,14 @@ export function TimeTracker({
                 logManualMutation.mutate();
               }}
               disabled={logManualMutation.isPending}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
             >
               Log
             </button>
             <button
               type="button"
               onClick={() => { setShowManual(false); setManualError(""); }}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             >
               Cancel
             </button>

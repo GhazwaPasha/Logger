@@ -68,6 +68,8 @@ import {
 } from "@/lib/work-board-scope";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { useArchiveTask } from "@/hooks/useArchiveTask";
+import { useOpenNewTask } from "@/hooks/useOpenNewTask";
 import {
   FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
@@ -373,6 +375,8 @@ function WorkItemsInner() {
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
+  const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
+  const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
   const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
@@ -513,14 +517,14 @@ function WorkItemsInner() {
     });
   }, [lists, levelPref, listPref]);
 
-  // 'N' keyboard shortcut → navigate to new task page
+  // 'N' keyboard shortcut → create draft task, then open editor
   useEffect(() => {
     function handler() {
-      router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
+      void openNewTask(listId || undefined);
     }
     window.addEventListener("wl:new-task", handler);
     return () => window.removeEventListener("wl:new-task", handler);
-  }, [router, workspaceSlug, listId]);
+  }, [openNewTask, listId]);
 
   useEffect(() => {
     if (!viewTaskId) return;
@@ -791,24 +795,19 @@ function WorkItemsInner() {
 
   const runTaskArchive = useCallback(
     async (taskId: string) => {
-      if (!token) return;
-      setTaskContextMenu(null);
       setError(null);
-      try {
-        await apiJson<TaskMutationResult>(`/tasks/${taskId}/archive`, { method: "POST", token });
-        await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-        queryClient.removeQueries({ queryKey: taskKeys.detail(taskId) });
-        setViewTaskId((id) => (id === taskId ? null : id));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not archive task");
+      clearArchiveError();
+      const result = await archiveTask(taskId);
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
       }
+      setViewTaskId((id) => (id === taskId ? null : id));
     },
-    [token, queryClient, workspaceId, setError],
+    [archiveTask, clearArchiveError, setError],
   );
 
   function openTaskContextMenu(e: ReactMouseEvent, task: TaskRow) {
-    const caps = taskArchiveDeleteCaps(task, lists, sessionUserId, members);
-    if (!caps.canArchiveTask && !caps.canDeleteTask) return;
     e.preventDefault();
     setTaskContextMenu({ x: e.clientX, y: e.clientY, task });
   }
@@ -817,20 +816,31 @@ function WorkItemsInner() {
     if (!taskContextMenu) return [];
     const { task } = taskContextMenu;
     const caps = taskArchiveDeleteCaps(task, lists, sessionUserId, members);
-    const items: SimpleContextMenuItem[] = [];
+    const items: SimpleContextMenuItem[] = [
+      {
+        id: "edit",
+        label: "Edit task",
+        onSelect: () => {
+          router.push(`/${workspaceSlug}/work/task/${task.id}`);
+        },
+      },
+    ];
     if (caps.canDeleteTask) {
       items.push({
         id: "delete",
         label: "Delete task",
         destructive: true,
         onSelect: () => {
+          const taskId = task.id;
           setTaskActionConfirm({
             title: "Delete this task?",
             description:
               "It will be removed from the board. You can still rely on exports or backups outside LogBase if you need a record.",
             confirmLabel: "Delete task",
             variant: "danger",
-            onConfirm: () => void runTaskArchive(task.id),
+            onConfirm: async () => {
+              await runTaskArchive(taskId);
+            },
           });
         },
       });
@@ -840,18 +850,21 @@ function WorkItemsInner() {
         id: "archive",
         label: "Archive task",
         onSelect: () => {
+          const taskId = task.id;
           setTaskActionConfirm({
             title: "Archive this task?",
             description: "It will be hidden from the board and treated as archived.",
             confirmLabel: "Archive",
             variant: "default",
-            onConfirm: () => void runTaskArchive(task.id),
+            onConfirm: async () => {
+              await runTaskArchive(taskId);
+            },
           });
         },
       });
     }
     return items;
-  }, [taskContextMenu, lists, sessionUserId, members, runTaskArchive]);
+  }, [taskContextMenu, lists, sessionUserId, members, runTaskArchive, router, workspaceSlug]);
 
   const toggleListRowExpand = useCallback((taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -1729,12 +1742,14 @@ function WorkItemsInner() {
         <div className="pt-4">
           <button
             type="button"
-            className="text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-            onClick={() => {
-              router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
-            }}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => void openNewTask(listId || undefined)}
+            disabled={isOpeningNewTask}
           >
-            + Add task
+            {isOpeningNewTask ? (
+              <InlineSpinner className="size-3 shrink-0 animate-spin motion-reduce:animate-none" />
+            ) : null}
+            <span>{isOpeningNewTask ? "Opening…" : "+ Add task"}</span>
           </button>
         </div>
       </div>
@@ -2051,12 +2066,14 @@ function WorkItemsInner() {
             </div>
             <button
               type="button"
-              className="btn-primary !h-8 shrink-0 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
-              onClick={() => {
-                router.push(`/${workspaceSlug}/work/task/new${listId ? `?listId=${listId}` : ""}`);
-              }}
+              className="btn-primary !h-8 inline-flex shrink-0 items-center gap-1.5 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+              onClick={() => void openNewTask(listId || undefined)}
+              disabled={isOpeningNewTask}
             >
-              + New task
+              {isOpeningNewTask ? (
+                <InlineSpinner className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+              ) : null}
+              <span>{isOpeningNewTask ? "Opening…" : "+ New task"}</span>
             </button>
           </div>
           <WorkBoardStatsCard

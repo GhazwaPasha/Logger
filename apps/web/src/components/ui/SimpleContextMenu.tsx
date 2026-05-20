@@ -77,8 +77,8 @@ export function SimpleContextMenu({
           role="menuitem"
           className="flex w-full px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
           onClick={() => {
-            item.onSelect();
             onClose();
+            queueMicrotask(() => item.onSelect());
           }}
         >
           {item.label}

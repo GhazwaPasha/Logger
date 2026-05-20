@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -116,6 +117,20 @@ export class TasksByIdController {
     @Body() body: unknown,
   ) {
     return this.tasks.patchSubtask(user.id, taskId, subtaskId, body);
+  }
+
+  @Delete(":taskId/subtasks/:subtaskId")
+  deleteSubtask(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @Param("subtaskId") subtaskId: string,
+  ) {
+    return this.tasks.deleteSubtask(user.id, taskId, subtaskId);
+  }
+
+  @Delete(":taskId")
+  deleteTask(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
+    return this.tasks.deleteTask(user.id, taskId);
   }
 
   @Post(":taskId/archive")
