@@ -4,6 +4,14 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-20 — Push notification click opens production (not localhost)
+
+- **Context:** Opening a push notification sent users to **`http://localhost:3000`** instead of the live site.
+- **Root cause:** API **`notifyLedgerActivity`** built absolute URLs from **`PUBLIC_WEB_ORIGIN`**, defaulting to localhost when unset on the API host (prod often has **`NEXT_PUBLIC_APP_URL`** but not **`PUBLIC_WEB_ORIGIN`**).
+- **What we did:** Payload **`url`** is now **path-only** (`/{slug}/work?task=…`) so **`notificationclick`** resolves on the subscriber’s origin. **`sw.js`** **`resolveNotificationTarget`** rewrites legacy absolute localhost (or same-origin) links to path + query. **`Client.navigate`** when an app window is already open.
+- **Deploy:** Redeploy **API** (new payloads) and **web** (updated **`sw.js`**). Users may need a refresh so the SW updates; old notifications already in the tray still get localhost rewrite on click.
+- **Code / repo:** `apps/api/src/push/push-notifications.service.ts`, `apps/web/public/sw.js`.
+
 ### 2026-05-20 — Task delete/archive fixes + context menu Edit
 
 - **Context:** Delete showed no loading; editor/board right-click delete seemed broken; slow disappear from board.

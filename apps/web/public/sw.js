@@ -63,15 +63,33 @@ self.addEventListener("push", (event) => {
   );
 });
 
+/** Resolve push deep link against this PWA origin; strip stale localhost from older payloads. */
+function resolveNotificationTarget(url) {
+  if (typeof url !== "string" || url.length === 0) return "/";
+  if (url.startsWith("/")) return url;
+  try {
+    const parsed = new URL(url, self.location.origin);
+    const isLocalhost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+    if (isLocalhost || parsed.origin === self.location.origin) {
+      return parsed.pathname + parsed.search + parsed.hash;
+    }
+    return parsed.href;
+  } catch {
+    return "/";
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification?.data?.url;
-  const target = typeof url === "string" && url.length > 0 ? url : "/";
+  const target = resolveNotificationTarget(event.notification?.data?.url);
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url && "focus" in client) {
+        if ("focus" in client) {
+          if ("navigate" in client) {
+            return client.focus().then(() => client.navigate(target));
+          }
           void client.focus();
           return;
         }

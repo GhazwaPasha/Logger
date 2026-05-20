@@ -104,8 +104,6 @@ export class PushNotificationsService implements OnModuleInit {
 
     if (subs.length === 0) return;
 
-    const origin = this.config.get<string>("PUBLIC_WEB_ORIGIN")?.trim()?.replace(/\/$/, "") ?? "http://localhost:3000";
-
     const [orgRow] = await this.db
       .select({ slug: organizations.slug })
       .from(organizations)
@@ -113,7 +111,8 @@ export class PushNotificationsService implements OnModuleInit {
       .limit(1);
 
     const slug = orgRow?.slug ?? opts.organizationId;
-    const url = `${origin}/${slug}/work?task=${encodeURIComponent(opts.taskId)}`;
+    // Path-only so notificationclick opens on the subscriber's origin (prod, preview, custom domain).
+    const url = `/${slug}/work?task=${encodeURIComponent(opts.taskId)}`;
 
     const summary = summarizeLedgerDelta(opts.ledgerDelta);
     const title = "LogBase";
