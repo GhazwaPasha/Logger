@@ -12,11 +12,11 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 - **Deploy:** API + web.
 - **Code / repo:** `organizations.service.ts`, `tasks.service.ts`, `ledger-types.ts`, `useOrgActivityFeed.ts`, `WorkspaceNotificationsProvider.tsx`.
 
-### 2026-05-20 — Header: online teammates left, no status dots
+### 2026-05-20 — Header: online teammates by search, no status dots
 
-- **Context:** Online member avatars sat right of search; green/amber status dots on stacked circles.
-- **What we did:** Moved **`OnlineMembersAvatars`** to left header cluster (after LogBase logo). Removed status dot spans from teammate circles; away still in `title` tooltip.
-- **Code / repo:** `apps/web/src/components/app/AppHeader.tsx`, `OnlineMembersAvatars.tsx`.
+- **Context:** Teammate avatars placement + remove green/amber dots on stacked circles.
+- **What we did:** **`OnlineMembersAvatars`** in a flex group **immediately left of** **`GlobalSearch`** (right header cluster, not by logo). **`GlobalSearch`** reserves `w-[22rem] sm:w-[28rem]` when open so expand/collapse does not collapse layout or shift bell/settings. No status dots on teammate circles.
+- **Code / repo:** `AppHeader.tsx`, `OnlineMembersAvatars.tsx`, `GlobalSearch.tsx`.
 
 ### 2026-05-20 — Push notification click opens production (not localhost)
 
