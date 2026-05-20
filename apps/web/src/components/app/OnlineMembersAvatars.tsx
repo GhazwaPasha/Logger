@@ -27,7 +27,10 @@ export function OnlineMembersAvatars() {
   const { onlineUserIds, awayUserIds } = useOnlinePresence();
 
   const onlineMembers = members.filter(
-    (m) => onlineUserIds.has(m.userId) && m.userId !== currentUserId,
+    (m) =>
+      onlineUserIds.has(m.userId) &&
+      !awayUserIds.has(m.userId) &&
+      m.userId !== currentUserId,
   );
 
   if (onlineMembers.length === 0) return null;
@@ -37,14 +40,12 @@ export function OnlineMembersAvatars() {
 
   return (
     <div className="flex items-center gap-1.5" role="list" aria-label={`${onlineMembers.length} teammate${onlineMembers.length === 1 ? "" : "s"} online`}>
-      {shown.map((m) => {
-        const isAway = awayUserIds.has(m.userId);
-        return (
+      {shown.map((m) => (
           <div
             key={m.userId}
             role="listitem"
             className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]"
-            title={`${m.name || m.email}${isAway ? " (Away)" : ""}`}
+            title={m.name || m.email}
           >
             {m.image ? (
               <img src={m.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
@@ -52,8 +53,7 @@ export function OnlineMembersAvatars() {
               <span aria-hidden>{initials(m.name, m.email)}</span>
             )}
           </div>
-        );
-      })}
+      ))}
       {overflow > 0 && (
         <div
           className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[10px] font-semibold text-[var(--muted)]"

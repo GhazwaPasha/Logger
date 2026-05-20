@@ -20,7 +20,7 @@ import { CollaborationService, orgSocketRoom, userSocketRoom } from "./collabora
  *
  * Global `JwtAuthGuard` skips `ws` contexts; we verify JWT here in `handleConnection`.
  */
-export type PresenceSyncPayload = { onlineUserIds: string[] };
+export type PresenceSyncPayload = { onlineUserIds: string[]; awayUserIds: string[] };
 export type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
 
 @WebSocketGateway({
@@ -78,6 +78,10 @@ export class OrgCollaborationGateway
     return [...(this.presence.get(orgId)?.keys() ?? [])];
   }
 
+  private awayUserIds(orgId: string): string[] {
+    return [...(this.awayUsers.get(orgId) ?? [])];
+  }
+
   async afterInit(server: Server): Promise<void> {
     this.collaboration.bindServer(server);
 
@@ -117,6 +121,7 @@ export class OrgCollaborationGateway
   handleDisconnect(client: Socket): void {
     const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
     if (!userId || !organizationId) return;
+    this.awayUsers.get(organizationId)?.delete(userId);
     const wasLast = this.removePresence(organizationId, userId, client.id);
     if (wasLast) {
       const payload: PresenceUpdatePayload = { userId, status: "offline" };
@@ -169,7 +174,10 @@ export class OrgCollaborationGateway
       this.addPresence(organizationId, userId, client.id);
 
       // Send current online snapshot to the newly connected client
-      const syncPayload: PresenceSyncPayload = { onlineUserIds: this.onlineUserIds(organizationId) };
+      const syncPayload: PresenceSyncPayload = {
+        onlineUserIds: this.onlineUserIds(organizationId),
+        awayUserIds: this.awayUserIds(organizationId),
+      };
       client.emit("presence_sync", syncPayload);
 
       // Notify others in the org room that this user came online

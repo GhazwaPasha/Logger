@@ -18,7 +18,7 @@ type WorkspaceChangedPayload = {
   taskId?: string | null;
 };
 
-type PresenceSyncPayload = { onlineUserIds: string[] };
+type PresenceSyncPayload = { onlineUserIds: string[]; awayUserIds?: string[] };
 type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
 
 /** Subscribes to org collaboration events; invalidates workspace (and optional task) cache. */
@@ -56,13 +56,18 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
     };
 
     const onPresenceSync = (payload: PresenceSyncPayload) => {
-      setOnlineUserIds(new Set(payload.onlineUserIds));
+      const away = new Set(payload.awayUserIds ?? []);
+      const online = new Set(
+        payload.onlineUserIds.filter((id) => !away.has(id)),
+      );
+      setAwayUserIds(away);
+      setOnlineUserIds(online);
     };
 
     const onPresenceUpdate = (payload: PresenceUpdatePayload) => {
       if (payload.status === "away") {
         setAwayUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
-        setOnlineUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
+        setOnlineUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
       } else if (payload.status === "online") {
         setAwayUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
         setOnlineUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
