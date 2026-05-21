@@ -4,6 +4,12 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-22 — Notifications panel: remove intro copy
+
+- **Context:** Bell slide-over had redundant explanatory paragraph under the header.
+- **What we did:** Removed muted helper text (“Updates on tasks you assigned…”) from **`WorkspaceNotificationsProvider`** panel; header + list only.
+- **Code / repo:** `apps/web/src/components/notifications/WorkspaceNotificationsProvider.tsx`.
+
 ### 2026-05-22 — PWA icons: black tile (Android/iOS), transparent Windows
 
 - **Context:** Install icons for Android/iOS should be **black background + `logbase-dark.png` mark**; Windows taskbar/tile stays **transparent** full-bleed.

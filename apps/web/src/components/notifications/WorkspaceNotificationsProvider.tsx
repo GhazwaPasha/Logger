@@ -295,10 +295,6 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-[var(--muted)]">
-                  Updates on tasks you assigned or are assigned to (plus assignment changes that involve you). Matches
-                  your workspace activity feed, filtered for you.
-                </p>
 
                 {activityQuery.isPending ? (
                   <p className="text-sm text-[var(--muted)]">Loading…</p>
