@@ -4,6 +4,13 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-05-22 — PWA icons: black tile (Android/iOS), transparent Windows
+
+- **Context:** Install icons for Android/iOS should be **black background + `logbase-dark.png` mark**; Windows taskbar/tile stays **transparent** full-bleed.
+- **What we did:** **`gen-pwa-icons.ps1`** — **`BackgroundColor`** on **`Export-SquareIcon`**; **192 / 512 / maskable-512 / 152 / 167 / 180** use **`#000`**; **`logbase-app-512-win.png`** + **256** stay transparent. **`layout.tsx`** — **`msapplication-TileImage`** and tab **512** → **`512-win`**. **`manifest.ts`** unchanged (black **512** + maskable for Android). Regenerated **`public/icons/*`**.
+- **Takeaway:** Re-run **`gen-pwa-icons.ps1`** after logo changes; **`npm run build:favicon`** only affects Windows **256** source.
+- **Code / repo:** `apps/web/scripts/gen-pwa-icons.ps1`, `apps/web/public/icons/`, `manifest.ts`, `layout.tsx`, `public/sw.js`, `src/app/apple-icon.png`.
+
 ### 2026-05-20 — Notifications for assigner (not only assignees)
 
 - **Context:** Task updates only notified assignees; assigner (task creator) saw nothing.

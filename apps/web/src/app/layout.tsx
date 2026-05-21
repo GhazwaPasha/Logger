@@ -31,13 +31,17 @@ export const metadata: Metadata = {
       { url: "/favicon.ico", type: "image/x-icon" },
       { url: "/icons/logbase-app-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/logbase-app-256.png", sizes: "256x256", type: "image/png" },
-      { url: "/icons/logbase-app-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/logbase-app-512-win.png", sizes: "512x512", type: "image/png" },
     ],
     shortcut: "/favicon.ico",
-    apple: "/icons/logbase-app-256.png",
+    apple: [
+      { url: "/icons/logbase-app-180.png", sizes: "180x180", type: "image/png" },
+      { url: "/icons/logbase-app-152.png", sizes: "152x152", type: "image/png" },
+      { url: "/icons/logbase-app-167.png", sizes: "167x167", type: "image/png" },
+    ],
   },
   other: {
-    "msapplication-TileImage": `${siteOrigin}/icons/logbase-app-512.png`,
+    "msapplication-TileImage": `${siteOrigin}/icons/logbase-app-512-win.png`,
     "msapplication-TileColor": "#fafafa",
   },
   appleWebApp: {

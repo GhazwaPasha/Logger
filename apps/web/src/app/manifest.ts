@@ -22,19 +22,13 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: "any",
       },
       {
-        src: `${origin}/icons/logbase-app-256.png`,
-        sizes: "256x256",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
         src: `${origin}/icons/logbase-app-512.png`,
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: `${origin}/icons/logbase-app-512.png`,
+        src: `${origin}/icons/logbase-app-maskable-512.png`,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
