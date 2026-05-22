@@ -1502,7 +1502,7 @@ function WorkItemsInner() {
         className="flex size-6 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         {name ? (
-          <span className="flex size-6 items-center justify-center rounded-full bg-sky-500/25 text-[10px] font-bold leading-none tabular-nums text-sky-900 dark:bg-sky-500/20 dark:text-sky-100" aria-hidden>
+          <span className="flex size-6 items-center justify-center rounded-full bg-sky-500/20 text-[10px] font-bold leading-none tabular-nums text-[var(--fg)]" aria-hidden>
             {initial}
           </span>
         ) : (
@@ -2212,7 +2212,7 @@ function WorkItemsInner() {
         createPortal(
           <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
             <div
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 backdrop-blur-sm"
               aria-hidden
               onClick={() => setViewTaskId(null)}
             />

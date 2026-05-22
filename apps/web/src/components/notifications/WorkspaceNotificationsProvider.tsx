@@ -267,7 +267,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
         createPortal(
           <div className="fixed inset-0 z-[60]">
             <div
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 backdrop-blur-sm"
               aria-hidden
               onClick={() => setPanelOpen(false)}
             />

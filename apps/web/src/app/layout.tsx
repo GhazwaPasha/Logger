@@ -62,6 +62,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-theme="system" suppressHydrationWarning>
+      <head>
+        {/* Apply stored theme before first paint to avoid a flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme-pref');if(t==='light'||t==='dark'||t==='system')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className={`${dmSans.variable} ${jetbrains.variable} ${outfit.variable} antialiased`}>
         <ServiceWorkerRegister />
         {children}
