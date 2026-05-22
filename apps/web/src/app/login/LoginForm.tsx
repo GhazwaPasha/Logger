@@ -80,7 +80,7 @@ export function LoginForm() {
           ...(staySignedIn ? {} : { rememberMe: false }),
         } as Parameters<typeof authClient.signUp.email>[0]);
         if (err) setError(err.message ?? "Sign up failed");
-        else router.push(next);
+        else router.replace(next);
       } else {
         const { error: err } = await authClient.signIn.email({
           email,
@@ -88,7 +88,7 @@ export function LoginForm() {
           rememberMe: staySignedIn,
         });
         if (err) setError(err.message ?? "Sign in failed");
-        else router.push(next);
+        else router.replace(next);
       }
     } finally {
       setLoading(false);
