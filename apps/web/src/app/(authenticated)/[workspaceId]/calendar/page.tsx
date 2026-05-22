@@ -19,10 +19,10 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 const STATUS_CHIP: Record<string, string> = {
-  pending: "bg-slate-500/15 text-slate-800 dark:bg-slate-500/25 dark:text-slate-100",
-  in_progress: "bg-blue-500/15 text-blue-800 dark:bg-blue-500/25 dark:text-blue-100",
-  done: "bg-green-500/15 text-green-800 dark:bg-green-500/25 dark:text-green-100",
-  cancelled: "bg-neutral-400/15 text-neutral-700 dark:bg-neutral-500/25 dark:text-neutral-200",
+  pending: "bg-slate-500/15 dark:bg-slate-500/25",
+  in_progress: "bg-blue-500/15 dark:bg-blue-500/25",
+  done: "bg-green-500/15 dark:bg-green-500/25",
+  cancelled: "bg-neutral-400/15 dark:bg-neutral-500/25",
 };
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -330,7 +330,7 @@ export default function CalendarPage() {
                                   key={t.id}
                                   type="button"
                                   onClick={() => openTask(t.id)}
-                                  className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""} ${idx >= 1 ? "hidden sm:flex" : ""}`}
+                                  className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""} ${idx >= 1 ? "hidden sm:flex" : ""}`}
                                 >
                                   <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-slate-400"}`} aria-hidden />
                                   <span className="min-w-0 truncate">{t.title}</span>
@@ -369,7 +369,7 @@ export default function CalendarPage() {
                       <button
                         type="button"
                         onClick={() => openTask(t.id)}
-                        className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs leading-snug transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""}`}
+                        className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs leading-snug text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""}`}
                       >
                         <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-slate-400"}`} aria-hidden />
                         <span className="min-w-0 truncate">{t.title}</span>
