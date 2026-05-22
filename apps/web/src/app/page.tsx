@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { Outfit } from "next/font/google";
+import { auth } from "@/lib/auth";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { HeroProductMock } from "@/components/marketing/HeroProductMock";
 import { MarketingBackground } from "@/components/marketing/MarketingBackground";
@@ -45,7 +48,10 @@ function IconShield({ className }: { className?: string }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (session) redirect("/app");
+
   const year = new Date().getFullYear();
 
   const capabilityItems = [
