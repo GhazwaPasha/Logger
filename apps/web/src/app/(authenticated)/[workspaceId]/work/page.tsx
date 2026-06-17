@@ -1119,7 +1119,7 @@ function WorkItemsInner() {
             className={`flex size-[18px] shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
               checklistDone
                 ? "surface-glass-primary border-solid text-[var(--fg)]"
-                : "border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
+                : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
             } ${
               taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)
                 ? "cursor-not-allowed opacity-40"
@@ -1206,7 +1206,7 @@ function WorkItemsInner() {
             <AttachIconBtn task={task} />
           </div>
           {expanded && subtasksPreview.length > 0 && (
-            <ul className="mt-1.5 space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
+            <ul className="mt-1.5 space-y-1">
               {subtasksPreview.map((s) => {
                 const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                 return (
@@ -1219,7 +1219,7 @@ function WorkItemsInner() {
                       className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
                         s.done
                           ? "surface-glass-primary border-solid"
-                          : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                          : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
                       } disabled:cursor-not-allowed disabled:opacity-60`}
                       aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                     >
@@ -1649,7 +1649,7 @@ function WorkItemsInner() {
               <AttachIconBtn task={task} />
             </div>
             {subtasksPreview.length > 0 && (
-              <ul className="mt-1.5 space-y-1 rounded-md bg-[var(--surface-base)]/60 py-1.5 pl-1.5 pr-1 dark:bg-black/15">
+              <ul className="mt-1.5 space-y-1">
                 {subtasksPreview.map((s) => {
                   const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                   return (
@@ -1662,7 +1662,7 @@ function WorkItemsInner() {
                         className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
                           s.done
                             ? "surface-glass-primary border-solid"
-                            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                            : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                         aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                       >
