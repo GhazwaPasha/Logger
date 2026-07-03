@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useThemePreference } from "@/hooks/useThemePreference";
 import { safeReturnPath } from "@/lib/safe-return-path";
-import { LoadingScreen } from "@/components/ui/LoadingFrame";
+import { AppBootScreen } from "@/components/ui/LoadingFrame";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 import { QueryProvider } from "./QueryProvider";
@@ -26,7 +26,7 @@ export function AppAuthenticatedProviders({ children }: { children: React.ReactN
   }, [isSessionPending, session, router, pathname, searchParams]);
 
   if (isSessionPending) {
-    return <LoadingScreen label="Loading session…" />;
+    return <AppBootScreen />;
   }
 
   if (!session?.user) {

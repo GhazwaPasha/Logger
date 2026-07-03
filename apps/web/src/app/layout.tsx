@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
+import { BootProvider } from "@/components/app/BootProvider";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import "./globals.css";
 
@@ -72,7 +73,7 @@ export default function RootLayout({
       </head>
       <body className={`${dmSans.variable} ${jetbrains.variable} ${outfit.variable} antialiased`}>
         <ServiceWorkerRegister />
-        {children}
+        <BootProvider>{children}</BootProvider>
       </body>
     </html>
   );

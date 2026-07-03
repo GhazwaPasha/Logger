@@ -1,7 +1,7 @@
 "use client";
 
-import { LoadingScreen } from "@/components/ui/LoadingFrame";
+import { AppBootScreen } from "@/components/ui/LoadingFrame";
 
 export function AppSectionSuspenseFallback() {
-  return <LoadingScreen label="Loading…" />;
+  return <AppBootScreen />;
 }

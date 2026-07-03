@@ -11,8 +11,9 @@ import { WorkspaceNotificationsProvider } from "@/components/notifications/Works
 import { KeyboardShortcutsProvider } from "@/components/app/KeyboardShortcutsProvider";
 import { OnlinePresenceProvider } from "@/components/app/OnlinePresenceProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
-import { LoadingScreen } from "@/components/ui/LoadingFrame";
+import { AppBootScreen } from "@/components/ui/LoadingFrame";
 import { useApiSession } from "@/hooks/useApiSession";
+import { useBoot } from "@/components/app/BootProvider";
 import type { Org } from "@/lib/ledger-types";
 import { pathAfterWorkspace, resolveOrgFromUrlSegment, workspaceUrlSegment } from "@/lib/workspace-url";
 
@@ -29,6 +30,7 @@ export function WorkspaceShell({
   const searchParams = useSearchParams();
   const { token } = useApiSession();
   const { orgs, isLoading: orgsLoading } = useOrganizationsState();
+  const { deactivate } = useBoot();
 
   const resolved = useMemo((): Org | undefined => {
     if (orgsLoading || orgs.length === 0) return undefined;
@@ -40,6 +42,7 @@ export function WorkspaceShell({
 
   useEffect(() => {
     if (!token || orgsLoading) return;
+    deactivate();
     if (orgs.length === 0) {
       router.replace("/app");
       return;
@@ -54,10 +57,10 @@ export function WorkspaceShell({
       const suffix = q ? `?${q}` : "";
       router.replace(`/${resolved.slug}${tail}${suffix}`);
     }
-  }, [token, orgsLoading, orgs.length, resolved, workspaceSegment, pathname, searchParams, router]);
+  }, [token, orgsLoading, orgs.length, resolved, workspaceSegment, pathname, searchParams, router, deactivate]);
 
   if (!token || orgsLoading) {
-    return <LoadingScreen label={orgsLoading ? "Loading workspaces…" : "Loading…"} />;
+    return <AppBootScreen />;
   }
 
   if (!resolved) {

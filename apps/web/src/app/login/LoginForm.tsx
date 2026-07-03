@@ -7,24 +7,13 @@ import { useId, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { safeReturnPath } from "@/lib/safe-return-path";
+import { useBoot } from "@/components/app/BootProvider";
 
 const brand = Outfit({
   subsets: ["latin"],
   weight: ["600", "700"],
 });
 
-function IconSpinner({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-      <path
-        className="opacity-90"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
-  );
-}
 
 function IconEye({ className }: { className?: string }) {
   return (
@@ -65,11 +54,13 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   /** Maps to Better Auth `rememberMe` (persistent cookie + longer DB session when true). */
   const [staySignedIn, setStaySignedIn] = useState(true);
+  const { activate, deactivate } = useBoot();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    activate();
     try {
       if (mode === "signup") {
         // Server accepts `rememberMe`; inferred client types for `signUp.email` omit it in some releases.
@@ -79,7 +70,7 @@ export function LoginForm() {
           name: name || email.split("@")[0] || "User",
           ...(staySignedIn ? {} : { rememberMe: false }),
         } as Parameters<typeof authClient.signUp.email>[0]);
-        if (err) setError(err.message ?? "Sign up failed");
+        if (err) { deactivate(); setError(err.message ?? "Sign up failed"); }
         else router.replace(next);
       } else {
         const { error: err } = await authClient.signIn.email({
@@ -87,9 +78,11 @@ export function LoginForm() {
           password,
           rememberMe: staySignedIn,
         });
-        if (err) setError(err.message ?? "Sign in failed");
+        if (err) { deactivate(); setError(err.message ?? "Sign in failed"); }
         else router.replace(next);
       }
+    } catch {
+      deactivate();
     } finally {
       setLoading(false);
     }
@@ -224,20 +217,9 @@ export function LoginForm() {
             <button
               className="btn-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium"
               type="submit"
-              disabled={loading}
-              aria-busy={loading}
               aria-label={mode === "signin" ? "Sign in to LogBase with email and password" : "Create your LogBase account"}
             >
-              {loading ? (
-                <>
-                  <IconSpinner className="h-4 w-4 animate-spin" />
-                  <span>{mode === "signin" ? "Opening your base…" : "Building your base…"}</span>
-                </>
-              ) : mode === "signin" ? (
-                "Log in"
-              ) : (
-                "Create Account"
-              )}
+              {mode === "signin" ? "Log in" : "Create Account"}
             </button>
           </form>
 
