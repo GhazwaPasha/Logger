@@ -48,6 +48,8 @@ import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
+import { TaskGoalIconBtn } from "@/components/roadmap/TaskGoalIconBtn";
+import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { SelectPopover } from "@/components/ui/SelectPopover";
@@ -375,7 +377,8 @@ function WorkItemsInner() {
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
-  const { openNewTask } = useOpenNewTask();
+  const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
+  const roadmap = useRoadmap(token, workspaceId);
   const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
@@ -393,6 +396,7 @@ function WorkItemsInner() {
   const [urlStatusFilter, setUrlStatusFilter] = useState<UrlStatusFilter | null>(null);
   const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
   const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
+  const [goalFilter, setGoalFilter] = useState<string | null>(null);
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -595,6 +599,8 @@ function WorkItemsInner() {
         setUrlAssigneeUserId(null);
       }
     }
+
+    setGoalFilter(searchParams.get("goal"));
   }, [searchParams]);
 
   const replaceWorkQuery = useCallback(
@@ -970,6 +976,10 @@ function WorkItemsInner() {
         if (!t.dueAt) return false;
         if (!taskMatchesDueRange(t, dueFrom, dueTo)) return false;
       }
+      if (goalFilter) {
+        const goal = roadmap.items.find((i) => i.id === goalFilter);
+        if (!goal || !goal.linkedTaskIds.includes(t.id)) return false;
+      }
       return true;
     });
   }, [
@@ -981,6 +991,8 @@ function WorkItemsInner() {
     urlAssigneeScope,
     urlAssigneeUserId,
     sessionUserId,
+    goalFilter,
+    roadmap.items,
   ]);
 
   const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortMode), [filteredTasks, sortMode]);
@@ -1200,6 +1212,7 @@ function WorkItemsInner() {
               </button>
             )}
             <div className="flex-1" />
+            <TaskGoalIconBtn taskId={task.id} />
             <AssigneeIconBtn task={task} />
             <DueIconBtn task={task} />
             <PriorityIconBtn task={task} />
@@ -1643,6 +1656,7 @@ function WorkItemsInner() {
                 </button>
               )}
               <div className="flex-1" />
+              <TaskGoalIconBtn taskId={task.id} />
               <AssigneeIconBtn task={task} />
               <DueIconBtn task={task} />
               <PriorityIconBtn task={task} />
@@ -1742,10 +1756,16 @@ function WorkItemsInner() {
         <div className="pt-4">
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-60"
             onClick={() => openNewTask(listId || undefined)}
+            disabled={isOpeningNewTask}
+            aria-busy={isOpeningNewTask || undefined}
           >
-            <span>+ Add task</span>
+            {isOpeningNewTask ? (
+              <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <span>+ Add task</span>
+            )}
           </button>
         </div>
       </div>
@@ -1901,7 +1921,8 @@ function WorkItemsInner() {
     Boolean(searchParams.get("status")) ||
     searchParams.get("mine") === "1" ||
     searchParams.get("unassigned") === "1" ||
-    Boolean(searchParams.get("assignee"));
+    Boolean(searchParams.get("assignee")) ||
+    Boolean(searchParams.get("goal"));
 
   const drilldownLabel = useMemo(() => {
     const parts: string[] = [];
@@ -1920,8 +1941,13 @@ function WorkItemsInner() {
       const m = members.find((x) => x.userId === aid);
       parts.push(m?.name?.trim() || m?.email || "Selected assignee");
     }
+    const gid = searchParams.get("goal");
+    if (gid) {
+      const g = roadmap.items.find((i) => i.id === gid);
+      parts.push(g ? `Roadmap: ${g.title}` : "Roadmap goal");
+    }
     return parts.join(" · ");
-  }, [searchParams, members]);
+  }, [searchParams, members, roadmap.items]);
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
@@ -1961,6 +1987,7 @@ function WorkItemsInner() {
                 p.delete("mine");
                 p.delete("unassigned");
                 p.delete("assignee");
+                p.delete("goal");
               });
             }}
           >
@@ -2062,10 +2089,16 @@ function WorkItemsInner() {
             </div>
             <button
               type="button"
-              className="btn-primary !h-8 inline-flex shrink-0 items-center gap-1.5 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+              className="btn-primary !h-8 inline-flex shrink-0 items-center gap-1.5 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:opacity-70"
               onClick={() => openNewTask(listId || undefined)}
+              disabled={isOpeningNewTask}
+              aria-busy={isOpeningNewTask || undefined}
             >
-              <span>+ New task</span>
+              {isOpeningNewTask ? (
+                <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <span>+ New task</span>
+              )}
             </button>
           </div>
           <WorkBoardStatsCard

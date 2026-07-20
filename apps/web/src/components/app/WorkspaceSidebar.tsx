@@ -172,6 +172,7 @@ export function WorkspaceSidebar({
   }, []);
 
   const activeDashboard = pathname === `${base}/dashboard`;
+  const activeRoadmap = pathname.startsWith(`${base}/roadmap`);
   const activeCalendar = pathname.startsWith(`${base}/calendar`);
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
   const activePeople = pathname.startsWith(`${base}/people`);
@@ -195,6 +196,7 @@ export function WorkspaceSidebar({
     const tail = pathname.replace(/^\/[^/]+/, "");
     const allowedTails = new Set([
       "/dashboard",
+      "/roadmap",
       "/my-tasks",
       "/people",
       "/work",
@@ -498,6 +500,9 @@ export function WorkspaceSidebar({
           <div className="mt-2 space-y-0.5 px-1">
             <Link href={`${base}/dashboard`} className={`${rowBase(activeDashboard)} pl-2`}>
               Dashboard
+            </Link>
+            <Link href={`${base}/roadmap`} className={`${rowBase(activeRoadmap)} pl-2`}>
+              Roadmaps
             </Link>
             <Link href={`${base}/calendar`} className={`${rowBase(activeCalendar)} pl-2`}>
               Calendar

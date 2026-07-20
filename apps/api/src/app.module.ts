@@ -18,6 +18,8 @@ import { SearchModule } from "./search/search.module";
 import { DependenciesModule } from "./dependencies/dependencies.module";
 import { TimeModule } from "./time/time.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { RoadmapModule } from "./roadmap/roadmap.module";
+import { DiscordModule } from "./discord/discord.module";
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { RealtimeModule } from "./realtime/realtime.module";
     DependenciesModule,
     TimeModule,
     RealtimeModule,
+    RoadmapModule,
+    DiscordModule,
   ],
   controllers: [HealthController],
 })

@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind v4 defaults `dark:` to `@media (prefers-color-scheme: dark)`, but this app's theme
+ * is driven by `data-theme` on <html> (light/dark/system), not the OS media query directly.
+ * Without this override, picking "Light" while the OS is in dark mode still applies every
+ * `dark:*` utility (fighting the light CSS variables above) — e.g. badges/pills rendering with
+ * their dark-mode colors on a light surface. Mirror the exact same rule used for the CSS
+ * custom properties below: explicit dark theme, or "system" while the OS prefers dark.
+ */
+@custom-variant dark {
+  &:where(html[data-theme="dark"], html[data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(html[data-theme="system"], html[data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
+
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -11,6 +30,7 @@
   --on-accent: #fafafa;
   --muted: #737373;
   --surface-base: #ffffff;
+  --surface: #f4f4f5;
   --surface-elevated: #f4f4f5;
   --surface-muted: #ececed;
   --surface-hover: #ececed;
@@ -32,6 +52,7 @@ html[data-theme="dark"] {
   --on-accent: #18181b;
   --muted: #a1a1aa;
   --surface-base: #09090b;
+  --surface: #121214;
   --surface-elevated: #121214;
   --surface-muted: #18181b;
   --surface-hover: #1c1c21;
@@ -54,6 +75,7 @@ html[data-theme="dark"] {
     --on-accent: #18181b;
     --muted: #a1a1aa;
     --surface-base: #09090b;
+    --surface: #121214;
     --surface-elevated: #121214;
     --surface-muted: #18181b;
     --surface-hover: #1c1c21;
@@ -77,6 +99,7 @@ html[data-theme="dark"] {
     --on-accent: #fafafa;
     --muted: #737373;
     --surface-base: #ffffff;
+    --surface: #f4f4f5;
     --surface-elevated: #f4f4f5;
     --surface-muted: #f4f4f5;
     --surface-hover: #f4f4f5;

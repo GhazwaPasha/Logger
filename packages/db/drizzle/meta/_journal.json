@@ -155,6 +155,20 @@
       "when": 1747440010000,
       "tag": "0021_attachment_blobs",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1747440011000,
+      "tag": "0022_roadmap",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1747440012000,
+      "tag": "0023_discord_integration",
+      "breakpoints": true
     }
   ]
 }

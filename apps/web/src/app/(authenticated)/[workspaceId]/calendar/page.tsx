@@ -7,6 +7,7 @@ import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import type { TaskRow } from "@/lib/ledger-types";
 import { normalizeTaskStatus, storedStatusToFlowColumn } from "@/lib/task-board";
 import { SelectPopover } from "@/components/ui/SelectPopover";
+import { CalendarRoadmapStrip } from "@/components/roadmap/CalendarRoadmapStrip";
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -293,6 +294,8 @@ export default function CalendarPage() {
           </button>
         )}
       </div>
+
+      <CalendarRoadmapStrip year={year} month={month} />
 
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Calendar grid */}

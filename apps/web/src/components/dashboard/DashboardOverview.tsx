@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
+import { RoadmapDashboardPanel } from "@/components/dashboard/RoadmapDashboardPanel";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -451,6 +452,8 @@ export function DashboardOverview({
           </div>
         </div>
       ) : null}
+
+      <RoadmapDashboardPanel basePath={basePath} />
 
       <div className="grid gap-x-4 gap-y-3 lg:grid-cols-2">
         <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">

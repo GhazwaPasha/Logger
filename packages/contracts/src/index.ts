@@ -155,6 +155,8 @@ export const patchTaskSchema = z
       .optional(),
     /** IDs of existing subtasks to delete in the same transaction. */
     subtasksToDelete: z.array(z.string().uuid()).max(MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
+    /** Discord channel snowflake ID attachments should post to; `null` disables Discord posting for this task. */
+    discordChannelId: z.string().min(1).max(64).nullable().optional(),
   })
   .refine(
     (d) => {
@@ -168,11 +170,19 @@ export const patchTaskSchema = z
         d.assigneeUserIds !== undefined ||
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
+        d.discordChannelId !== undefined ||
         hasSubCreate || hasSubUpdate || hasSubDelete
       );
     },
     { message: "Provide at least one field to update" },
   );
+
+export const discordIntegrationConfigSchema = z.object({
+  guildId: z.string().min(1).max(64),
+});
+export type DiscordIntegrationConfigInput = z.infer<typeof discordIntegrationConfigSchema>;
+
+export type DiscordChannelOption = { id: string; name: string; position: number };
 
 export const taskCapabilitiesSchema = z.object({
   canArchiveTask: z.boolean(),
@@ -212,6 +222,45 @@ export const editCommentSchema = z.object({
 });
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type EditCommentInput = z.infer<typeof editCommentSchema>;
+
+export const roadmapPeriodSchema = z.enum(["yearly", "quarterly", "monthly", "weekly"]);
+export const roadmapStatusSchema = z.enum(["on_track", "at_risk", "done", "archived"]);
+
+export const createRoadmapItemSchema = z.object({
+  title: z.string().min(1).max(256),
+  description: z.string().max(4000).optional().nullable(),
+  period: roadmapPeriodSchema,
+  parentId: z.string().uuid().optional().nullable(),
+  departmentId: z.string().uuid().optional().nullable(),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  ownerId: z.string().min(1).optional().nullable(),
+});
+
+export const updateRoadmapItemSchema = z
+  .object({
+    title: z.string().min(1).max(256).optional(),
+    description: z.string().max(4000).optional().nullable(),
+    parentId: z.string().uuid().optional().nullable(),
+    departmentId: z.string().uuid().optional().nullable(),
+    periodStart: z.string().datetime().optional(),
+    periodEnd: z.string().datetime().optional(),
+    ownerId: z.string().min(1).optional().nullable(),
+    status: roadmapStatusSchema.optional(),
+    orderIndex: z.number().int().optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: "Provide at least one field to update",
+  });
+
+/** Splits a period into its standard children (yearly → quarters, quarterly → months, monthly → weeks). */
+export const generateRoadmapChildrenSchema = z.object({
+  childPeriod: roadmapPeriodSchema,
+});
+
+export const linkRoadmapTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1).max(100),
+});
 
 export const markNotificationsReadSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(100),

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listNotificationsQuerySchema = exports.markAllNotificationsReadSchema = exports.markNotificationsReadSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.listNotificationsQuerySchema = exports.markAllNotificationsReadSchema = exports.markNotificationsReadSchema = exports.linkRoadmapTasksSchema = exports.generateRoadmapChildrenSchema = exports.updateRoadmapItemSchema = exports.createRoadmapItemSchema = exports.roadmapStatusSchema = exports.roadmapPeriodSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
@@ -137,6 +137,8 @@ exports.patchTaskSchema = zod_1.z
         .optional(),
     /** IDs of existing subtasks to delete in the same transaction. */
     subtasksToDelete: zod_1.z.array(zod_1.z.string().uuid()).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
+    /** Discord channel snowflake ID attachments should post to; `null` disables Discord posting for this task. */
+    discordChannelId: zod_1.z.string().min(1).max(64).nullable().optional(),
 })
     .refine((d) => {
     const hasSubCreate = (d.subtasksToCreate?.length ?? 0) > 0;
@@ -148,8 +150,12 @@ exports.patchTaskSchema = zod_1.z
         d.assigneeUserIds !== undefined ||
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
+        d.discordChannelId !== undefined ||
         hasSubCreate || hasSubUpdate || hasSubDelete);
 }, { message: "Provide at least one field to update" });
+exports.discordIntegrationConfigSchema = zod_1.z.object({
+    guildId: zod_1.z.string().min(1).max(64),
+});
 exports.taskCapabilitiesSchema = zod_1.z.object({
     canArchiveTask: zod_1.z.boolean(),
     canDeleteTask: zod_1.z.boolean(),
@@ -179,6 +185,40 @@ exports.createCommentSchema = zod_1.z.object({
 });
 exports.editCommentSchema = zod_1.z.object({
     body: zod_1.z.string().min(1).max(4000),
+});
+exports.roadmapPeriodSchema = zod_1.z.enum(["yearly", "quarterly", "monthly", "weekly"]);
+exports.roadmapStatusSchema = zod_1.z.enum(["on_track", "at_risk", "done", "archived"]);
+exports.createRoadmapItemSchema = zod_1.z.object({
+    title: zod_1.z.string().min(1).max(256),
+    description: zod_1.z.string().max(4000).optional().nullable(),
+    period: exports.roadmapPeriodSchema,
+    parentId: zod_1.z.string().uuid().optional().nullable(),
+    departmentId: zod_1.z.string().uuid().optional().nullable(),
+    periodStart: zod_1.z.string().datetime(),
+    periodEnd: zod_1.z.string().datetime(),
+    ownerId: zod_1.z.string().min(1).optional().nullable(),
+});
+exports.updateRoadmapItemSchema = zod_1.z
+    .object({
+    title: zod_1.z.string().min(1).max(256).optional(),
+    description: zod_1.z.string().max(4000).optional().nullable(),
+    parentId: zod_1.z.string().uuid().optional().nullable(),
+    departmentId: zod_1.z.string().uuid().optional().nullable(),
+    periodStart: zod_1.z.string().datetime().optional(),
+    periodEnd: zod_1.z.string().datetime().optional(),
+    ownerId: zod_1.z.string().min(1).optional().nullable(),
+    status: exports.roadmapStatusSchema.optional(),
+    orderIndex: zod_1.z.number().int().optional(),
+})
+    .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: "Provide at least one field to update",
+});
+/** Splits a period into its standard children (yearly → quarters, quarterly → months, monthly → weeks). */
+exports.generateRoadmapChildrenSchema = zod_1.z.object({
+    childPeriod: exports.roadmapPeriodSchema,
+});
+exports.linkRoadmapTasksSchema = zod_1.z.object({
+    taskIds: zod_1.z.array(zod_1.z.string().uuid()).min(1).max(100),
 });
 exports.markNotificationsReadSchema = zod_1.z.object({
     ids: zod_1.z.array(zod_1.z.string().uuid()).min(1).max(100),

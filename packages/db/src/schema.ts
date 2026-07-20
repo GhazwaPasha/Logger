@@ -94,6 +94,18 @@ export const jwks = pgTable("jwks", {
 });
 
 export const orgRoleEnum = pgEnum("org_role", ["owner", "manager", "member"]);
+export const roadmapPeriodEnum = pgEnum("roadmap_period", [
+  "yearly",
+  "quarterly",
+  "monthly",
+  "weekly",
+]);
+export const roadmapStatusEnum = pgEnum("roadmap_status", [
+  "on_track",
+  "at_risk",
+  "done",
+  "archived",
+]);
 export const taskStatusEnum = pgEnum("task_status", [
   "open",
   "pending",
@@ -216,6 +228,8 @@ export const tasks = pgTable(
     recurringSeriesId: uuid("recurring_series_id"),
     /** If this row was created as the next cycle of a recurring task, parent task id. */
     spawnedFromTaskId: uuid("spawned_from_task_id"),
+    /** Discord channel snowflake ID attachments on this task are posted to; null = Discord posting disabled. */
+    discordChannelId: text("discord_channel_id"),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -319,6 +333,56 @@ export const taskDependencies = pgTable(
   (t) => [
     primaryKey({ columns: [t.taskId, t.dependsOnTaskId] }),
     index("task_deps_depends_on_idx").on(t.dependsOnTaskId),
+  ],
+);
+
+/** Planning goal: Year → Quarter → Month → Week, self-referencing via parentId. */
+export const roadmapItems = pgTable(
+  "roadmap_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Optional level scope; null = org-wide goal. */
+    departmentId: uuid("department_id").references(() => departments.id, { onDelete: "set null" }),
+    parentId: uuid("parent_id"),
+    period: roadmapPeriodEnum("period").notNull(),
+    title: text("title").notNull(),
+    description: text("description"),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
+    status: roadmapStatusEnum("status").notNull().default("on_track"),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("roadmap_items_org_idx").on(t.organizationId),
+    index("roadmap_items_parent_idx").on(t.parentId),
+    index("roadmap_items_org_period_idx").on(t.organizationId, t.period),
+  ],
+);
+
+/** Which real tasks count toward a (usually weekly/monthly) roadmap goal. */
+export const roadmapItemTasks = pgTable(
+  "roadmap_item_tasks",
+  {
+    roadmapItemId: uuid("roadmap_item_id")
+      .notNull()
+      .references(() => roadmapItems.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.roadmapItemId, t.taskId] }),
+    index("roadmap_item_tasks_task_idx").on(t.taskId),
   ],
 );
 
@@ -431,6 +495,24 @@ export const webhookDeliveries = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("webhook_deliveries_endpoint_idx").on(t.webhookEndpointId, t.createdAt)],
+);
+
+/** Discord server (guild) an organization has connected; the bot itself is one shared app-wide bot. */
+export const discordIntegrations = pgTable(
+  "discord_integrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    guildId: text("guild_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("discord_integrations_org_uidx").on(t.organizationId)],
 );
 
 /** Time entries: manual or timer-based work log per task per user. */
@@ -605,6 +687,27 @@ export const taskDependenciesRelations = relations(taskDependencies, ({ one }) =
   dependsOn: one(tasks, { fields: [taskDependencies.dependsOnTaskId], references: [tasks.id], relationName: "blocking" }),
 }));
 
+export const roadmapItemsRelations = relations(roadmapItems, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [roadmapItems.organizationId],
+    references: [organizations.id],
+  }),
+  department: one(departments, { fields: [roadmapItems.departmentId], references: [departments.id] }),
+  parent: one(roadmapItems, {
+    fields: [roadmapItems.parentId],
+    references: [roadmapItems.id],
+    relationName: "children",
+  }),
+  children: many(roadmapItems, { relationName: "children" }),
+  owner: one(user, { fields: [roadmapItems.ownerId], references: [user.id] }),
+  linkedTasks: many(roadmapItemTasks),
+}));
+
+export const roadmapItemTasksRelations = relations(roadmapItemTasks, ({ one }) => ({
+  roadmapItem: one(roadmapItems, { fields: [roadmapItemTasks.roadmapItemId], references: [roadmapItems.id] }),
+  task: one(tasks, { fields: [roadmapItemTasks.taskId], references: [tasks.id] }),
+}));
+
 export const attachmentBlobsRelations = relations(attachmentBlobs, ({ many }) => ({
   attachments: many(taskAttachments),
 }));
@@ -642,6 +745,10 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
   endpoint: one(webhookEndpoints, { fields: [webhookDeliveries.webhookEndpointId], references: [webhookEndpoints.id] }),
 }));
 
+export const discordIntegrationsRelations = relations(discordIntegrations, ({ one }) => ({
+  organization: one(organizations, { fields: [discordIntegrations.organizationId], references: [organizations.id] }),
+}));
+
 export const subtasksRelations = relations(subtasks, ({ one }) => ({
   task: one(tasks, { fields: [subtasks.taskId], references: [tasks.id] }),
 }));
@@ -677,6 +784,9 @@ export const appSchema = {
   timeEntries,
   webhookEndpoints,
   webhookDeliveries,
+  discordIntegrations,
+  roadmapItems,
+  roadmapItemTasks,
   organizationsRelations,
   organizationMembersRelations,
   organizationMemberManagedDepartmentsRelations,
@@ -696,4 +806,7 @@ export const appSchema = {
   timeEntriesRelations,
   webhookEndpointsRelations,
   webhookDeliveriesRelations,
+  discordIntegrationsRelations,
+  roadmapItemsRelations,
+  roadmapItemTasksRelations,
 };

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
-import { notificationKeys, workspaceKeys } from "@/lib/query-keys";
+import { notificationKeys, roadmapKeys, workspaceKeys } from "@/lib/query-keys";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
@@ -51,6 +51,8 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
         void queryClient.invalidateQueries({
           queryKey: workspaceKeys.activity(workspaceId),
         });
+        // Task completion/linking elsewhere should refresh roadmap rollups without a manual reload.
+        void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(workspaceId) });
       }, WORKSPACE_INVALIDATE_DEBOUNCE_MS);
       // Task detail is updated by mutation handlers (PATCH / subtask APIs).
     };

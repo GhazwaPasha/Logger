@@ -57,6 +57,8 @@ export type TaskRow = {
   recurringSeriesId?: string | null;
   /** Parent task id when this row was spawned as the next recurrence cycle. */
   spawnedFromTaskId?: string | null;
+  /** Discord channel snowflake ID attachments post to; `null`/omitted = Discord posting disabled. */
+  discordChannelId?: string | null;
   listId: string;
   assignerId: string;
   /** ISO timestamps from API detail/list (`Date` serialized). */
@@ -93,6 +95,33 @@ export type TaskMutationResult = {
   ledgerDelta: LedgerRow[];
   /** Present when completing a recurring task created the next occurrence. */
   spawnedRecurringTaskId?: string;
+};
+
+export type DiscordChannelOption = { id: string; name: string; position: number };
+
+export type RoadmapPeriod = "yearly" | "quarterly" | "monthly" | "weekly";
+export type RoadmapStatus = "on_track" | "at_risk" | "done" | "archived";
+
+/** A planning goal (Year → Quarter → Month → Week) with rollup progress computed server-side. */
+export type RoadmapItemRow = {
+  id: string;
+  organizationId: string;
+  departmentId: string | null;
+  parentId: string | null;
+  period: RoadmapPeriod;
+  title: string;
+  description: string | null;
+  periodStart: string;
+  periodEnd: string;
+  ownerId: string | null;
+  status: RoadmapStatus;
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+  /** Real tasks linked directly to this goal (not including descendants'). */
+  linkedTaskIds: string[];
+  /** Bottom-up rollup: own linked tasks + all descendant goals' linked tasks. */
+  progress: { done: number; total: number; pct: number };
 };
 
 /** `GET /organizations/:id/activity` — ledger rows for tasks visible to the user (newest first). */

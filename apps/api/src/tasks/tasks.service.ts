@@ -1,5 +1,5 @@
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { BadRequestException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import {
   appendLedgerSchema,
   createSubtaskSchema,
@@ -9,7 +9,7 @@ import {
   updateSubtaskSchema,
   updateTaskStatusSchema,
 } from "@work-ledger/contracts";
-import { activityLedger, organizationMembers, subtasks, taskAssignees, tasks } from "@work-ledger/db";
+import { activityLedger, organizationMembers, subtasks, taskAssignees, taskAttachments, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { AuthorizationService, type ListTasksOpts } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
@@ -391,14 +391,41 @@ export class TasksService {
       dueCleared ? null : parsed.dueRepeat !== undefined ? (parsed.dueRepeat ?? null) : (task.dueRepeat ?? null);
     const repeatChanged = (task.dueRepeat ?? null) !== nextRepeat;
 
+    const discordChannelChanged =
+      parsed.discordChannelId !== undefined && parsed.discordChannelId !== (task.discordChannelId ?? null);
+
     const hasTaskFieldUpdates =
-      statusChanged || priorityChanged || titleChanged || assigneesChanged || dueChanged || repeatChanged;
+      statusChanged ||
+      priorityChanged ||
+      titleChanged ||
+      assigneesChanged ||
+      dueChanged ||
+      repeatChanged ||
+      discordChannelChanged;
 
     if (!hasTaskFieldUpdates && !hasSubtasksChange) {
       return this.taskMutationResult(userId, taskId, []);
     }
 
     if (dueChanged && !caps.canReschedule) throw new ForbiddenException("Cannot update due date");
+
+    if (discordChannelChanged && !access.isOwner) {
+      throw new ForbiddenException("Only the workspace owner can change a task's Discord channel");
+    }
+
+    const nextDiscordChannelId =
+      parsed.discordChannelId !== undefined ? parsed.discordChannelId : (task.discordChannelId ?? null);
+    if (statusChanged && nextStatus === "done" && nextDiscordChannelId) {
+      const [{ attachmentCount }] = await this.db
+        .select({ attachmentCount: count() })
+        .from(taskAttachments)
+        .where(eq(taskAttachments.taskId, taskId));
+      if ((attachmentCount ?? 0) === 0) {
+        throw new BadRequestException(
+          "This task has a Discord channel assigned — attach a file before marking it done",
+        );
+      }
+    }
 
     if (assigneesChanged && parsed.assigneeUserIds && parsed.assigneeUserIds.length > 0) {
       const ids = [...new Set(parsed.assigneeUserIds)];
@@ -441,6 +468,7 @@ export class TasksService {
             ...(parsed.title !== undefined ? { title: parsed.title } : {}),
             ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
             ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
+            ...(discordChannelChanged ? { discordChannelId: parsed.discordChannelId } : {}),
             updatedAt: now,
           })
           .where(eq(tasks.id, taskId));

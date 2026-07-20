@@ -37,6 +37,7 @@ export function useTaskEditorForm(options: {
   const [due, setDue] = useState("");
   const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [discordChannelId, setDiscordChannelId] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -52,8 +53,9 @@ export function useTaskEditorForm(options: {
         due,
         dueRepeat,
         assigneeIds: [...assigneeIds].sort(),
+        discordChannelId,
       }),
-    [title, status, priority, due, dueRepeat, assigneeIds],
+    [title, status, priority, due, dueRepeat, assigneeIds, discordChannelId],
   );
 
   const { status: syncStatus, error: syncError, hasUnsavedChanges, establishBaseline, flushSave, dueFieldPatch, seedSavedDueAt } =
@@ -69,6 +71,7 @@ export function useTaskEditorForm(options: {
         priority,
         assigneeUserIds: assigneeIds,
         dueRepeat,
+        discordChannelId,
         ...dueFieldPatch(due),
       }),
       debounceMs: 400,
@@ -82,6 +85,7 @@ export function useTaskEditorForm(options: {
     setDueRepeat(parseTaskDueRepeat(detail.task.dueRepeat));
     setStatus(manualStatusFromStored(normalizeTaskStatus(detail.task.status)));
     setPriority(taskPriority(detail.task));
+    setDiscordChannelId(detail.task.discordChannelId ?? null);
     seedSavedDueAt(detail.task.dueAt);
     setInitialized(true);
   }, [detail, initialized, seedSavedDueAt]);
@@ -105,6 +109,14 @@ export function useTaskEditorForm(options: {
     [flushSave],
   );
 
+  const setDiscordChannel = useCallback(
+    (channelId: string | null) => {
+      setDiscordChannelId(channelId);
+      queueMicrotask(() => flushSave());
+    },
+    [flushSave],
+  );
+
   return {
     title,
     setTitle,
@@ -119,6 +131,8 @@ export function useTaskEditorForm(options: {
     assigneeIds,
     setAssigneeIds,
     toggleAssignee,
+    discordChannelId,
+    setDiscordChannel,
     initialized,
     formFingerprint,
     syncStatus,

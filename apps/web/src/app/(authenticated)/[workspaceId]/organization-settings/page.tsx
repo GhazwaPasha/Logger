@@ -13,10 +13,13 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { Org } from "@/lib/ledger-types";
-import { orgKeys, workspaceKeys } from "@/lib/query-keys";
+import { discordKeys, orgKeys, workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
+
+type DiscordIntegrationConfig = { guildId: string; updatedAt: string } | null;
+type DiscordConnectionResult = { ok: true; guildName: string } | { ok: false; reason: string };
 
 export default function OrganizationSettingsPage() {
   const router = useRouter();
@@ -33,6 +36,14 @@ export default function OrganizationSettingsPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [orgDeleteDialog, setOrgDeleteDialog] = useState<ConfirmDialogOptions | null>(null);
   const canDeleteOrg = isWorkspaceOwner(members, session?.user?.id);
+
+  const [discordConfig, setDiscordConfig] = useState<DiscordIntegrationConfig>(null);
+  const [discordLoading, setDiscordLoading] = useState(true);
+  const [discordGuildId, setDiscordGuildId] = useState("");
+  const [discordSaveBusy, setDiscordSaveBusy] = useState(false);
+  const [discordTestBusy, setDiscordTestBusy] = useState(false);
+  const [discordResult, setDiscordResult] = useState<DiscordConnectionResult | null>(null);
+  const [discordInviteUrl, setDiscordInviteUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -62,6 +73,89 @@ export default function OrganizationSettingsPage() {
       c = true;
     };
   }, [token, workspaceId]);
+
+  useEffect(() => {
+    if (!token || !canDeleteOrg) {
+      setDiscordLoading(false);
+      return;
+    }
+    setDiscordLoading(true);
+    let c = false;
+    void (async () => {
+      try {
+        const [cfg, invite] = await Promise.all([
+          apiJson<DiscordIntegrationConfig>(`/organizations/${workspaceId}/discord-integration`, { token }),
+          apiJson<{ url: string }>("/discord/invite-url", { token }).catch(() => null),
+        ]);
+        if (!c) {
+          setDiscordConfig(cfg);
+          setDiscordGuildId(cfg?.guildId ?? "");
+          setDiscordInviteUrl(invite?.url ?? null);
+        }
+      } catch {
+        if (!c) setDiscordConfig(null);
+      } finally {
+        if (!c) setDiscordLoading(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, [token, workspaceId, canDeleteOrg]);
+
+  async function saveDiscordIntegration() {
+    if (!token || !discordGuildId.trim() || discordSaveBusy) return;
+    setDiscordSaveBusy(true);
+    setDiscordResult(null);
+    try {
+      const result = await apiJson<DiscordConnectionResult>(`/organizations/${workspaceId}/discord-integration`, {
+        method: "PUT",
+        token,
+        body: JSON.stringify({ guildId: discordGuildId.trim() }),
+      });
+      setDiscordResult(result);
+      const cfg = await apiJson<DiscordIntegrationConfig>(`/organizations/${workspaceId}/discord-integration`, { token });
+      setDiscordConfig(cfg);
+      await queryClient.invalidateQueries({ queryKey: discordKeys.channels(workspaceId) });
+    } catch (e) {
+      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Could not save Discord integration" });
+    } finally {
+      setDiscordSaveBusy(false);
+    }
+  }
+
+  async function testDiscordIntegration() {
+    if (!token || discordTestBusy) return;
+    setDiscordTestBusy(true);
+    setDiscordResult(null);
+    try {
+      const result = await apiJson<DiscordConnectionResult>(`/organizations/${workspaceId}/discord-integration/test`, {
+        method: "POST",
+        token,
+      });
+      setDiscordResult(result);
+    } catch (e) {
+      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Connection test failed" });
+    } finally {
+      setDiscordTestBusy(false);
+    }
+  }
+
+  async function disconnectDiscordIntegration() {
+    if (!token || discordSaveBusy) return;
+    setDiscordSaveBusy(true);
+    setDiscordResult(null);
+    try {
+      await apiVoid(`/organizations/${workspaceId}/discord-integration`, { method: "DELETE", token });
+      setDiscordConfig(null);
+      setDiscordGuildId("");
+      await queryClient.invalidateQueries({ queryKey: discordKeys.channels(workspaceId) });
+    } catch (e) {
+      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Could not disconnect Discord" });
+    } finally {
+      setDiscordSaveBusy(false);
+    }
+  }
 
   async function saveWorkspaceName() {
     if (!token || !rename.trim() || saveBusy) return;
@@ -185,6 +279,86 @@ export default function OrganizationSettingsPage() {
           </p>
         </section>
       )}
+      {!orgLoading && org && canDeleteOrg ? (
+        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
+          <h2 className="text-sm font-semibold">Discord integration</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Invite the bot to your Discord server, then connect it here so task attachments can be posted to a channel picked per task.
+          </p>
+          {discordLoading ? (
+            <div className="mt-4 h-10 w-full max-w-md animate-pulse rounded-xl bg-[var(--surface-muted)] motion-reduce:animate-none" />
+          ) : (
+            <>
+              {discordInviteUrl ? (
+                <a
+                  href={discordInviteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+                >
+                  Invite bot to your Discord server
+                </a>
+              ) : null}
+              {discordConfig ? (
+                <p className="mt-3 text-xs text-[var(--muted)]">
+                  Connected to server <span className="font-mono-ledger text-[var(--fg)]">{discordConfig.guildId}</span>
+                </p>
+              ) : null}
+              <div className="mt-4 flex flex-col gap-3 sm:max-w-md">
+                <label className="text-xs font-medium text-[var(--muted)]">
+                  Server (guild) ID
+                  <input
+                    className="input mt-1.5 w-full rounded-xl"
+                    value={discordGuildId}
+                    disabled={discordSaveBusy}
+                    onChange={(e) => setDiscordGuildId(e.target.value)}
+                    placeholder="123456789012345678"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
+                  disabled={discordSaveBusy || !discordGuildId.trim()}
+                  aria-busy={discordSaveBusy || undefined}
+                  onClick={() => void saveDiscordIntegration()}
+                >
+                  {discordSaveBusy ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+                  <span>{discordSaveBusy ? "Saving" : "Save"}</span>
+                </button>
+                {discordConfig ? (
+                  <button
+                    type="button"
+                    className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4"
+                    disabled={discordTestBusy}
+                    aria-busy={discordTestBusy || undefined}
+                    onClick={() => void testDiscordIntegration()}
+                  >
+                    {discordTestBusy ? "Testing…" : "Test connection"}
+                  </button>
+                ) : null}
+                {discordConfig ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-[var(--muted)] underline decoration-dotted hover:text-[var(--fg)]"
+                    disabled={discordSaveBusy}
+                    onClick={() => void disconnectDiscordIntegration()}
+                  >
+                    Disconnect
+                  </button>
+                ) : null}
+              </div>
+              {discordResult ? (
+                <p className={`mt-3 text-xs ${discordResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {discordResult.ok ? `Connected as "${discordResult.guildName}"` : discordResult.reason}
+                </p>
+              ) : null}
+            </>
+          )}
+        </section>
+      ) : null}
       {!orgLoading && org && canDeleteOrg ? (
         <section className="rounded-2xl border border-red-500/40 bg-red-700 p-6 text-white shadow-md dark:bg-red-900">
           <h2 className="text-sm font-semibold text-white">Delete organization</h2>

@@ -8,6 +8,7 @@ import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useTaskFormNavigationGuard } from "@/hooks/useTaskFormNavigationGuard";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
+import { useDiscordChannels } from "@/hooks/useDiscordChannels";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
@@ -16,6 +17,7 @@ import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
 import { DependencySection } from "@/components/tasks/DependencySection";
+import { RoadmapLinkSection } from "@/components/tasks/RoadmapLinkSection";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
 import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { CommentThread } from "@/components/tasks/CommentThread";
@@ -24,7 +26,7 @@ import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SelectPopover } from "@/components/ui/SelectPopover";
-import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
+import { isWorkspaceOwner, taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
 import { memberInitials } from "@/lib/member-utils";
 import {
   TASK_FLOW_ORDER,
@@ -85,6 +87,9 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const subtaskOps = useTaskSubtasks(taskId, token, workspaceId);
 
   const form = useTaskEditorForm({ taskId, workspaceId, token, detail });
+  const isOwner = isWorkspaceOwner(members, sessionUserId);
+  const discordChannels = useDiscordChannels(isOwner ? token : null, workspaceId);
+  const discordChannelOptions = discordChannels.data ?? [];
 
   useEffect(() => {
     const el = titleRef.current;
@@ -269,6 +274,8 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             ) : null}
           </div>
 
+          {detail && token && <RoadmapLinkSection taskId={taskId} token={token} />}
+
           {detail && token && (
             <DependencySection
               taskId={taskId}
@@ -445,6 +452,22 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 </div>
               )}
             </div>
+
+            {discordChannelOptions.length > 0 && (
+              <div>
+                <SectionLabel>Discord channel</SectionLabel>
+                <SelectPopover
+                  value={form.discordChannelId ?? ""}
+                  onChange={(v) => form.setDiscordChannel(v || null)}
+                  options={[
+                    { value: "", label: "No channel" },
+                    ...discordChannelOptions.map((c) => ({ value: c.id, label: `#${c.name}` })),
+                  ]}
+                  triggerClassName="inline-flex min-w-[9rem] items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-medium text-[var(--fg)]"
+                  aria-label="Discord channel"
+                />
+              </div>
+            )}
           </div>
 
           {detail && token && sessionUserId && (

@@ -14,6 +14,7 @@ export type TaskFieldPatchBody = {
   priority: string;
   assigneeUserIds: string[];
   dueRepeat: unknown;
+  discordChannelId: string | null;
   dueAt?: string | null;
 };
 

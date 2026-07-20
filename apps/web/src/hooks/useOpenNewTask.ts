@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -11,6 +11,8 @@ import { createDraftTask } from "@/lib/create-draft-task";
 /**
  * Seeds cache with a stub task and navigates to its editor immediately.
  * The server POST fires in the background — no waiting required.
+ * `isOpening` reflects the client-side navigation itself (route compile + mount),
+ * which is what actually causes the visible delay — not the draft POST.
  */
 export function useOpenNewTask() {
   const router = useRouter();
@@ -19,6 +21,7 @@ export function useOpenNewTask() {
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const { lists } = useWorkspaceData();
   const openingRef = useRef(false);
+  const [isOpening, startNavigation] = useTransition();
 
   const openNewTask = useCallback(
     (listId?: string) => {
@@ -31,11 +34,13 @@ export function useOpenNewTask() {
         listId: resolvedListId,
         assignerId: session?.user?.id ?? undefined,
       });
-      router.push(`/${workspaceSlug}/work/task/${clientId}`);
+      startNavigation(() => {
+        router.push(`/${workspaceSlug}/work/task/${clientId}`);
+      });
       openingRef.current = false;
     },
     [token, session, lists, queryClient, workspaceId, router, workspaceSlug],
   );
 
-  return { openNewTask };
+  return { openNewTask, isOpening };
 }

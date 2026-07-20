@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
-import { DeleteObjectCommand, ListObjectsV2Command, PutObjectCommand, type S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+  type S3ClientConfig,
+} from "@aws-sdk/client-s3";
 import { eq, sql } from "drizzle-orm";
 import { attachmentBlobs } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
@@ -7,6 +14,26 @@ import { prepareUploadBytes } from "./attachment-image.util";
 
 export function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+/** Builds an R2-configured S3Client from env, or `null` if credentials are missing. */
+export function buildR2Client(): S3Client | null {
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+  const config: S3ClientConfig = {
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  };
+  return new S3Client(config);
+}
+
+export async function getObjectBuffer(s3: S3Client, bucket: string, storageKey: string): Promise<Buffer> {
+  const res = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: storageKey }));
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
 }
 
 export function contentAddressedStorageKey(contentSha256: string, storageSuffix: string): string {

@@ -68,6 +68,20 @@ export class AuthorizationService {
     return legacyDepartmentId ? [legacyDepartmentId] : [];
   }
 
+  /** Public wrapper for callers outside task access (e.g. RoadmapService) that need a member's managed levels. */
+  async managedDepartmentIdsForUser(userId: string, organizationId: string): Promise<string[]> {
+    const rows = await this.db
+      .select()
+      .from(organizationMembers)
+      .where(
+        and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)),
+      )
+      .limit(1);
+    const m = rows[0];
+    if (!m) return [];
+    return this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
+  }
+
   async assertOrgMember(userId: string, organizationId: string) {
     const row = await this.db
       .select()
@@ -83,6 +97,15 @@ export class AuthorizationService {
       throw new ForbiddenException("Not a member of this organization");
     }
     return row[0]!;
+  }
+
+  /** Membership plus an owner-role check, for owner-only actions (billing, integrations, org deletion). */
+  async assertOrgOwner(userId: string, organizationId: string) {
+    const membership = await this.assertOrgMember(userId, organizationId);
+    if (membership.role !== "owner") {
+      throw new ForbiddenException("Only owners can perform this action");
+    }
+    return membership;
   }
 
   async getTaskAccess(userId: string, taskId: string): Promise<TaskAccess> {

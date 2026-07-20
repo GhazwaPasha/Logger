@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { count, eq } from "drizzle-orm";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -10,10 +10,12 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { CollaborationService } from "../realtime/collaboration.service";
 import {
   acquireLegacyBlob,
+  buildR2Client,
   cleanupOrphanR2Objects,
   releaseBlobRef,
   storeBlobFromBuffer,
 } from "./attachments-storage.util";
+import { DiscordNotifyService } from "../discord/discord-notify.service";
 
 const MAX_FILES_PER_TASK = 10;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -57,21 +59,10 @@ export type AttachmentUploadFile = {
   size: number;
 };
 
-function buildS3Client(): S3Client | null {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  if (!accountId || !accessKeyId || !secretAccessKey) return null;
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId, secretAccessKey },
-  });
-}
-
 @Injectable()
 export class AttachmentsService {
-  private readonly s3 = buildS3Client();
+  private readonly log = new Logger(AttachmentsService.name);
+  private readonly s3 = buildR2Client();
   private readonly bucket = process.env.R2_BUCKET_NAME ?? "";
   private readonly publicUrl = (process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
 
@@ -79,6 +70,7 @@ export class AttachmentsService {
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
     private readonly collaboration: CollaborationService,
+    private readonly discordNotify: DiscordNotifyService,
   ) {}
 
   isR2Configured(): boolean {
@@ -122,7 +114,13 @@ export class AttachmentsService {
     userId: string,
     taskId: string,
     access: Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>,
-    opts: { blobId: string; fileName: string; fileSize: number; mimeType: string },
+    opts: {
+      blobId: string;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      discordSource?: { fileBuffer: Buffer } | { storageKey: string };
+    },
   ) {
     const [row] = await this.db
       .insert(taskAttachments)
@@ -144,6 +142,22 @@ export class AttachmentsService {
     });
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+
+    if (access.task.discordChannelId && opts.discordSource) {
+      void this.discordNotify
+        .notifyAttachment({
+          organizationId: access.task.organizationId,
+          taskId,
+          taskTitle: access.task.title,
+          discordChannelId: access.task.discordChannelId,
+          uploaderId: userId,
+          fileName: opts.fileName,
+          mimeType: opts.mimeType,
+          source: opts.discordSource,
+        })
+        .catch((e) => this.log.warn(`Discord notify failed for task ${taskId}: ${e instanceof Error ? e.message : String(e)}`));
+    }
+
     return row;
   }
 
@@ -161,6 +175,7 @@ export class AttachmentsService {
       fileName,
       fileSize: file.size,
       mimeType,
+      discordSource: { fileBuffer: file.buffer },
     });
 
     return { ...row, storageKey: stored.storageKey, deduplicated: stored.deduplicated };
@@ -202,6 +217,7 @@ export class AttachmentsService {
       fileName: opts.fileName,
       fileSize: opts.fileSize,
       mimeType,
+      discordSource: { storageKey: opts.storageKey },
     });
   }
 
