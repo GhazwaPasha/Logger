@@ -25,8 +25,8 @@ export function Toggle({
     >
       <span
         aria-hidden
-        className={`inline-block size-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          checked ? "translate-x-[18px]" : "translate-x-0.5"
+        className={`inline-block size-5 transform rounded-full shadow-sm transition-transform duration-200 ${
+          checked ? "translate-x-[18px] bg-[var(--on-accent)]" : "translate-x-0.5 bg-white"
         }`}
       />
     </button>
