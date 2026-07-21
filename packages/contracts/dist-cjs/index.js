@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listNotificationsQuerySchema = exports.markAllNotificationsReadSchema = exports.markNotificationsReadSchema = exports.linkRoadmapTasksSchema = exports.generateRoadmapChildrenSchema = exports.updateRoadmapItemSchema = exports.createRoadmapItemSchema = exports.roadmapStatusSchema = exports.roadmapPeriodSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.listNotificationsQuerySchema = exports.markAllNotificationsReadSchema = exports.markNotificationsReadSchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
@@ -192,19 +192,41 @@ exports.createCommentSchema = zod_1.z.object({
 exports.editCommentSchema = zod_1.z.object({
     body: zod_1.z.string().min(1).max(4000),
 });
-exports.roadmapPeriodSchema = zod_1.z.enum(["yearly", "quarterly", "monthly", "weekly"]);
 exports.roadmapStatusSchema = zod_1.z.enum(["on_track", "at_risk", "done", "archived"]);
-exports.createRoadmapItemSchema = zod_1.z.object({
+/** An outcome a team is pursuing; not time-boxed. Owns one or more milestones. */
+exports.createGoalSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(256),
     description: zod_1.z.string().max(4000).optional().nullable(),
-    period: exports.roadmapPeriodSchema,
+    departmentId: zod_1.z.string().uuid().optional().nullable(),
+    ownerId: zod_1.z.string().min(1).optional().nullable(),
+    status: exports.roadmapStatusSchema.optional(),
+    /** Soft overall deadline; not a structural boundary for its milestones. */
+    targetDate: zod_1.z.string().datetime().optional().nullable(),
+});
+exports.updateGoalSchema = zod_1.z
+    .object({
+    title: zod_1.z.string().min(1).max(256).optional(),
+    description: zod_1.z.string().max(4000).optional().nullable(),
+    departmentId: zod_1.z.string().uuid().optional().nullable(),
+    ownerId: zod_1.z.string().min(1).optional().nullable(),
+    status: exports.roadmapStatusSchema.optional(),
+    targetDate: zod_1.z.string().datetime().optional().nullable(),
+})
+    .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: "Provide at least one field to update",
+});
+/** Time-boxed step serving a goal; free-form dates, no forced period ladder. */
+exports.createMilestoneSchema = zod_1.z.object({
+    goalId: zod_1.z.string().uuid(),
+    title: zod_1.z.string().min(1).max(256),
+    description: zod_1.z.string().max(4000).optional().nullable(),
     parentId: zod_1.z.string().uuid().optional().nullable(),
     departmentId: zod_1.z.string().uuid().optional().nullable(),
     periodStart: zod_1.z.string().datetime(),
     periodEnd: zod_1.z.string().datetime(),
     ownerId: zod_1.z.string().min(1).optional().nullable(),
 });
-exports.updateRoadmapItemSchema = zod_1.z
+exports.updateMilestoneSchema = zod_1.z
     .object({
     title: zod_1.z.string().min(1).max(256).optional(),
     description: zod_1.z.string().max(4000).optional().nullable(),
@@ -219,11 +241,7 @@ exports.updateRoadmapItemSchema = zod_1.z
     .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: "Provide at least one field to update",
 });
-/** Splits a period into its standard children (yearly → quarters, quarterly → months, monthly → weeks). */
-exports.generateRoadmapChildrenSchema = zod_1.z.object({
-    childPeriod: exports.roadmapPeriodSchema,
-});
-exports.linkRoadmapTasksSchema = zod_1.z.object({
+exports.linkMilestoneTasksSchema = zod_1.z.object({
     taskIds: zod_1.z.array(zod_1.z.string().uuid()).min(1).max(100),
 });
 exports.markNotificationsReadSchema = zod_1.z.object({

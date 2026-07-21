@@ -18,7 +18,7 @@ import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
 import { DependencySection } from "@/components/tasks/DependencySection";
-import { RoadmapLinkSection } from "@/components/tasks/RoadmapLinkSection";
+import { MilestoneLinkSection } from "@/components/tasks/MilestoneLinkSection";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
 import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { DiscordSubmissionZone } from "@/components/tasks/DiscordSubmissionZone";
@@ -304,7 +304,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             ) : null}
           </div>
 
-          {detail && token && <RoadmapLinkSection taskId={taskId} token={token} />}
+          {detail && token && <MilestoneLinkSection taskId={taskId} token={token} />}
 
           {detail && token && (
             <DependencySection
@@ -467,6 +467,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                       className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2 text-sm font-medium text-[var(--fg)]"
                     >
                       {m.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied URL, no next/image remote-pattern config in this app yet
                         <img
                           src={m.image}
                           alt=""

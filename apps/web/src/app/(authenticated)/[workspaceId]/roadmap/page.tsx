@@ -6,15 +6,15 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useRoadmap } from "@/hooks/useRoadmap";
-import { RoadmapItemEditor, type RoadmapEditorMode } from "@/components/roadmap/RoadmapItemEditor";
+import { GoalEditor, type GoalEditorMode } from "@/components/roadmap/GoalEditor";
+import { MilestoneEditor, type MilestoneEditorMode } from "@/components/roadmap/MilestoneEditor";
 import { RoadmapOutlineView } from "@/components/roadmap/RoadmapOutlineView";
 import { RoadmapTimelineView } from "@/components/roadmap/RoadmapTimelineView";
 import { RoadmapLevelBoardView } from "@/components/roadmap/RoadmapLevelBoardView";
 import { RoadmapStatsRow } from "@/components/roadmap/RoadmapStatsRow";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
-import { CHILD_PERIOD } from "@/lib/roadmap-format";
-import type { RoadmapItemRow, RoadmapPeriod } from "@/lib/ledger-types";
+import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
 type RoadmapView = "outline" | "timeline" | "level";
 
@@ -24,6 +24,10 @@ const VIEW_LABELS: Record<RoadmapView, string> = {
   level: "By level",
 };
 
+type EditorMode =
+  | { entity: "goal"; mode: GoalEditorMode }
+  | { entity: "milestone"; mode: MilestoneEditorMode };
+
 export default function RoadmapPage() {
   const { workspaceId } = useWorkspaceRoute();
   const { token } = useApiSession();
@@ -31,27 +35,34 @@ export default function RoadmapPage() {
   const roadmap = useRoadmap(token, workspaceId);
   const [view, setView] = useState<RoadmapView>("outline");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [editorMode, setEditorMode] = useState<RoadmapEditorMode | null>(null);
+  const [editorMode, setEditorMode] = useState<EditorMode | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const childrenByParent = useMemo(() => {
-    const m = new Map<string, RoadmapItemRow[]>();
-    for (const item of roadmap.items) {
-      if (!item.parentId) continue;
-      const arr = m.get(item.parentId);
-      if (arr) arr.push(item);
-      else m.set(item.parentId, [item]);
+    const m = new Map<string, MilestoneRow[]>();
+    for (const milestone of roadmap.milestones) {
+      if (!milestone.parentId) continue;
+      const arr = m.get(milestone.parentId);
+      if (arr) arr.push(milestone);
+      else m.set(milestone.parentId, [milestone]);
     }
     return m;
-  }, [roadmap.items]);
+  }, [roadmap.milestones]);
 
-  const roots = useMemo(
-    () =>
-      roadmap.items
-        .filter((i) => !i.parentId)
-        .slice()
-        .sort((a, b) => a.periodStart.localeCompare(b.periodStart) || a.orderIndex - b.orderIndex),
-    [roadmap.items],
+  const rootMilestonesByGoal = useMemo(() => {
+    const m = new Map<string, MilestoneRow[]>();
+    for (const milestone of roadmap.milestones) {
+      if (milestone.parentId) continue;
+      const arr = m.get(milestone.goalId);
+      if (arr) arr.push(milestone);
+      else m.set(milestone.goalId, [milestone]);
+    }
+    return m;
+  }, [roadmap.milestones]);
+
+  const goals = useMemo(
+    () => roadmap.goals.slice().sort((a, b) => a.title.localeCompare(b.title)),
+    [roadmap.goals],
   );
 
   function toggle(id: string) {
@@ -63,33 +74,52 @@ export default function RoadmapPage() {
     });
   }
 
-  function openForEdit(item: RoadmapItemRow) {
-    setExpanded((prev) => new Set(prev).add(item.id));
-    setEditorMode({ kind: "edit", item });
+  function openGoalForCreate() {
+    setEditorMode({ entity: "goal", mode: { kind: "create" } });
+  }
+
+  function openGoalForEdit(goal: GoalRow) {
+    setExpanded((prev) => new Set(prev).add(goal.id));
+    setEditorMode({ entity: "goal", mode: { kind: "edit", goal } });
+  }
+
+  function openMilestoneForCreate(goalId: string, parent: MilestoneRow | null, departmentId: string | null) {
+    setEditorMode({ entity: "milestone", mode: { kind: "create", goalId, parent, departmentId } });
+    setExpanded((prev) => new Set(prev).add(parent ? parent.id : goalId));
+  }
+
+  function openMilestoneForEdit(milestone: MilestoneRow) {
+    setExpanded((prev) => new Set(prev).add(milestone.id));
+    setEditorMode({ entity: "milestone", mode: { kind: "edit", milestone } });
   }
 
   /** Opens the editor without also expanding — Timeline/By-level already show breakdown via their own toggle/drilldown. */
-  function editOnly(item: RoadmapItemRow) {
-    setEditorMode({ kind: "edit", item });
+  function editMilestoneOnly(milestone: MilestoneRow) {
+    setEditorMode({ entity: "milestone", mode: { kind: "edit", milestone } });
   }
 
-  function openForCreate(parent: RoadmapItemRow | null) {
-    const period: RoadmapPeriod = parent ? (CHILD_PERIOD[parent.period] ?? "weekly") : "yearly";
-    setEditorMode({ kind: "create", parent, period, departmentId: parent?.departmentId ?? null });
-    if (parent) setExpanded((prev) => new Set(prev).add(parent.id));
-  }
-
-  /** Re-resolve the live row each render so linking/unlinking tasks or generating children reflects immediately. */
-  const liveEditorMode: RoadmapEditorMode | null =
-    editorMode?.kind === "edit"
-      ? (() => {
-          const live = roadmap.items.find((i) => i.id === editorMode.item.id);
-          return live ? { kind: "edit", item: live } : null;
-        })()
-      : editorMode;
+  /** Re-resolve the live row each render so linking/unlinking tasks reflects immediately. */
+  const liveEditorMode: EditorMode | null = useMemo(() => {
+    if (!editorMode) return null;
+    if (editorMode.entity === "goal" && editorMode.mode.kind === "edit") {
+      const wantedId = editorMode.mode.goal.id;
+      const live = roadmap.goals.find((g) => g.id === wantedId);
+      return live ? { entity: "goal" as const, mode: { kind: "edit" as const, goal: live } } : null;
+    }
+    if (editorMode.entity === "milestone" && editorMode.mode.kind === "edit") {
+      const wantedId = editorMode.mode.milestone.id;
+      const live = roadmap.milestones.find((m) => m.id === wantedId);
+      return live ? { entity: "milestone" as const, mode: { kind: "edit" as const, milestone: live } } : null;
+    }
+    return editorMode;
+  }, [editorMode, roadmap.goals, roadmap.milestones]);
 
   const editingHasChildren =
-    liveEditorMode?.kind === "edit" ? (childrenByParent.get(liveEditorMode.item.id)?.length ?? 0) > 0 : false;
+    liveEditorMode?.entity === "goal" && liveEditorMode.mode.kind === "edit"
+      ? (rootMilestonesByGoal.get(liveEditorMode.mode.goal.id)?.length ?? 0) > 0
+      : liveEditorMode?.entity === "milestone" && liveEditorMode.mode.kind === "edit"
+        ? (childrenByParent.get(liveEditorMode.mode.milestone.id)?.length ?? 0) > 0
+        : false;
 
   const loading = workspaceLoading || roadmap.isLoading;
   const displayError = error ?? roadmap.error;
@@ -102,20 +132,20 @@ export default function RoadmapPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Roadmaps</h1>
           <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
-            Break yearly goals down into quarters, months, and weeks — then link real tasks to the leaf goals.
+            Set goals for what you&apos;re pursuing, then break each into milestones dated however the work actually needs.
           </p>
         </div>
         <button
           type="button"
           className="btn-primary inline-flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
-          onClick={() => openForCreate(null)}
+          onClick={openGoalForCreate}
         >
           <Plus weight="bold" className="size-4" />
           New goal
         </button>
       </div>
 
-      <RoadmapStatsRow items={roadmap.items} loading={loading} />
+      <RoadmapStatsRow goals={roadmap.goals} milestones={roadmap.milestones} loading={loading} />
 
       <div
         className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
@@ -142,35 +172,56 @@ export default function RoadmapPage() {
       <LoadingFrame show={loading} className="rounded-2xl p-0.5" ribbonRadius="2xl" aria-label="Loading roadmap">
         {view === "outline" && (
           <RoadmapOutlineView
-            roots={roots}
+            goals={goals}
+            rootMilestonesByGoal={rootMilestonesByGoal}
             childrenByParent={childrenByParent}
             expanded={expanded}
             loading={loading}
             onToggle={toggle}
-            onOpen={openForEdit}
-            onAddChild={openForCreate}
-            onCreateRoot={() => openForCreate(null)}
+            onOpenGoal={openGoalForEdit}
+            onOpenMilestone={openMilestoneForEdit}
+            onAddMilestone={(goal) => openMilestoneForCreate(goal.id, null, goal.departmentId)}
+            onAddSubMilestone={(parent) => openMilestoneForCreate(parent.goalId, parent, parent.departmentId)}
+            onCreateGoal={openGoalForCreate}
           />
         )}
         {view === "timeline" && (
           <RoadmapTimelineView
-            roots={roots}
+            goals={goals}
+            rootMilestonesByGoal={rootMilestonesByGoal}
             childrenByParent={childrenByParent}
             expanded={expanded}
             loading={loading}
             onToggle={toggle}
-            onEdit={editOnly}
+            onEditMilestone={editMilestoneOnly}
           />
         )}
         {view === "level" && (
-          <RoadmapLevelBoardView items={roadmap.items} depts={depts} loading={loading} onOpen={openForEdit} />
+          <RoadmapLevelBoardView
+            milestones={roadmap.milestones}
+            goals={roadmap.goals}
+            depts={depts}
+            loading={loading}
+            onOpen={editMilestoneOnly}
+          />
         )}
       </LoadingFrame>
 
-      {liveEditorMode && (
-        <RoadmapItemEditor
-          key={liveEditorMode.kind === "edit" ? liveEditorMode.item.id : "create"}
-          mode={liveEditorMode}
+      {liveEditorMode?.entity === "goal" && (
+        <GoalEditor
+          key={liveEditorMode.mode.kind === "edit" ? liveEditorMode.mode.goal.id : "create-goal"}
+          mode={liveEditorMode.mode}
+          depts={depts}
+          members={members}
+          roadmap={roadmap}
+          hasMilestones={editingHasChildren}
+          onClose={() => setEditorMode(null)}
+        />
+      )}
+      {liveEditorMode?.entity === "milestone" && (
+        <MilestoneEditor
+          key={liveEditorMode.mode.kind === "edit" ? liveEditorMode.mode.milestone.id : "create-milestone"}
+          mode={liveEditorMode.mode}
           depts={depts}
           lists={lists}
           members={members}

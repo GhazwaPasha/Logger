@@ -15,20 +15,19 @@ import type {
   Dept,
   ListRow,
   MemberRow,
-  RoadmapItemRow,
-  RoadmapPeriod,
+  MilestoneRow,
   RoadmapStatus,
   TaskMutationResult,
   TaskRow,
 } from "@/lib/ledger-types";
 import type { useRoadmap } from "@/hooks/useRoadmap";
-import { defaultRangeForPeriod, formatDate, PERIOD_LABELS, STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
+import { defaultMilestoneRange, formatDate, STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
 
-export type RoadmapEditorMode =
-  | { kind: "create"; parent: RoadmapItemRow | null; period: RoadmapPeriod; departmentId: string | null }
-  | { kind: "edit"; item: RoadmapItemRow };
+export type MilestoneEditorMode =
+  | { kind: "create"; goalId: string; parent: MilestoneRow | null; departmentId: string | null }
+  | { kind: "edit"; milestone: MilestoneRow };
 
-export function RoadmapItemEditor({
+export function MilestoneEditor({
   mode,
   depts,
   lists,
@@ -39,7 +38,7 @@ export function RoadmapItemEditor({
   hasChildren,
   onClose,
 }: {
-  mode: RoadmapEditorMode;
+  mode: MilestoneEditorMode;
   depts: Dept[];
   lists: ListRow[];
   members: MemberRow[];
@@ -51,8 +50,9 @@ export function RoadmapItemEditor({
 }) {
   const queryClient = useQueryClient();
   const { workspaceSlug } = useWorkspaceRoute();
-  const editing = mode.kind === "edit" ? mode.item : null;
-  const period = editing?.period ?? (mode.kind === "create" ? mode.period : "yearly");
+  const editing = mode.kind === "edit" ? mode.milestone : null;
+  const goalId = mode.kind === "create" ? mode.goalId : editing!.goalId;
+  const goal = useMemo(() => roadmap.goals.find((g) => g.id === goalId) ?? null, [roadmap.goals, goalId]);
 
   const [title, setTitle] = useState(editing?.title ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
@@ -61,10 +61,8 @@ export function RoadmapItemEditor({
   );
   const [ownerId, setOwnerId] = useState<string>(editing?.ownerId ?? "");
   const [status, setStatus] = useState<RoadmapStatus>(editing?.status ?? "on_track");
-  /** New goals default to the calendar period containing today (or the parent's start, for a child) — not just "today" for both ends. */
-  const smartDefaultAnchor =
-    mode.kind === "create" && mode.parent ? new Date(mode.parent.periodStart) : new Date();
-  const [smartStart, smartEnd] = defaultRangeForPeriod(period, smartDefaultAnchor);
+  const smartDefaultAnchor = mode.kind === "create" && mode.parent ? new Date(mode.parent.periodStart) : new Date();
+  const [smartStart, smartEnd] = defaultMilestoneRange(smartDefaultAnchor);
   const [periodStart, setPeriodStart] = useState(editing ? toDateInputValue(editing.periodStart) : smartStart);
   const [periodEnd, setPeriodEnd] = useState(editing ? toDateInputValue(editing.periodEnd) : smartEnd);
   const [saving, setSaving] = useState(false);
@@ -76,18 +74,18 @@ export function RoadmapItemEditor({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [creatingTask, setCreatingTask] = useState(false);
 
-  /** Ancestor chain from root down to (but not including) this goal, for the breadcrumb. */
+  /** Ancestor sub-milestone chain within this goal, for the breadcrumb (goal title always leads). */
   const breadcrumb = useMemo(() => {
-    const byId = new Map(roadmap.items.map((i) => [i.id, i] as const));
-    const startParentId = mode.kind === "create" ? mode.parent?.id ?? null : editing?.parentId ?? null;
-    const chain: RoadmapItemRow[] = [];
+    const byId = new Map(roadmap.milestones.map((m) => [m.id, m] as const));
+    const startParentId = mode.kind === "create" ? (mode.parent?.id ?? null) : (editing?.parentId ?? null);
+    const chain: MilestoneRow[] = [];
     let cursor = startParentId ? byId.get(startParentId) : undefined;
     while (cursor) {
       chain.unshift(cursor);
       cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
     }
     return chain;
-  }, [roadmap.items, mode, editing]);
+  }, [roadmap.milestones, mode, editing]);
 
   const candidateLists = useMemo(() => {
     if (!editing) return [];
@@ -110,7 +108,7 @@ export function RoadmapItemEditor({
       .slice(0, 30);
   }, [editing, tasks, taskQuery]);
 
-  /** Ranks unlinked tasks by same-department + due-date-within-goal-range, shown before the user types anything. */
+  /** Ranks unlinked tasks by same-department + due-date-within-milestone-range, shown before the user types anything. */
   const suggestedTasks = useMemo(() => {
     if (!editing) return [];
     const listDeptById = new Map(lists.map((l) => [l.id, l.departmentId] as const));
@@ -141,10 +139,10 @@ export function RoadmapItemEditor({
       const periodStartIso = new Date(`${periodStart}T00:00:00.000Z`).toISOString();
       const periodEndIso = new Date(`${periodEnd}T23:59:59.999Z`).toISOString();
       if (mode.kind === "create") {
-        await roadmap.createItem({
+        await roadmap.createMilestone({
+          goalId: mode.goalId,
           title: title.trim(),
           description: description.trim() || null,
-          period,
           parentId: mode.parent?.id ?? null,
           departmentId: departmentId || null,
           periodStart: periodStartIso,
@@ -152,7 +150,7 @@ export function RoadmapItemEditor({
           ownerId: ownerId || null,
         });
       } else {
-        await roadmap.updateItem(editing!.id, {
+        await roadmap.updateMilestone(editing!.id, {
           title: title.trim(),
           description: description.trim() || null,
           departmentId: departmentId || null,
@@ -164,7 +162,7 @@ export function RoadmapItemEditor({
       }
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save goal");
+      setError(e instanceof Error ? e.message : "Failed to save milestone");
     } finally {
       setSaving(false);
     }
@@ -172,7 +170,7 @@ export function RoadmapItemEditor({
 
   async function handleDelete() {
     if (!editing) return;
-    await roadmap.deleteItem(editing.id);
+    await roadmap.deleteMilestone(editing.id);
     onClose();
   }
 
@@ -196,7 +194,7 @@ export function RoadmapItemEditor({
     }
   }
 
-  /** Creates a real task scoped to this goal's list/period and links it in one step. */
+  /** Creates a real task scoped to this milestone's list/range and links it in one step. */
   async function createAndLinkTask() {
     if (!editing || !newTaskTitle.trim() || !effectiveNewTaskListId || creatingTask) return;
     setCreatingTask(true);
@@ -225,11 +223,7 @@ export function RoadmapItemEditor({
 
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="presentation">
-      <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-        aria-hidden
-        onMouseDown={onClose}
-      />
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-hidden onMouseDown={onClose} />
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       <div
         role="dialog"
@@ -238,16 +232,12 @@ export function RoadmapItemEditor({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            {breadcrumb.length > 0 && (
-              <p className="mb-1 truncate text-xs text-[var(--muted)]">
-                {breadcrumb.map((b) => b.title).join(" › ")}
-              </p>
-            )}
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-              {PERIOD_LABELS[period]}ly goal
+            <p className="mb-1 truncate text-xs text-[var(--muted)]">
+              {[goal?.title, ...breadcrumb.map((b) => b.title)].filter(Boolean).join(" › ")}
             </p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Milestone</p>
             <h2 className="mt-0.5 text-lg font-semibold text-[var(--fg)]">
-              {mode.kind === "create" ? "New goal" : "Edit goal"}
+              {mode.kind === "create" ? "New milestone" : "Edit milestone"}
             </h2>
           </div>
           <button
@@ -276,15 +266,7 @@ export function RoadmapItemEditor({
               className="input w-full rounded-lg px-3 py-2 text-sm"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={
-                period === "yearly"
-                  ? "e.g. FY2026"
-                  : period === "quarterly"
-                    ? "e.g. Q3 2026"
-                    : period === "monthly"
-                      ? "e.g. August 2026"
-                      : "e.g. Ship the launch checklist"
-              }
+              placeholder="e.g. Sign the Berlin office lease"
             />
           </div>
 
@@ -371,30 +353,6 @@ export function RoadmapItemEditor({
             </div>
           )}
 
-          {editing && period !== "weekly" && !hasChildren && (
-            <button
-              type="button"
-              className="btn-secondary w-full rounded-lg px-3 py-2 text-sm font-medium"
-              disabled={saving}
-              onClick={() =>
-                setConfirm({
-                  title: `Split into ${period === "yearly" ? "quarters" : period === "quarterly" ? "months" : "weeks"}?`,
-                  description:
-                    "This creates standard child goals with calendar dates already filled in — you can edit or delete them after.",
-                  confirmLabel: "Generate",
-                  variant: "default",
-                  onConfirm: async () => {
-                    const childPeriod: RoadmapPeriod =
-                      period === "yearly" ? "quarterly" : period === "quarterly" ? "monthly" : "weekly";
-                    await roadmap.generateChildren(editing.id, childPeriod);
-                  },
-                })
-              }
-            >
-              Split into {period === "yearly" ? "quarters" : period === "quarterly" ? "months" : "weeks"}
-            </button>
-          )}
-
           {editing && (
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -403,7 +361,7 @@ export function RoadmapItemEditor({
                 </label>
                 {linkedTasks.length > 0 && (
                   <Link
-                    href={`/${workspaceSlug}/work?goal=${editing.id}`}
+                    href={`/${workspaceSlug}/work?milestone=${editing.id}`}
                     className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline"
                   >
                     View on board
@@ -431,9 +389,7 @@ export function RoadmapItemEditor({
                     </div>
                   );
                 })}
-                {linkedTasks.length === 0 && (
-                  <p className="text-sm text-[var(--muted)]">No tasks linked yet.</p>
-                )}
+                {linkedTasks.length === 0 && <p className="text-sm text-[var(--muted)]">No tasks linked yet.</p>}
               </div>
 
               {suggestedTasks.length > 0 && !taskQuery.trim() && (
@@ -497,9 +453,7 @@ export function RoadmapItemEditor({
                   </button>
                 </div>
               ) : (
-                <p className="mt-2.5 text-xs text-[var(--muted)]">
-                  Create a list under Work before adding tasks here.
-                </p>
+                <p className="mt-2.5 text-xs text-[var(--muted)]">Create a list under Work before adding tasks here.</p>
               )}
               <p className="mt-1 text-xs text-[var(--muted)]">
                 New tasks default to due {formatDate(editing.periodEnd)} — edit the task afterward to change it.
@@ -532,9 +486,7 @@ export function RoadmapItemEditor({
                       </button>
                     );
                   })}
-                  {candidateTasks.length === 0 && (
-                    <p className="px-2 py-1 text-sm text-[var(--muted)]">No matching tasks.</p>
-                  )}
+                  {candidateTasks.length === 0 && <p className="px-2 py-1 text-sm text-[var(--muted)]">No matching tasks.</p>}
                 </div>
               )}
             </div>
@@ -548,12 +500,11 @@ export function RoadmapItemEditor({
               className="rounded-lg px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400"
               onClick={() =>
                 setConfirm({
-                  title: "Delete this goal?",
-                  description:
-                    hasChildren
-                      ? "This also deletes every child goal beneath it. Linked tasks themselves are not deleted."
-                      : "Linked tasks themselves are not deleted.",
-                  confirmLabel: "Delete goal",
+                  title: "Delete this milestone?",
+                  description: hasChildren
+                    ? "This also deletes every sub-milestone beneath it. Linked tasks themselves are not deleted."
+                    : "Linked tasks themselves are not deleted.",
+                  confirmLabel: "Delete milestone",
                   variant: "danger",
                   onConfirm: handleDelete,
                 })

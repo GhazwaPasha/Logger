@@ -105,16 +105,32 @@ export type TaskMutationResult = {
 
 export type DiscordChannelOption = { id: string; name: string; position: number; isPrivate: boolean };
 
-export type RoadmapPeriod = "yearly" | "quarterly" | "monthly" | "weekly";
 export type RoadmapStatus = "on_track" | "at_risk" | "done" | "archived";
 
-/** A planning goal (Year → Quarter → Month → Week) with rollup progress computed server-side. */
-export type RoadmapItemRow = {
+/** An outcome a team is pursuing; not time-boxed. Owns one or more milestones. */
+export type GoalRow = {
   id: string;
   organizationId: string;
   departmentId: string | null;
+  title: string;
+  description: string | null;
+  ownerId: string | null;
+  status: RoadmapStatus;
+  /** Soft overall deadline; not a structural boundary for its milestones. */
+  targetDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Rollup across every milestone under this goal (root milestones' subtrees). */
+  progress: { done: number; total: number; pct: number };
+};
+
+/** A time-boxed step serving a goal; free-form dates, no forced period ladder. Optionally self-nests via parentId. */
+export type MilestoneRow = {
+  id: string;
+  organizationId: string;
+  departmentId: string | null;
+  goalId: string;
   parentId: string | null;
-  period: RoadmapPeriod;
   title: string;
   description: string | null;
   periodStart: string;
@@ -124,9 +140,9 @@ export type RoadmapItemRow = {
   orderIndex: number;
   createdAt: string;
   updatedAt: string;
-  /** Real tasks linked directly to this goal (not including descendants'). */
+  /** Real tasks linked directly to this milestone (not including sub-milestones'). */
   linkedTaskIds: string[];
-  /** Bottom-up rollup: own linked tasks + all descendant goals' linked tasks. */
+  /** Bottom-up rollup: own linked tasks + all sub-milestones' linked tasks. */
   progress: { done: number; total: number; pct: number };
 };
 

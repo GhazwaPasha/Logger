@@ -21,7 +21,6 @@ import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
 import { SelectPopover } from "@/components/ui/SelectPopover";
-import { Toggle } from "@/components/ui/Toggle";
 import {
   FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
@@ -263,6 +262,7 @@ export function TaskViewPanel({
                   className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
                 >
                   {m?.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied URL, no next/image remote-pattern config in this app yet
                     <img src={m.image} alt="" className="size-5 shrink-0 rounded-full object-cover" aria-hidden />
                   ) : (
                     <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]" aria-hidden>
@@ -366,38 +366,16 @@ export function TaskViewPanel({
         />
       )}
 
-      {/* Time tracking visibility toggle — privileged users only; render condition below has no such gate, so it stays hidden for everyone when off */}
-      {token && sessionUserId && caps.canEditFields && (
-        <div className="flex items-center justify-between gap-2 text-sm text-[var(--muted)]">
-          <span>Show time tracking</span>
-          <Toggle
-            checked={form.timeTrackingEnabled}
-            aria-label="Show time tracking"
-            onChange={(next) => form.setTimeTrackingEnabled(next)}
-          />
-        </div>
-      )}
-      {/* Time tracking — only shows when there are entries (viewOnly=true) */}
+      {/* Time tracking — only shows when there are entries (viewOnly=true); the enable/disable toggle lives in the full editor only */}
       {token && sessionUserId && form.timeTrackingEnabled && (
         <TimeTracker taskId={taskId} token={token} userId={sessionUserId} viewOnly />
       )}
 
-      {/* Attachments — live for everyone with access */}
+      {/* Attachments — live for everyone with access; the required toggle lives in the full editor only */}
       {token && sessionUserId && (
         <div className="space-y-2">
-          {caps.canEditFields ? (
-            <div className="flex items-center justify-between gap-2 text-xs font-medium text-[var(--muted)]">
-              <span>Require at least one attachment before marking done</span>
-              <Toggle
-                checked={form.attachmentRequired}
-                aria-label="Require at least one attachment before marking done"
-                onChange={(next) => form.setAttachmentRequired(next)}
-              />
-            </div>
-          ) : (
-            form.attachmentRequired && (
-              <p className="text-xs font-medium text-[var(--muted)]">Attachment required before marking done</p>
-            )
+          {form.attachmentRequired && (
+            <p className="text-xs font-medium text-[var(--muted)]">Attachment required before marking done</p>
           )}
           <AttachmentZone taskId={taskId} token={token} userId={sessionUserId} />
         </div>

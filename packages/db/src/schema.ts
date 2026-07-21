@@ -94,12 +94,6 @@ export const jwks = pgTable("jwks", {
 });
 
 export const orgRoleEnum = pgEnum("org_role", ["owner", "manager", "member"]);
-export const roadmapPeriodEnum = pgEnum("roadmap_period", [
-  "yearly",
-  "quarterly",
-  "monthly",
-  "weekly",
-]);
 export const roadmapStatusEnum = pgEnum("roadmap_status", [
   "on_track",
   "at_risk",
@@ -340,9 +334,9 @@ export const taskDependencies = pgTable(
   ],
 );
 
-/** Planning goal: Year → Quarter → Month → Week, self-referencing via parentId. */
-export const roadmapItems = pgTable(
-  "roadmap_items",
+/** Outcome a team is pursuing; not time-boxed. Owns one or more milestones. */
+export const goals = pgTable(
+  "goals",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     organizationId: uuid("organization_id")
@@ -350,8 +344,35 @@ export const roadmapItems = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     /** Optional level scope; null = org-wide goal. */
     departmentId: uuid("department_id").references(() => departments.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    ownerId: text("owner_id").references(() => user.id, { onDelete: "set null" }),
+    status: roadmapStatusEnum("status").notNull().default("on_track"),
+    /** Soft overall deadline; not a structural boundary for its milestones. */
+    targetDate: timestamp("target_date", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("goals_org_idx").on(t.organizationId)],
+);
+
+/** Time-boxed step serving a goal; free-form dates, no forced period ladder. Optionally self-nests via parentId. */
+export const milestones = pgTable(
+  "milestones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** Optional level scope; null = org-wide milestone. */
+    departmentId: uuid("department_id").references(() => departments.id, { onDelete: "set null" }),
+    goalId: uuid("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
     parentId: uuid("parent_id"),
-    period: roadmapPeriodEnum("period").notNull(),
     title: text("title").notNull(),
     description: text("description"),
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
@@ -366,27 +387,27 @@ export const roadmapItems = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    index("roadmap_items_org_idx").on(t.organizationId),
-    index("roadmap_items_parent_idx").on(t.parentId),
-    index("roadmap_items_org_period_idx").on(t.organizationId, t.period),
+    index("milestones_org_idx").on(t.organizationId),
+    index("milestones_goal_idx").on(t.goalId),
+    index("milestones_parent_idx").on(t.parentId),
   ],
 );
 
-/** Which real tasks count toward a (usually weekly/monthly) roadmap goal. */
-export const roadmapItemTasks = pgTable(
-  "roadmap_item_tasks",
+/** Which real tasks count toward a milestone. */
+export const milestoneTasks = pgTable(
+  "milestone_tasks",
   {
-    roadmapItemId: uuid("roadmap_item_id")
+    milestoneId: uuid("milestone_id")
       .notNull()
-      .references(() => roadmapItems.id, { onDelete: "cascade" }),
+      .references(() => milestones.id, { onDelete: "cascade" }),
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    primaryKey({ columns: [t.roadmapItemId, t.taskId] }),
-    index("roadmap_item_tasks_task_idx").on(t.taskId),
+    primaryKey({ columns: [t.milestoneId, t.taskId] }),
+    index("milestone_tasks_task_idx").on(t.taskId),
   ],
 );
 
@@ -693,25 +714,33 @@ export const taskDependenciesRelations = relations(taskDependencies, ({ one }) =
   dependsOn: one(tasks, { fields: [taskDependencies.dependsOnTaskId], references: [tasks.id], relationName: "blocking" }),
 }));
 
-export const roadmapItemsRelations = relations(roadmapItems, ({ one, many }) => ({
-  organization: one(organizations, {
-    fields: [roadmapItems.organizationId],
-    references: [organizations.id],
-  }),
-  department: one(departments, { fields: [roadmapItems.departmentId], references: [departments.id] }),
-  parent: one(roadmapItems, {
-    fields: [roadmapItems.parentId],
-    references: [roadmapItems.id],
-    relationName: "children",
-  }),
-  children: many(roadmapItems, { relationName: "children" }),
-  owner: one(user, { fields: [roadmapItems.ownerId], references: [user.id] }),
-  linkedTasks: many(roadmapItemTasks),
+export const goalsRelations = relations(goals, ({ one, many }) => ({
+  organization: one(organizations, { fields: [goals.organizationId], references: [organizations.id] }),
+  department: one(departments, { fields: [goals.departmentId], references: [departments.id] }),
+  owner: one(user, { fields: [goals.ownerId], references: [user.id] }),
+  milestones: many(milestones),
 }));
 
-export const roadmapItemTasksRelations = relations(roadmapItemTasks, ({ one }) => ({
-  roadmapItem: one(roadmapItems, { fields: [roadmapItemTasks.roadmapItemId], references: [roadmapItems.id] }),
-  task: one(tasks, { fields: [roadmapItemTasks.taskId], references: [tasks.id] }),
+export const milestonesRelations = relations(milestones, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [milestones.organizationId],
+    references: [organizations.id],
+  }),
+  department: one(departments, { fields: [milestones.departmentId], references: [departments.id] }),
+  goal: one(goals, { fields: [milestones.goalId], references: [goals.id] }),
+  parent: one(milestones, {
+    fields: [milestones.parentId],
+    references: [milestones.id],
+    relationName: "children",
+  }),
+  children: many(milestones, { relationName: "children" }),
+  owner: one(user, { fields: [milestones.ownerId], references: [user.id] }),
+  linkedTasks: many(milestoneTasks),
+}));
+
+export const milestoneTasksRelations = relations(milestoneTasks, ({ one }) => ({
+  milestone: one(milestones, { fields: [milestoneTasks.milestoneId], references: [milestones.id] }),
+  task: one(tasks, { fields: [milestoneTasks.taskId], references: [tasks.id] }),
 }));
 
 export const attachmentBlobsRelations = relations(attachmentBlobs, ({ many }) => ({
@@ -791,8 +820,9 @@ export const appSchema = {
   webhookEndpoints,
   webhookDeliveries,
   discordIntegrations,
-  roadmapItems,
-  roadmapItemTasks,
+  goals,
+  milestones,
+  milestoneTasks,
   organizationsRelations,
   organizationMembersRelations,
   organizationMemberManagedDepartmentsRelations,
@@ -813,6 +843,7 @@ export const appSchema = {
   webhookEndpointsRelations,
   webhookDeliveriesRelations,
   discordIntegrationsRelations,
-  roadmapItemsRelations,
-  roadmapItemTasksRelations,
+  goalsRelations,
+  milestonesRelations,
+  milestoneTasksRelations,
 };

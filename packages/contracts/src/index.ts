@@ -229,13 +229,37 @@ export const editCommentSchema = z.object({
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type EditCommentInput = z.infer<typeof editCommentSchema>;
 
-export const roadmapPeriodSchema = z.enum(["yearly", "quarterly", "monthly", "weekly"]);
 export const roadmapStatusSchema = z.enum(["on_track", "at_risk", "done", "archived"]);
 
-export const createRoadmapItemSchema = z.object({
+/** An outcome a team is pursuing; not time-boxed. Owns one or more milestones. */
+export const createGoalSchema = z.object({
   title: z.string().min(1).max(256),
   description: z.string().max(4000).optional().nullable(),
-  period: roadmapPeriodSchema,
+  departmentId: z.string().uuid().optional().nullable(),
+  ownerId: z.string().min(1).optional().nullable(),
+  status: roadmapStatusSchema.optional(),
+  /** Soft overall deadline; not a structural boundary for its milestones. */
+  targetDate: z.string().datetime().optional().nullable(),
+});
+
+export const updateGoalSchema = z
+  .object({
+    title: z.string().min(1).max(256).optional(),
+    description: z.string().max(4000).optional().nullable(),
+    departmentId: z.string().uuid().optional().nullable(),
+    ownerId: z.string().min(1).optional().nullable(),
+    status: roadmapStatusSchema.optional(),
+    targetDate: z.string().datetime().optional().nullable(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: "Provide at least one field to update",
+  });
+
+/** Time-boxed step serving a goal; free-form dates, no forced period ladder. */
+export const createMilestoneSchema = z.object({
+  goalId: z.string().uuid(),
+  title: z.string().min(1).max(256),
+  description: z.string().max(4000).optional().nullable(),
   parentId: z.string().uuid().optional().nullable(),
   departmentId: z.string().uuid().optional().nullable(),
   periodStart: z.string().datetime(),
@@ -243,7 +267,7 @@ export const createRoadmapItemSchema = z.object({
   ownerId: z.string().min(1).optional().nullable(),
 });
 
-export const updateRoadmapItemSchema = z
+export const updateMilestoneSchema = z
   .object({
     title: z.string().min(1).max(256).optional(),
     description: z.string().max(4000).optional().nullable(),
@@ -259,12 +283,7 @@ export const updateRoadmapItemSchema = z
     message: "Provide at least one field to update",
   });
 
-/** Splits a period into its standard children (yearly → quarters, quarterly → months, monthly → weeks). */
-export const generateRoadmapChildrenSchema = z.object({
-  childPeriod: roadmapPeriodSchema,
-});
-
-export const linkRoadmapTasksSchema = z.object({
+export const linkMilestoneTasksSchema = z.object({
   taskIds: z.array(z.string().uuid()).min(1).max(100),
 });
 

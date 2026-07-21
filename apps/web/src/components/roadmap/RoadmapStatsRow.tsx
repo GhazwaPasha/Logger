@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { RoadmapItemRow } from "@/lib/ledger-types";
+import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
 function StatTile({
   label,
@@ -28,39 +28,41 @@ function StatTile({
   );
 }
 
-export function RoadmapStatsRow({ items, loading }: { items: RoadmapItemRow[]; loading: boolean }) {
+export function RoadmapStatsRow({
+  goals,
+  milestones,
+  loading,
+}: {
+  goals: GoalRow[];
+  milestones: MilestoneRow[];
+  loading: boolean;
+}) {
   const stats = useMemo(() => {
     const now = new Date().getTime();
-    const total = items.length;
     let active = 0;
-    let atRisk = 0;
-    for (const i of items) {
-      const start = new Date(i.periodStart).getTime();
-      const end = new Date(i.periodEnd).getTime();
+    for (const m of milestones) {
+      const start = new Date(m.periodStart).getTime();
+      const end = new Date(m.periodEnd).getTime();
       if (start <= now && now <= end) active++;
-      if (i.status === "at_risk") atRisk++;
     }
-    const roots = items.filter((i) => !i.parentId);
-    const rollup = roots.reduce(
-      (acc, r) => ({ done: acc.done + r.progress.done, total: acc.total + r.progress.total }),
+    const atRisk =
+      goals.filter((g) => g.status === "at_risk").length + milestones.filter((m) => m.status === "at_risk").length;
+    const rollup = goals.reduce(
+      (acc, g) => ({ done: acc.done + g.progress.done, total: acc.total + g.progress.total }),
       { done: 0, total: 0 },
     );
     const overallPct = rollup.total > 0 ? Math.round((rollup.done / rollup.total) * 100) : 0;
-    return { total, active, atRisk, overallPct, hasTasks: rollup.total > 0 };
-  }, [items]);
+    return { total: goals.length, active, atRisk, overallPct, hasTasks: rollup.total > 0 };
+  }, [goals, milestones]);
 
-  if (items.length === 0 && !loading) return null;
+  if (goals.length === 0 && !loading) return null;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <StatTile label="Total goals" value={String(stats.total)} loading={loading} />
+      <StatTile label="Goals" value={String(stats.total)} loading={loading} />
       <StatTile label="Active now" value={String(stats.active)} loading={loading} />
       <StatTile label="At risk" value={String(stats.atRisk)} tone={stats.atRisk > 0 ? "warn" : undefined} loading={loading} />
-      <StatTile
-        label="Overall progress"
-        value={stats.hasTasks ? `${stats.overallPct}%` : "—"}
-        loading={loading}
-      />
+      <StatTile label="Overall progress" value={stats.hasTasks ? `${stats.overallPct}%` : "—"} loading={loading} />
     </div>
   );
 }

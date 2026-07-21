@@ -183,6 +183,13 @@
       "when": 1747440014000,
       "tag": "0025_task_required_toggles",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1747440015000,
+      "tag": "0026_goals_milestones",
+      "breakpoints": true
     }
   ]
 }

@@ -1,44 +1,58 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Target } from "@phosphor-icons/react";
+import { Flag } from "@phosphor-icons/react";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
-export function RoadmapLinkSection({ taskId, token }: { taskId: string; token: string | null }) {
+export function MilestoneLinkSection({ taskId, token }: { taskId: string; token: string | null }) {
   const router = useRouter();
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const roadmap = useRoadmap(token, workspaceId);
   const [linking, setLinking] = useState(false);
 
-  const linkedGoals = useMemo(
-    () => roadmap.items.filter((i) => i.linkedTaskIds.includes(taskId)),
-    [roadmap.items, taskId],
+  const linkedMilestones = useMemo(
+    () => roadmap.milestones.filter((m) => m.linkedTaskIds.includes(taskId)),
+    [roadmap.milestones, taskId],
   );
 
-  const linkableGoals = useMemo(
-    () => roadmap.items.filter((i) => i.period !== "yearly" && !i.linkedTaskIds.includes(taskId)),
-    [roadmap.items, taskId],
+  const linkableMilestones = useMemo(
+    () => roadmap.milestones.filter((m) => !m.linkedTaskIds.includes(taskId)),
+    [roadmap.milestones, taskId],
   );
 
-  if (roadmap.items.length === 0) return null;
+  if (roadmap.milestones.length === 0) {
+    return (
+      <div className="space-y-1.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Milestones</h3>
+        <p className="text-sm text-[var(--muted)]">
+          No milestones yet.{" "}
+          <Link href={`/${workspaceSlug}/roadmap`} className="font-medium text-[var(--accent)] hover:underline">
+            Create one from the Roadmap page
+          </Link>{" "}
+          to link this task to it.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Roadmap goals</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Milestones</h3>
       <div className="flex flex-wrap items-center gap-1.5">
-        {linkedGoals.map((g) => (
+        {linkedMilestones.map((m) => (
           <button
-            key={g.id}
+            key={m.id}
             type="button"
             className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-xs font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
             onClick={() => router.push(`/${workspaceSlug}/roadmap`)}
             title="Open Roadmap"
           >
-            <Target size={12} weight="bold" />
-            {g.title}
+            <Flag size={12} weight="bold" />
+            {m.title}
             <span
               role="button"
               tabIndex={-1}
@@ -47,7 +61,7 @@ export function RoadmapLinkSection({ taskId, token }: { taskId: string; token: s
                 e.stopPropagation();
                 if (!linking) {
                   setLinking(true);
-                  roadmap.unlinkTask(g.id, taskId).finally(() => setLinking(false));
+                  roadmap.unlinkTask(m.id, taskId).finally(() => setLinking(false));
                 }
               }}
             >
@@ -55,11 +69,9 @@ export function RoadmapLinkSection({ taskId, token }: { taskId: string; token: s
             </span>
           </button>
         ))}
-        {linkedGoals.length === 0 && (
-          <p className="text-sm text-[var(--muted)]">Not part of any goal yet.</p>
-        )}
+        {linkedMilestones.length === 0 && <p className="text-sm text-[var(--muted)]">Not part of any milestone yet.</p>}
       </div>
-      {linkableGoals.length > 0 && (
+      {linkableMilestones.length > 0 && (
         <SelectPopover
           value="__placeholder__"
           onChange={(v) => {
@@ -68,8 +80,8 @@ export function RoadmapLinkSection({ taskId, token }: { taskId: string; token: s
             roadmap.linkTasks(v, [taskId]).finally(() => setLinking(false));
           }}
           options={[
-            { value: "__placeholder__", label: "Link to a goal…" },
-            ...linkableGoals.map((g) => ({ value: g.id, label: g.title })),
+            { value: "__placeholder__", label: "Link to a milestone…" },
+            ...linkableMilestones.map((m) => ({ value: m.id, label: m.title })),
           ]}
           triggerClassName="inline-flex items-center gap-2 rounded-lg border border-dashed border-[var(--border-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
         />

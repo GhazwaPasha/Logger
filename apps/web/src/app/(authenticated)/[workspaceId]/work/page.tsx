@@ -44,7 +44,7 @@ import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
 import { StatusPillSelect, KANBAN_STATUS_SHELL_LAYOUT } from "@/components/tasks/StatusPillSelect";
-import { TaskGoalIconBtn } from "@/components/roadmap/TaskGoalIconBtn";
+import { TaskMilestoneIconBtn } from "@/components/roadmap/TaskMilestoneIconBtn";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
@@ -385,6 +385,7 @@ function WorkItemsInner() {
   const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
   const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
   const [goalFilter, setGoalFilter] = useState<string | null>(null);
+  const [milestoneFilter, setMilestoneFilter] = useState<string | null>(null);
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -589,6 +590,7 @@ function WorkItemsInner() {
     }
 
     setGoalFilter(searchParams.get("goal"));
+    setMilestoneFilter(searchParams.get("milestone"));
   }, [searchParams]);
 
   const replaceWorkQuery = useCallback(
@@ -965,8 +967,12 @@ function WorkItemsInner() {
         if (!taskMatchesDueRange(t, dueFrom, dueTo)) return false;
       }
       if (goalFilter) {
-        const goal = roadmap.items.find((i) => i.id === goalFilter);
-        if (!goal || !goal.linkedTaskIds.includes(t.id)) return false;
+        const linked = roadmap.milestones.some((m) => m.goalId === goalFilter && m.linkedTaskIds.includes(t.id));
+        if (!linked) return false;
+      }
+      if (milestoneFilter) {
+        const milestone = roadmap.milestones.find((m) => m.id === milestoneFilter);
+        if (!milestone || !milestone.linkedTaskIds.includes(t.id)) return false;
       }
       return true;
     });
@@ -980,7 +986,8 @@ function WorkItemsInner() {
     urlAssigneeUserId,
     sessionUserId,
     goalFilter,
-    roadmap.items,
+    milestoneFilter,
+    roadmap.milestones,
   ]);
 
   const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortMode), [filteredTasks, sortMode]);
@@ -1200,7 +1207,7 @@ function WorkItemsInner() {
               </button>
             )}
             <div className="flex-1" />
-            <TaskGoalIconBtn taskId={task.id} />
+            <TaskMilestoneIconBtn taskId={task.id} />
             <AssigneeIconBtn task={task} />
             <DueIconBtn task={task} />
             <PriorityIconBtn task={task} />
@@ -1519,7 +1526,7 @@ function WorkItemsInner() {
                 </button>
               )}
               <div className="flex-1" />
-              <TaskGoalIconBtn taskId={task.id} />
+              <TaskMilestoneIconBtn taskId={task.id} />
               <AssigneeIconBtn task={task} />
               <DueIconBtn task={task} />
               <PriorityIconBtn task={task} />
@@ -1786,7 +1793,8 @@ function WorkItemsInner() {
     searchParams.get("mine") === "1" ||
     searchParams.get("unassigned") === "1" ||
     Boolean(searchParams.get("assignee")) ||
-    Boolean(searchParams.get("goal"));
+    Boolean(searchParams.get("goal")) ||
+    Boolean(searchParams.get("milestone"));
 
   const drilldownLabel = useMemo(() => {
     const parts: string[] = [];
@@ -1807,11 +1815,16 @@ function WorkItemsInner() {
     }
     const gid = searchParams.get("goal");
     if (gid) {
-      const g = roadmap.items.find((i) => i.id === gid);
-      parts.push(g ? `Roadmap: ${g.title}` : "Roadmap goal");
+      const g = roadmap.goals.find((x) => x.id === gid);
+      parts.push(g ? `Goal: ${g.title}` : "Roadmap goal");
+    }
+    const mid = searchParams.get("milestone");
+    if (mid) {
+      const m = roadmap.milestones.find((x) => x.id === mid);
+      parts.push(m ? `Milestone: ${m.title}` : "Roadmap milestone");
     }
     return parts.join(" · ");
-  }, [searchParams, members, roadmap.items]);
+  }, [searchParams, members, roadmap.goals, roadmap.milestones]);
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
@@ -1852,6 +1865,7 @@ function WorkItemsInner() {
                 p.delete("unassigned");
                 p.delete("assignee");
                 p.delete("goal");
+                p.delete("milestone");
               });
             }}
           >

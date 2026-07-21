@@ -1,25 +1,4 @@
-import type { RoadmapPeriod, RoadmapStatus } from "@/lib/ledger-types";
-
-export const PERIOD_LABELS: Record<RoadmapPeriod, string> = {
-  yearly: "Year",
-  quarterly: "Quarter",
-  monthly: "Month",
-  weekly: "Week",
-};
-
-export const PERIOD_BADGE_CLASS: Record<RoadmapPeriod, string> = {
-  yearly: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-  quarterly: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
-  monthly: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
-  weekly: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
-};
-
-export const CHILD_PERIOD: Record<RoadmapPeriod, RoadmapPeriod | null> = {
-  yearly: "quarterly",
-  quarterly: "monthly",
-  monthly: "weekly",
-  weekly: null,
-};
+import type { RoadmapStatus } from "@/lib/ledger-types";
 
 export const STATUS_LABELS: Record<RoadmapStatus, string> = {
   on_track: "On track",
@@ -59,30 +38,10 @@ export function toDateInputValue(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** The calendar period (year/quarter/month/Mon-start week) containing `anchor`, as [start, end] date-input strings. */
-export function defaultRangeForPeriod(period: RoadmapPeriod, anchor: Date): [string, string] {
-  const y = anchor.getUTCFullYear();
+/** Default range for a new milestone: a 2-week window starting at `anchor`, fully editable. */
+export function defaultMilestoneRange(anchor: Date): [string, string] {
   const pad = (n: number) => String(n).padStart(2, "0");
   const fmt = (d: Date) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-
-  if (period === "yearly") {
-    return [fmt(new Date(Date.UTC(y, 0, 1))), fmt(new Date(Date.UTC(y, 11, 31)))];
-  }
-  if (period === "quarterly") {
-    const qStartMonth = Math.floor(anchor.getUTCMonth() / 3) * 3;
-    return [
-      fmt(new Date(Date.UTC(y, qStartMonth, 1))),
-      fmt(new Date(Date.UTC(y, qStartMonth + 3, 0))),
-    ];
-  }
-  if (period === "monthly") {
-    const m = anchor.getUTCMonth();
-    return [fmt(new Date(Date.UTC(y, m, 1))), fmt(new Date(Date.UTC(y, m + 1, 0)))];
-  }
-  // weekly — Monday-start week containing `anchor`
-  const dow = anchor.getUTCDay();
-  const daysSinceMonday = (dow + 6) % 7;
-  const monday = new Date(Date.UTC(y, anchor.getUTCMonth(), anchor.getUTCDate() - daysSinceMonday));
-  const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000);
-  return [fmt(monday), fmt(sunday)];
+  const end = new Date(anchor.getTime() + 13 * 24 * 60 * 60 * 1000);
+  return [fmt(anchor), fmt(end)];
 }

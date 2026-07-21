@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.attachmentBlobsRelations = exports.roadmapItemTasksRelations = exports.roadmapItemsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.roadmapItemTasks = exports.roadmapItems = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.roadmapPeriodEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = void 0;
+exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -72,12 +72,6 @@ exports.jwks = (0, pg_core_1.pgTable)("jwks", {
     expiresAt: (0, pg_core_1.timestamp)("expires_at", { withTimezone: true }),
 });
 exports.orgRoleEnum = (0, pg_core_1.pgEnum)("org_role", ["owner", "manager", "member"]);
-exports.roadmapPeriodEnum = (0, pg_core_1.pgEnum)("roadmap_period", [
-    "yearly",
-    "quarterly",
-    "monthly",
-    "weekly",
-]);
 exports.roadmapStatusEnum = (0, pg_core_1.pgEnum)("roadmap_status", [
     "on_track",
     "at_risk",
@@ -270,16 +264,38 @@ exports.taskDependencies = (0, pg_core_1.pgTable)("task_dependencies", {
     (0, pg_core_1.primaryKey)({ columns: [t.taskId, t.dependsOnTaskId] }),
     (0, pg_core_1.index)("task_deps_depends_on_idx").on(t.dependsOnTaskId),
 ]);
-/** Planning goal: Year → Quarter → Month → Week, self-referencing via parentId. */
-exports.roadmapItems = (0, pg_core_1.pgTable)("roadmap_items", {
+/** Outcome a team is pursuing; not time-boxed. Owns one or more milestones. */
+exports.goals = (0, pg_core_1.pgTable)("goals", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
     organizationId: (0, pg_core_1.uuid)("organization_id")
         .notNull()
         .references(() => exports.organizations.id, { onDelete: "cascade" }),
     /** Optional level scope; null = org-wide goal. */
     departmentId: (0, pg_core_1.uuid)("department_id").references(() => exports.departments.id, { onDelete: "set null" }),
+    title: (0, pg_core_1.text)("title").notNull(),
+    description: (0, pg_core_1.text)("description"),
+    ownerId: (0, pg_core_1.text)("owner_id").references(() => exports.user.id, { onDelete: "set null" }),
+    status: (0, exports.roadmapStatusEnum)("status").notNull().default("on_track"),
+    /** Soft overall deadline; not a structural boundary for its milestones. */
+    targetDate: (0, pg_core_1.timestamp)("target_date", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [(0, pg_core_1.index)("goals_org_idx").on(t.organizationId)]);
+/** Time-boxed step serving a goal; free-form dates, no forced period ladder. Optionally self-nests via parentId. */
+exports.milestones = (0, pg_core_1.pgTable)("milestones", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    /** Optional level scope; null = org-wide milestone. */
+    departmentId: (0, pg_core_1.uuid)("department_id").references(() => exports.departments.id, { onDelete: "set null" }),
+    goalId: (0, pg_core_1.uuid)("goal_id")
+        .notNull()
+        .references(() => exports.goals.id, { onDelete: "cascade" }),
     parentId: (0, pg_core_1.uuid)("parent_id"),
-    period: (0, exports.roadmapPeriodEnum)("period").notNull(),
     title: (0, pg_core_1.text)("title").notNull(),
     description: (0, pg_core_1.text)("description"),
     periodStart: (0, pg_core_1.timestamp)("period_start", { withTimezone: true }).notNull(),
@@ -293,22 +309,22 @@ exports.roadmapItems = (0, pg_core_1.pgTable)("roadmap_items", {
         .defaultNow()
         .$onUpdate(() => new Date()),
 }, (t) => [
-    (0, pg_core_1.index)("roadmap_items_org_idx").on(t.organizationId),
-    (0, pg_core_1.index)("roadmap_items_parent_idx").on(t.parentId),
-    (0, pg_core_1.index)("roadmap_items_org_period_idx").on(t.organizationId, t.period),
+    (0, pg_core_1.index)("milestones_org_idx").on(t.organizationId),
+    (0, pg_core_1.index)("milestones_goal_idx").on(t.goalId),
+    (0, pg_core_1.index)("milestones_parent_idx").on(t.parentId),
 ]);
-/** Which real tasks count toward a (usually weekly/monthly) roadmap goal. */
-exports.roadmapItemTasks = (0, pg_core_1.pgTable)("roadmap_item_tasks", {
-    roadmapItemId: (0, pg_core_1.uuid)("roadmap_item_id")
+/** Which real tasks count toward a milestone. */
+exports.milestoneTasks = (0, pg_core_1.pgTable)("milestone_tasks", {
+    milestoneId: (0, pg_core_1.uuid)("milestone_id")
         .notNull()
-        .references(() => exports.roadmapItems.id, { onDelete: "cascade" }),
+        .references(() => exports.milestones.id, { onDelete: "cascade" }),
     taskId: (0, pg_core_1.uuid)("task_id")
         .notNull()
         .references(() => exports.tasks.id, { onDelete: "cascade" }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
-    (0, pg_core_1.primaryKey)({ columns: [t.roadmapItemId, t.taskId] }),
-    (0, pg_core_1.index)("roadmap_item_tasks_task_idx").on(t.taskId),
+    (0, pg_core_1.primaryKey)({ columns: [t.milestoneId, t.taskId] }),
+    (0, pg_core_1.index)("milestone_tasks_task_idx").on(t.taskId),
 ]);
 /** Deduplicated binary payload in R2 (content-addressed or legacy key). */
 exports.attachmentBlobs = (0, pg_core_1.pgTable)("attachment_blobs", {
@@ -547,24 +563,31 @@ exports.taskDependenciesRelations = (0, drizzle_orm_1.relations)(exports.taskDep
     task: one(exports.tasks, { fields: [exports.taskDependencies.taskId], references: [exports.tasks.id], relationName: "blockedBy" }),
     dependsOn: one(exports.tasks, { fields: [exports.taskDependencies.dependsOnTaskId], references: [exports.tasks.id], relationName: "blocking" }),
 }));
-exports.roadmapItemsRelations = (0, drizzle_orm_1.relations)(exports.roadmapItems, ({ one, many }) => ({
+exports.goalsRelations = (0, drizzle_orm_1.relations)(exports.goals, ({ one, many }) => ({
+    organization: one(exports.organizations, { fields: [exports.goals.organizationId], references: [exports.organizations.id] }),
+    department: one(exports.departments, { fields: [exports.goals.departmentId], references: [exports.departments.id] }),
+    owner: one(exports.user, { fields: [exports.goals.ownerId], references: [exports.user.id] }),
+    milestones: many(exports.milestones),
+}));
+exports.milestonesRelations = (0, drizzle_orm_1.relations)(exports.milestones, ({ one, many }) => ({
     organization: one(exports.organizations, {
-        fields: [exports.roadmapItems.organizationId],
+        fields: [exports.milestones.organizationId],
         references: [exports.organizations.id],
     }),
-    department: one(exports.departments, { fields: [exports.roadmapItems.departmentId], references: [exports.departments.id] }),
-    parent: one(exports.roadmapItems, {
-        fields: [exports.roadmapItems.parentId],
-        references: [exports.roadmapItems.id],
+    department: one(exports.departments, { fields: [exports.milestones.departmentId], references: [exports.departments.id] }),
+    goal: one(exports.goals, { fields: [exports.milestones.goalId], references: [exports.goals.id] }),
+    parent: one(exports.milestones, {
+        fields: [exports.milestones.parentId],
+        references: [exports.milestones.id],
         relationName: "children",
     }),
-    children: many(exports.roadmapItems, { relationName: "children" }),
-    owner: one(exports.user, { fields: [exports.roadmapItems.ownerId], references: [exports.user.id] }),
-    linkedTasks: many(exports.roadmapItemTasks),
+    children: many(exports.milestones, { relationName: "children" }),
+    owner: one(exports.user, { fields: [exports.milestones.ownerId], references: [exports.user.id] }),
+    linkedTasks: many(exports.milestoneTasks),
 }));
-exports.roadmapItemTasksRelations = (0, drizzle_orm_1.relations)(exports.roadmapItemTasks, ({ one }) => ({
-    roadmapItem: one(exports.roadmapItems, { fields: [exports.roadmapItemTasks.roadmapItemId], references: [exports.roadmapItems.id] }),
-    task: one(exports.tasks, { fields: [exports.roadmapItemTasks.taskId], references: [exports.tasks.id] }),
+exports.milestoneTasksRelations = (0, drizzle_orm_1.relations)(exports.milestoneTasks, ({ one }) => ({
+    milestone: one(exports.milestones, { fields: [exports.milestoneTasks.milestoneId], references: [exports.milestones.id] }),
+    task: one(exports.tasks, { fields: [exports.milestoneTasks.taskId], references: [exports.tasks.id] }),
 }));
 exports.attachmentBlobsRelations = (0, drizzle_orm_1.relations)(exports.attachmentBlobs, ({ many }) => ({
     attachments: many(exports.taskAttachments),
@@ -633,8 +656,9 @@ exports.appSchema = {
     webhookEndpoints: exports.webhookEndpoints,
     webhookDeliveries: exports.webhookDeliveries,
     discordIntegrations: exports.discordIntegrations,
-    roadmapItems: exports.roadmapItems,
-    roadmapItemTasks: exports.roadmapItemTasks,
+    goals: exports.goals,
+    milestones: exports.milestones,
+    milestoneTasks: exports.milestoneTasks,
     organizationsRelations: exports.organizationsRelations,
     organizationMembersRelations: exports.organizationMembersRelations,
     organizationMemberManagedDepartmentsRelations: exports.organizationMemberManagedDepartmentsRelations,
@@ -655,6 +679,7 @@ exports.appSchema = {
     webhookEndpointsRelations: exports.webhookEndpointsRelations,
     webhookDeliveriesRelations: exports.webhookDeliveriesRelations,
     discordIntegrationsRelations: exports.discordIntegrationsRelations,
-    roadmapItemsRelations: exports.roadmapItemsRelations,
-    roadmapItemTasksRelations: exports.roadmapItemTasksRelations,
+    goalsRelations: exports.goalsRelations,
+    milestonesRelations: exports.milestonesRelations,
+    milestoneTasksRelations: exports.milestoneTasksRelations,
 };
