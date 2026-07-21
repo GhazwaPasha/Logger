@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import {
   appendLedgerSchema,
   createSubtaskSchema,
@@ -156,7 +156,7 @@ export class TasksService {
   async createSubtask(userId: string, taskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot create subtask");
+    if (!caps.canEditFields) throw new ForbiddenException("Cannot create subtask");
     const parsed = createSubtaskSchema.parse(body);
     const [row] = await this.db
       .insert(subtasks)
@@ -172,8 +172,9 @@ export class TasksService {
   async patchSubtask(userId: string, taskId: string, subtaskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update subtask");
     const parsed = updateSubtaskSchema.parse(body);
+    if (parsed.title !== undefined && !caps.canEditFields) throw new ForbiddenException("Cannot rename subtask");
+    if (parsed.title === undefined && !caps.canParticipate) throw new ForbiddenException("Cannot update subtask");
     const [row] = await this.db
       .update(subtasks)
       .set({
@@ -193,7 +194,7 @@ export class TasksService {
   async deleteSubtask(userId: string, taskId: string, subtaskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot delete subtask");
+    if (!caps.canEditFields) throw new ForbiddenException("Cannot delete subtask");
     const [row] = await this.db
       .delete(subtasks)
       .where(and(eq(subtasks.id, subtaskId), eq(subtasks.taskId, taskId)))
@@ -206,7 +207,7 @@ export class TasksService {
   async appendLedger(userId: string, taskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot append to ledger");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot append to ledger");
 
     const parsed = appendLedgerSchema.parse(body);
 
@@ -261,7 +262,7 @@ export class TasksService {
   async reschedule(userId: string, taskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canReschedule) throw new ForbiddenException("Cannot reschedule");
+    if (!caps.canEditFields) throw new ForbiddenException("Cannot reschedule");
 
     const parsed = rescheduleTaskSchema.parse(body);
     const oldDue = access.task.dueAt;
@@ -356,7 +357,6 @@ export class TasksService {
   async patchTask(userId: string, taskId: string, body: unknown) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot update task");
 
     const parsed = patchTaskSchema.parse(body);
     const task = access.task;
@@ -394,6 +394,16 @@ export class TasksService {
     const discordChannelChanged =
       parsed.discordChannelId !== undefined && parsed.discordChannelId !== (task.discordChannelId ?? null);
 
+    const nextAttachmentRequired =
+      parsed.attachmentRequired !== undefined ? parsed.attachmentRequired : task.attachmentRequired;
+    const attachmentRequiredChanged =
+      parsed.attachmentRequired !== undefined && parsed.attachmentRequired !== task.attachmentRequired;
+
+    const nextTimeTrackingEnabled =
+      parsed.timeTrackingEnabled !== undefined ? parsed.timeTrackingEnabled : task.timeTrackingEnabled;
+    const timeTrackingEnabledChanged =
+      parsed.timeTrackingEnabled !== undefined && parsed.timeTrackingEnabled !== task.timeTrackingEnabled;
+
     const hasTaskFieldUpdates =
       statusChanged ||
       priorityChanged ||
@@ -401,13 +411,45 @@ export class TasksService {
       assigneesChanged ||
       dueChanged ||
       repeatChanged ||
-      discordChannelChanged;
+      discordChannelChanged ||
+      attachmentRequiredChanged ||
+      timeTrackingEnabledChanged;
 
     if (!hasTaskFieldUpdates && !hasSubtasksChange) {
       return this.taskMutationResult(userId, taskId, []);
     }
 
-    if (dueChanged && !caps.canReschedule) throw new ForbiddenException("Cannot update due date");
+    /**
+     * `assigneesChanged` only reflects whether the field was present in the request body — the
+     * shared client-side autosave hook always resends the full field bundle (including
+     * assigneeUserIds) on every save, even for a status-only change. Authorization must key off
+     * whether the assignee set actually differs, not merely whether it was included in the body.
+     */
+    const previousAssigneeSorted = assigneesChanged
+      ? (
+          await this.db
+            .select({ userId: taskAssignees.userId })
+            .from(taskAssignees)
+            .where(eq(taskAssignees.taskId, taskId))
+        )
+          .map((r) => r.userId)
+          .sort()
+      : ([] as string[]);
+    const nextAssigneeSorted = assigneesChanged ? [...new Set(parsed.assigneeUserIds!)].sort() : ([] as string[]);
+    const assigneesActuallyChanged =
+      assigneesChanged && JSON.stringify(previousAssigneeSorted) !== JSON.stringify(nextAssigneeSorted);
+
+    if (
+      (titleChanged || priorityChanged || assigneesActuallyChanged || dueChanged || repeatChanged ||
+        attachmentRequiredChanged || timeTrackingEnabledChanged) &&
+      !caps.canEditFields
+    ) {
+      throw new ForbiddenException("Cannot edit this field");
+    }
+    if ((hasSubtasksCreate || hasSubtasksUpdate || hasSubtasksDelete) && !caps.canEditFields) {
+      throw new ForbiddenException("Cannot edit subtasks");
+    }
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot update task");
 
     if (discordChannelChanged && !access.isOwner) {
       throw new ForbiddenException("Only the workspace owner can change a task's Discord channel");
@@ -416,13 +458,25 @@ export class TasksService {
     const nextDiscordChannelId =
       parsed.discordChannelId !== undefined ? parsed.discordChannelId : (task.discordChannelId ?? null);
     if (statusChanged && nextStatus === "done" && nextDiscordChannelId) {
+      const [{ deliveredCount }] = await this.db
+        .select({ deliveredCount: count() })
+        .from(taskAttachments)
+        .where(and(eq(taskAttachments.taskId, taskId), isNotNull(taskAttachments.discordDeliveredAt)));
+      if ((deliveredCount ?? 0) === 0) {
+        throw new BadRequestException(
+          "This task has a Discord channel assigned — submit a file to Discord before marking it done",
+        );
+      }
+    }
+
+    if (statusChanged && nextStatus === "done" && nextAttachmentRequired) {
       const [{ attachmentCount }] = await this.db
         .select({ attachmentCount: count() })
         .from(taskAttachments)
         .where(eq(taskAttachments.taskId, taskId));
       if ((attachmentCount ?? 0) === 0) {
         throw new BadRequestException(
-          "This task has a Discord channel assigned — attach a file before marking it done",
+          "An attachment is required for this task — add a file before marking it done",
         );
       }
     }
@@ -437,20 +491,6 @@ export class TasksService {
         throw new ForbiddenException("Invalid assignee selection");
       }
     }
-
-    const previousAssigneeSorted = assigneesChanged
-      ? (
-          await this.db
-            .select({ userId: taskAssignees.userId })
-            .from(taskAssignees)
-            .where(eq(taskAssignees.taskId, taskId))
-        )
-          .map((r) => r.userId)
-          .sort()
-      : ([] as string[]);
-    const nextAssigneeSorted = assigneesChanged ? [...new Set(parsed.assigneeUserIds!)].sort() : ([] as string[]);
-    const assigneesActuallyChanged =
-      assigneesChanged && JSON.stringify(previousAssigneeSorted) !== JSON.stringify(nextAssigneeSorted);
 
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     const now = new Date();
@@ -469,6 +509,8 @@ export class TasksService {
             ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
             ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
             ...(discordChannelChanged ? { discordChannelId: parsed.discordChannelId } : {}),
+            ...(attachmentRequiredChanged ? { attachmentRequired: parsed.attachmentRequired } : {}),
+            ...(timeTrackingEnabledChanged ? { timeTrackingEnabled: parsed.timeTrackingEnabled } : {}),
             updatedAt: now,
           })
           .where(eq(tasks.id, taskId));

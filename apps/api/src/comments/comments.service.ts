@@ -58,7 +58,7 @@ export class CommentsService {
   async create(userId: string, taskId: string, body: { body: string; parentCommentId?: string }) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot comment on this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot comment on this task");
 
     const [comment] = await this.db
       .insert(comments)

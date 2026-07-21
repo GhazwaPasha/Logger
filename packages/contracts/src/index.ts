@@ -157,6 +157,10 @@ export const patchTaskSchema = z
     subtasksToDelete: z.array(z.string().uuid()).max(MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
     /** Discord channel snowflake ID attachments should post to; `null` disables Discord posting for this task. */
     discordChannelId: z.string().min(1).max(64).nullable().optional(),
+    /** Requires at least one attachment (any source) before the task can be marked done. */
+    attachmentRequired: z.boolean().optional(),
+    /** Controls whether the time-tracking UI is shown for this task at all. */
+    timeTrackingEnabled: z.boolean().optional(),
   })
   .refine(
     (d) => {
@@ -171,6 +175,8 @@ export const patchTaskSchema = z
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
         d.discordChannelId !== undefined ||
+        d.attachmentRequired !== undefined ||
+        d.timeTrackingEnabled !== undefined ||
         hasSubCreate || hasSubUpdate || hasSubDelete
       );
     },
@@ -182,7 +188,7 @@ export const discordIntegrationConfigSchema = z.object({
 });
 export type DiscordIntegrationConfigInput = z.infer<typeof discordIntegrationConfigSchema>;
 
-export type DiscordChannelOption = { id: string; name: string; position: number };
+export type DiscordChannelOption = { id: string; name: string; position: number; isPrivate: boolean };
 
 export const taskCapabilitiesSchema = z.object({
   canArchiveTask: z.boolean(),

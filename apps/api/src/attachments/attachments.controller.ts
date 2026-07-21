@@ -42,6 +42,22 @@ export class AttachmentsController {
     });
   }
 
+  @Post("tasks/:taskId/attachments/discord-submit")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_FILE_SIZE } }))
+  discordSubmit(
+    @CurrentUser() user: RequestUser,
+    @Param("taskId") taskId: string,
+    @UploadedFile() file?: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  ) {
+    if (!file?.buffer) throw new BadRequestException("No file uploaded");
+    return this.attachments.discordSubmit(user.id, taskId, {
+      buffer: file.buffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+  }
+
   @Post("tasks/:taskId/attachments/presign")
   presign(
     @CurrentUser() user: RequestUser,

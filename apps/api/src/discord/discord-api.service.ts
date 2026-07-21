@@ -3,10 +3,13 @@ import { ConfigService } from "@nestjs/config";
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const TEXT_CHANNEL_TYPES = new Set([0, 5]);
+const CATEGORY_TYPE = 4;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RATE_LIMIT_WAIT_MS = 2_000;
 /** View Channel (0x400) + Send Messages (0x800) + Attach Files (0x8000). */
 const INVITE_PERMISSIONS = 1024 + 2048 + 32768;
+/** VIEW_CHANNEL permission bit; permission bitfields are 53+ bit strings, so compare as BigInt. */
+const VIEW_CHANNEL_BIT = 1024n;
 
 export class DiscordApiError extends Error {
   constructor(
@@ -18,7 +21,27 @@ export class DiscordApiError extends Error {
   }
 }
 
-export type DiscordChannel = { id: string; name: string; position: number };
+export type DiscordChannel = { id: string; name: string; position: number; isPrivate: boolean };
+
+type DiscordApiChannel = {
+  id: string;
+  name: string;
+  type: number;
+  position: number;
+  parent_id?: string | null;
+  permission_overwrites?: { id: string; type: number; allow: string; deny: string }[];
+};
+
+/** True if the `@everyone` role (id == guild id) has VIEW_CHANNEL explicitly denied on this channel/category. */
+function everyoneDeniedView(channel: DiscordApiChannel, guildId: string): boolean {
+  const overwrite = channel.permission_overwrites?.find((o) => o.type === 0 && o.id === guildId);
+  if (!overwrite) return false;
+  try {
+    return (BigInt(overwrite.deny || "0") & VIEW_CHANNEL_BIT) !== 0n;
+  } catch {
+    return false;
+  }
+}
 
 function describeStatus(status: number): string {
   switch (status) {
@@ -88,11 +111,18 @@ export class DiscordApiService implements OnModuleInit {
   async listGuildChannels(guildId: string): Promise<DiscordChannel[]> {
     const res = await this.request(`/guilds/${guildId}/channels`);
     if (!res.ok) throw new DiscordApiError(describeStatus(res.status), res.status);
-    const body = (await res.json()) as { id: string; name: string; type: number; position: number }[];
+    const body = (await res.json()) as DiscordApiChannel[];
+
+    const categoriesById = new Map(body.filter((c) => c.type === CATEGORY_TYPE).map((c) => [c.id, c]));
+
     return body
       .filter((c) => TEXT_CHANNEL_TYPES.has(c.type))
       .sort((a, b) => a.position - b.position)
-      .map((c) => ({ id: c.id, name: c.name, position: c.position }));
+      .map((c) => {
+        const parent = c.parent_id ? categoriesById.get(c.parent_id) : undefined;
+        const isPrivate = everyoneDeniedView(c, guildId) || (parent ? everyoneDeniedView(parent, guildId) : false);
+        return { id: c.id, name: c.name, position: c.position, isPrivate };
+      });
   }
 
   async postFileMessage(

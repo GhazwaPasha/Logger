@@ -230,6 +230,10 @@ export const tasks = pgTable(
     spawnedFromTaskId: uuid("spawned_from_task_id"),
     /** Discord channel snowflake ID attachments on this task are posted to; null = Discord posting disabled. */
     discordChannelId: text("discord_channel_id"),
+    /** At least one attachment (any source) is required before the task can be marked done. */
+    attachmentRequired: boolean("attachment_required").notNull().default(false),
+    /** Controls whether the time-tracking UI renders for this task at all. */
+    timeTrackingEnabled: boolean("time_tracking_enabled").notNull().default(true),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -417,6 +421,8 @@ export const taskAttachments = pgTable(
     fileName: text("file_name").notNull(),
     fileSize: text("file_size").notNull(), // display size (original upload); blob may be smaller when compressed
     mimeType: text("mime_type").notNull(),
+    /** Set when this file was uploaded via the "Discord submission" flow and successfully posted; null = not a Discord submission (or delivery failed). */
+    discordDeliveredAt: timestamp("discord_delivered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("task_attachments_task_idx").on(t.taskId), index("task_attachments_blob_idx").on(t.blobId)],

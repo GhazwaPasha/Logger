@@ -1,19 +1,38 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
+import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
+import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { useRouter } from "next/navigation";
+import { taskEditCaps } from "@/lib/workspace-permissions";
 import { DependencySection } from "@/components/tasks/DependencySection";
 import { AttachmentZone } from "@/components/tasks/AttachmentZone";
+import { DiscordSubmissionZone } from "@/components/tasks/DiscordSubmissionZone";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
-import { statusPillPaletteClasses, STATUS_LABELS, PRIORITY_LABELS, type TaskPriority } from "@/lib/task-board";
+import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
+import { StatusPillSelect } from "@/components/tasks/StatusPillSelect";
+import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
+import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
+import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
+import { SelectPopover } from "@/components/ui/SelectPopover";
+import { Toggle } from "@/components/ui/Toggle";
+import {
+  FLOW_COLUMN_LABELS,
+  PRIORITY_LABELS,
+  normalizeTaskStatus,
+  stageControlDropdownOptions,
+  type TaskPriority,
+} from "@/lib/task-board";
 import { CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { memberInitials } from "@/lib/member-utils";
+import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -39,11 +58,26 @@ export function TaskViewPanel({
   const router = useRouter();
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
-  const { tasks, members } = useWorkspaceData();
-  const { workspaceSlug } = useWorkspaceRoute();
+  const { tasks, lists, members } = useWorkspaceData();
+  const { workspaceSlug, workspaceId } = useWorkspaceRoute();
+
+  const [showAssignees, setShowAssignees] = useState(false);
+  const [showDuePanel, setShowDuePanel] = useState(false);
+  const [showRepeatPanel, setShowRepeatPanel] = useState(false);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const taskFromList = tasks.find((t) => t.id === taskId) ?? null;
   const { detail, isLoading } = useTaskDetail(token, taskId, taskFromList);
+
+  const form = useTaskEditorForm({ taskId, workspaceId, token, detail });
+  const subtaskOps = useTaskSubtasks(taskId, token, workspaceId);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [form.title]);
 
   function navigateToEdit() {
     router.push(`/${workspaceSlug}/work/task/${taskId}`);
@@ -77,9 +111,14 @@ export function TaskViewPanel({
     );
   }
 
-  const { task, subtasks, assigneeUserIds, ledger } = detail;
-  const dueRepeat = parseTaskDueRepeat(task.dueRepeat);
+  const { task, ledger } = detail;
+  const caps = taskEditCaps(task, lists, sessionUserId, members);
+
+  const stored = normalizeTaskStatus(task.status);
+  const statusMenuOptions = stageControlDropdownOptions(stored);
+
   const dueFormatted = formatDueDate(task.dueAt);
+  const dueRepeat = parseTaskDueRepeat(task.dueRepeat);
 
   return (
     <div className="flex flex-col gap-5">
@@ -105,67 +144,116 @@ export function TaskViewPanel({
       </div>
 
       {/* Title */}
-      <h3 className="text-base font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
+      {caps.canEditFields ? (
+        <textarea
+          ref={titleRef}
+          rows={1}
+          value={form.title}
+          onChange={(e) => {
+            form.setTitle(e.target.value);
+            form.scheduleSave();
+          }}
+          placeholder={TASK_TITLE_PLACEHOLDER}
+          aria-label="Task title"
+          className="w-full resize-none overflow-hidden bg-transparent p-0 text-base font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
+        />
+      ) : (
+        <h3 className="text-base font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
+      )}
 
       {/* Subtasks — always shown, right below title */}
-      <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Subtasks{subtasks.length > 0 ? ` (${subtasks.filter((s) => s.done).length}/${subtasks.length})` : ""}
-        </p>
-        {subtasks.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No subtasks</p>
-        ) : (
-          <div className="rounded-xl border border-[var(--border-subtle)]">
-            {subtasks.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2 last:border-b-0"
-              >
-                <span className={`text-sm ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}>
-                  {item.done ? "✓" : "○"}
-                </span>
-                <span
-                  className={`flex-1 text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
-                >
-                  {item.title}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <TaskSubtaskList
+        subtasks={detail.subtasks}
+        disabled={!token}
+        toggleOnly={!caps.canEditFields}
+        error={subtaskOps.error}
+        onCreate={subtaskOps.createSubtask}
+        onUpdate={subtaskOps.updateSubtask}
+        onDelete={subtaskOps.deleteSubtask}
+        getStableKey={subtaskOps.getStableKey}
+      />
 
       {/* Status + Priority */}
       <div className="flex flex-wrap gap-2">
-        <span
-          className={`inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold ${statusPillPaletteClasses(task.status as Parameters<typeof statusPillPaletteClasses>[0])}`}
-        >
-          {STATUS_LABELS[task.status as keyof typeof STATUS_LABELS] ?? task.status}
-        </span>
-        {(() => {
-          const p = task.priority as TaskPriority;
-          const color = p === "high"
-            ? "text-amber-500 dark:text-amber-400"
-            : p === "low"
-              ? "text-sky-500 dark:text-sky-400"
-              : "text-[var(--muted)]";
-          return (
-            <span className={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}>
-              {p === "high" ? <CaretDoubleUp size={12} weight="fill" /> : p === "low" ? <CaretDoubleDown size={12} weight="fill" /> : <ArrowLineUp size={12} weight="bold" />}
-              {PRIORITY_LABELS[p] ?? "Medium"}
-            </span>
-          );
-        })()}
+        <StatusPillSelect
+          aria-label={`Task stage: ${FLOW_COLUMN_LABELS[form.status]}`}
+          value={form.status}
+          onChange={(v) => {
+            form.setStatus(v);
+            form.scheduleSave();
+          }}
+          options={statusMenuOptions}
+        />
+        {caps.canEditFields ? (
+          (() => {
+            const color =
+              form.priority === "high"
+                ? "text-amber-500 dark:text-amber-400"
+                : form.priority === "low"
+                  ? "text-sky-500 dark:text-sky-400"
+                  : "text-[var(--muted)]";
+            const icon =
+              form.priority === "high" ? (
+                <CaretDoubleUp size={12} weight="fill" />
+              ) : form.priority === "low" ? (
+                <CaretDoubleDown size={12} weight="fill" />
+              ) : (
+                <ArrowLineUp size={12} weight="bold" />
+              );
+            return (
+              <SelectPopover
+                value={form.priority}
+                onChange={(v) => {
+                  form.setPriority(v as TaskPriority);
+                  form.scheduleSave();
+                }}
+                options={(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => ({
+                  value: k,
+                  label: PRIORITY_LABELS[k],
+                }))}
+                triggerClassName={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}
+                triggerContent={
+                  <>
+                    <span aria-hidden>{icon}</span>
+                    {PRIORITY_LABELS[form.priority]}
+                  </>
+                }
+                showChevron={false}
+                aria-label="Priority"
+              />
+            );
+          })()
+        ) : (
+          (() => {
+            const p = task.priority as TaskPriority;
+            const color = p === "high"
+              ? "text-amber-500 dark:text-amber-400"
+              : p === "low"
+                ? "text-sky-500 dark:text-sky-400"
+                : "text-[var(--muted)]";
+            return (
+              <span className={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}>
+                {p === "high" ? <CaretDoubleUp size={12} weight="fill" /> : p === "low" ? <CaretDoubleDown size={12} weight="fill" /> : <ArrowLineUp size={12} weight="bold" />}
+                {PRIORITY_LABELS[p] ?? "Medium"}
+              </span>
+            );
+          })()
+        )}
       </div>
+      {form.syncStatus === "error" && form.syncError && (
+        <p className="-mt-3 text-xs text-red-600 dark:text-red-400" role="alert">
+          {form.syncError}
+        </p>
+      )}
 
       {/* Assignees */}
       <div>
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Assignees</p>
-        {assigneeUserIds.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">Unassigned</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {assigneeUserIds.map((id) => {
+        <div className="flex flex-wrap items-center gap-1.5">
+          {form.assigneeIds.length === 0 && !caps.canEditFields ? (
+            <p className="text-sm text-[var(--muted)]">Unassigned</p>
+          ) : (
+            form.assigneeIds.map((id) => {
               const m = members.find((r) => r.userId === id);
               const name = m ? ((m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown") : "Unknown";
               const initials = m ? memberInitials(m) : "?";
@@ -182,9 +270,37 @@ export function TaskViewPanel({
                     </span>
                   )}
                   {name}
+                  {caps.canEditFields && (
+                    <button
+                      type="button"
+                      className="shrink-0 leading-none text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                      onClick={() => form.toggleAssignee(id)}
+                      aria-label={`Remove ${name}`}
+                    >
+                      ×
+                    </button>
+                  )}
                 </span>
               );
-            })}
+            })
+          )}
+          {caps.canEditFields && (
+            <button
+              type="button"
+              className="inline-flex items-center rounded-full border border-dashed border-[var(--border-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              onClick={() => setShowAssignees((v) => !v)}
+            >
+              {form.assigneeIds.length === 0 ? "Add assignee" : "+ Add"}
+            </button>
+          )}
+        </div>
+        {caps.canEditFields && showAssignees && (
+          <div className="mt-2">
+            <AssigneeSearchField
+              members={members}
+              assigneeIds={form.assigneeIds}
+              onToggleAssignee={form.toggleAssignee}
+            />
           </div>
         )}
       </div>
@@ -192,7 +308,40 @@ export function TaskViewPanel({
       {/* Due date */}
       <div>
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Due date</p>
-        {dueFormatted ? (
+        {caps.canEditFields ? (
+          <div className="flex flex-wrap gap-2">
+            <DueDateTimePopover
+              open={showDuePanel}
+              onOpenChange={(o) => {
+                setShowDuePanel(o);
+                if (o) setShowRepeatPanel(false);
+              }}
+              value={form.due}
+              onChange={(v) => {
+                form.setDue(v);
+                form.scheduleSave();
+              }}
+              onClear={() => {
+                form.setDue("");
+                form.setDueRepeat(null);
+                form.scheduleSave();
+              }}
+            />
+            <DueRepeatPopover
+              open={showRepeatPanel}
+              onOpenChange={(o) => {
+                setShowRepeatPanel(o);
+                if (o) setShowDuePanel(false);
+              }}
+              dueLocalValue={form.due}
+              value={form.dueRepeat}
+              onChange={(v) => {
+                form.setDueRepeat(v);
+                form.scheduleSave();
+              }}
+            />
+          </div>
+        ) : dueFormatted ? (
           <>
             <p className="text-sm text-[var(--fg)]">{dueFormatted}</p>
             {dueRepeat && (
@@ -217,19 +366,49 @@ export function TaskViewPanel({
         />
       )}
 
+      {/* Time tracking visibility toggle — privileged users only; render condition below has no such gate, so it stays hidden for everyone when off */}
+      {token && sessionUserId && caps.canEditFields && (
+        <div className="flex items-center justify-between gap-2 text-sm text-[var(--muted)]">
+          <span>Show time tracking</span>
+          <Toggle
+            checked={form.timeTrackingEnabled}
+            aria-label="Show time tracking"
+            onChange={(next) => form.setTimeTrackingEnabled(next)}
+          />
+        </div>
+      )}
       {/* Time tracking — only shows when there are entries (viewOnly=true) */}
-      {token && sessionUserId && (
+      {token && sessionUserId && form.timeTrackingEnabled && (
         <TimeTracker taskId={taskId} token={token} userId={sessionUserId} viewOnly />
       )}
 
-      {/* Attachments — only shows when there are attachments (viewOnly=true) */}
+      {/* Attachments — live for everyone with access */}
       {token && sessionUserId && (
-        <AttachmentZone taskId={taskId} token={token} userId={sessionUserId} viewOnly />
+        <div className="space-y-2">
+          {caps.canEditFields ? (
+            <div className="flex items-center justify-between gap-2 text-xs font-medium text-[var(--muted)]">
+              <span>Require at least one attachment before marking done</span>
+              <Toggle
+                checked={form.attachmentRequired}
+                aria-label="Require at least one attachment before marking done"
+                onChange={(next) => form.setAttachmentRequired(next)}
+              />
+            </div>
+          ) : (
+            form.attachmentRequired && (
+              <p className="text-xs font-medium text-[var(--muted)]">Attachment required before marking done</p>
+            )
+          )}
+          <AttachmentZone taskId={taskId} token={token} userId={sessionUserId} />
+        </div>
       )}
 
-      {/* Comments — only shows when there are comments (viewOnly=true) */}
+      {/* Discord submission — live for everyone with access, when a channel is assigned */}
+      {token && form.discordChannelId && <DiscordSubmissionZone taskId={taskId} token={token} />}
+
+      {/* Comments — live for everyone with access */}
       {token && sessionUserId && (
-        <CommentThread taskId={taskId} token={token} userId={sessionUserId} members={members} viewOnly />
+        <CommentThread taskId={taskId} token={token} userId={sessionUserId} members={members} />
       )}
 
       {/* Activity history — always shown */}

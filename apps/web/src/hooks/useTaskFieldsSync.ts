@@ -15,6 +15,8 @@ export type TaskFieldPatchBody = {
   assigneeUserIds: string[];
   dueRepeat: unknown;
   discordChannelId: string | null;
+  attachmentRequired: boolean;
+  timeTrackingEnabled: boolean;
   dueAt?: string | null;
 };
 

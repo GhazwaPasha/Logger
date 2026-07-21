@@ -169,6 +169,20 @@
       "when": 1747440012000,
       "tag": "0023_discord_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1747440013000,
+      "tag": "0024_task_attachment_discord_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1747440014000,
+      "tag": "0025_task_required_toggles",
+      "breakpoints": true
     }
   ]
 }

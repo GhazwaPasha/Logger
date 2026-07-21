@@ -23,7 +23,9 @@ export type NotifyAttachmentOpts = {
   source: DiscordAttachmentSource;
 };
 
-/** Fire-and-forget side effect: posts a newly attached task file into the workspace's configured Discord channel. */
+export type DiscordDeliveryResult = { ok: true } | { ok: false; reason: string };
+
+/** Posts a task attachment into the workspace's configured Discord channel; caller awaits the outcome. */
 @Injectable()
 export class DiscordNotifyService {
   private readonly log = new Logger(DiscordNotifyService.name);
@@ -36,21 +38,26 @@ export class DiscordNotifyService {
     private readonly discordApi: DiscordApiService,
   ) {}
 
-  async notifyAttachment(opts: NotifyAttachmentOpts): Promise<void> {
-    if (!this.discordApi.isConfigured()) return;
+  async notifyAttachment(opts: NotifyAttachmentOpts): Promise<DiscordDeliveryResult> {
+    if (!this.discordApi.isConfigured()) {
+      return { ok: false, reason: "Discord is not configured on this server" };
+    }
 
     const [integration] = await this.db
       .select()
       .from(discordIntegrations)
       .where(eq(discordIntegrations.organizationId, opts.organizationId))
       .limit(1);
-    if (!integration) return;
+    if (!integration) {
+      return { ok: false, reason: "This workspace hasn't connected a Discord server" };
+    }
 
     const fileBuffer = await this.resolveBytes(opts.source);
-    if (!fileBuffer) return;
+    if (!fileBuffer) {
+      return { ok: false, reason: "Could not read the file to send to Discord" };
+    }
     if (fileBuffer.length > DISCORD_MAX_UPLOAD_BYTES) {
-      this.log.warn(`Skipping Discord post for task ${opts.taskId}: file exceeds Discord's upload limit`);
-      return;
+      return { ok: false, reason: "File exceeds Discord's upload limit" };
     }
 
     const [uploaderRow, orgRow] = await Promise.all([
@@ -62,14 +69,21 @@ export class DiscordNotifyService {
     const baseUrl = this.config.get<string>("WEB_APP_BASE_URL")?.trim().replace(/\/$/, "");
     const taskUrl = baseUrl && slug ? `\n${baseUrl}/${slug}/work?task=${encodeURIComponent(opts.taskId)}` : "";
 
-    const content = `📎 New attachment on **${opts.taskTitle}** · uploaded by ${uploaderName}${taskUrl}`;
+    const content = `📎 Discord submission on **${opts.taskTitle}** · submitted by ${uploaderName}${taskUrl}`;
 
-    await this.discordApi.postFileMessage(opts.discordChannelId, {
-      content,
-      fileBuffer,
-      fileName: opts.fileName,
-      mimeType: opts.mimeType,
-    });
+    try {
+      await this.discordApi.postFileMessage(opts.discordChannelId, {
+        content,
+        fileBuffer,
+        fileName: opts.fileName,
+        mimeType: opts.mimeType,
+      });
+      return { ok: true };
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "Discord rejected the message";
+      this.log.warn(`Discord delivery failed for task ${opts.taskId}: ${reason}`);
+      return { ok: false, reason };
+    }
   }
 
   private async resolveBytes(source: DiscordAttachmentSource): Promise<Buffer | null> {

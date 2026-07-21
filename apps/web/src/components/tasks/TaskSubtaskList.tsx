@@ -19,6 +19,7 @@ export function TaskSubtaskList({
   onUpdate,
   onDelete,
   getStableKey,
+  toggleOnly,
 }: {
   subtasks: SubtaskRow[];
   disabled?: boolean;
@@ -29,6 +30,8 @@ export function TaskSubtaskList({
   onDelete: (subtaskId: string) => void;
   /** Keeps row identity when optimistic ids are replaced by server ids. */
   getStableKey?: (subtaskId: string) => string;
+  /** Members without edit rights: done-toggle stays live, add/rename/remove are hidden. */
+  toggleOnly?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export function TaskSubtaskList({
             >
               {item.done ? "✓" : "○"}
             </button>
-            {editingId === item.id ? (
+            {!toggleOnly && editingId === item.id ? (
               <input
                 autoFocus
                 disabled={disabled}
@@ -101,9 +104,9 @@ export function TaskSubtaskList({
               />
             ) : (
               <span
-                className={`flex-1 cursor-text text-sm ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
+                className={`flex-1 text-sm ${toggleOnly ? "" : "cursor-text"} ${item.done ? "text-[var(--muted)] line-through" : "text-[var(--fg)]"}`}
                 onClick={() => {
-                  if (disabled) return;
+                  if (disabled || toggleOnly) return;
                   setEditingId(item.id);
                   setEditingVal(item.title);
                 }}
@@ -111,33 +114,37 @@ export function TaskSubtaskList({
                 {item.title}
               </span>
             )}
-            <button
-              type="button"
-              disabled={disabled || item.id.startsWith("optimistic-")}
-              className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 disabled:opacity-50"
-              onClick={() => onDelete(item.id)}
-            >
-              Remove
-            </button>
+            {!toggleOnly && (
+              <button
+                type="button"
+                disabled={disabled || item.id.startsWith("optimistic-")}
+                className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 disabled:opacity-50"
+                onClick={() => onDelete(item.id)}
+              >
+                Remove
+              </button>
+            )}
           </div>
         ))}
-        <div className="flex items-center gap-2.5 py-1.5">
-          <span className="text-sm text-[var(--muted)]">+</span>
-          <input
-            disabled={disabled}
-            className="flex-1 bg-transparent text-sm text-[var(--fg)] outline-none placeholder:text-[var(--muted)] disabled:opacity-50"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Add a subtask…"
-            onBlur={commitDraft}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitDraft();
-              }
-            }}
-          />
-        </div>
+        {!toggleOnly && (
+          <div className="flex items-center gap-2.5 py-1.5">
+            <span className="text-sm text-[var(--muted)]">+</span>
+            <input
+              disabled={disabled}
+              className="flex-1 bg-transparent text-sm text-[var(--fg)] outline-none placeholder:text-[var(--muted)] disabled:opacity-50"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Add a subtask…"
+              onBlur={commitDraft}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitDraft();
+                }
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

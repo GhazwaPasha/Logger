@@ -13,6 +13,7 @@ type AttachmentRow = {
   mimeType: string;
   storageKey: string;
   url: string;
+  discordDeliveredAt: string | null;
   createdAt: string;
 };
 
@@ -148,6 +149,14 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                 </a>
                 <p className="font-mono-ledger text-[10px] text-[var(--muted)]">{formatBytes(a.fileSize)}</p>
               </div>
+              {a.discordDeliveredAt && (
+                <span
+                  title={`Sent to Discord ${new Date(a.discordDeliveredAt).toLocaleString()}`}
+                  className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
+                >
+                  Discord
+                </span>
+              )}
               {!viewOnly && (a.uploadedBy === userId) && (
                 <button
                   type="button"

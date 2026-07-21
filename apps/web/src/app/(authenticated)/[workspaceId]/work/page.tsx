@@ -11,9 +11,6 @@ import {
   CaretRight,
   ChatCircle,
   Check,
-  CheckSquare,
-  Clock,
-  ClockUser,
   Columns,
   DotsThreeVertical,
   ListChecks,
@@ -22,7 +19,6 @@ import {
   Rows,
   Timer,
   UserPlus,
-  XSquare,
 } from "@phosphor-icons/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
@@ -30,7 +26,6 @@ import {
   Suspense,
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -42,12 +37,13 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiJson } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
-import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
+import { taskEditCaps } from "@/lib/workspace-permissions";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
+import { StatusPillSelect, KANBAN_STATUS_SHELL_LAYOUT } from "@/components/tasks/StatusPillSelect";
 import { TaskGoalIconBtn } from "@/components/roadmap/TaskGoalIconBtn";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
@@ -240,14 +236,6 @@ function TaskPanelScopeBadges({ level, list }: { level: string | null; list: str
     </div>
   );
 }
-
-/** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
-const STATUS_PILL_LAYOUT =
-  "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 px-1.5";
-
-/** Kanban card meta row: status pill is icon-only, compact. */
-const KANBAN_STATUS_SHELL_LAYOUT =
-  "relative inline-flex h-6 w-auto min-w-[5.5rem] shrink-0 items-center rounded";
 
 /** Kanban card meta row: priority tile fills an equal-width cell (matches list-row tile height). */
 const KANBAN_PRIORITY_SHELL_LAYOUT =
@@ -821,7 +809,7 @@ function WorkItemsInner() {
   const taskContextMenuItems = useMemo((): SimpleContextMenuItem[] => {
     if (!taskContextMenu) return [];
     const { task } = taskContextMenu;
-    const caps = taskArchiveDeleteCaps(task, lists, sessionUserId, members);
+    const caps = taskEditCaps(task, lists, sessionUserId, members);
     const items: SimpleContextMenuItem[] = [
       {
         id: "edit",
@@ -1217,6 +1205,7 @@ function WorkItemsInner() {
             <DueIconBtn task={task} />
             <PriorityIconBtn task={task} />
             <AttachIconBtn task={task} />
+            <DiscordIconBtn task={task} />
           </div>
           {expanded && subtasksPreview.length > 0 && (
             <ul className="mt-1.5 space-y-1">
@@ -1257,154 +1246,7 @@ function WorkItemsInner() {
     );
   }
 
-  function StatusIcon({ status, className, size }: { status: ManualTaskStatus; className?: string; size?: number }) {
-    if (status === "done") return <CheckSquare className={className} size={size} weight="fill" aria-hidden />;
-    if (status === "in_progress") return <ClockUser className={className} size={size} weight="fill" aria-hidden />;
-    if (status === "cancelled") return <XSquare className={className} size={size} weight="fill" aria-hidden />;
-    return <Clock className={className} size={size} weight="regular" aria-hidden />;
-  }
-
-  /** Same chrome as list-row {@link KanbanStatusPill}; options list is caller-defined (full pipeline vs board menu). */
-  function StatusPillSelect({
-    "aria-label": ariaLabel,
-    value,
-    onChange,
-    options,
-    disabled,
-    pending,
-    shellLayoutClassName = STATUS_PILL_LAYOUT,
-  }: {
-    "aria-label": string;
-    value: ManualTaskStatus;
-    onChange: (next: ManualTaskStatus) => void;
-    options: readonly ManualTaskStatus[];
-    disabled?: boolean;
-    /** Server sync in progress (e.g. PATCH status). */
-    pending?: boolean;
-    /** Outer box sizing (list row uses fixed width; kanban uses equal flex cells). */
-    shellLayoutClassName?: string;
-  }) {
-    const [open, setOpen] = useState(false);
-    const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
-    const triggerRef = useRef<HTMLButtonElement>(null);
-    const menuRef = useRef<HTMLUListElement>(null);
-    const listboxId = useId();
-    const paletteKey = value;
-
-    useLayoutEffect(() => {
-      if (!open || !triggerRef.current) {
-        setMenuPos(null);
-        return;
-      }
-      const el = triggerRef.current;
-      const sync = () => {
-        const r = el.getBoundingClientRect();
-        setMenuPos({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, el.offsetWidth) });
-      };
-      sync();
-      window.addEventListener("scroll", sync, true);
-      window.addEventListener("resize", sync);
-      return () => {
-        window.removeEventListener("scroll", sync, true);
-        window.removeEventListener("resize", sync);
-      };
-    }, [open]);
-
-    useEffect(() => {
-      if (pending) setOpen(false);
-    }, [pending]);
-
-    useEffect(() => {
-      if (!open) return;
-      const onDocMouseDown = (e: MouseEvent) => {
-        const t = e.target as Node;
-        if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-        setOpen(false);
-      };
-      const onKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") setOpen(false);
-      };
-      document.addEventListener("mousedown", onDocMouseDown);
-      document.addEventListener("keydown", onKeyDown);
-      return () => {
-        document.removeEventListener("mousedown", onDocMouseDown);
-        document.removeEventListener("keydown", onKeyDown);
-      };
-    }, [open]);
-
-    const blocked = disabled || pending;
-
-    return (
-      <div
-        className={`relative ${shellLayoutClassName} ${statusPillPaletteClasses(paletteKey)} ${pending ? "opacity-[0.88]" : ""}`}
-      >
-        <button
-          ref={triggerRef}
-          type="button"
-          disabled={blocked}
-          aria-expanded={open}
-          aria-busy={pending || undefined}
-          aria-haspopup="listbox"
-          aria-controls={open ? listboxId : undefined}
-          aria-label={ariaLabel}
-          id={`${listboxId}-trigger`}
-          onClick={() => {
-            if (blocked) return;
-            setOpen((o) => !o);
-          }}
-          className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-center rounded-[inherit] px-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="pointer-events-none truncate text-[12px] font-semibold leading-none tracking-tight">
-            {FLOW_COLUMN_LABELS[value]}
-          </span>
-        </button>
-        {open && menuPos
-          ? createPortal(
-              <ul
-                ref={menuRef}
-                id={listboxId}
-                role="listbox"
-                style={{
-                  position: "fixed",
-                  top: menuPos.top,
-                  left: menuPos.left,
-                  minWidth: menuPos.width,
-                  zIndex: 80,
-                }}
-                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 dark:bg-[var(--surface-base)]"
-              >
-                {options.map((s) => (
-                  <li key={s} role="presentation" className="px-1">
-                    <button
-                      type="button"
-                      role="option"
-                      id={`${listboxId}-opt-${s}`}
-                      aria-selected={s === value}
-                      className={`flex w-full min-w-[8rem] items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
-                        s === value
-                          ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
-                          : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                      }`}
-                      onClick={() => {
-                        setOpen(false);
-                        if (s !== value) onChange(s);
-                        queueMicrotask(() => triggerRef.current?.focus());
-                      }}
-                    >
-                      <StatusIcon status={s} size={16} className="opacity-70" />
-                      {FLOW_COLUMN_LABELS[s]}
-                    </button>
-                  </li>
-                ))}
-              </ul>,
-              document.body,
-            )
-          : null}
-      </div>
-    );
-  }
-
-  /** List row: fixed-width status shell ({@link STATUS_PILL_LAYOUT}) — do not use {@link KanbanStatusPill} here. */
+  /** List row: fixed-width status shell — do not use {@link KanbanStatusPill} here. */
   function ListRowStatusPill({ task }: { task: TaskRow }) {
     const stored = normalizeTaskStatus(task.status);
     const manual = manualStatusFromStored(stored);
@@ -1439,6 +1281,7 @@ function WorkItemsInner() {
   function PriorityIconBtn({ task }: { task: TaskRow }) {
     const p = taskPriority(task);
     const syncing = patchTaskPendingId === task.id;
+    const canEdit = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
     const color =
       p === "high"
         ? "text-amber-500 dark:text-amber-400"
@@ -1448,19 +1291,21 @@ function WorkItemsInner() {
     return (
       <div
         title={`Priority: ${PRIORITY_LABELS[p]}`}
-        className={`relative flex size-5 shrink-0 items-center justify-center ${color} transition-opacity hover:opacity-75 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-1 focus-within:ring-offset-[var(--surface-elevated)]`}
+        className={`relative flex size-5 shrink-0 items-center justify-center ${color} ${canEdit ? "transition-opacity hover:opacity-75 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-1 focus-within:ring-offset-[var(--surface-elevated)]" : ""}`}
       >
-        <select
-          className="absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
-          value={p}
-          disabled={syncing}
-          onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
-          aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
-        >
-          {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-            <option key={k} value={k}>{PRIORITY_LABELS[k]}</option>
-          ))}
-        </select>
+        {canEdit && (
+          <select
+            className="absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
+            value={p}
+            disabled={syncing}
+            onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
+            aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
+          >
+            {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
+              <option key={k} value={k}>{PRIORITY_LABELS[k]}</option>
+            ))}
+          </select>
+        )}
         <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
           {p === "high" ? (
             <CaretDoubleUp size={16} weight="fill" aria-hidden />
@@ -1549,6 +1394,24 @@ function WorkItemsInner() {
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         <Paperclip size={16} weight="regular" aria-hidden />
+      </button>
+    );
+  }
+
+  /** Shown only when the task has a Discord channel assigned — flags that a Discord submission is required. */
+  function DiscordIconBtn({ task }: { task: TaskRow }) {
+    if (!task.discordChannelId) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => openViewTask(task.id)}
+        title="Discord submission required"
+        aria-label="Discord submission required"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+      >
+        <svg viewBox="0 0 127.14 96.36" fill="currentColor" className="size-4" aria-hidden>
+          <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
+        </svg>
       </button>
     );
   }
@@ -1661,6 +1524,7 @@ function WorkItemsInner() {
               <DueIconBtn task={task} />
               <PriorityIconBtn task={task} />
               <AttachIconBtn task={task} />
+              <DiscordIconBtn task={task} />
             </div>
             {subtasksPreview.length > 0 && (
               <ul className="mt-1.5 space-y-1">

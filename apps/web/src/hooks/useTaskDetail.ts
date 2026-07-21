@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { taskKeys } from "@/lib/query-keys";
 import type { ListRow, MemberRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
-import { taskArchiveDeleteCaps } from "@/lib/workspace-permissions";
+import { taskEditCaps } from "@/lib/workspace-permissions";
 
 type PlaceholderContext = {
   lists: ListRow[];
@@ -16,15 +16,15 @@ type PlaceholderContext = {
 /** Lets the edit panel render from workspace list data before GET /tasks/:id finishes. */
 function taskRowToPlaceholderDetail(row: TaskRow, ctx?: PlaceholderContext): TaskDetail {
   const caps = ctx?.userId
-    ? taskArchiveDeleteCaps(row, ctx.lists, ctx.userId, ctx.members)
-    : { canArchiveTask: false, canDeleteTask: false };
+    ? taskEditCaps(row, ctx.lists, ctx.userId, ctx.members)
+    : { canArchiveTask: false, canDeleteTask: false, canEditFields: false };
   return {
     task: row,
     capabilities: {
       canArchiveTask: caps.canArchiveTask,
       canDeleteTask: caps.canDeleteTask,
-      canReschedule: true,
-      canAppendLedger: false,
+      canEditFields: caps.canEditFields,
+      canParticipate: true,
     },
     assigneeUserIds: row.assigneeUserIds ?? [],
     subtasks: row.subtasks ?? [],

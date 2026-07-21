@@ -59,6 +59,10 @@ export type TaskRow = {
   spawnedFromTaskId?: string | null;
   /** Discord channel snowflake ID attachments post to; `null`/omitted = Discord posting disabled. */
   discordChannelId?: string | null;
+  /** At least one attachment (any source) is required to mark this task done. */
+  attachmentRequired?: boolean;
+  /** Controls whether the time-tracking UI renders for this task; defaults true server-side. */
+  timeTrackingEnabled?: boolean;
   listId: string;
   assignerId: string;
   /** ISO timestamps from API detail/list (`Date` serialized). */
@@ -78,8 +82,10 @@ export type TaskDetail = {
   capabilities: {
     canArchiveTask: boolean;
     canDeleteTask: boolean;
-    canReschedule: boolean;
-    canAppendLedger: boolean;
+    /** Structural/scope edits: title, priority, due/recurrence, assignees, subtask add/edit/delete. */
+    canEditFields: boolean;
+    /** Status change, subtask toggle, comments, attachments, Discord submit, dependencies, time log. */
+    canParticipate: boolean;
   };
   assigneeUserIds: string[];
   subtasks: SubtaskRow[];
@@ -97,7 +103,7 @@ export type TaskMutationResult = {
   spawnedRecurringTaskId?: string;
 };
 
-export type DiscordChannelOption = { id: string; name: string; position: number };
+export type DiscordChannelOption = { id: string; name: string; position: number; isPrivate: boolean };
 
 export type RoadmapPeriod = "yearly" | "quarterly" | "monthly" | "weekly";
 export type RoadmapStatus = "on_track" | "at_risk" | "done" | "archived";

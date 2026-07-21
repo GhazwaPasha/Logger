@@ -41,7 +41,7 @@ export class DependenciesService {
       this.authz.getTaskAccess(userId, dependsOnTaskId),
     ]);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canReschedule) throw new ForbiddenException("Cannot modify dependencies on this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot modify dependencies on this task");
 
     if (await this.wouldCreateCycle(dependsOnTaskId, taskId)) {
       throw new BadRequestException("Adding this dependency would create a circular dependency");
@@ -65,7 +65,7 @@ export class DependenciesService {
   async remove(userId: string, taskId: string, dependsOnTaskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canReschedule) throw new ForbiddenException("Cannot modify dependencies on this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot modify dependencies on this task");
 
     const [blockerRow] = await this.db
       .select({ title: tasks.title })

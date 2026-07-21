@@ -170,11 +170,15 @@ export class AuthorizationService {
     const isAssigner = access.task.assignerId === userId;
     const canArchiveTask = active && access.isDeptManager && !access.isOwner;
     const canDeleteTask = active && (access.isOwner || isAssigner);
+    /** Structural/scope edits: title, priority, due/recurrence, assignees, subtask add/edit/delete. */
+    const canEditFields = active && (access.isOwner || access.isDeptManager || isAssigner);
+    /** Status change, subtask toggle, comments, attachments, Discord submit, dependencies, time log — any participant while active. */
+    const canParticipate = active;
     return {
       canArchiveTask,
       canDeleteTask,
-      canReschedule: active && (access.isOwner || access.isDeptManager || access.isAssignee),
-      canAppendLedger: active && (access.isOwner || access.isDeptManager || access.isAssignee),
+      canEditFields,
+      canParticipate,
     };
   }
 

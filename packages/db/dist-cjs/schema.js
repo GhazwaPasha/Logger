@@ -184,6 +184,10 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     spawnedFromTaskId: (0, pg_core_1.uuid)("spawned_from_task_id"),
     /** Discord channel snowflake ID attachments on this task are posted to; null = Discord posting disabled. */
     discordChannelId: (0, pg_core_1.text)("discord_channel_id"),
+    /** At least one attachment (any source) is required before the task can be marked done. */
+    attachmentRequired: (0, pg_core_1.boolean)("attachment_required").notNull().default(false),
+    /** Controls whether the time-tracking UI renders for this task at all. */
+    timeTrackingEnabled: (0, pg_core_1.boolean)("time_tracking_enabled").notNull().default(true),
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
@@ -331,6 +335,8 @@ exports.taskAttachments = (0, pg_core_1.pgTable)("task_attachments", {
     fileName: (0, pg_core_1.text)("file_name").notNull(),
     fileSize: (0, pg_core_1.text)("file_size").notNull(), // display size (original upload); blob may be smaller when compressed
     mimeType: (0, pg_core_1.text)("mime_type").notNull(),
+    /** Set when this file was uploaded via the "Discord submission" flow and successfully posted; null = not a Discord submission (or delivery failed). */
+    discordDeliveredAt: (0, pg_core_1.timestamp)("discord_delivered_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("task_attachments_task_idx").on(t.taskId), (0, pg_core_1.index)("task_attachments_blob_idx").on(t.blobId)]);
 /** Task comments (threaded, soft-deletable). */

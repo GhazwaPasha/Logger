@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { count, eq } from "drizzle-orm";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -61,7 +61,6 @@ export type AttachmentUploadFile = {
 
 @Injectable()
 export class AttachmentsService {
-  private readonly log = new Logger(AttachmentsService.name);
   private readonly s3 = buildR2Client();
   private readonly bucket = process.env.R2_BUCKET_NAME ?? "";
   private readonly publicUrl = (process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
@@ -94,7 +93,7 @@ export class AttachmentsService {
   ): Promise<Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>> {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot upload files to this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot upload files to this task");
 
     if (!isAllowedMime(mimeType)) throw new BadRequestException("File type not allowed");
     if (fileSize > MAX_FILE_SIZE) throw new BadRequestException("File exceeds 10 MB limit");
@@ -114,13 +113,7 @@ export class AttachmentsService {
     userId: string,
     taskId: string,
     access: Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>,
-    opts: {
-      blobId: string;
-      fileName: string;
-      fileSize: number;
-      mimeType: string;
-      discordSource?: { fileBuffer: Buffer } | { storageKey: string };
-    },
+    opts: { blobId: string; fileName: string; fileSize: number; mimeType: string },
   ) {
     const [row] = await this.db
       .insert(taskAttachments)
@@ -142,26 +135,10 @@ export class AttachmentsService {
     });
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
-
-    if (access.task.discordChannelId && opts.discordSource) {
-      void this.discordNotify
-        .notifyAttachment({
-          organizationId: access.task.organizationId,
-          taskId,
-          taskTitle: access.task.title,
-          discordChannelId: access.task.discordChannelId,
-          uploaderId: userId,
-          fileName: opts.fileName,
-          mimeType: opts.mimeType,
-          source: opts.discordSource,
-        })
-        .catch((e) => this.log.warn(`Discord notify failed for task ${taskId}: ${e instanceof Error ? e.message : String(e)}`));
-    }
-
     return row;
   }
 
-  /** Server-side upload with image compression and content-hash deduplication. */
+  /** Server-side upload with image compression and content-hash deduplication. Plain attachment — never touches Discord. */
   async upload(userId: string, taskId: string, file: AttachmentUploadFile) {
     const fileName = file.originalname.trim() || "upload";
     const mimeType = resolveMime(fileName, file.mimetype);
@@ -175,10 +152,62 @@ export class AttachmentsService {
       fileName,
       fileSize: file.size,
       mimeType,
-      discordSource: { fileBuffer: file.buffer },
     });
 
     return { ...row, storageKey: stored.storageKey, deduplicated: stored.deduplicated };
+  }
+
+  /**
+   * "Discord submission" — a separate upload path from `upload()`. Stores the file exactly like a normal
+   * attachment, but also synchronously posts it to the task's Discord channel and waits for the result,
+   * so the caller gets immediate success/failure feedback instead of a silent background attempt.
+   */
+  async discordSubmit(userId: string, taskId: string, file: AttachmentUploadFile) {
+    const fileName = file.originalname.trim() || "upload";
+    const mimeType = resolveMime(fileName, file.mimetype);
+    const access = await this.assertCanUpload(userId, taskId, mimeType, file.size);
+
+    if (!access.task.discordChannelId) {
+      throw new BadRequestException("This task doesn't have a Discord channel assigned");
+    }
+
+    const s3 = this.assertR2();
+    const stored = await storeBlobFromBuffer(this.db, s3, this.bucket, file.buffer, mimeType);
+
+    const row = await this.recordAttachment(userId, taskId, access, {
+      blobId: stored.blobId,
+      fileName,
+      fileSize: file.size,
+      mimeType,
+    });
+
+    const delivery = await this.discordNotify.notifyAttachment({
+      organizationId: access.task.organizationId,
+      taskId,
+      taskTitle: access.task.title,
+      discordChannelId: access.task.discordChannelId,
+      uploaderId: userId,
+      fileName,
+      mimeType,
+      source: { fileBuffer: file.buffer },
+    });
+
+    let discordDeliveredAt: Date | null = null;
+    if (delivery.ok) {
+      discordDeliveredAt = new Date();
+      await this.db
+        .update(taskAttachments)
+        .set({ discordDeliveredAt })
+        .where(eq(taskAttachments.id, row.id));
+    }
+
+    return {
+      ...row,
+      discordDeliveredAt,
+      storageKey: stored.storageKey,
+      deduplicated: stored.deduplicated,
+      discord: delivery,
+    };
   }
 
   async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
@@ -217,7 +246,6 @@ export class AttachmentsService {
       fileName: opts.fileName,
       fileSize: opts.fileSize,
       mimeType,
-      discordSource: { storageKey: opts.storageKey },
     });
   }
 
@@ -232,6 +260,7 @@ export class AttachmentsService {
         fileName: taskAttachments.fileName,
         fileSize: taskAttachments.fileSize,
         mimeType: taskAttachments.mimeType,
+        discordDeliveredAt: taskAttachments.discordDeliveredAt,
         createdAt: taskAttachments.createdAt,
         storageKey: attachmentBlobs.storageKey,
       })

@@ -139,6 +139,10 @@ exports.patchTaskSchema = zod_1.z
     subtasksToDelete: zod_1.z.array(zod_1.z.string().uuid()).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
     /** Discord channel snowflake ID attachments should post to; `null` disables Discord posting for this task. */
     discordChannelId: zod_1.z.string().min(1).max(64).nullable().optional(),
+    /** Requires at least one attachment (any source) before the task can be marked done. */
+    attachmentRequired: zod_1.z.boolean().optional(),
+    /** Controls whether the time-tracking UI is shown for this task at all. */
+    timeTrackingEnabled: zod_1.z.boolean().optional(),
 })
     .refine((d) => {
     const hasSubCreate = (d.subtasksToCreate?.length ?? 0) > 0;
@@ -151,6 +155,8 @@ exports.patchTaskSchema = zod_1.z
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
         d.discordChannelId !== undefined ||
+        d.attachmentRequired !== undefined ||
+        d.timeTrackingEnabled !== undefined ||
         hasSubCreate || hasSubUpdate || hasSubDelete);
 }, { message: "Provide at least one field to update" });
 exports.discordIntegrationConfigSchema = zod_1.z.object({

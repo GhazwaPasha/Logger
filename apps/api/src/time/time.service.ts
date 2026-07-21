@@ -15,7 +15,7 @@ export class TimeService {
   async start(userId: string, taskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot log time on this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot log time on this task");
 
     // Only one running timer per user at a time
     const running = await this.db
@@ -61,7 +61,7 @@ export class TimeService {
   async logManual(userId: string, taskId: string, body: { startedAt: Date; stoppedAt: Date; note?: string }) {
     const access = await this.authz.getTaskAccess(userId, taskId);
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canAppendLedger) throw new ForbiddenException("Cannot log time on this task");
+    if (!caps.canParticipate) throw new ForbiddenException("Cannot log time on this task");
 
     if (body.stoppedAt <= body.startedAt) throw new BadRequestException("Stopped time must be after started time");
 

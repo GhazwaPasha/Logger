@@ -56,7 +56,7 @@ export function createDraftTask(
 
   const stubDetail: TaskDetail = {
     task: stubTask,
-    capabilities: { canArchiveTask: false, canDeleteTask: false, canReschedule: false, canAppendLedger: false },
+    capabilities: { canArchiveTask: false, canDeleteTask: false, canEditFields: true, canParticipate: true },
     assigneeUserIds: [],
     subtasks: [],
     ledger: [],
