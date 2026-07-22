@@ -55,11 +55,14 @@ export function TimeTracker({
   token,
   userId,
   viewOnly,
+  embedded,
 }: {
   taskId: string;
   token: string;
   userId: string;
   viewOnly?: boolean;
+  /** Skip the outer card chrome when nested inside another card (e.g. a ToggleSection). */
+  embedded?: boolean;
 }) {
   const queryClient = useQueryClient();
   const timeKey = ["time", taskId];
@@ -154,13 +157,23 @@ export function TimeTracker({
   if (viewOnly && completedEntries.length === 0 && !runningEntry) return null;
 
   return (
-    <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Time Tracking</h3>
-        {totalSeconds > 0 && (
-          <span className="text-xs font-semibold text-[var(--fg)]">{formatDuration(totalSeconds)} total</span>
-        )}
-      </div>
+    <div
+      className={
+        embedded
+          ? "space-y-3"
+          : "space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5"
+      }
+    >
+      {(!embedded || totalSeconds > 0) && (
+        <div className="flex items-center justify-between">
+          {!embedded && (
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Time Tracking</h3>
+          )}
+          {totalSeconds > 0 && (
+            <span className="ml-auto text-xs font-semibold text-[var(--fg)]">{formatDuration(totalSeconds)} total</span>
+          )}
+        </div>
+      )}
 
       {/* Timer control — hidden in view mode */}
       {!viewOnly && (

@@ -170,8 +170,12 @@ export function MilestoneEditor({
 
   async function handleDelete() {
     if (!editing) return;
-    await roadmap.deleteMilestone(editing.id);
-    onClose();
+    try {
+      await roadmap.deleteMilestone(editing.id);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete milestone");
+    }
   }
 
   async function addTask(taskId: string) {

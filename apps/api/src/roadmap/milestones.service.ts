@@ -21,9 +21,14 @@ export class MilestonesService {
     private readonly goals: GoalsService,
   ) {}
 
-  /** Owner: full write. Manager: write only within their managed level(s). Member: read-only. */
-  private async assertCanWrite(userId: string, organizationId: string, departmentId: string | null) {
-    const member = await this.authz.assertOrgMember(userId, organizationId);
+  /** Owner: full write. Manager: write only within their managed level(s). Member: read-only. Accepts an already-fetched member to skip a redundant lookup when the caller fetched it in a parallel batch. */
+  private async assertCanWrite(
+    userId: string,
+    organizationId: string,
+    departmentId: string | null,
+    prefetchedMember?: Awaited<ReturnType<AuthorizationService["assertOrgMember"]>>,
+  ) {
+    const member = prefetchedMember ?? (await this.authz.assertOrgMember(userId, organizationId));
     if (member.role === "owner") return;
     if (member.role === "manager" && departmentId) {
       const managed = await this.authz.managedDepartmentIdsForUser(userId, organizationId);
@@ -44,20 +49,19 @@ export class MilestonesService {
 
   async create(userId: string, organizationId: string, body: unknown) {
     const parsed = createMilestoneSchema.parse(body);
-    const goal = await this.goals.getGoalOrThrow(organizationId, parsed.goalId);
 
-    if (parsed.departmentId) {
-      await this.departments.assertDeptInOrg(organizationId, parsed.departmentId);
-    }
-    let parent: MilestoneRow | null = null;
-    if (parsed.parentId) {
-      parent = await this.getMilestoneOrThrow(organizationId, parsed.parentId);
-      if (parent.goalId !== parsed.goalId) {
-        throw new BadRequestException("A sub-milestone must belong to the same goal as its parent");
-      }
+    // Independent reads — run concurrently instead of round-tripping to the DB one at a time.
+    const [goal, parent, , member] = await Promise.all([
+      this.goals.getGoalOrThrow(organizationId, parsed.goalId),
+      parsed.parentId ? this.getMilestoneOrThrow(organizationId, parsed.parentId) : Promise.resolve(null),
+      parsed.departmentId ? this.departments.assertDeptInOrg(organizationId, parsed.departmentId) : Promise.resolve(),
+      this.authz.assertOrgMember(userId, organizationId),
+    ]);
+    if (parent && parent.goalId !== parsed.goalId) {
+      throw new BadRequestException("A sub-milestone must belong to the same goal as its parent");
     }
     const departmentId = parsed.departmentId ?? parent?.departmentId ?? goal.departmentId ?? null;
-    await this.assertCanWrite(userId, organizationId, departmentId);
+    await this.assertCanWrite(userId, organizationId, departmentId, member);
 
     const [row] = await this.db
       .insert(milestones)

@@ -72,8 +72,12 @@ export function GoalEditor({
 
   async function handleDelete() {
     if (!editing) return;
-    await roadmap.deleteGoal(editing.id);
-    onClose();
+    try {
+      await roadmap.deleteGoal(editing.id);
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete goal");
+    }
   }
 
   if (typeof document === "undefined") return null;

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "@phosphor-icons/react";
 import { apiFetch, apiJson } from "@/lib/api";
 
 type AttachmentRow = {
@@ -43,7 +44,6 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   const query = useQuery({
     queryKey: ["attachments", taskId],
@@ -99,36 +99,32 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Attachments</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Attachments</h3>
+        {!viewOnly && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            aria-label="Upload attachment"
+            title="Upload attachment"
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+          >
+            <Plus size={14} weight="bold" />
+          </button>
+        )}
+      </div>
 
       {!viewOnly && (
         <>
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label="Upload file"
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-            onClick={() => inputRef.current?.click()}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors ${dragOver ? "border-[var(--accent)] bg-[var(--accent-muted)]/20" : "border-[var(--border-subtle)] hover:border-[var(--accent)]/50"}`}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 text-[var(--muted)]" aria-hidden>
-              <path fillRule="evenodd" d="M13 8V2H7v6H2l8 8 8-8h-5zM0 18h20v2H0v-2z" />
-            </svg>
-            <p className="text-xs text-[var(--muted)]">
-              {uploading ? "Uploading…" : "Drop a file here or click to browse"}
-            </p>
-            <p className="text-[10px] text-[var(--muted)]">PDF, images, text, Office docs · max 10 MB</p>
-            <input
-              ref={inputRef}
-              type="file"
-              className="hidden"
-              accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          {uploading && <p className="text-xs text-[var(--muted)]">Uploading…</p>}
           {uploadError && <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>}
         </>
       )}

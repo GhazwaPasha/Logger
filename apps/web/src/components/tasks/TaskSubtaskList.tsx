@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Check } from "@phosphor-icons/react";
+import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import type { SubtaskRow } from "@/lib/ledger-types";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -20,10 +22,10 @@ export function TaskSubtaskList({
   onDelete,
   getStableKey,
   toggleOnly,
+  pendingSubtaskId,
 }: {
   subtasks: SubtaskRow[];
   disabled?: boolean;
-  isPending?: boolean;
   error?: string | null;
   onCreate: (title: string) => void;
   onUpdate: (vars: { subtaskId: string; title?: string; done?: boolean }) => void;
@@ -32,6 +34,8 @@ export function TaskSubtaskList({
   getStableKey?: (subtaskId: string) => string;
   /** Members without edit rights: done-toggle stays live, add/rename/remove are hidden. */
   toggleOnly?: boolean;
+  /** Id of the row whose create/update/delete is currently in flight, for a per-row spinner. */
+  pendingSubtaskId?: string | null;
 }) {
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,6 +44,9 @@ export function TaskSubtaskList({
 
   /** Cache already maintains display order; re-sorting here caused rows to jump while saving. */
   const ordered = subtasks;
+
+  const rowBusy = (id: string) =>
+    id.startsWith("optimistic-") || (pendingSubtaskId != null && pendingSubtaskId === id);
 
   function commitDraft() {
     const title = draft.trim();
@@ -79,12 +86,21 @@ export function TaskSubtaskList({
           >
             <button
               type="button"
-              disabled={disabled || item.id.startsWith("optimistic-")}
-              className={`shrink-0 text-sm disabled:opacity-50 ${item.done ? "text-green-600 dark:text-green-400" : "text-[var(--muted)]"}`}
+              disabled={disabled || rowBusy(item.id)}
+              aria-busy={rowBusy(item.id) || undefined}
+              className={`flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                item.done
+                  ? "surface-glass-primary border-solid text-[var(--fg)]"
+                  : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+              }`}
               onClick={() => onUpdate({ subtaskId: item.id, done: !item.done })}
               aria-label={item.done ? "Mark subtask incomplete" : "Mark subtask done"}
             >
-              {item.done ? "✓" : "○"}
+              {rowBusy(item.id) ? (
+                <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
+              ) : item.done ? (
+                <Check className="size-[11px] shrink-0" weight="bold" aria-hidden />
+              ) : null}
             </button>
             {!toggleOnly && editingId === item.id ? (
               <input
@@ -117,7 +133,7 @@ export function TaskSubtaskList({
             {!toggleOnly && (
               <button
                 type="button"
-                disabled={disabled || item.id.startsWith("optimistic-")}
+                disabled={disabled || rowBusy(item.id)}
                 className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 disabled:opacity-50"
                 onClick={() => onDelete(item.id)}
               >

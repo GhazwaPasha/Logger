@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
+import { ArrowLeft, CaretDoubleUp, CaretDoubleDown, ArrowLineUp, DiscordLogo } from "@phosphor-icons/react";
 import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useTaskFormNavigationGuard } from "@/hooks/useTaskFormNavigationGuard";
@@ -72,6 +72,49 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
       {children}
     </label>
+  );
+}
+
+/** Sidebar card with a toggle in its header that expands/collapses its own content. */
+function ToggleSection({
+  label,
+  checked,
+  onChange,
+  ariaLabel,
+  icon,
+  className,
+  toggleActiveClassName,
+  children,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  ariaLabel: string;
+  icon?: React.ReactNode;
+  className?: string;
+  toggleActiveClassName?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      className={
+        className ?? "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-3"
+      }
+    >
+      <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
+        <span className="inline-flex items-center gap-2">
+          {icon}
+          {label}
+        </span>
+        <Toggle
+          checked={checked}
+          aria-label={ariaLabel}
+          onChange={onChange}
+          activeClassName={toggleActiveClassName}
+        />
+      </div>
+      {checked && children}
+    </div>
   );
 }
 
@@ -250,7 +293,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1 space-y-6">
+        <div className="min-w-0 flex-1 space-y-1">
           <TaskPanelAiFill
             members={members}
             existingDraft={{ title: form.title, dueLocal: form.due, dueRepeat: form.dueRepeat }}
@@ -300,6 +343,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 onUpdate={subtaskOps.updateSubtask}
                 onDelete={subtaskOps.deleteSubtask}
                 getStableKey={subtaskOps.getStableKey}
+                pendingSubtaskId={subtaskOps.pendingSubtaskId}
               />
             ) : null}
           </div>
@@ -326,10 +370,8 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
           )}
         </div>
 
-        <div className="w-full space-y-4 lg:w-72 lg:shrink-0">
+        <div className="w-full space-y-1 lg:w-72 lg:shrink-0">
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-[var(--fg)]">Properties</h2>
-
             <div>
               <SectionLabel>Status &amp; Priority</SectionLabel>
               <div className="flex flex-wrap items-center gap-2">
@@ -519,53 +561,53 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 </div>
               )}
             </div>
-
-            {discordChannelOptions.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between gap-2 text-sm text-[var(--fg)]">
-                  <span>Enable Discord submission for this task</span>
-                  <Toggle
-                    checked={discordEnabled}
-                    aria-label="Enable Discord submission for this task"
-                    onChange={(next) => {
-                      setDiscordEnabled(next);
-                      if (!next) form.setDiscordChannel(null);
-                    }}
-                  />
-                </div>
-                {discordEnabled && (
-                  <div className="mt-2">
-                    <SectionLabel>Discord channel</SectionLabel>
-                    <DiscordChannelSearchField
-                      channels={discordChannelOptions}
-                      value={form.discordChannelId}
-                      onChange={(v) => form.setDiscordChannel(v)}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
-          {detail && token && sessionUserId && caps.canEditFields && (
-            <div className="flex items-center justify-between gap-2 text-sm text-[var(--muted)]">
-              <span>Show time tracking</span>
-              <Toggle
-                checked={form.timeTrackingEnabled}
-                aria-label="Show time tracking"
-                onChange={(next) => form.setTimeTrackingEnabled(next)}
-              />
-            </div>
+          {(discordChannelOptions.length > 0 || form.discordChannelId) && (
+            <ToggleSection
+              label="Discord Submission"
+              checked={discordEnabled}
+              ariaLabel="Enable Discord submission for this task"
+              icon={<DiscordLogo size={24} weight="fill" className="text-[#5865F2]" />}
+              className="rounded-3xl border border-[#5865F2]/30 bg-[#5865F2]/[0.06] p-5 space-y-3"
+              toggleActiveClassName="bg-[#5865F2]"
+              onChange={(next) => {
+                setDiscordEnabled(next);
+                if (!next) form.setDiscordChannel(null);
+              }}
+            >
+              <div className="space-y-3">
+                <div>
+                  <SectionLabel>Discord channel</SectionLabel>
+                  <DiscordChannelSearchField
+                    channels={discordChannelOptions}
+                    value={form.discordChannelId}
+                    onChange={(v) => form.setDiscordChannel(v)}
+                  />
+                </div>
+                {detail && token && form.discordChannelId && (
+                  <DiscordSubmissionZone taskId={taskId} token={token} />
+                )}
+              </div>
+            </ToggleSection>
           )}
-          {detail && token && sessionUserId && form.timeTrackingEnabled && (
-            <TimeTracker taskId={taskId} token={token} userId={sessionUserId} />
+
+          {detail && token && sessionUserId && caps.canEditFields && (
+            <ToggleSection
+              label="Show time tracking"
+              checked={form.timeTrackingEnabled}
+              ariaLabel="Show time tracking"
+              onChange={(next) => form.setTimeTrackingEnabled(next)}
+            >
+              <TimeTracker taskId={taskId} token={token} userId={sessionUserId} embedded />
+            </ToggleSection>
           )}
 
           {detail && token && sessionUserId && (
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-2">
               {caps.canEditFields ? (
-                <div className="flex items-center justify-between gap-2 text-xs font-medium text-[var(--muted)]">
-                  <span>Require at least one attachment before marking done</span>
+                <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
+                  <span>Attach File (Required)</span>
                   <Toggle
                     checked={form.attachmentRequired}
                     aria-label="Require at least one attachment before marking done"
@@ -581,18 +623,12 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             </div>
           )}
 
-          {detail && token && form.discordChannelId && (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5">
-              <DiscordSubmissionZone taskId={taskId} token={token} />
-            </div>
-          )}
-
           {(caps.canDeleteTask || caps.canArchiveTask) && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
               {caps.canArchiveTask && (
                 <button
                   type="button"
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                   onClick={() =>
                     setConfirm({
                       title: "Archive this task?",
@@ -609,7 +645,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
               {caps.canDeleteTask && (
                 <button
                   type="button"
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400"
+                  className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400"
                   onClick={() =>
                     setConfirm({
                       title: "Delete this task?",

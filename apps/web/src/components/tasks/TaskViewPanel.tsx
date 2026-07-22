@@ -66,7 +66,9 @@ export function TaskViewPanel({
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const taskFromList = tasks.find((t) => t.id === taskId) ?? null;
-  const { detail, isLoading } = useTaskDetail(token, taskId, taskFromList);
+  const { detail, isLoading } = useTaskDetail(token, taskId, taskFromList, undefined, {
+    formSession: true,
+  });
 
   const form = useTaskEditorForm({ taskId, workspaceId, token, detail });
   const subtaskOps = useTaskSubtasks(taskId, token, workspaceId);
@@ -170,6 +172,7 @@ export function TaskViewPanel({
         onUpdate={subtaskOps.updateSubtask}
         onDelete={subtaskOps.deleteSubtask}
         getStableKey={subtaskOps.getStableKey}
+        pendingSubtaskId={subtaskOps.pendingSubtaskId}
       />
 
       {/* Status + Priority */}

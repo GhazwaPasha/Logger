@@ -1610,11 +1610,11 @@ function WorkItemsInner() {
         <div className="columns-1 gap-3">
           {items.map((item) =>
             item.kind === "task" ? (
-              <div key={item.task.id} className="mb-3 break-inside-avoid">
+              <div key={item.task.id} className="mb-1 break-inside-avoid">
                 <ListTaskCard task={item.task} />
               </div>
             ) : (
-              <div key={item.seriesId} className="mb-3 break-inside-avoid">
+              <div key={item.seriesId} className="mb-1 break-inside-avoid">
                 <RecurringSeriesCard
                   tasks={item.tasks}
                   members={members}
@@ -1675,7 +1675,7 @@ function WorkItemsInner() {
                   width: "100%",
                   transform: `translateY(${vItem.start}px)`,
                 }}
-                className="pb-1.5"
+                className="pb-1"
               >
                 {item.kind === "task" && <TaskCard task={item.task} />}
                 {item.kind === "series" && (

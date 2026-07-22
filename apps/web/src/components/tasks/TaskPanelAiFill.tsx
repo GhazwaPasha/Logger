@@ -1,7 +1,9 @@
 "use client";
 
 import { startTransition, useCallback, useId, useState } from "react";
+import { Sparkle } from "@phosphor-icons/react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
+import { Toggle } from "@/components/ui/Toggle";
 import type { MemberRow } from "@/lib/ledger-types";
 import type {
   TaskAiExistingDraft,
@@ -113,37 +115,26 @@ export function TaskPanelAiFill({ members, existingDraft = null, onApply }: Task
     }
   }, [existingDraft, members, onApply, text]);
 
-  /** True **blue** (`blue-500`), not sky; opacity matches workflow pills in `task-board.ts`. */
-  const pillSurface = "bg-blue-500/22 text-[var(--fg)] dark:bg-blue-500/15";
-
   return (
-    <div
-      className={`overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-sm ${pillSurface}`}
-    >
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => {
-          setOpen((o) => !o);
-          setError(null);
-          setOkHint(null);
-        }}
-      >
-        <span className="flex items-center gap-2">
-          <span className="text-[var(--fg)]/70" aria-hidden>
-            ✦
-          </span>
+    <div className="rounded-3xl border border-blue-500/30 bg-blue-500/[0.06] p-5 space-y-3 dark:bg-blue-500/[0.07]">
+      <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
+        <span className="inline-flex items-center gap-2">
+          <Sparkle size={18} weight="fill" className="text-blue-500" aria-hidden />
           Describe your task in natural language
         </span>
-        <span className="text-xs text-[var(--fg)]/75">{open ? "Hide" : "Show"}</span>
-      </button>
+        <Toggle
+          checked={open}
+          aria-label="Describe your task in natural language"
+          activeClassName="bg-blue-500"
+          onChange={(next) => {
+            setOpen(next);
+            setError(null);
+            setOkHint(null);
+          }}
+        />
+      </div>
       {open && (
-        <div
-          id={panelId}
-          className="space-y-2 border-t border-[var(--border-subtle)]/60 bg-[var(--surface-base)]/45 px-3 py-3 backdrop-blur-[2px] dark:bg-[var(--surface-base)]/30"
-        >
+        <div id={panelId} className="space-y-2">
           <textarea
             className={[
               "min-h-[5.5rem] w-full resize-y rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--fg)]",

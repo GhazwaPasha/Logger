@@ -45,3 +45,10 @@ export function defaultMilestoneRange(anchor: Date): [string, string] {
   const end = new Date(anchor.getTime() + 13 * 24 * 60 * 60 * 1000);
   return [fmt(anchor), fmt(end)];
 }
+
+/** Depth-tapered sizing for nested milestone bars on a Gantt track — root bars read as primary, each nested level recedes slightly. Pairs with the indent rail; doesn't touch color. */
+export function milestoneDepthStyle(depth: number): { trackClass: string; barClass: string; textClass: string } {
+  if (depth === 0) return { trackClass: "h-8", barClass: "h-6", textClass: "text-[11px] font-semibold" };
+  if (depth === 1) return { trackClass: "h-7", barClass: "h-5", textClass: "text-[11px] font-medium" };
+  return { trackClass: "h-6", barClass: "h-4", textClass: "text-[10px] font-medium" };
+}

@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowsIn, ArrowsOut, CaretLeft, CaretRight, Flag, PencilSimple } from "@phosphor-icons/react";
-import { STATUS_BAR_CLASS, milestoneDepthStyle } from "@/lib/roadmap-format";
+import { STATUS_BAR_CLASS, STATUS_LABELS, milestoneDepthStyle } from "@/lib/roadmap-format";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type TimelineRow = { milestone: MilestoneRow; depth: number };
-type Tick = { pos: number; label: string };
+type DisplayRow =
+  | { kind: "goal"; goal: GoalRow }
+  | { kind: "milestone"; goal: GoalRow; milestone: MilestoneRow; depth: number };
 
-/** Every descendant, unconditionally — used only for the axis date range, never for what's actually rendered. */
+/** Every descendant, unconditionally — used only for the shared axis date range, never for what's actually rendered. */
 function flattenAll(roots: MilestoneRow[], childrenByParent: Map<string, MilestoneRow[]>, depth: number, out: TimelineRow[]) {
   for (const milestone of roots
     .slice()
@@ -21,7 +23,7 @@ function flattenAll(roots: MilestoneRow[], childrenByParent: Map<string, Milesto
   }
 }
 
-/** Roots always show; a milestone's own children only show once its own bar-toggle is expanded. */
+/** Roots always show (once the goal's master toggle is open); a milestone's own children only show once its own bar-toggle is expanded. */
 function flattenExpanded(
   roots: MilestoneRow[],
   childrenByParent: Map<string, MilestoneRow[]>,
@@ -40,13 +42,13 @@ function flattenExpanded(
 }
 
 /** Month-start gridline ticks between start/end, spaced 1/2/3 months apart depending on span. */
-function buildTicks(axisStart: number, axisEnd: number): Tick[] {
+function buildTicks(axisStart: number, axisEnd: number): { pos: number; label: string }[] {
   const spanDays = (axisEnd - axisStart) / DAY_MS;
   const stepMonths = spanDays <= 100 ? 1 : spanDays <= 260 ? 2 : 3;
   const startDate = new Date(axisStart);
   let cursor = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1);
   if (cursor < axisStart) cursor = Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, 1);
-  const ticks: Tick[] = [];
+  const ticks: { pos: number; label: string }[] = [];
   let lastYear: number | null = null;
   while (cursor < axisEnd) {
     const d = new Date(cursor);
@@ -63,26 +65,29 @@ function buildTicks(axisStart: number, axisEnd: number): Tick[] {
 }
 
 /**
- * One goal's fully self-contained mini-Gantt. Two tiers of expand/collapse:
- * one master toggle (in the goal header) shows/hides the whole tree, and each individual
- * milestone bar that has children carries its own small toggle for just that branch.
+ * Every goal on one shared axis. Two tiers of expand/collapse: one master toggle per goal
+ * (shows/hides its whole tree) and, once shown, each individual milestone bar that has
+ * children carries its own small toggle for just that branch.
  */
-function GoalTimelineCard({
-  goal,
-  rootMilestones,
+export function RoadmapGrandView({
+  goals,
+  rootMilestonesByGoal,
   childrenByParent,
+  loading,
   onEditGoal,
   onEditMilestone,
 }: {
-  goal: GoalRow;
-  rootMilestones: MilestoneRow[];
+  goals: GoalRow[];
+  rootMilestonesByGoal: Map<string, MilestoneRow[]>;
   childrenByParent: Map<string, MilestoneRow[]>;
+  loading: boolean;
   onEditGoal: (goal: GoalRow) => void;
   onEditMilestone: (milestone: MilestoneRow) => void;
 }) {
+  /** Manual shift, in units of the current window's span — 0 is the natural (data-driven) window. */
   const [shift, setShift] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(() => new Set());
   const [expandedMilestones, setExpandedMilestones] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -94,6 +99,15 @@ function GoalTimelineCard({
     return () => document.removeEventListener("keydown", onKey);
   }, [focusMode]);
 
+  function toggleGoal(goalId: string) {
+    setExpandedGoals((prev) => {
+      const n = new Set(prev);
+      if (n.has(goalId)) n.delete(goalId);
+      else n.add(goalId);
+      return n;
+    });
+  }
+
   function toggleMilestone(id: string) {
     setExpandedMilestones((prev) => {
       const n = new Set(prev);
@@ -103,22 +117,27 @@ function GoalTimelineCard({
     });
   }
 
-  /** Every descendant, regardless of expand state — the axis reflects the whole goal, not just what's currently shown. */
-  const allRows = useMemo(() => {
-    const out: TimelineRow[] = [];
-    flattenAll(rootMilestones, childrenByParent, 0, out);
-    return out;
-  }, [rootMilestones, childrenByParent]);
+  const allByGoal = useMemo(() => {
+    const m = new Map<string, TimelineRow[]>();
+    for (const goal of goals) {
+      const flat: TimelineRow[] = [];
+      flattenAll(rootMilestonesByGoal.get(goal.id) ?? [], childrenByParent, 0, flat);
+      m.set(goal.id, flat);
+    }
+    return m;
+  }, [goals, rootMilestonesByGoal, childrenByParent]);
 
-  /** Data-driven window: this goal's own milestone span, padded ~6% each side — computed regardless of expand state so the layout doesn't jump when toggled. */
+  /** Data-driven window: the union span of every goal's milestones, padded ~6% each side — stable regardless of expand state. */
   const naturalRange = useMemo(() => {
     let min: number | null = null;
     let max: number | null = null;
-    for (const { milestone } of allRows) {
-      const start = new Date(milestone.periodStart).getTime();
-      const end = new Date(milestone.periodEnd).getTime();
-      if (min === null || start < min) min = start;
-      if (max === null || end > max) max = end;
+    for (const rows of allByGoal.values()) {
+      for (const { milestone } of rows) {
+        const start = new Date(milestone.periodStart).getTime();
+        const end = new Date(milestone.periodEnd).getTime();
+        if (min === null || start < min) min = start;
+        if (max === null || end > max) max = end;
+      }
     }
     if (min === null || max === null) {
       const now = new Date().getTime();
@@ -126,7 +145,7 @@ function GoalTimelineCard({
     }
     const pad = Math.max((max - min) * 0.06, 3 * DAY_MS);
     return { start: min - pad, end: max + pad };
-  }, [allRows]);
+  }, [allByGoal]);
 
   const axisSpan = naturalRange.end - naturalRange.start;
   const axisStart = naturalRange.start + shift * axisSpan;
@@ -140,42 +159,34 @@ function GoalTimelineCard({
     return ((now - axisStart) / axisSpan) * 100;
   }, [axisStart, axisEnd, axisSpan]);
 
-  const rows = useMemo(() => {
-    if (!isExpanded) return [];
-    const visible: TimelineRow[] = [];
-    flattenExpanded(rootMilestones, childrenByParent, expandedMilestones, 0, visible);
-    return visible.filter(({ milestone }) => {
-      const start = new Date(milestone.periodStart).getTime();
-      const end = new Date(milestone.periodEnd).getTime();
-      return end >= axisStart && start < axisEnd;
-    });
-  }, [isExpanded, rootMilestones, childrenByParent, expandedMilestones, axisStart, axisEnd]);
+  /** One master toggle row per goal, followed by its milestones only when expanded — everything in one continuous run, no divider breaking up the bars. */
+  const displayRows = useMemo(() => {
+    const out: DisplayRow[] = [];
+    for (const goal of goals) {
+      const all = allByGoal.get(goal.id) ?? [];
+      if (all.length === 0) continue;
+      out.push({ kind: "goal", goal });
+      if (expandedGoals.has(goal.id)) {
+        const visible: TimelineRow[] = [];
+        flattenExpanded(rootMilestonesByGoal.get(goal.id) ?? [], childrenByParent, expandedMilestones, 0, visible);
+        for (const { milestone, depth } of visible) {
+          const start = new Date(milestone.periodStart).getTime();
+          const end = new Date(milestone.periodEnd).getTime();
+          if (end >= axisStart && start < axisEnd) {
+            out.push({ kind: "milestone", goal, milestone, depth });
+          }
+        }
+      }
+    }
+    return out;
+  }, [goals, allByGoal, rootMilestonesByGoal, childrenByParent, expandedGoals, expandedMilestones, axisStart, axisEnd]);
+
+  const hasAnyGoals = goals.some((g) => (allByGoal.get(g.id)?.length ?? 0) > 0);
 
   const content = (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            className="flex size-5 shrink-0 items-center justify-center rounded text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-            onClick={() => setIsExpanded((v) => !v)}
-            aria-label={isExpanded ? "Collapse all milestones" : "Expand all milestones"}
-          >
-            <CaretRight
-              weight="bold"
-              className={`size-3.5 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
-            />
-          </button>
-          <button
-            type="button"
-            className="min-w-0 truncate text-left text-xs font-semibold uppercase tracking-wide text-[var(--fg)] hover:underline"
-            onClick={() => onEditGoal(goal)}
-          >
-            {goal.title}
-          </button>
-          <span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">{goal.progress.pct}%</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
+    <>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             className="rounded-lg p-1.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
@@ -200,31 +211,43 @@ function GoalTimelineCard({
           >
             <CaretRight weight="bold" className="size-4" />
           </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-3 text-xs text-[var(--muted)] sm:flex">
+            {(Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[]).map((s) => (
+              <span key={s} className="flex items-center gap-1.5">
+                <span className={`size-2 rounded-full ${STATUS_BAR_CLASS[s]}`} aria-hidden />
+                {STATUS_LABELS[s]}
+              </span>
+            ))}
+          </div>
           <button
             type="button"
-            className="ml-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
             onClick={() => setFocusMode((f) => !f)}
             aria-label={focusMode ? "Exit full screen" : "Full screen"}
           >
-            {focusMode ? <ArrowsIn weight="bold" className="size-4" /> : <ArrowsOut weight="bold" className="size-4" />}
+            {focusMode ? (
+              <>
+                <ArrowsIn weight="bold" className="size-4" />
+                Exit full screen
+              </>
+            ) : (
+              <ArrowsOut weight="bold" className="size-4" />
+            )}
           </button>
         </div>
       </div>
 
-      {!isExpanded ? (
-        <p className="px-1 text-xs text-[var(--muted)]">
-          {allRows.length} milestone{allRows.length === 1 ? "" : "s"} — click the arrow to show them.
-        </p>
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 px-6 py-8 text-center">
-          <p className="text-sm text-[var(--muted)]">Nothing in this window.</p>
-          <button
-            type="button"
-            className="text-xs font-medium text-[var(--accent)] hover:underline"
-            onClick={() => setShift(0)}
-          >
-            Reset
-          </button>
+      {!hasAnyGoals && !loading ? (
+        <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
+            <Flag size={24} weight="bold" />
+          </span>
+          <div>
+            <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
+            <p className="mt-1 text-sm text-[var(--muted)]">Add a milestone from the outline view to see it here.</p>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -241,8 +264,44 @@ function GoalTimelineCard({
               ))}
             </div>
 
+            {/* One continuous run — each goal's master toggle row, then (if expanded) its milestone bars, no divider breaking the flow. */}
             <div className="space-y-1.5">
-              {rows.map(({ milestone, depth }) => {
+              {displayRows.map((row) => {
+                if (row.kind === "goal") {
+                  const isOpen = expandedGoals.has(row.goal.id);
+                  return (
+                    <div key={`goal-${row.goal.id}`} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="flex h-8 flex-1 items-center gap-1.5 rounded-md px-1 text-left transition-colors hover:bg-[var(--surface-hover)]"
+                        onClick={() => toggleGoal(row.goal.id)}
+                        aria-label={isOpen ? `Collapse ${row.goal.title}` : `Expand ${row.goal.title}`}
+                      >
+                        <CaretRight
+                          weight="bold"
+                          className={`size-3.5 shrink-0 text-[var(--muted)] transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+                        />
+                        <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--fg)]">
+                          {row.goal.title}
+                        </span>
+                      </button>
+                      <span className="w-9 shrink-0 text-right text-xs tabular-nums text-[var(--muted)]">
+                        {row.goal.progress.pct}%
+                      </span>
+                      <button
+                        type="button"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                        onClick={() => onEditGoal(row.goal)}
+                        aria-label={`Edit ${row.goal.title}`}
+                        title="Edit goal"
+                      >
+                        <PencilSimple size={14} weight="bold" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                const { goal, milestone, depth } = row;
                 const start = new Date(milestone.periodStart).getTime();
                 const end = new Date(milestone.periodEnd).getTime();
                 const left = Math.max(0, ((start - axisStart) / axisSpan) * 100);
@@ -316,7 +375,7 @@ function GoalTimelineCard({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 
   if (focusMode) {
@@ -330,53 +389,6 @@ function GoalTimelineCard({
   return (
     <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-4">
       {content}
-    </div>
-  );
-}
-
-export function RoadmapTimelineView({
-  goals,
-  rootMilestonesByGoal,
-  childrenByParent,
-  loading,
-  onEditGoal,
-  onEditMilestone,
-}: {
-  goals: GoalRow[];
-  rootMilestonesByGoal: Map<string, MilestoneRow[]>;
-  childrenByParent: Map<string, MilestoneRow[]>;
-  loading: boolean;
-  onEditGoal: (goal: GoalRow) => void;
-  onEditMilestone: (milestone: MilestoneRow) => void;
-}) {
-  const goalsWithMilestones = goals.filter((g) => (rootMilestonesByGoal.get(g.id)?.length ?? 0) > 0);
-
-  if (goalsWithMilestones.length === 0 && !loading) {
-    return (
-      <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
-        <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <Flag size={24} weight="bold" />
-        </span>
-        <div>
-          <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">Add a milestone from the outline view to see it here.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {goalsWithMilestones.map((goal) => (
-        <GoalTimelineCard
-          key={goal.id}
-          goal={goal}
-          rootMilestones={rootMilestonesByGoal.get(goal.id) ?? []}
-          childrenByParent={childrenByParent}
-          onEditGoal={onEditGoal}
-          onEditMilestone={onEditMilestone}
-        />
-      ))}
     </div>
   );
 }

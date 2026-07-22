@@ -90,6 +90,7 @@ export function useTaskSubtasks(taskId: string, token: string | null, workspaceI
         }),
       }),
     onMutate: async (vars) => {
+      const previous = readSubtasks();
       patchTaskSubtasksInCache(
         queryClient,
         workspaceId,
@@ -106,6 +107,7 @@ export function useTaskSubtasks(taskId: string, token: string | null, workspaceI
           ),
         { preserveOrder: true },
       );
+      return { previous };
     },
     onSuccess: (row) => {
       patchTaskSubtasksInCache(
@@ -113,6 +115,16 @@ export function useTaskSubtasks(taskId: string, token: string | null, workspaceI
         workspaceId,
         taskId,
         (prev) => prev.map((s) => (s.id === row.id ? row : s)),
+        { preserveOrder: true },
+      );
+    },
+    onError: (_err, _vars, ctx) => {
+      if (!ctx?.previous) return;
+      patchTaskSubtasksInCache(
+        queryClient,
+        workspaceId,
+        taskId,
+        () => ctx.previous,
         { preserveOrder: true },
       );
     },
@@ -151,6 +163,14 @@ export function useTaskSubtasks(taskId: string, token: string | null, workspaceI
   const isPending =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
+  /** Which existing row currently has a save in flight (for a per-row spinner). */
+  const pendingSubtaskId: string | null =
+    updateMutation.isPending && updateMutation.variables
+      ? updateMutation.variables.subtaskId
+      : deleteMutation.isPending && deleteMutation.variables
+        ? deleteMutation.variables
+        : null;
+
   const createSubtask = useCallback(
     (title: string) => {
       if (!enabled) return;
@@ -180,6 +200,7 @@ export function useTaskSubtasks(taskId: string, token: string | null, workspaceI
     updateSubtask,
     deleteSubtask,
     isPending,
+    pendingSubtaskId,
     error: err instanceof Error ? err.message : null,
     getStableKey,
   };

@@ -8,6 +8,35 @@ import type { GoalRow, MilestoneRow, RoadmapStatus } from "@/lib/ledger-types";
 
 type TreeResponse = { goals: GoalRow[]; milestones: MilestoneRow[] };
 
+/** POST/PATCH on goals & milestones return the raw persisted row — no `progress`/`linkedTaskIds`, those are only computed by the tree GET. */
+type RawGoalRow = Omit<GoalRow, "progress">;
+type RawMilestoneRow = Omit<MilestoneRow, "linkedTaskIds" | "progress">;
+
+const ZERO_PROGRESS = { done: 0, total: 0, pct: 0 };
+
+/** Every sub-milestone under `rootId`, plus itself, walking the cached parent/child links. */
+function collectDescendantIds(milestones: MilestoneRow[], rootId: string): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const m of milestones) {
+    if (!m.parentId) continue;
+    const arr = childrenByParent.get(m.parentId);
+    if (arr) arr.push(m.id);
+    else childrenByParent.set(m.parentId, [m.id]);
+  }
+  const toRemove = new Set<string>([rootId]);
+  const queue = [rootId];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    for (const childId of childrenByParent.get(id) ?? []) {
+      if (!toRemove.has(childId)) {
+        toRemove.add(childId);
+        queue.push(childId);
+      }
+    }
+  }
+  return toRemove;
+}
+
 export type CreateGoalInput = {
   title: string;
   description?: string | null;
@@ -65,89 +94,115 @@ export function useRoadmap(token: string | null, orgId: string | null) {
     void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(orgId) });
   }, [queryClient, orgId]);
 
+  const patchTree = useCallback(
+    (updater: (old: TreeResponse) => TreeResponse) => {
+      if (!orgId) return;
+      queryClient.setQueryData<TreeResponse>(roadmapKeys.tree(orgId), (old) => (old ? updater(old) : old));
+    },
+    [orgId, queryClient],
+  );
+
   const createGoal = useCallback(
     async (input: CreateGoalInput) => {
-      const row = await apiJson<GoalRow>(`/organizations/${orgId}/goals`, {
+      const row = await apiJson<RawGoalRow>(`/organizations/${orgId}/goals`, {
         method: "POST",
         token,
         body: JSON.stringify(input),
       });
+      const goal: GoalRow = { ...row, progress: ZERO_PROGRESS };
+      // Patch the real row into the cache immediately — don't make the user wait on a background refetch to see it appear.
+      patchTree((old) => ({ ...old, goals: [...old.goals, goal] }));
       invalidate();
-      return row;
+      return goal;
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   const updateGoal = useCallback(
     async (goalId: string, input: UpdateGoalInput) => {
-      const row = await apiJson<GoalRow>(`/organizations/${orgId}/goals/${goalId}`, {
+      const row = await apiJson<RawGoalRow>(`/organizations/${orgId}/goals/${goalId}`, {
         method: "PATCH",
         token,
         body: JSON.stringify(input),
       });
+      patchTree((old) => ({
+        ...old,
+        goals: old.goals.map((g) => (g.id === goalId ? { ...g, ...row } : g)),
+      }));
       invalidate();
       return row;
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   const deleteGoal = useCallback(
     async (goalId: string) => {
       await apiVoid(`/organizations/${orgId}/goals/${goalId}`, { method: "DELETE", token });
+      // Cascade reflected client-side too — every milestone under this goal disappears with it.
+      patchTree((old) => ({
+        goals: old.goals.filter((g) => g.id !== goalId),
+        milestones: old.milestones.filter((m) => m.goalId !== goalId),
+      }));
       invalidate();
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   const createMilestone = useCallback(
     async (input: CreateMilestoneInput) => {
-      const row = await apiJson<MilestoneRow>(`/organizations/${orgId}/milestones`, {
+      const row = await apiJson<RawMilestoneRow>(`/organizations/${orgId}/milestones`, {
         method: "POST",
         token,
         body: JSON.stringify(input),
       });
+      const milestone: MilestoneRow = { ...row, linkedTaskIds: [], progress: ZERO_PROGRESS };
+      patchTree((old) => ({ ...old, milestones: [...old.milestones, milestone] }));
       invalidate();
-      return row;
+      return milestone;
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   const updateMilestone = useCallback(
     async (milestoneId: string, input: UpdateMilestoneInput) => {
-      const row = await apiJson<MilestoneRow>(`/organizations/${orgId}/milestones/${milestoneId}`, {
+      const row = await apiJson<RawMilestoneRow>(`/organizations/${orgId}/milestones/${milestoneId}`, {
         method: "PATCH",
         token,
         body: JSON.stringify(input),
       });
+      patchTree((old) => ({
+        ...old,
+        milestones: old.milestones.map((m) => (m.id === milestoneId ? { ...m, ...row } : m)),
+      }));
       invalidate();
       return row;
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   const deleteMilestone = useCallback(
     async (milestoneId: string) => {
       await apiVoid(`/organizations/${orgId}/milestones/${milestoneId}`, { method: "DELETE", token });
+      patchTree((old) => {
+        const toRemove = collectDescendantIds(old.milestones, milestoneId);
+        return { ...old, milestones: old.milestones.filter((m) => !toRemove.has(m.id)) };
+      });
       invalidate();
     },
-    [orgId, token, invalidate],
+    [orgId, token, invalidate, patchTree],
   );
 
   /** Patches a milestone's `linkedTaskIds` in the cached tree immediately — progress/rollup catches up via the background invalidate. */
   const patchLinkedTaskIds = useCallback(
     (milestoneId: string, updater: (ids: string[]) => string[]) => {
-      if (!orgId) return;
-      queryClient.setQueryData<TreeResponse>(roadmapKeys.tree(orgId), (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          milestones: old.milestones.map((m) =>
-            m.id === milestoneId ? { ...m, linkedTaskIds: updater(m.linkedTaskIds) } : m,
-          ),
-        };
-      });
+      patchTree((old) => ({
+        ...old,
+        milestones: old.milestones.map((m) =>
+          m.id === milestoneId ? { ...m, linkedTaskIds: updater(m.linkedTaskIds) } : m,
+        ),
+      }));
     },
-    [orgId, queryClient],
+    [patchTree],
   );
 
   const linkTasks = useCallback(

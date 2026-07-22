@@ -10,17 +10,19 @@ import { GoalEditor, type GoalEditorMode } from "@/components/roadmap/GoalEditor
 import { MilestoneEditor, type MilestoneEditorMode } from "@/components/roadmap/MilestoneEditor";
 import { RoadmapOutlineView } from "@/components/roadmap/RoadmapOutlineView";
 import { RoadmapTimelineView } from "@/components/roadmap/RoadmapTimelineView";
+import { RoadmapGrandView } from "@/components/roadmap/RoadmapGrandView";
 import { RoadmapLevelBoardView } from "@/components/roadmap/RoadmapLevelBoardView";
 import { RoadmapStatsRow } from "@/components/roadmap/RoadmapStatsRow";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
-type RoadmapView = "outline" | "timeline" | "level";
+type RoadmapView = "outline" | "timeline" | "grand" | "level";
 
 const VIEW_LABELS: Record<RoadmapView, string> = {
   outline: "Outline",
   timeline: "Timeline",
+  grand: "Grand Roadmap",
   level: "By level",
 };
 
@@ -96,6 +98,11 @@ export default function RoadmapPage() {
   /** Opens the editor without also expanding — Timeline/By-level already show breakdown via their own toggle/drilldown. */
   function editMilestoneOnly(milestone: MilestoneRow) {
     setEditorMode({ entity: "milestone", mode: { kind: "edit", milestone } });
+  }
+
+  /** Opens the goal editor without touching Outline's expand state — Timeline/Grand Roadmap manage their own master toggle. */
+  function editGoalOnly(goal: GoalRow) {
+    setEditorMode({ entity: "goal", mode: { kind: "edit", goal } });
   }
 
   /** Re-resolve the live row each render so linking/unlinking tasks reflects immediately. */
@@ -183,6 +190,7 @@ export default function RoadmapPage() {
             onAddMilestone={(goal) => openMilestoneForCreate(goal.id, null, goal.departmentId)}
             onAddSubMilestone={(parent) => openMilestoneForCreate(parent.goalId, parent, parent.departmentId)}
             onCreateGoal={openGoalForCreate}
+            members={members}
           />
         )}
         {view === "timeline" && (
@@ -190,9 +198,18 @@ export default function RoadmapPage() {
             goals={goals}
             rootMilestonesByGoal={rootMilestonesByGoal}
             childrenByParent={childrenByParent}
-            expanded={expanded}
             loading={loading}
-            onToggle={toggle}
+            onEditGoal={editGoalOnly}
+            onEditMilestone={editMilestoneOnly}
+          />
+        )}
+        {view === "grand" && (
+          <RoadmapGrandView
+            goals={goals}
+            rootMilestonesByGoal={rootMilestonesByGoal}
+            childrenByParent={childrenByParent}
+            loading={loading}
+            onEditGoal={editGoalOnly}
             onEditMilestone={editMilestoneOnly}
           />
         )}

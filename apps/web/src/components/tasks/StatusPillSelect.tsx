@@ -7,7 +7,7 @@ import { FLOW_COLUMN_LABELS, statusPillPaletteClasses, type ManualTaskStatus } f
 
 /** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
 export const STATUS_PILL_LAYOUT =
-  "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 px-1.5";
+  "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 rounded-lg px-1.5";
 
 /** Kanban card meta row: status pill is icon-only, compact. */
 export const KANBAN_STATUS_SHELL_LAYOUT =
