@@ -12,7 +12,7 @@ import { RoadmapOutlineView } from "@/components/roadmap/RoadmapOutlineView";
 import { RoadmapTimelineView } from "@/components/roadmap/RoadmapTimelineView";
 import { RoadmapGrandView } from "@/components/roadmap/RoadmapGrandView";
 import { RoadmapLevelBoardView } from "@/components/roadmap/RoadmapLevelBoardView";
-import { RoadmapStatsRow } from "@/components/roadmap/RoadmapStatsRow";
+import { RoadmapPipelineBar } from "@/components/roadmap/RoadmapPipelineBar";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
@@ -135,45 +135,41 @@ export default function RoadmapPage() {
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
       {displayError && <ErrorBanner message={displayError} onDismiss={() => setError(null)} />}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Roadmaps</h1>
-          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
-            Set goals for what you&apos;re pursuing, then break each into milestones dated however the work actually needs.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary inline-flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold"
-          onClick={openGoalForCreate}
-        >
-          <Plus weight="bold" className="size-4" />
-          New goal
-        </button>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h1 className="shrink-0 text-3xl font-semibold tracking-tight">Roadmap</h1>
+        <RoadmapPipelineBar goals={roadmap.goals} loading={loading} />
       </div>
 
-      <RoadmapStatsRow goals={roadmap.goals} milestones={roadmap.milestones} loading={loading} />
-
-      <div
-        className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
-        role="group"
-        aria-label="Roadmap view"
-      >
-        {(Object.keys(VIEW_LABELS) as RoadmapView[]).map((v) => (
-          <button
-            key={v}
-            type="button"
-            className={`rounded-lg px-3.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-              view === v
-                ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-            }`}
-            onClick={() => setView(v)}
-            aria-pressed={view === v}
-          >
-            {VIEW_LABELS[v]}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
+          onClick={openGoalForCreate}
+        >
+          <Plus weight="bold" className="size-3.5" />
+          New goal
+        </button>
+        <div
+          className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
+          role="group"
+          aria-label="Roadmap view"
+        >
+          {(Object.keys(VIEW_LABELS) as RoadmapView[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`rounded-lg px-3.5 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                view === v
+                  ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                  : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+              }`}
+              onClick={() => setView(v)}
+              aria-pressed={view === v}
+            >
+              {VIEW_LABELS[v]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <LoadingFrame show={loading} className="rounded-2xl p-0.5" ribbonRadius="2xl" aria-label="Loading roadmap">

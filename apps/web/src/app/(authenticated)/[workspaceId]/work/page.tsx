@@ -1967,7 +1967,7 @@ function WorkItemsInner() {
             </div>
             <button
               type="button"
-              className="btn-primary !h-8 inline-flex shrink-0 items-center gap-1.5 !rounded-lg !px-2.5 !py-1 !text-xs !font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:opacity-70"
+              className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
               onClick={() => openNewTask(listId || undefined)}
               disabled={isOpeningNewTask}
               aria-busy={isOpeningNewTask || undefined}
@@ -1975,8 +1975,9 @@ function WorkItemsInner() {
               {isOpeningNewTask ? (
                 <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
               ) : (
-                <span>+ New task</span>
+                <Plus weight="bold" className="size-3.5" />
               )}
+              New task
             </button>
           </div>
           <WorkBoardStatsCard

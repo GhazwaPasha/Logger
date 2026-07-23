@@ -22,6 +22,14 @@ export const STATUS_BAR_CLASS: Record<RoadmapStatus, string> = {
   archived: "bg-[var(--muted)]/50",
 };
 
+/** Pill background per status — mirrors {@link import("./task-board").statusPillPaletteClasses} for the roadmap pipeline bar. */
+export const STATUS_PILL_CLASS: Record<RoadmapStatus, string> = {
+  on_track: "bg-emerald-500/20 dark:bg-emerald-500/15 text-[var(--fg)]",
+  at_risk: "bg-amber-500/20 dark:bg-amber-500/15 text-[var(--fg)]",
+  done: "bg-sky-500/20 dark:bg-sky-500/15 text-[var(--fg)]",
+  archived: "bg-neutral-500/15 text-[var(--muted)]",
+};
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }

@@ -502,7 +502,7 @@ export function WorkspaceSidebar({
               Dashboard
             </Link>
             <Link href={`${base}/roadmap`} className={`${rowBase(activeRoadmap)} pl-2`}>
-              Roadmaps
+              Roadmap
             </Link>
             <Link href={`${base}/calendar`} className={`${rowBase(activeCalendar)} pl-2`}>
               Calendar
