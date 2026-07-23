@@ -9,7 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { CaretDown } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCaretDown } from "@fortawesome/free-solid-svg-icons";
 
 export type SelectOption<T extends string = string> = {
   value: T;
@@ -121,10 +122,9 @@ export function SelectPopover<T extends string>({
       >
         {triggerContent ?? <span className="truncate">{currentLabel}</span>}
         {showChevron && (
-          <CaretDown
-            size={12}
-            weight="bold"
-            className={`ml-auto shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          <FontAwesomeIcon
+            icon={faCaretDown}
+            className={`ml-auto size-3 shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
           />
         )}
       </button>

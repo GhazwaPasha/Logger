@@ -3,6 +3,7 @@ import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { BootProvider } from "@/components/app/BootProvider";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import "@/lib/fontawesome-config";
 import "./globals.css";
 
 const dmSans = DM_Sans({

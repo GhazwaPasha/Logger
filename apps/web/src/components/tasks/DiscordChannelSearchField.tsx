@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Lock } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
 import type { DiscordChannelOption } from "@/lib/ledger-types";
 
 function matchesQuery(c: DiscordChannelOption, q: string): boolean {
@@ -48,7 +49,7 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm text-[var(--fg)]">
             {selected.isPrivate && (
-              <Lock size={12} weight="fill" className="shrink-0 text-[var(--muted)]" aria-label="Private channel" />
+              <FontAwesomeIcon icon={faLock} className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
             )}
             <span className="min-w-0 truncate">#{selected.name}</span>
             <button
@@ -111,7 +112,7 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
                   >
                     <span className="font-medium text-[var(--fg)]">#{c.name}</span>
                     {c.isPrivate && (
-                      <Lock size={12} weight="fill" className="shrink-0 text-[var(--muted)]" aria-label="Private channel" />
+                      <FontAwesomeIcon icon={faLock} className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
                     )}
                   </button>
                 </li>

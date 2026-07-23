@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import type { SubtaskRow } from "@/lib/ledger-types";
 
@@ -99,7 +100,7 @@ export function TaskSubtaskList({
               {rowBusy(item.id) ? (
                 <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
               ) : item.done ? (
-                <Check className="size-[11px] shrink-0" weight="bold" aria-hidden />
+                <FontAwesomeIcon icon={faCheck} className="size-[11px] shrink-0" aria-hidden />
               ) : null}
             </button>
             {!toggleOnly && editingId === item.id ? (

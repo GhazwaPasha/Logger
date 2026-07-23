@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Flag } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
@@ -51,7 +52,7 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
             onClick={() => router.push(`/${workspaceSlug}/roadmap`)}
             title="Open Roadmap"
           >
-            <Flag size={12} weight="bold" />
+            <FontAwesomeIcon icon={faFlag} className="size-3" />
             {m.title}
             <span
               role="button"

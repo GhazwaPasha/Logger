@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 
 type AttachmentRow = {
@@ -110,7 +111,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
             title="Upload attachment"
             className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
           >
-            <Plus size={14} weight="bold" />
+            <FontAwesomeIcon icon={faPlus} className="size-3.5" />
           </button>
         )}
       </div>

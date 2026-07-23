@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Flag } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useRoadmap } from "@/hooks/useRoadmap";
@@ -29,7 +30,7 @@ export function TaskMilestoneIconBtn({ taskId }: { taskId: string }) {
       aria-label={`Linked to roadmap milestone: ${label}`}
       className="inline-flex size-6 shrink-0 items-center justify-center rounded text-[var(--muted)] opacity-70 transition-[opacity,colors] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100"
     >
-      <Flag size={15} weight="bold" aria-hidden />
+      <FontAwesomeIcon icon={faFlag} className="size-[15px]" aria-hidden />
     </button>
   );
 }

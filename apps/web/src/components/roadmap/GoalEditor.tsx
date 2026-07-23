@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import type { Dept, GoalRow, MemberRow, RoadmapStatus } from "@/lib/ledger-types";
@@ -104,7 +105,7 @@ export function GoalEditor({
             onClick={onClose}
             aria-label="Close"
           >
-            <X weight="bold" className="size-4" />
+            <FontAwesomeIcon icon={faXmark} className="size-4" />
           </button>
         </div>
 

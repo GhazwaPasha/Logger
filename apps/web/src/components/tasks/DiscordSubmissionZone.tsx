@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "@/lib/api";
 
 type DiscordSubmitResponse = {
@@ -83,7 +84,7 @@ export function DiscordSubmissionZone({ taskId, token }: Props) {
           title="Submit file to Discord"
           className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[#5865F2]/30 text-[#5865F2] transition-colors hover:border-[#5865F2] hover:bg-[#5865F2]/10 disabled:opacity-50"
         >
-          <Plus size={14} weight="bold" />
+          <FontAwesomeIcon icon={faPlus} className="size-3.5" />
         </button>
       </div>
       <input

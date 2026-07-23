@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CircleNotch } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
 
 export type ConfirmDialogOptions = {
   title: string;
@@ -112,7 +113,7 @@ export function ConfirmDialog({
             onClick={() => void confirm()}
           >
             {pending ? (
-              <CircleNotch weight="bold" className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+              <FontAwesomeIcon icon={faCircleNotch} className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
             ) : null}
             {pending ? "Working…" : o.confirmLabel}
           </button>

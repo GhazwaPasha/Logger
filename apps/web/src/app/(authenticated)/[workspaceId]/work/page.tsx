@@ -1,25 +1,26 @@
 "use client";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  Alarm,
-  ArrowLineUp,
-  ArrowsDownUp,
-  CalendarDots,
-  CalendarPlus,
-  CaretDoubleDown,
-  CaretDoubleUp,
-  CaretRight,
-  ChatCircle,
-  Check,
-  Columns,
-  DotsThreeVertical,
-  ListChecks,
-  Paperclip,
-  Plus,
-  Rows,
-  Timer,
-  UserPlus,
-} from "@phosphor-icons/react";
+  faBell,
+  faArrowUp,
+  faArrowsUpDown,
+  faCalendarDays,
+  faCalendarPlus,
+  faAnglesDown,
+  faAnglesUp,
+  faCaretRight,
+  faComment,
+  faCheck,
+  faTableColumns,
+  faEllipsisVertical,
+  faListCheck,
+  faPaperclip,
+  faPlus,
+  faTableList,
+  faStopwatch,
+  faUserPlus,
+} from "@fortawesome/free-solid-svg-icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import {
@@ -104,9 +105,9 @@ type ViewMode = "list" | "kanban";
 
 function IconChevron({ className, open }: { className?: string; open: boolean }) {
   return (
-    <CaretRight
+    <FontAwesomeIcon
+      icon={faCaretRight}
       className={`${className ?? ""} shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
-      weight="bold"
       aria-hidden
     />
   );
@@ -1142,7 +1143,7 @@ function WorkItemsInner() {
             }}
           >
             {checklistDone ? (
-              <Check className="size-[11px] shrink-0" weight="bold" aria-hidden />
+              <FontAwesomeIcon icon={faCheck} className="size-[11px] shrink-0" aria-hidden />
             ) : null}
           </button>
 
@@ -1171,7 +1172,7 @@ function WorkItemsInner() {
               title="Edit task"
               aria-label={`More options — edit: ${task.title}`}
             >
-              <DotsThreeVertical size={16} weight="bold" aria-hidden />
+              <FontAwesomeIcon icon={faEllipsisVertical} className="size-4" aria-hidden />
             </button>
           </div>
         </div>
@@ -1186,7 +1187,7 @@ function WorkItemsInner() {
                 aria-expanded={expanded}
                 className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
               >
-                <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                 Subtasks
                 {Array.isArray(subtasksState) ? (
                   <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
@@ -1201,9 +1202,9 @@ function WorkItemsInner() {
                 title="Add subtasks"
                 aria-label="Add subtasks"
               >
-                <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                 Subtasks
-                <Plus size={16} className="opacity-60" weight="bold" aria-hidden />
+                <FontAwesomeIcon icon={faPlus} className="size-4 opacity-60" aria-hidden />
               </button>
             )}
             <div className="flex-1" />
@@ -1235,7 +1236,7 @@ function WorkItemsInner() {
                       {subPending ? (
                         <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
                       ) : s.done ? (
-                        <Check className="size-[9px] shrink-0" weight="bold" aria-hidden />
+                        <FontAwesomeIcon icon={faCheck} className="size-[9px] shrink-0" aria-hidden />
                       ) : null}
                     </button>
                     <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}>
@@ -1315,11 +1316,11 @@ function WorkItemsInner() {
         )}
         <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
           {p === "high" ? (
-            <CaretDoubleUp size={16} weight="fill" aria-hidden />
+            <FontAwesomeIcon icon={faAnglesUp} className="size-4" aria-hidden />
           ) : p === "low" ? (
-            <CaretDoubleDown size={16} weight="fill" aria-hidden />
+            <FontAwesomeIcon icon={faAnglesDown} className="size-4" aria-hidden />
           ) : (
-            <ArrowLineUp size={16} weight="bold" aria-hidden />
+            <FontAwesomeIcon icon={faArrowUp} className="size-4" aria-hidden />
           )}
         </span>
       </div>
@@ -1343,11 +1344,11 @@ function WorkItemsInner() {
         className={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
       >
         {isLate ? (
-          <Alarm size={16} weight="fill" aria-hidden />
+          <FontAwesomeIcon icon={faBell} className="size-4" aria-hidden />
         ) : hasDue ? (
-          <Timer size={16} weight="regular" aria-hidden />
+          <FontAwesomeIcon icon={faStopwatch} className="size-4" aria-hidden />
         ) : (
-          <CalendarPlus size={16} weight="regular" aria-hidden />
+          <FontAwesomeIcon icon={faCalendarPlus} className="size-4" aria-hidden />
         )}
       </button>
     );
@@ -1371,7 +1372,7 @@ function WorkItemsInner() {
             {initial}
           </span>
         ) : (
-          <UserPlus size={16} className="text-[var(--muted)] opacity-80" weight="regular" aria-hidden />
+          <FontAwesomeIcon icon={faUserPlus} className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
         )}
       </button>
     );
@@ -1386,7 +1387,7 @@ function WorkItemsInner() {
         aria-label="Comments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <ChatCircle size={16} weight="regular" aria-hidden />
+        <FontAwesomeIcon icon={faComment} className="size-4" aria-hidden />
       </button>
     );
   }
@@ -1400,7 +1401,7 @@ function WorkItemsInner() {
         aria-label="Attachments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <Paperclip size={16} weight="regular" aria-hidden />
+        <FontAwesomeIcon icon={faPaperclip} className="size-4" aria-hidden />
       </button>
     );
   }
@@ -1484,7 +1485,7 @@ function WorkItemsInner() {
                 title="Edit task"
                 aria-label={`More options — edit: ${task.title}`}
               >
-                <DotsThreeVertical size={16} weight="bold" aria-hidden />
+                <FontAwesomeIcon icon={faEllipsisVertical} className="size-4" aria-hidden />
               </button>
             </div>
           </div>
@@ -1504,7 +1505,7 @@ function WorkItemsInner() {
                   title="View subtasks"
                   aria-label="View subtasks"
                 >
-                  <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                  <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                   Subtasks
                   {Array.isArray(subtasksState) ? (
                     <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
@@ -1518,7 +1519,7 @@ function WorkItemsInner() {
                   title="Add subtasks"
                   aria-label="Add subtasks"
                 >
-                  <ListChecks size={16} className="opacity-70" weight="regular" aria-hidden />
+                  <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                   Subtasks
                   <svg className="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M12 5v14M5 12h14" />
@@ -1910,7 +1911,7 @@ function WorkItemsInner() {
                   aria-label="List view"
                   aria-pressed={viewMode === "list"}
                 >
-                  <Rows size={18} weight="regular" aria-hidden />
+                  <FontAwesomeIcon icon={faTableList} className="size-[18px]" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -1923,7 +1924,7 @@ function WorkItemsInner() {
                   aria-label="Kanban view"
                   aria-pressed={viewMode === "kanban"}
                 >
-                  <Columns size={18} weight="regular" aria-hidden />
+                  <FontAwesomeIcon icon={faTableColumns} className="size-[18px]" aria-hidden />
                 </button>
               </div>
               <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
@@ -1940,7 +1941,7 @@ function WorkItemsInner() {
                 aria-haspopup="menu"
                 aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
               >
-                <ArrowsDownUp size={18} className="pointer-events-none" weight="regular" aria-hidden />
+                <FontAwesomeIcon icon={faArrowsUpDown} className="size-[18px] pointer-events-none" aria-hidden />
               </button>
               <button
                 ref={dateTriggerRef}
@@ -1959,7 +1960,7 @@ function WorkItemsInner() {
                     : "Due date filter"
                 }
               >
-                <CalendarDots size={18} className="pointer-events-none" weight="regular" aria-hidden />
+                <FontAwesomeIcon icon={faCalendarDays} className="size-[18px] pointer-events-none" aria-hidden />
                 {(datePreset !== "all" || dueFrom || dueTo) && (
                   <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
                 )}
@@ -1975,7 +1976,7 @@ function WorkItemsInner() {
               {isOpeningNewTask ? (
                 <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
               ) : (
-                <Plus weight="bold" className="size-3.5" />
+                <FontAwesomeIcon icon={faPlus} className="size-3.5" />
               )}
               New task
             </button>

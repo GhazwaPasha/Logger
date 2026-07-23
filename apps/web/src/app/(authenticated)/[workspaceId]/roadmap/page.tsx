@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -146,7 +147,7 @@ export default function RoadmapPage() {
           className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]"
           onClick={openGoalForCreate}
         >
-          <Plus weight="bold" className="size-3.5" />
+          <FontAwesomeIcon icon={faPlus} className="size-3.5" />
           New goal
         </button>
         <div

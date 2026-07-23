@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PaperPlaneTilt, PencilSimple, Trash, ChatCircle } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPaperPlane, faPen, faTrashCan, faComment } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import type { MemberRow } from "@/lib/ledger-types";
 
@@ -201,7 +202,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
         className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-neutral-700 hover:bg-neutral-600 disabled:opacity-30 transition-colors"
         aria-label="Send"
       >
-        <PaperPlaneTilt size={15} weight="fill" color="white" />
+        <FontAwesomeIcon icon={faPaperPlane} className="size-[15px]" color="white" />
       </button>
     </div>
   );
@@ -285,7 +286,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                     className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
                     aria-label="Edit"
                   >
-                    <PencilSimple size={11} />
+                    <FontAwesomeIcon icon={faPen} className="size-[11px]" />
                   </button>
                   <button
                     type="button"
@@ -293,7 +294,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                     className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-red-500 transition-opacity"
                     aria-label="Delete"
                   >
-                    <Trash size={11} />
+                    <FontAwesomeIcon icon={faTrashCan} className="size-[11px]" />
                   </button>
                 </>
               )}
@@ -426,7 +427,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               onClick={() => setShowInput(true)}
               className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
             >
-              <ChatCircle size={16} />
+              <FontAwesomeIcon icon={faComment} className="size-4" />
               <span>Add a comment…</span>
             </button>
           )}

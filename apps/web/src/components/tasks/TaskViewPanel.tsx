@@ -28,7 +28,8 @@ import {
   stageControlDropdownOptions,
   type TaskPriority,
 } from "@/lib/task-board";
-import { CaretDoubleUp, CaretDoubleDown, ArrowLineUp } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { memberInitials } from "@/lib/member-utils";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
@@ -196,11 +197,11 @@ export function TaskViewPanel({
                   : "text-[var(--muted)]";
             const icon =
               form.priority === "high" ? (
-                <CaretDoubleUp size={12} weight="fill" />
+                <FontAwesomeIcon icon={faAnglesUp} className="size-3" />
               ) : form.priority === "low" ? (
-                <CaretDoubleDown size={12} weight="fill" />
+                <FontAwesomeIcon icon={faAnglesDown} className="size-3" />
               ) : (
-                <ArrowLineUp size={12} weight="bold" />
+                <FontAwesomeIcon icon={faArrowUp} className="size-3" />
               );
             return (
               <SelectPopover
@@ -235,7 +236,7 @@ export function TaskViewPanel({
                 : "text-[var(--muted)]";
             return (
               <span className={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}>
-                {p === "high" ? <CaretDoubleUp size={12} weight="fill" /> : p === "low" ? <CaretDoubleDown size={12} weight="fill" /> : <ArrowLineUp size={12} weight="bold" />}
+                {p === "high" ? <FontAwesomeIcon icon={faAnglesUp} className="size-3" /> : p === "low" ? <FontAwesomeIcon icon={faAnglesDown} className="size-3" /> : <FontAwesomeIcon icon={faArrowUp} className="size-3" />}
                 {PRIORITY_LABELS[p] ?? "Medium"}
               </span>
             );

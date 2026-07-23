@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowsIn, ArrowsOut, CaretLeft, CaretRight, Flag, MapPin, PencilSimple } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCompress, faExpand, faCaretLeft, faCaretRight, faFlag, faLocationDot, faPen } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_BAR_CLASS, formatRange, milestoneDepthStyle } from "@/lib/roadmap-format";
 import { buildTicks, clampZoomLevel, computeNaturalRange, fitZoomToRange, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
 import { ZoomLevelSwitch } from "@/components/roadmap/ZoomLevelSwitch";
@@ -198,8 +199,8 @@ function GoalTimelineCard({
             onClick={() => setIsExpanded((v) => !v)}
             aria-label={isExpanded ? "Collapse all milestones" : "Expand all milestones"}
           >
-            <CaretRight
-              weight="bold"
+            <FontAwesomeIcon
+              icon={faCaretRight}
               className={`size-3.5 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
             />
           </button>
@@ -221,7 +222,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate((c) => c - axisSpan / 2)}
               aria-label="Earlier"
             >
-              <CaretLeft weight="bold" className="size-4" />
+              <FontAwesomeIcon icon={faCaretLeft} className="size-4" />
             </button>
             <button
               type="button"
@@ -236,7 +237,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate(new Date().getTime())}
               aria-label="Jump to today"
             >
-              <MapPin weight="bold" className="size-3.5" />
+              <FontAwesomeIcon icon={faLocationDot} className="size-3.5" />
               Today
             </button>
             <button
@@ -245,7 +246,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate((c) => c + axisSpan / 2)}
               aria-label="Later"
             >
-              <CaretRight weight="bold" className="size-4" />
+              <FontAwesomeIcon icon={faCaretRight} className="size-4" />
             </button>
           </div>
           <button
@@ -254,7 +255,7 @@ function GoalTimelineCard({
             onClick={() => setFocusMode((f) => !f)}
             aria-label={focusMode ? "Exit full screen" : "Full screen"}
           >
-            {focusMode ? <ArrowsIn weight="bold" className="size-4" /> : <ArrowsOut weight="bold" className="size-4" />}
+            {focusMode ? <FontAwesomeIcon icon={faCompress} className="size-4" /> : <FontAwesomeIcon icon={faExpand} className="size-4" />}
           </button>
         </div>
       </div>
@@ -338,8 +339,8 @@ function GoalTimelineCard({
                               }}
                               aria-label={isOpen ? `Collapse ${milestone.title}` : `Expand ${milestone.title}`}
                             >
-                              <CaretRight
-                                weight="bold"
+                              <FontAwesomeIcon
+                                icon={faCaretRight}
                                 className={`size-3 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                               />
                             </button>
@@ -360,7 +361,7 @@ function GoalTimelineCard({
                         aria-label={`Edit ${milestone.title}`}
                         title="Edit"
                       >
-                        <PencilSimple size={14} weight="bold" />
+                        <FontAwesomeIcon icon={faPen} className="size-3.5" />
                       </button>
                     </div>
                   );
@@ -409,7 +410,7 @@ export function RoadmapTimelineView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <Flag size={24} weight="bold" />
+          <FontAwesomeIcon icon={faFlag} className="size-6" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>

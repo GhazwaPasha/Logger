@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowsIn, ArrowsOut, CaretLeft, CaretRight, Flag, MapPin, PencilSimple } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCompress, faExpand, faCaretLeft, faCaretRight, faFlag, faLocationDot, faPen } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_BAR_CLASS, formatRange, milestoneDepthStyle } from "@/lib/roadmap-format";
-import { buildTicks, clampZoomLevel, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
+import { buildTicks, clampZoomLevel, computeNaturalRange, fitZoomToRange, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
 import { ZoomLevelSwitch } from "@/components/roadmap/ZoomLevelSwitch";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
@@ -106,6 +107,18 @@ export function RoadmapGrandView({
     }
     return m;
   }, [goals, rootMilestonesByGoal, childrenByParent]);
+
+  function fitToData() {
+    const spans: { start: number; end: number }[] = [];
+    for (const rows of allByGoal.values()) {
+      for (const { milestone } of rows) {
+        spans.push({ start: new Date(milestone.periodStart).getTime(), end: new Date(milestone.periodEnd).getTime() });
+      }
+    }
+    const fit = fitZoomToRange(computeNaturalRange(spans));
+    setZoomLevel(fit.zoomLevel);
+    setCenterDate(fit.centerDate);
+  }
 
   const axisSpan = ZOOM_LEVELS[zoomLevel]!.days * 24 * 60 * 60 * 1000;
   const axisStart = centerDate - axisSpan / 2;
@@ -225,7 +238,14 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate((c) => c - axisSpan / 2)}
               aria-label="Earlier"
             >
-              <CaretLeft weight="bold" className="size-4" />
+              <FontAwesomeIcon icon={faCaretLeft} className="size-4" />
+            </button>
+            <button
+              type="button"
+              className="rounded-lg px-2 py-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+              onClick={fitToData}
+            >
+              Reset
             </button>
             <button
               type="button"
@@ -233,7 +253,7 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate(new Date().getTime())}
               aria-label="Jump to today"
             >
-              <MapPin weight="bold" className="size-3.5" />
+              <FontAwesomeIcon icon={faLocationDot} className="size-3.5" />
               Today
             </button>
             <button
@@ -242,7 +262,7 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate((c) => c + axisSpan / 2)}
               aria-label="Later"
             >
-              <CaretRight weight="bold" className="size-4" />
+              <FontAwesomeIcon icon={faCaretRight} className="size-4" />
             </button>
           </div>
           <button
@@ -253,11 +273,11 @@ export function RoadmapGrandView({
           >
             {focusMode ? (
               <>
-                <ArrowsIn weight="bold" className="size-4" />
+                <FontAwesomeIcon icon={faCompress} className="size-4" />
                 Exit full screen
               </>
             ) : (
-              <ArrowsOut weight="bold" className="size-4" />
+              <FontAwesomeIcon icon={faExpand} className="size-4" />
             )}
           </button>
         </div>
@@ -266,7 +286,7 @@ export function RoadmapGrandView({
       {!hasAnyGoals && !loading ? (
         <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-            <Flag size={24} weight="bold" />
+            <FontAwesomeIcon icon={faFlag} className="size-6" />
           </span>
           <div>
             <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
@@ -300,7 +320,7 @@ export function RoadmapGrandView({
             </div>
 
             {displayRows.length === 0 ? (
-              <p className="px-1 py-6 text-center text-sm text-[var(--muted)]">Nothing in this window — drag, zoom out, or jump to Today.</p>
+              <p className="px-1 py-6 text-center text-sm text-[var(--muted)]">Nothing in this window — drag, zoom out, jump to Today, or Reset.</p>
             ) : (
               /* One continuous run — each goal's master toggle row, then (if expanded) its milestone bars, no divider breaking the flow. */
               <div className="space-y-1.5">
@@ -323,8 +343,8 @@ export function RoadmapGrandView({
                             onClick={() => toggleGoal(row.goal.id)}
                             aria-label={isOpen ? `Collapse ${row.goal.title}` : `Expand ${row.goal.title}`}
                           >
-                            <CaretRight
-                              weight="bold"
+                            <FontAwesomeIcon
+                              icon={faCaretRight}
                               className={`size-3.5 shrink-0 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                             />
                             <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--fg)]">
@@ -343,7 +363,7 @@ export function RoadmapGrandView({
                           aria-label={`Edit ${row.goal.title}`}
                           title="Edit goal"
                         >
-                          <PencilSimple size={14} weight="bold" />
+                          <FontAwesomeIcon icon={faPen} className="size-3.5" />
                         </button>
                       </div>
                     );
@@ -394,8 +414,8 @@ export function RoadmapGrandView({
                               }}
                               aria-label={isOpen ? `Collapse ${milestone.title}` : `Expand ${milestone.title}`}
                             >
-                              <CaretRight
-                                weight="bold"
+                              <FontAwesomeIcon
+                                icon={faCaretRight}
                                 className={`size-3 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                               />
                             </button>
@@ -415,7 +435,7 @@ export function RoadmapGrandView({
                             aria-label={`Collapse ${goal.title}`}
                             title={goal.title}
                           >
-                            <CaretRight weight="bold" className="size-3.5 shrink-0 rotate-90 transition-transform duration-150" />
+                            <FontAwesomeIcon icon={faCaretRight} className="size-3.5 shrink-0 rotate-90 transition-transform duration-150" />
                             <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--fg)]">
                               {goal.title}
                             </span>
@@ -433,7 +453,7 @@ export function RoadmapGrandView({
                         aria-label={`Edit ${milestone.title}`}
                         title="Edit"
                       >
-                        <PencilSimple size={14} weight="bold" />
+                        <FontAwesomeIcon icon={faPen} className="size-3.5" />
                       </button>
                     </div>
                   );

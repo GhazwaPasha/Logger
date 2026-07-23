@@ -638,6 +638,9 @@ export class TasksService {
         if (!existingChild) {
           const nextDue = computeNextDue(preDue, preRepeat);
           const seriesId = task.recurringSeriesId ?? task.id;
+          if (!task.recurringSeriesId) {
+            await tx.update(tasks).set({ recurringSeriesId: seriesId }).where(eq(tasks.id, taskId));
+          }
           const nextTitle = parsed.title !== undefined ? parsed.title : task.title;
           const nextPri = parsed.priority !== undefined ? parsed.priority : task.priority;
           const [spawned] = await tx

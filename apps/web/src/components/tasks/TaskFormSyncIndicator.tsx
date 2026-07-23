@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, CircleNotch, CloudArrowUp, WarningCircle } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faCircleNotch, faCloudArrowUp, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
 
 type IndicatorConfig = {
@@ -18,7 +19,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: error ?? "Could not save",
       className:
         "border-red-200/80 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400",
-      icon: <WarningCircle weight="fill" className="size-3.5 shrink-0" aria-hidden />,
+      icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3.5 shrink-0" aria-hidden />,
     };
   }
   if (status === "saving") {
@@ -27,8 +28,8 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: "Saving your changes…",
       className: "border-[var(--accent)]/35 bg-[var(--accent-muted)] text-[var(--fg)]",
       icon: (
-        <CircleNotch
-          weight="bold"
+        <FontAwesomeIcon
+          icon={faCircleNotch}
           className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
           aria-hidden
         />
@@ -40,7 +41,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Pending",
       title: "Changes will save shortly",
       className: "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]",
-      icon: <CloudArrowUp weight="bold" className="size-3.5 shrink-0 text-[var(--accent)]" aria-hidden />,
+      icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 text-[var(--accent)]" aria-hidden />,
       pulse: true,
     };
   }
@@ -50,7 +51,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: "All changes saved",
       className:
         "border-green-200/80 bg-green-50 text-green-700 dark:border-green-900/50 dark:bg-green-950/35 dark:text-green-400",
-      icon: <Check weight="bold" className="size-3.5 shrink-0" aria-hidden />,
+      icon: <FontAwesomeIcon icon={faCheck} className="size-3.5 shrink-0" aria-hidden />,
     };
   }
   if (hint) {
@@ -58,14 +59,14 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Draft",
       title: hint,
       className: "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)]",
-      icon: <CloudArrowUp weight="bold" className="size-3.5 shrink-0 opacity-50" aria-hidden />,
+      icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 opacity-50" aria-hidden />,
     };
   }
   return {
     label: "Auto-save",
     title: "Changes save automatically when you edit",
     className: "border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--muted)]",
-    icon: <CloudArrowUp weight="bold" className="size-3.5 shrink-0 opacity-50" aria-hidden />,
+    icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 opacity-50" aria-hidden />,
   };
 }
 

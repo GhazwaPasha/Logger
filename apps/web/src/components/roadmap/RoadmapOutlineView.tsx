@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CaretRight, Flag, Plus } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCaretRight, faFlag, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_DOT_CLASS, STATUS_LABELS, formatDate, formatRange } from "@/lib/roadmap-format";
 import type { GoalRow, MemberRow, MilestoneRow } from "@/lib/ledger-types";
 
@@ -40,8 +41,8 @@ function MilestoneRowItem({
           aria-label={hasChildren ? (isOpen ? "Collapse" : "Expand") : undefined}
         >
           {hasChildren ? (
-            <CaretRight
-              weight="bold"
+            <FontAwesomeIcon
+              icon={faCaretRight}
               className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
             />
           ) : null}
@@ -78,7 +79,7 @@ function MilestoneRowItem({
           onClick={() => onAddChild(milestone)}
           aria-label={`Add sub-milestone under ${milestone.title}`}
         >
-          <Plus weight="bold" className="size-3.5" />
+          <FontAwesomeIcon icon={faPlus} className="size-3.5" />
         </button>
       </div>
 
@@ -140,7 +141,7 @@ function GoalSection({
           aria-label={hasMilestones ? (isOpen ? "Collapse" : "Expand") : undefined}
         >
           {hasMilestones ? (
-            <CaretRight weight="bold" className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`} />
+            <FontAwesomeIcon icon={faCaretRight} className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`} />
           ) : null}
         </button>
 
@@ -181,7 +182,7 @@ function GoalSection({
           onClick={() => onAddMilestone(goal)}
           aria-label={`Add milestone under ${goal.title}`}
         >
-          <Plus weight="bold" className="size-3.5" />
+          <FontAwesomeIcon icon={faPlus} className="size-3.5" />
         </button>
       </div>
 
@@ -257,7 +258,7 @@ export function RoadmapOutlineView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <Flag size={24} weight="bold" />
+          <FontAwesomeIcon icon={faFlag} className="size-6" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No goals yet</p>

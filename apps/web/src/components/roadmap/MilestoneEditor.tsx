@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { X } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
@@ -250,7 +251,7 @@ export function MilestoneEditor({
             onClick={onClose}
             aria-label="Close"
           >
-            <X weight="bold" className="size-4" />
+            <FontAwesomeIcon icon={faXmark} className="size-4" />
           </button>
         </div>
 

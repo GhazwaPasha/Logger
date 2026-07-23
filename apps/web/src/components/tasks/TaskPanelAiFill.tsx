@@ -1,7 +1,8 @@
 "use client";
 
 import { startTransition, useCallback, useId, useState } from "react";
-import { Sparkle } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { Toggle } from "@/components/ui/Toggle";
 import type { MemberRow } from "@/lib/ledger-types";
@@ -119,7 +120,7 @@ export function TaskPanelAiFill({ members, existingDraft = null, onApply }: Task
     <div className="rounded-3xl border border-blue-500/30 bg-blue-500/[0.06] p-5 space-y-3 dark:bg-blue-500/[0.07]">
       <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
         <span className="inline-flex items-center gap-2">
-          <Sparkle size={18} weight="fill" className="text-blue-500" aria-hidden />
+          <FontAwesomeIcon icon={faWandMagicSparkles} className="size-[18px] text-blue-500" aria-hidden />
           Describe your task in natural language
         </span>
         <Toggle

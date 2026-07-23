@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { Flag } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_DOT_CLASS, STATUS_LABELS } from "@/lib/roadmap-format";
 import type { Dept, GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
@@ -83,7 +84,7 @@ export function RoadmapLevelBoardView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <Flag size={24} weight="bold" />
+          <FontAwesomeIcon icon={faFlag} className="size-6" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>

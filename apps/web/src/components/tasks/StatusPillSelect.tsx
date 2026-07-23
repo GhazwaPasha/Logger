@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CheckSquare, Clock, ClockUser, XSquare } from "@phosphor-icons/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSquareCheck, faClock, faUserClock, faSquareXmark } from "@fortawesome/free-solid-svg-icons";
 import { FLOW_COLUMN_LABELS, statusPillPaletteClasses, type ManualTaskStatus } from "@/lib/task-board";
 
 /** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
@@ -14,10 +15,11 @@ export const KANBAN_STATUS_SHELL_LAYOUT =
   "relative inline-flex h-6 w-auto min-w-[5.5rem] shrink-0 items-center rounded";
 
 export function StatusIcon({ status, className, size }: { status: ManualTaskStatus; className?: string; size?: number }) {
-  if (status === "done") return <CheckSquare className={className} size={size} weight="fill" aria-hidden />;
-  if (status === "in_progress") return <ClockUser className={className} size={size} weight="fill" aria-hidden />;
-  if (status === "cancelled") return <XSquare className={className} size={size} weight="fill" aria-hidden />;
-  return <Clock className={className} size={size} weight="regular" aria-hidden />;
+  const style = size ? { width: size, height: size } : undefined;
+  if (status === "done") return <FontAwesomeIcon icon={faSquareCheck} className={className} style={style} aria-hidden />;
+  if (status === "in_progress") return <FontAwesomeIcon icon={faUserClock} className={className} style={style} aria-hidden />;
+  if (status === "cancelled") return <FontAwesomeIcon icon={faSquareXmark} className={className} style={style} aria-hidden />;
+  return <FontAwesomeIcon icon={faClock} className={className} style={style} aria-hidden />;
 }
 
 /** Shared status pill/dropdown control — used by the board (list/kanban cards) and the task view panel. */
