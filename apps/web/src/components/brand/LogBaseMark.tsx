@@ -38,7 +38,8 @@ export function LogBaseMark({
 }: LogBaseMarkProps) {
   const size = sizeOverride ?? VARIANT_PX[variant];
   const dim = Math.round(size * 2);
-  const boxStyle = { width: size, height: size } satisfies CSSProperties;
+  // Lifts the mark off whatever sits below it (wordmark baseline, boot text, nav row).
+  const boxStyle = { width: size, height: size, marginBottom: 6 } satisfies CSSProperties;
 
   return (
     <span
