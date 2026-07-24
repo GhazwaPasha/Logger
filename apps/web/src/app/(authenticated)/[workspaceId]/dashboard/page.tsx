@@ -33,8 +33,10 @@ export default function WorkspaceDashboardPage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Hey {firstName}</h1>
-          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">All tracking is live!</p>
+          <h1 className="text-3xl font-semibold tracking-tight">Hey, {firstName}!</h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
+            Your base is logging, tracking tasks, monitoring deadlines.
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ExportButton />

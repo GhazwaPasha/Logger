@@ -107,6 +107,10 @@ export const auth = betterAuth({
       clientId: process.env.DISCORD_LOGIN_CLIENT_ID ?? "",
       clientSecret: process.env.DISCORD_LOGIN_CLIENT_SECRET ?? "",
     },
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    },
   },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
   baseURL: authBaseUrl,
