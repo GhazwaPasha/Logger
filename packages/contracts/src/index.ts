@@ -287,6 +287,18 @@ export const linkMilestoneTasksSchema = z.object({
   taskIds: z.array(z.string().uuid()).min(1).max(100),
 });
 
+export const logTimeEntrySchema = z.object({
+  startedAt: z.string().datetime(),
+  stoppedAt: z.string().datetime(),
+  note: z.string().max(512).optional(),
+});
+export type LogTimeEntryInput = z.infer<typeof logTimeEntrySchema>;
+
+export const createApiKeySchema = z.object({
+  name: z.string().min(1).max(128),
+});
+export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
+
 export const markNotificationsReadSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(100),
 });

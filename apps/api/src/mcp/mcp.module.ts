@@ -1,0 +1,27 @@
+import { Module } from "@nestjs/common";
+import { ApiKeysModule } from "../api-keys/api-keys.module";
+import { AuthModule } from "../auth/auth.module";
+import { CommentsModule } from "../comments/comments.module";
+import { DepartmentsModule } from "../departments/departments.module";
+import { RoadmapModule } from "../roadmap/roadmap.module";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { OrganizationsModule } from "../organizations/organizations.module";
+import { TasksModule } from "../tasks/tasks.module";
+import { TimeModule } from "../time/time.module";
+import { McpController } from "./mcp.controller";
+
+@Module({
+  imports: [
+    AuthModule,
+    ApiKeysModule,
+    TasksModule,
+    TimeModule,
+    CommentsModule,
+    OrganizationsModule,
+    DepartmentsModule,
+    RoadmapModule,
+    NotificationsModule,
+  ],
+  controllers: [McpController],
+})
+export class McpModule {}

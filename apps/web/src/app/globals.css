@@ -960,8 +960,8 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
     transform: none;
   }
 
-  .auth-combo-badge,
-  .auth-combo-link-dot {
+  .auth-combo-seq-ring,
+  .auth-combo-seq-dot {
     animation: none !important;
   }
 
@@ -990,11 +990,9 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
 @keyframes ui-auth-card-enter {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
@@ -1014,7 +1012,7 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
 }
 
 .ui-auth-card-enter {
-  animation: ui-auth-card-enter 0.52s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+  animation: ui-auth-card-enter 0.22s ease-out both;
 }
 
 .ui-dropdown-pop {
@@ -1035,30 +1033,37 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   }
 }
 
-@keyframes auth-combo-pulse-ring {
+/*
+ * Both elements below share one 3.5s cycle split into five equal 0.7s (20%) turns — logo, dot,
+ * dot, dot, logo. Each keyframe only "blinks" in its own first 20%, then holds at rest for the
+ * remaining 80%; staggering `animation-delay` by 0.7s per turn (set inline in LoginForm.tsx) lines
+ * up the turns back-to-back with no gap or overlap, and the round-robin repeats forever since each
+ * element's own loop length equals the total sequence length. `backwards` fill-mode matters here:
+ * without it, an element with a delay > 0 renders at the browser's default opacity/transform (i.e.
+ * fully "lit") until its delay elapses, instead of the keyframe's resting (dim) state — which is
+ * exactly why every dot used to appear lit at once on first paint.
+ */
+@keyframes auth-combo-seq-ring {
   0%,
+  20%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--combo-ring, var(--accent)) 30%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--combo-ring, var(--accent)) 0%, transparent);
   }
-  50% {
-    box-shadow: 0 0 0 9px color-mix(in srgb, var(--combo-ring, var(--accent)) 0%, transparent);
+  10% {
+    box-shadow: 0 0 0 14px color-mix(in srgb, var(--combo-ring, var(--accent)) 32%, transparent);
   }
 }
 
-@keyframes auth-combo-link-travel {
-  0% {
-    transform: translateX(-120%);
-    opacity: 0;
-  }
-  18% {
-    opacity: 1;
-  }
-  82% {
-    opacity: 1;
-  }
+@keyframes auth-combo-seq-dot {
+  0%,
+  20%,
   100% {
-    transform: translateX(120%);
-    opacity: 0;
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+  10% {
+    opacity: 1;
+    transform: scale(1.1);
   }
 }
 
@@ -1066,36 +1071,22 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   animation: auth-combo-enter 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.auth-combo-badge {
-  animation: auth-combo-pulse-ring 1.7s ease-in-out infinite;
+.auth-combo-seq-ring {
+  animation: auth-combo-seq-ring 3.5s ease-in-out infinite backwards;
 }
 
 .auth-combo-badge--discord {
   --combo-ring: #5865f2;
-  animation-delay: 0.55s;
 }
 
 .auth-combo-badge--google {
   --combo-ring: #4285f4;
-  animation-delay: 0.55s;
 }
 
-.auth-combo-link-track {
-  position: relative;
-  overflow: hidden;
-}
-
-.auth-combo-link-dot {
-  position: absolute;
-  inset: 0;
-  width: 40%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--accent) 70%, transparent),
-    transparent
-  );
-  animation: auth-combo-link-travel 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+.auth-combo-seq-dot {
+  border-radius: 9999px;
+  background: var(--fg);
+  animation: auth-combo-seq-dot 3.5s ease-in-out infinite backwards;
 }
 
 .ui-app-header {

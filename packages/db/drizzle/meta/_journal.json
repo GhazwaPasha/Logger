@@ -197,6 +197,13 @@
       "when": 1747440016000,
       "tag": "0027_backfill_recurring_series_id",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1747440017000,
+      "tag": "0028_api_keys",
+      "breakpoints": true
     }
   ]
 }

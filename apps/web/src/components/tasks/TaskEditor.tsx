@@ -31,8 +31,8 @@ import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { Toggle } from "@/components/ui/Toggle";
+import { Avatar } from "@/components/ui/Avatar";
 import { isWorkspaceOwner, taskEditCaps } from "@/lib/workspace-permissions";
-import { memberInitials } from "@/lib/member-utils";
 import {
   TASK_FLOW_ORDER,
   PRIORITY_LABELS,
@@ -504,28 +504,18 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   const m = members.find((r) => r.userId === id);
                   if (!m) return null;
                   const name = (m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown";
-                  const initials = memberInitials(m);
                   return (
                     <span
                       key={id}
                       className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2 text-sm font-medium text-[var(--fg)]"
                     >
-                      {m.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied URL, no next/image remote-pattern config in this app yet
-                        <img
-                          src={m.image}
-                          alt=""
-                          className="size-5 shrink-0 rounded-full object-cover"
-                          aria-hidden
-                        />
-                      ) : (
-                        <span
-                          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]"
-                          aria-hidden
-                        >
-                          {initials}
-                        </span>
-                      )}
+                      <Avatar
+                        name={m.name}
+                        email={m.email}
+                        image={m.image}
+                        size="size-5"
+                        className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                      />
                       {name}
                       {caps.canEditFields && (
                         <button

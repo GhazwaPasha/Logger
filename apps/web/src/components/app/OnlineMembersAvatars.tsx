@@ -1,24 +1,11 @@
 "use client";
 
+import { Avatar } from "@/components/ui/Avatar";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspaceData } from "./WorkspaceDataProvider";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const MAX_SHOWN = 5;
-
-function initials(name: string, email: string): string {
-  const n = name?.trim();
-  if (n) {
-    const parts = n.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      const a = parts[0]?.[0];
-      const b = parts[parts.length - 1]?.[0];
-      if (a && b) return (a + b).toUpperCase();
-    }
-    return n.slice(0, 2).toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
-}
 
 export function OnlineMembersAvatars() {
   const { data: session } = authClient.useSession();
@@ -47,11 +34,7 @@ export function OnlineMembersAvatars() {
             className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]"
             title={m.name || m.email}
           >
-            {m.image ? (
-              <img src={m.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span aria-hidden>{initials(m.name, m.email)}</span>
-            )}
+            <Avatar name={m.name} email={m.email} image={m.image} size="size-full" />
           </div>
       ))}
       {overflow > 0 && (

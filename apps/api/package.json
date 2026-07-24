@@ -5,14 +5,15 @@
   "scripts": {
     "prebuild": "npm run build -w @work-ledger/db && npm run build -w @work-ledger/contracts",
     "predev": "npm run build -w @work-ledger/db && npm run build -w @work-ledger/contracts",
-    "build": "nest build",
-    "dev": "nest start --watch",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nest build",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nest start --watch",
     "start": "node dist/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",
     "@aws-sdk/s3-request-presigner": "^3.1048.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.12",
     "@nestjs/config": "^4.0.0",
@@ -44,6 +45,7 @@
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.10",
     "@types/web-push": "^3.6.4",
+    "cross-env": "^10.1.0",
     "typescript": "^5.7.3"
   }
 }

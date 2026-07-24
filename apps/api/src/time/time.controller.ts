@@ -1,14 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post } from "@nestjs/common";
-import { z } from "zod";
+import { logTimeEntrySchema } from "@work-ledger/contracts";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { TimeService } from "./time.service";
-
-const logManualSchema = z.object({
-  startedAt: z.string().datetime(),
-  stoppedAt: z.string().datetime(),
-  note: z.string().max(512).optional(),
-});
 
 @Controller()
 export class TimeController {
@@ -30,7 +24,7 @@ export class TimeController {
     @Param("taskId") taskId: string,
     @Body() body: unknown,
   ) {
-    const parsed = logManualSchema.parse(body);
+    const parsed = logTimeEntrySchema.parse(body);
     return this.time.logManual(user.id, taskId, {
       startedAt: new Date(parsed.startedAt),
       stoppedAt: new Date(parsed.stoppedAt),

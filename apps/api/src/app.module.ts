@@ -2,6 +2,7 @@ import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { DbModule } from "./db/db.module";
@@ -20,6 +21,7 @@ import { TimeModule } from "./time/time.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { RoadmapModule } from "./roadmap/roadmap.module";
 import { DiscordModule } from "./discord/discord.module";
+import { McpModule } from "./mcp/mcp.module";
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { DiscordModule } from "./discord/discord.module";
     DbModule,
     AuthorizationModule,
     AuthModule,
+    ApiKeysModule,
     OrganizationsModule,
     DepartmentsModule,
     ListsModule,
@@ -48,6 +51,7 @@ import { DiscordModule } from "./discord/discord.module";
     RealtimeModule,
     RoadmapModule,
     DiscordModule,
+    McpModule,
   ],
   controllers: [HealthController],
 })

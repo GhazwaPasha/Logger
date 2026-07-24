@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPaperPlane, faPen, faTrashCan, faComment } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
+import { Avatar } from "@/components/ui/Avatar";
 import type { MemberRow } from "@/lib/ledger-types";
 
 type CommentRow = {
@@ -30,15 +31,6 @@ function formatRelative(iso: string): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function authorInitials(name: string | null, email: string): string {
-  if (name?.trim()) {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
-    return name.trim().slice(0, 2).toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
 }
 
 function MentionHighlightedBody({ body }: { body: string }) {
@@ -176,9 +168,13 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
                   insertMention(m);
                 }}
               >
-                <span className="size-5 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[10px] font-semibold leading-5 text-[var(--fg)]">
-                  {authorInitials(m.name ?? null, m.email)}
-                </span>
+                <Avatar
+                  name={m.name}
+                  email={m.email}
+                  image={m.image}
+                  size="size-5"
+                  className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                />
                 <span className="truncate">{m.name ?? m.email}</span>
               </button>
             </li>
@@ -261,13 +257,13 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
       <div>
         <div className="group flex items-start gap-3 rounded-xl bg-[var(--surface-elevated)] px-3 py-2">
           {/* Avatar */}
-          <div className="mt-0.5 size-8 shrink-0 rounded-full bg-[var(--accent-muted)] text-center text-[11px] font-semibold leading-8 text-[var(--fg)] overflow-hidden">
-            {comment.authorImage ? (
-              <img src={comment.authorImage} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              authorInitials(comment.authorName, comment.authorEmail)
-            )}
-          </div>
+          <Avatar
+            name={comment.authorName}
+            email={comment.authorEmail}
+            image={comment.authorImage}
+            size="mt-0.5 size-8"
+            className="bg-[var(--accent-muted)] text-[11px] font-semibold text-[var(--fg)]"
+          />
 
           {/* Content */}
           <div className="min-w-0 flex-1">

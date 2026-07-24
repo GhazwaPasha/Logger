@@ -542,6 +542,26 @@ export const discordIntegrations = pgTable(
   (t) => [uniqueIndex("discord_integrations_org_uidx").on(t.organizationId)],
 );
 
+/** Long-lived, revocable credential for machine/agent clients (e.g. the MCP tool API). Raw key is shown once on creation; only its hash is stored. */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** SHA-256 hex digest of the raw key; the raw key itself is never persisted. */
+    keyHash: text("key_hash").notNull().unique(),
+    /** First few characters of the raw key, shown in the UI to help identify a key without revealing it. */
+    keyPrefix: text("key_prefix").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [index("api_keys_user_idx").on(t.userId)],
+);
+
 /** Time entries: manual or timer-based work log per task per user. */
 export const timeEntries = pgTable(
   "time_entries",
@@ -703,6 +723,10 @@ export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one })
   user: one(user, { fields: [pushSubscriptions.userId], references: [user.id] }),
 }));
 
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  user: one(user, { fields: [apiKeys.userId], references: [user.id] }),
+}));
+
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(user, { fields: [notifications.userId], references: [user.id] }),
   organization: one(organizations, { fields: [notifications.organizationId], references: [organizations.id] }),
@@ -820,6 +844,7 @@ export const appSchema = {
   webhookEndpoints,
   webhookDeliveries,
   discordIntegrations,
+  apiKeys,
   goals,
   milestones,
   milestoneTasks,
@@ -843,6 +868,7 @@ export const appSchema = {
   webhookEndpointsRelations,
   webhookDeliveriesRelations,
   discordIntegrationsRelations,
+  apiKeysRelations,
   goalsRelations,
   milestonesRelations,
   milestoneTasksRelations,

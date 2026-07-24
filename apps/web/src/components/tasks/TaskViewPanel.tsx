@@ -31,7 +31,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
-import { memberInitials } from "@/lib/member-utils";
+import { Avatar } from "@/components/ui/Avatar";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
 
 const REPEAT_LABELS: Record<string, string> = {
@@ -259,20 +259,18 @@ export function TaskViewPanel({
             form.assigneeIds.map((id) => {
               const m = members.find((r) => r.userId === id);
               const name = m ? ((m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown") : "Unknown";
-              const initials = m ? memberInitials(m) : "?";
               return (
                 <span
                   key={id}
                   className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
                 >
-                  {m?.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied URL, no next/image remote-pattern config in this app yet
-                    <img src={m.image} alt="" className="size-5 shrink-0 rounded-full object-cover" aria-hidden />
-                  ) : (
-                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]" aria-hidden>
-                      {initials}
-                    </span>
-                  )}
+                  <Avatar
+                    name={m?.name}
+                    email={m?.email}
+                    image={m?.image}
+                    size="size-5"
+                    className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                  />
                   {name}
                   {caps.canEditFields && (
                     <button

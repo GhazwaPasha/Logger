@@ -10,5 +10,6 @@ import { OrganizationsService } from "./organizations.service";
   imports: [DepartmentsModule, ListsModule, RealtimeModule],
   controllers: [OrganizationsController, OrganizationMembersController],
   providers: [OrganizationsService],
+  exports: [OrganizationsService],
 })
 export class OrganizationsModule {}

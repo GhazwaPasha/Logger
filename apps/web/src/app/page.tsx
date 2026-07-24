@@ -324,6 +324,21 @@ export default async function Home() {
                     </li>
                   </ul>
                 </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Legal</p>
+                  <ul className="mt-3 space-y-2 text-sm">
+                    <li>
+                      <Link href="/privacy" className="text-[var(--fg)] underline-offset-4 hover:underline">
+                        Privacy Policy
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/terms" className="text-[var(--fg)] underline-offset-4 hover:underline">
+                        Terms of Service
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
             <p className="mt-8 text-xs text-[var(--muted)]">

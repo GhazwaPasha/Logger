@@ -8,5 +8,6 @@ import { CommentsService } from "./comments.service";
   imports: [NotificationsModule, RealtimeModule],
   controllers: [CommentsController],
   providers: [CommentsService],
+  exports: [CommentsService],
 })
 export class CommentsModule {}

@@ -11,6 +11,7 @@ import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
 import { SelectPopover } from "@/components/ui/SelectPopover";
+import { Avatar } from "@/components/ui/Avatar";
 
 type EditState = {
   role: "owner" | "manager" | "member";
@@ -206,9 +207,13 @@ export default function PeoplePage() {
               >
                 {/* Header: avatar + name/email + role badge */}
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-sm font-semibold uppercase">
-                    {(m.name?.[0] ?? m.email[0] ?? "?").toUpperCase()}
-                  </div>
+                  <Avatar
+                    name={m.name}
+                    email={m.email}
+                    image={m.image}
+                    size="h-10 w-10"
+                    className="bg-[var(--surface-muted)] text-sm font-semibold uppercase"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium leading-snug">{m.name}</p>
                     <p className="truncate text-xs text-[var(--muted)]">{m.email}</p>

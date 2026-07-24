@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = void 0;
+exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -423,6 +423,21 @@ exports.discordIntegrations = (0, pg_core_1.pgTable)("discord_integrations", {
         .defaultNow()
         .$onUpdate(() => new Date()),
 }, (t) => [(0, pg_core_1.uniqueIndex)("discord_integrations_org_uidx").on(t.organizationId)]);
+/** Long-lived, revocable credential for machine/agent clients (e.g. the MCP tool API). Raw key is shown once on creation; only its hash is stored. */
+exports.apiKeys = (0, pg_core_1.pgTable)("api_keys", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    name: (0, pg_core_1.text)("name").notNull(),
+    /** SHA-256 hex digest of the raw key; the raw key itself is never persisted. */
+    keyHash: (0, pg_core_1.text)("key_hash").notNull().unique(),
+    /** First few characters of the raw key, shown in the UI to help identify a key without revealing it. */
+    keyPrefix: (0, pg_core_1.text)("key_prefix").notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: (0, pg_core_1.timestamp)("last_used_at", { withTimezone: true }),
+    revokedAt: (0, pg_core_1.timestamp)("revoked_at", { withTimezone: true }),
+}, (t) => [(0, pg_core_1.index)("api_keys_user_idx").on(t.userId)]);
 /** Time entries: manual or timer-based work log per task per user. */
 exports.timeEntries = (0, pg_core_1.pgTable)("time_entries", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -554,6 +569,9 @@ exports.activityLedgerRelations = (0, drizzle_orm_1.relations)(exports.activityL
 exports.pushSubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.pushSubscriptions, ({ one }) => ({
     user: one(exports.user, { fields: [exports.pushSubscriptions.userId], references: [exports.user.id] }),
 }));
+exports.apiKeysRelations = (0, drizzle_orm_1.relations)(exports.apiKeys, ({ one }) => ({
+    user: one(exports.user, { fields: [exports.apiKeys.userId], references: [exports.user.id] }),
+}));
 exports.notificationsRelations = (0, drizzle_orm_1.relations)(exports.notifications, ({ one }) => ({
     user: one(exports.user, { fields: [exports.notifications.userId], references: [exports.user.id] }),
     organization: one(exports.organizations, { fields: [exports.notifications.organizationId], references: [exports.organizations.id] }),
@@ -656,6 +674,7 @@ exports.appSchema = {
     webhookEndpoints: exports.webhookEndpoints,
     webhookDeliveries: exports.webhookDeliveries,
     discordIntegrations: exports.discordIntegrations,
+    apiKeys: exports.apiKeys,
     goals: exports.goals,
     milestones: exports.milestones,
     milestoneTasks: exports.milestoneTasks,
@@ -679,6 +698,7 @@ exports.appSchema = {
     webhookEndpointsRelations: exports.webhookEndpointsRelations,
     webhookDeliveriesRelations: exports.webhookDeliveriesRelations,
     discordIntegrationsRelations: exports.discordIntegrationsRelations,
+    apiKeysRelations: exports.apiKeysRelations,
     goalsRelations: exports.goalsRelations,
     milestonesRelations: exports.milestonesRelations,
     milestoneTasksRelations: exports.milestoneTasksRelations,

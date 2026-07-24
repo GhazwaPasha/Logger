@@ -12,5 +12,6 @@ import { RoadmapService } from "./roadmap.service";
   imports: [RealtimeModule, DepartmentsModule],
   controllers: [RoadmapController, GoalsController, GoalController, MilestonesController, MilestoneController],
   providers: [RoadmapService, GoalsService, MilestonesService],
+  exports: [RoadmapService, GoalsService, MilestonesService],
 })
 export class RoadmapModule {}

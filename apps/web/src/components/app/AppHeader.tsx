@@ -5,25 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { useOptionalWorkspaceNotifications } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { Avatar } from "@/components/ui/Avatar";
 import { authClient } from "@/lib/auth-client";
 import { HeaderLiveIsland } from "./live-island";
 import { OnlineMembersAvatars } from "./OnlineMembersAvatars";
-
-function userInitials(name: string | null | undefined, email: string | null | undefined) {
-  const n = name?.trim();
-  if (n) {
-    const parts = n.split(/\s+/).filter(Boolean);
-    if (parts.length >= 2) {
-      const a = parts[0]?.[0];
-      const b = parts[parts.length - 1]?.[0];
-      if (a && b) return (a + b).toUpperCase();
-    }
-    return n.slice(0, 2).toUpperCase();
-  }
-  const e = email?.trim();
-  if (e) return e.slice(0, 2).toUpperCase();
-  return "?";
-}
 
 function IconBell({ className }: { className?: string }) {
   return (
@@ -100,7 +85,6 @@ export function AppHeader({
   const brandHref = workspaceSlug ? `/${workspaceSlug}/dashboard` : "/app";
   const settingsHref = workspaceSlug ? `/${workspaceSlug}/settings` : undefined;
   const profileTitle = user?.email ? `Account (${user.email})` : "Account";
-  const initials = user ? userInitials(user.name, user.email) : "?";
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const notifications = useOptionalWorkspaceNotifications();
@@ -192,11 +176,7 @@ export function AppHeader({
                   aria-controls="account-menu"
                   onClick={() => setAccountMenuOpen((o) => !o)}
                 >
-                  {user.image ? (
-                    <img src={user.image} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span aria-hidden>{initials}</span>
-                  )}
+                  <Avatar name={user.name} email={user.email} image={user.image} size="size-full" />
                 </button>
                 <span
                   className="pointer-events-none absolute bottom-0.5 right-0.5 size-2.5 rounded-full bg-green-500 ring-2 ring-[var(--bg-header)]"
