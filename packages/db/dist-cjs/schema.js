@@ -11,6 +11,11 @@ exports.user = (0, pg_core_1.pgTable)("user", {
     email: (0, pg_core_1.text)("email").notNull().unique(),
     emailVerified: (0, pg_core_1.boolean)("email_verified").notNull().default(false),
     image: (0, pg_core_1.text)("image"),
+    /** Cached avatar URL from each linked OAuth provider, refreshed on every sign-in via that provider. */
+    discordImage: (0, pg_core_1.text)("discord_image"),
+    googleImage: (0, pg_core_1.text)("google_image"),
+    /** Which linked provider's avatar to use for `image`. Null = auto (prefers Discord, see auth.ts). */
+    avatarSource: (0, pg_core_1.text)("avatar_source"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
         .notNull()

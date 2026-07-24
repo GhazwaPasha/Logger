@@ -5,6 +5,7 @@ import { nextCookies } from "better-auth/next-js";
 import { jwt } from "better-auth/plugins";
 import { createDbFromPool, normalizeDatabaseUrl } from "@work-ledger/db";
 import { account, jwks, session, user, verification } from "@work-ledger/db/schema";
+import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 
 const connectionString = process.env.DATABASE_URL;
@@ -14,6 +15,39 @@ if (!connectionString) {
 
 const pool = new Pool({ connectionString: normalizeDatabaseUrl(connectionString) });
 export const authDb = createDbFromPool(pool);
+
+/**
+ * Caches this provider's avatar on the user (`discordImage`/`googleImage`) and decides what
+ * `image` (the effective avatar rendered everywhere) should be.
+ *
+ * Linking/signing in with a *second* provider must not silently swap the visible avatar out from
+ * under the user — so the effective image follows `avatarSource` once the user has picked one in
+ * settings, and otherwise defaults to Discord's avatar (falling back to Google's, then whatever
+ * this sign-in just provided for brand-new users with no row yet).
+ */
+async function resolveAvatarFields(email: string, providerId: "discord" | "google", newImage: string | undefined) {
+  if (!newImage) return {};
+  const [existing] = await authDb
+    .select({ discordImage: user.discordImage, googleImage: user.googleImage, avatarSource: user.avatarSource })
+    .from(user)
+    .where(eq(user.email, email.toLowerCase()))
+    .limit(1);
+
+  const discordImage = providerId === "discord" ? newImage : (existing?.discordImage ?? undefined);
+  const googleImage = providerId === "google" ? newImage : (existing?.googleImage ?? undefined);
+
+  const image =
+    existing?.avatarSource === "discord"
+      ? (discordImage ?? newImage)
+      : existing?.avatarSource === "google"
+        ? (googleImage ?? newImage)
+        : (discordImage ?? googleImage ?? newImage);
+
+  return {
+    image,
+    ...(providerId === "discord" ? { discordImage: newImage } : { googleImage: newImage }),
+  };
+}
 
 /** Canonical site URL for Better Auth (must match browser origin on each deployment). */
 function resolveAuthBaseUrl(): string {
@@ -102,14 +136,30 @@ export const auth = betterAuth({
     schema: { user, session, account, verification, jwks },
   }),
   emailAndPassword: { enabled: true },
+  user: {
+    additionalFields: {
+      // Server-only: synced from OAuth profiles by resolveAvatarFields, not client-settable.
+      discordImage: { type: "string", required: false, input: false },
+      googleImage: { type: "string", required: false, input: false },
+      // Client-settable via authClient.updateUser — the user's chosen avatar provider.
+      avatarSource: { type: "string", required: false },
+    },
+  },
   socialProviders: {
     discord: {
       clientId: process.env.DISCORD_LOGIN_CLIENT_ID ?? "",
       clientSecret: process.env.DISCORD_LOGIN_CLIENT_SECRET ?? "",
+      /** Without this, linking a provider to an existing account never backfills its avatar/name. */
+      overrideUserInfoOnSignIn: true,
+      mapProfileToUser: (profile) =>
+        profile.email ? resolveAvatarFields(profile.email, "discord", profile.image_url) : {},
     },
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ?? "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      overrideUserInfoOnSignIn: true,
+      mapProfileToUser: (profile) =>
+        profile.email ? resolveAvatarFields(profile.email, "google", profile.picture) : {},
     },
   },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",

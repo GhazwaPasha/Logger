@@ -1,7 +1,8 @@
 import "@/lib/auth-session-jwt-capture";
 import { sentinelClient } from "@better-auth/infra/client";
 import { createAuthClient } from "better-auth/react";
-import { jwtClient } from "better-auth/client/plugins";
+import { inferAdditionalFields, jwtClient } from "better-auth/client/plugins";
+import type { auth } from "@/lib/auth";
 
 const baseURL =
   typeof window !== "undefined"
@@ -10,5 +11,5 @@ const baseURL =
 
 export const authClient = createAuthClient({
   baseURL,
-  plugins: [jwtClient(), sentinelClient()],
+  plugins: [jwtClient(), sentinelClient(), inferAdditionalFields<typeof auth>()],
 });

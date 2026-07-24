@@ -13,6 +13,9 @@ import type { ThemePref } from "@/hooks/useThemePreference";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
+import { Avatar } from "@/components/ui/Avatar";
+
+const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
 
 type ApiKeyRow = {
   id: string;
@@ -91,6 +94,30 @@ export default function UserSettingsPage() {
     }
   }
 
+  const avatarOptions = (["discord", "google"] as const)
+    .map((source) => ({ source, image: source === "discord" ? user?.discordImage : user?.googleImage }))
+    .filter((o): o is { source: "discord" | "google"; image: string } => Boolean(o.image));
+  const activeAvatarSource =
+    user?.avatarSource === "discord" || user?.avatarSource === "google"
+      ? user.avatarSource
+      : (avatarOptions[0]?.source ?? null);
+  const [avatarSaving, setAvatarSaving] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  async function chooseAvatar(source: "discord" | "google", image: string) {
+    if (avatarSaving || source === activeAvatarSource) return;
+    setAvatarSaving(source);
+    setAvatarError(null);
+    try {
+      const { error } = await authClient.updateUser({ avatarSource: source, image });
+      if (error) throw new Error(error.message ?? "Could not update avatar");
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : "Could not update avatar");
+    } finally {
+      setAvatarSaving(null);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
       <div>
@@ -124,7 +151,63 @@ export default function UserSettingsPage() {
             <ErrorBanner message={nameError} onDismiss={() => setNameError(null)} />
           </div>
         )}
+        {avatarError && (
+          <div className="mt-4">
+            <ErrorBanner message={avatarError} onDismiss={() => setAvatarError(null)} />
+          </div>
+        )}
         <dl className="mt-4 space-y-3 text-sm">
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Avatar</dt>
+            <dd className="mt-1.5">
+              {avatarOptions.length === 0 ? (
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    name={user?.name}
+                    email={user?.email}
+                    image={user?.image}
+                    size="size-12"
+                    className="border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-sm font-semibold text-[var(--fg)]"
+                  />
+                  <p className="text-xs text-[var(--muted)]">
+                    Connect a Discord or Google account to set a profile picture.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {avatarOptions.map((o) => {
+                    const active = o.source === activeAvatarSource;
+                    const busy = avatarSaving === o.source;
+                    return (
+                      <button
+                        key={o.source}
+                        type="button"
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border p-2 text-xs transition-colors ${
+                          active
+                            ? "border-[var(--accent)] bg-[var(--accent-muted)]"
+                            : "border-[var(--border-subtle)] hover:bg-[var(--surface-hover)]"
+                        }`}
+                        disabled={avatarSaving !== null}
+                        aria-pressed={active}
+                        onClick={() => void chooseAvatar(o.source, o.image)}
+                      >
+                        <Avatar
+                          name={user?.name}
+                          email={user?.email}
+                          image={o.image}
+                          size="size-12"
+                          className="border border-[var(--border-subtle)]"
+                        />
+                        <span className="font-medium text-[var(--fg)]">
+                          {busy ? "Saving…" : AVATAR_PROVIDER_LABELS[o.source]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </dd>
+          </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Email</dt>
             <dd className="mt-0.5 font-mono-ledger text-[var(--fg)]">{user?.email ?? "—"}</dd>

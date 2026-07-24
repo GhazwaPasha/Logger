@@ -204,6 +204,13 @@
       "when": 1747440017000,
       "tag": "0028_api_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1747440018000,
+      "tag": "0029_user_avatar_source_fields",
+      "breakpoints": true
     }
   ]
 }

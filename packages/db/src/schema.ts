@@ -20,6 +20,11 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** Cached avatar URL from each linked OAuth provider, refreshed on every sign-in via that provider. */
+  discordImage: text("discord_image"),
+  googleImage: text("google_image"),
+  /** Which linked provider's avatar to use for `image`. Null = auto (prefers Discord, see auth.ts). */
+  avatarSource: text("avatar_source"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
