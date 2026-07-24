@@ -149,8 +149,14 @@ export function LoginForm() {
     setError(null);
     setConnectingProvider(provider);
     try {
-      // Navigates the browser to the provider's authorize screen on success — no local "logged in" state to reach.
-      await authClient.signIn.social({ provider, callbackURL: next });
+      // On success this call itself navigates the browser to the provider's authorize screen —
+      // it does not throw on a failed request, so `error` must be checked explicitly or a bad
+      // provider config just leaves `connectingProvider` stuck forever with no visible failure.
+      const { error: err } = await authClient.signIn.social({ provider, callbackURL: next });
+      if (err) {
+        setConnectingProvider(null);
+        setError(err.message ?? `${PROVIDER_META[provider].label} sign-in failed`);
+      }
     } catch {
       setConnectingProvider(null);
     }
