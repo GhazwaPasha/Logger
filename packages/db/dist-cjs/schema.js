@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = void 0;
+exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -76,6 +76,65 @@ exports.jwks = (0, pg_core_1.pgTable)("jwks", {
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: (0, pg_core_1.timestamp)("expires_at", { withTimezone: true }),
 });
+/** Better Auth `mcp`/`oidc-provider` plugin — an OAuth client registered (usually via dynamic client registration) against our authorization server. */
+exports.oauthApplication = (0, pg_core_1.pgTable)("oauth_application", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    name: (0, pg_core_1.text)("name").notNull(),
+    icon: (0, pg_core_1.text)("icon"),
+    metadata: (0, pg_core_1.text)("metadata"),
+    clientId: (0, pg_core_1.text)("client_id").notNull().unique(),
+    clientSecret: (0, pg_core_1.text)("client_secret"),
+    redirectUrls: (0, pg_core_1.text)("redirect_urls").notNull(),
+    type: (0, pg_core_1.text)("type").notNull(),
+    /** Not part of Better Auth's documented oidc-provider schema, but `registerMcpClient` writes it on every DCR call — omitting this column causes registration to fail. */
+    authenticationScheme: (0, pg_core_1.text)("authentication_scheme"),
+    disabled: (0, pg_core_1.boolean)("disabled").notNull().default(false),
+    userId: (0, pg_core_1.text)("user_id").references(() => exports.user.id, { onDelete: "cascade" }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [(0, pg_core_1.index)("oauth_application_user_id_idx").on(t.userId)]);
+exports.oauthAccessToken = (0, pg_core_1.pgTable)("oauth_access_token", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    accessToken: (0, pg_core_1.text)("access_token").notNull().unique(),
+    refreshToken: (0, pg_core_1.text)("refresh_token").notNull().unique(),
+    accessTokenExpiresAt: (0, pg_core_1.timestamp)("access_token_expires_at", { withTimezone: true }).notNull(),
+    refreshTokenExpiresAt: (0, pg_core_1.timestamp)("refresh_token_expires_at", { withTimezone: true }).notNull(),
+    clientId: (0, pg_core_1.text)("client_id")
+        .notNull()
+        .references(() => exports.oauthApplication.clientId, { onDelete: "cascade" }),
+    userId: (0, pg_core_1.text)("user_id").references(() => exports.user.id, { onDelete: "cascade" }),
+    scopes: (0, pg_core_1.text)("scopes").notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [
+    (0, pg_core_1.index)("oauth_access_token_client_id_idx").on(t.clientId),
+    (0, pg_core_1.index)("oauth_access_token_user_id_idx").on(t.userId),
+]);
+exports.oauthConsent = (0, pg_core_1.pgTable)("oauth_consent", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    clientId: (0, pg_core_1.text)("client_id")
+        .notNull()
+        .references(() => exports.oauthApplication.clientId, { onDelete: "cascade" }),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    scopes: (0, pg_core_1.text)("scopes").notNull(),
+    consentGiven: (0, pg_core_1.boolean)("consent_given").notNull(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [
+    (0, pg_core_1.index)("oauth_consent_client_id_idx").on(t.clientId),
+    (0, pg_core_1.index)("oauth_consent_user_id_idx").on(t.userId),
+]);
 exports.orgRoleEnum = (0, pg_core_1.pgEnum)("org_role", ["owner", "manager", "member"]);
 exports.roadmapStatusEnum = (0, pg_core_1.pgEnum)("roadmap_status", [
     "on_track",
@@ -507,6 +566,25 @@ exports.sessionsRelations = (0, drizzle_orm_1.relations)(exports.session, ({ one
 exports.accountsRelations = (0, drizzle_orm_1.relations)(exports.account, ({ one }) => ({
     user: one(exports.user, { fields: [exports.account.userId], references: [exports.user.id] }),
 }));
+exports.oauthApplicationsRelations = (0, drizzle_orm_1.relations)(exports.oauthApplication, ({ one, many }) => ({
+    user: one(exports.user, { fields: [exports.oauthApplication.userId], references: [exports.user.id] }),
+    accessTokens: many(exports.oauthAccessToken),
+    consents: many(exports.oauthConsent),
+}));
+exports.oauthAccessTokensRelations = (0, drizzle_orm_1.relations)(exports.oauthAccessToken, ({ one }) => ({
+    application: one(exports.oauthApplication, {
+        fields: [exports.oauthAccessToken.clientId],
+        references: [exports.oauthApplication.clientId],
+    }),
+    user: one(exports.user, { fields: [exports.oauthAccessToken.userId], references: [exports.user.id] }),
+}));
+exports.oauthConsentsRelations = (0, drizzle_orm_1.relations)(exports.oauthConsent, ({ one }) => ({
+    application: one(exports.oauthApplication, {
+        fields: [exports.oauthConsent.clientId],
+        references: [exports.oauthApplication.clientId],
+    }),
+    user: one(exports.user, { fields: [exports.oauthConsent.userId], references: [exports.user.id] }),
+}));
 exports.organizationsRelations = (0, drizzle_orm_1.relations)(exports.organizations, ({ many }) => ({
     members: many(exports.organizationMembers),
     departments: many(exports.departments),
@@ -654,9 +732,15 @@ exports.authSchema = {
     account: exports.account,
     verification: exports.verification,
     jwks: exports.jwks,
+    oauthApplication: exports.oauthApplication,
+    oauthAccessToken: exports.oauthAccessToken,
+    oauthConsent: exports.oauthConsent,
     usersRelations: exports.usersRelations,
     sessionsRelations: exports.sessionsRelations,
     accountsRelations: exports.accountsRelations,
+    oauthApplicationsRelations: exports.oauthApplicationsRelations,
+    oauthAccessTokensRelations: exports.oauthAccessTokensRelations,
+    oauthConsentsRelations: exports.oauthConsentsRelations,
 };
 exports.appSchema = {
     organizations: exports.organizations,

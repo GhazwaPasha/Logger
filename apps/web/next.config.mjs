@@ -26,6 +26,17 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // Proxy the MCP endpoint through this app's own origin, so the URL anyone connects an AI
+    // agent to is the product's domain, not the API's separate Render hosting domain.
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+    return [
+      {
+        source: "/mcp",
+        destination: `${apiBase}/mcp`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

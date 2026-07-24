@@ -98,6 +98,80 @@ export const jwks = pgTable("jwks", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
+/** Better Auth `mcp`/`oidc-provider` plugin — an OAuth client registered (usually via dynamic client registration) against our authorization server. */
+export const oauthApplication = pgTable(
+  "oauth_application",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    icon: text("icon"),
+    metadata: text("metadata"),
+    clientId: text("client_id").notNull().unique(),
+    clientSecret: text("client_secret"),
+    redirectUrls: text("redirect_urls").notNull(),
+    type: text("type").notNull(),
+    /** Not part of Better Auth's documented oidc-provider schema, but `registerMcpClient` writes it on every DCR call — omitting this column causes registration to fail. */
+    authenticationScheme: text("authentication_scheme"),
+    disabled: boolean("disabled").notNull().default(false),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("oauth_application_user_id_idx").on(t.userId)],
+);
+
+export const oauthAccessToken = pgTable(
+  "oauth_access_token",
+  {
+    id: text("id").primaryKey(),
+    accessToken: text("access_token").notNull().unique(),
+    refreshToken: text("refresh_token").notNull().unique(),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }).notNull(),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }).notNull(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    scopes: text("scopes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("oauth_access_token_client_id_idx").on(t.clientId),
+    index("oauth_access_token_user_id_idx").on(t.userId),
+  ],
+);
+
+export const oauthConsent = pgTable(
+  "oauth_consent",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthApplication.clientId, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    scopes: text("scopes").notNull(),
+    consentGiven: boolean("consent_given").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("oauth_consent_client_id_idx").on(t.clientId),
+    index("oauth_consent_user_id_idx").on(t.userId),
+  ],
+);
+
 export const orgRoleEnum = pgEnum("org_role", ["owner", "manager", "member"]);
 export const roadmapStatusEnum = pgEnum("roadmap_status", [
   "on_track",
@@ -649,6 +723,28 @@ export const accountsRelations = relations(account, ({ one }) => ({
   user: one(user, { fields: [account.userId], references: [user.id] }),
 }));
 
+export const oauthApplicationsRelations = relations(oauthApplication, ({ one, many }) => ({
+  user: one(user, { fields: [oauthApplication.userId], references: [user.id] }),
+  accessTokens: many(oauthAccessToken),
+  consents: many(oauthConsent),
+}));
+
+export const oauthAccessTokensRelations = relations(oauthAccessToken, ({ one }) => ({
+  application: one(oauthApplication, {
+    fields: [oauthAccessToken.clientId],
+    references: [oauthApplication.clientId],
+  }),
+  user: one(user, { fields: [oauthAccessToken.userId], references: [user.id] }),
+}));
+
+export const oauthConsentsRelations = relations(oauthConsent, ({ one }) => ({
+  application: one(oauthApplication, {
+    fields: [oauthConsent.clientId],
+    references: [oauthApplication.clientId],
+  }),
+  user: one(user, { fields: [oauthConsent.userId], references: [user.id] }),
+}));
+
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   members: many(organizationMembers),
   departments: many(departments),
@@ -823,9 +919,15 @@ export const authSchema = {
   account,
   verification,
   jwks,
+  oauthApplication,
+  oauthAccessToken,
+  oauthConsent,
   usersRelations,
   sessionsRelations,
   accountsRelations,
+  oauthApplicationsRelations,
+  oauthAccessTokensRelations,
+  oauthConsentsRelations,
 };
 
 export const appSchema = {

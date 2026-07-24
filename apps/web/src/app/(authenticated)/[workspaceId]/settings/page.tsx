@@ -64,6 +64,12 @@ export default function UserSettingsPage() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: apiKeysQueryKey }),
   });
 
+  // Same origin as the app itself — /mcp is proxied through to the API (see next.config.mjs
+  // rewrites) so users never see the API's separate hosting domain.
+  const mcpUrl = `${(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}/mcp`;
+  const [copiedMcpUrl, setCopiedMcpUrl] = useState(false);
+  const cliCommand = `claude mcp add --transport http work-ledger ${mcpUrl} --header "Authorization: Bearer <your-key>"`;
+
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
@@ -327,6 +333,62 @@ export default function UserSettingsPage() {
               </button>
             </div>
           ))}
+        </div>
+      </section>
+      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
+        <h2 className="text-sm font-semibold">Connect to Claude</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Let Claude read and update your tasks, time entries, and roadmap directly.
+        </p>
+
+        <div className="mt-4">
+          <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">MCP server URL</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 truncate rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-xs">
+              {mcpUrl}
+            </code>
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(mcpUrl);
+                setCopiedMcpUrl(true);
+                setTimeout(() => setCopiedMcpUrl(false), 2000);
+              }}
+              className="btn-secondary shrink-0 rounded-lg px-3 py-1.5 text-xs"
+            >
+              {copiedMcpUrl ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              Claude Desktop or claude.ai
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-[var(--fg)]">
+              <li>
+                In Claude, open <span className="font-medium">Settings → Connectors</span> (sometimes labeled
+                &ldquo;Custom Connectors&rdquo;).
+              </li>
+              <li>
+                Choose <span className="font-medium">Add custom connector</span> and paste the URL above.
+              </li>
+              <li>
+                Click <span className="font-medium">Connect</span> — you&rsquo;ll be asked to log in and approve
+                access. No API key needed.
+              </li>
+            </ol>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Claude Code (CLI)</p>
+            <p className="mt-2 text-sm text-[var(--fg)]">
+              Create an API key above, then run:
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-xs">
+              {cliCommand}
+            </pre>
+          </div>
         </div>
       </section>
     </div>

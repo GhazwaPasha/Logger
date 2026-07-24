@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ApiKeysModule } from "../api-keys/api-keys.module";
 import { AuthModule } from "../auth/auth.module";
+import { OAuthResourceVerifierModule } from "../auth/oauth-resource-verifier.module";
 import { CommentsModule } from "../comments/comments.module";
 import { DepartmentsModule } from "../departments/departments.module";
 import { RoadmapModule } from "../roadmap/roadmap.module";
@@ -14,6 +15,7 @@ import { McpController } from "./mcp.controller";
   imports: [
     AuthModule,
     ApiKeysModule,
+    OAuthResourceVerifierModule,
     TasksModule,
     TimeModule,
     CommentsModule,

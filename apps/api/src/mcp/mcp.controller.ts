@@ -1,7 +1,7 @@
 import { Controller, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Request, Response } from "express";
-import { ApiKeyAuthGuard } from "../auth/api-key-auth.guard";
+import { McpAuthGuard } from "../auth/mcp-auth.guard";
 import { Public } from "../auth/public.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { CommentsService } from "../comments/comments.service";
@@ -17,7 +17,7 @@ import { createMcpServer } from "./mcp.server";
 
 @Controller("mcp")
 @Public()
-@UseGuards(ApiKeyAuthGuard)
+@UseGuards(McpAuthGuard)
 export class McpController {
   constructor(
     private readonly tasks: TasksService,

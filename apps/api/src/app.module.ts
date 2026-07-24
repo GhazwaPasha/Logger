@@ -22,6 +22,7 @@ import { RealtimeModule } from "./realtime/realtime.module";
 import { RoadmapModule } from "./roadmap/roadmap.module";
 import { DiscordModule } from "./discord/discord.module";
 import { McpModule } from "./mcp/mcp.module";
+import { WellKnownModule } from "./well-known/well-known.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { McpModule } from "./mcp/mcp.module";
     RoadmapModule,
     DiscordModule,
     McpModule,
+    WellKnownModule,
   ],
   controllers: [HealthController],
 })

@@ -3,6 +3,21 @@ import { NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // RFC 8414 requires authorization-server metadata at the origin root, but Better Auth's `mcp`
+  // plugin only serves it under /api/auth. Neither next.config.mjs `rewrites()` nor an `app/`
+  // route file under a dot-prefixed directory are reachable for `.well-known/*` paths — Next.js's
+  // static/dotfile handling intercepts them earlier in the pipeline, and even an in-pipeline
+  // `NextResponse.rewrite()` from middleware still 404s for this specific path (confirmed: the
+  // rewrite header is set correctly but the catch-all route never receives it). A real redirect —
+  // a fresh request the client re-issues — is what actually works; OAuth discovery clients follow
+  // redirects as a matter of course.
+  if (pathname === "/.well-known/oauth-authorization-server") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/auth/.well-known/oauth-authorization-server";
+    return NextResponse.redirect(url, 307);
+  }
+
   if (!pathname.startsWith("/app/orgs")) return NextResponse.next();
 
   const url = request.nextUrl.clone();
@@ -44,5 +59,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/orgs", "/app/orgs/:path*"],
+  matcher: ["/app/orgs", "/app/orgs/:path*", "/.well-known/oauth-authorization-server"],
 };

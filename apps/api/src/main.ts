@@ -18,7 +18,7 @@ async function bootstrap() {
     credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "Accept", "Mcp-Session-Id", "Mcp-Protocol-Version"],
-    exposedHeaders: ["Mcp-Session-Id"],
+    exposedHeaders: ["Mcp-Session-Id", "WWW-Authenticate"],
   });
   const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
   await app.listen(port);

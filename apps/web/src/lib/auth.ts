@@ -2,9 +2,18 @@ import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { jwt } from "better-auth/plugins";
+import { jwt, mcp } from "better-auth/plugins";
 import { createDbFromPool, normalizeDatabaseUrl } from "@work-ledger/db";
-import { account, jwks, session, user, verification } from "@work-ledger/db/schema";
+import {
+  account,
+  jwks,
+  oauthAccessToken,
+  oauthApplication,
+  oauthConsent,
+  session,
+  user,
+  verification,
+} from "@work-ledger/db/schema";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 
@@ -133,7 +142,7 @@ function resolveUseSecureCookies(): boolean {
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
     provider: "pg",
-    schema: { user, session, account, verification, jwks },
+    schema: { user, session, account, verification, jwks, oauthApplication, oauthAccessToken, oauthConsent },
   }),
   emailAndPassword: { enabled: true },
   user: {
@@ -180,6 +189,14 @@ export const auth = betterAuth({
         // causes "Failed to decrypt private key" and 500s on get-session. Storing the key material unencrypted
         // in Postgres (still protected by DB access) avoids deploy/env secret mismatches with Neon.
         disablePrivateKeyEncryption: true,
+      },
+    }),
+    mcp({
+      loginPage: "/login",
+      oidcConfig: {
+        loginPage: "/login",
+        consentPage: "/oauth/consent",
+        requirePKCE: true,
       },
     }),
     nextCookies(),

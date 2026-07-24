@@ -43,6 +43,8 @@ export function safeReturnPath(raw: string | null | undefined, fallback = FALLBA
   if (pathOnly.startsWith("/app/orgs")) return fallback;
   if (pathOnly === "/app" || pathOnly === "/app/") return "/app";
   if (pathOnly.startsWith("/app/workspaces")) return "/app";
+  // OAuth consent screen — needs its query string (consent_code/client_id/scope) preserved through login.
+  if (pathOnly === "/oauth/consent") return path;
   if (isWorkspaceScopedPath(pathOnly)) return path;
 
   return fallback;

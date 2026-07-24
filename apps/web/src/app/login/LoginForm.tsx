@@ -181,7 +181,7 @@ function HubStep({ error, onSelect }: { error: string | null; onSelect: (option:
 function ConnectingStep({ provider }: { provider: OAuthProvider }) {
   const meta = PROVIDER_META[provider];
   return (
-    <div className="auth-combo-enter flex w-full items-center justify-center gap-10 py-6 sm:gap-20">
+    <div className="auth-combo-enter flex w-full flex-col items-center justify-center gap-8 py-6 md:flex-row md:gap-16">
       {/*
         Choreographed sequence, not independent loops: all five elements share the same 3.5s
         keyframe (a single blink in the first 20% of the timeline, then rest) with delays spaced
