@@ -39,7 +39,7 @@ export class ApiKeysService {
         revokedAt: apiKeys.revokedAt,
       })
       .from(apiKeys)
-      .where(eq(apiKeys.userId, userId))
+      .where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)))
       .orderBy(desc(apiKeys.createdAt));
   }
 
