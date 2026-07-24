@@ -15,7 +15,7 @@ function StatTile({
   loading: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3.5">
+    <div className="min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5">
       <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">{label}</p>
       <p
         className={`mt-0.5 text-3xl font-semibold tabular-nums leading-none tracking-tight ${
@@ -58,7 +58,7 @@ export function RoadmapStatsRow({
   if (goals.length === 0 && !loading) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <StatTile label="Goals" value={String(stats.total)} loading={loading} />
       <StatTile label="Active now" value={String(stats.active)} loading={loading} />
       <StatTile label="At risk" value={String(stats.atRisk)} tone={stats.atRisk > 0 ? "warn" : undefined} loading={loading} />

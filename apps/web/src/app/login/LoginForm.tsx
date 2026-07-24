@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Outfit } from "next/font/google";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useId, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { safeReturnPath } from "@/lib/safe-return-path";
@@ -88,6 +90,16 @@ export function LoginForm() {
     }
   }
 
+  async function onDiscordSignIn() {
+    setError(null);
+    activate();
+    try {
+      await authClient.signIn.social({ provider: "discord", callbackURL: next });
+    } catch {
+      deactivate();
+    }
+  }
+
   function flipMode() {
     setMode((m) => (m === "signin" ? "signup" : "signin"));
     setError(null);
@@ -127,7 +139,23 @@ export function LoginForm() {
             ) : null}
           </div>
 
-          <form onSubmit={onSubmit} className="mt-7 space-y-4">
+          <button
+            type="button"
+            onClick={onDiscordSignIn}
+            disabled={loading}
+            className="mt-7 flex h-11 w-full items-center justify-center gap-2.5 rounded-xl border border-[#5865F2]/30 bg-[#5865F2]/[0.08] text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[#5865F2]/[0.14] disabled:opacity-60"
+          >
+            <FontAwesomeIcon icon={faDiscord} className="size-4 text-[#5865F2]" />
+            Continue with Discord
+          </button>
+
+          <div className="mt-5 flex items-center gap-3 text-xs font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+            <span className="h-px flex-1 bg-[var(--border-subtle)]" />
+            or
+            <span className="h-px flex-1 bg-[var(--border-subtle)]" />
+          </div>
+
+          <form onSubmit={onSubmit} className="mt-5 space-y-4">
             {mode === "signup" && (
               <div>
                 <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={nameId}>

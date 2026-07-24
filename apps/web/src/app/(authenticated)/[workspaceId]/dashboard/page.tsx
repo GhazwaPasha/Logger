@@ -9,7 +9,6 @@ import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal"
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
-import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 type DashboardView = "overview" | "activity";
@@ -27,17 +26,15 @@ export default function WorkspaceDashboardPage() {
   }, [workspaceId]);
 
   const base = `/${workspaceSlug}`;
+  const firstName = session?.user?.name?.trim().split(" ")[0] || session?.user?.email || "there";
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-3">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
-            Track workload, deadlines, and ownership across your {NODE_LABELS.workspace.toLowerCase()}. Use{" "}
-            <span className="text-[var(--fg)]">Activity log</span> for the full ledger.
-          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">Hey {firstName}</h1>
+          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">All tracking is live!</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <ExportButton />

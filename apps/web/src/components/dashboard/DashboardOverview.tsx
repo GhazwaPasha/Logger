@@ -281,11 +281,13 @@ export function DashboardOverview({
 
   return (
     <LoadingFrame show={loading} className="rounded-2xl p-0.5" ribbonRadius="2xl" aria-label="Loading dashboard">
-      <div className="space-y-3">
-      <div className="grid grid-cols-1 items-stretch gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14.5rem,19rem)] lg:grid-rows-[auto_auto]">
+      <div className="space-y-2">
+      <RoadmapDashboardPanel basePath={basePath} />
+
+      <div className="grid grid-cols-1 items-stretch gap-x-2.5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(14.5rem,19rem)] lg:grid-rows-[auto_auto]">
         <Link
           href={workHref(basePath, { status: "pending_work" })}
-          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[0].toneClass} rounded-2xl p-3 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-3.5 lg:col-start-1 lg:row-start-1 lg:h-full`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[0].toneClass} rounded-2xl p-2 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-2.5 lg:col-start-1 lg:row-start-1 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[0].waveBack} front={DASHBOARD_KPI_TONES[0].waveFront} />
           <div className="relative z-[1]">
@@ -298,7 +300,7 @@ export function DashboardOverview({
         </Link>
         <Link
           href={workHref(basePath, { status: "active_work" })}
-          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[1].toneClass} rounded-2xl p-3 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-3.5 lg:col-start-2 lg:row-start-1 lg:h-full`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[1].toneClass} rounded-2xl p-2 no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-2.5 lg:col-start-2 lg:row-start-1 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[1].waveBack} front={DASHBOARD_KPI_TONES[1].waveFront} />
           <div className="relative z-[1]">
@@ -310,7 +312,7 @@ export function DashboardOverview({
           </div>
         </Link>
         <div
-          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[2].toneClass} rounded-2xl p-3 sm:p-3.5 lg:col-start-1 lg:row-start-2 lg:h-full`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[2].toneClass} rounded-2xl p-2 sm:p-2.5 lg:col-start-1 lg:row-start-2 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[2].waveBack} front={DASHBOARD_KPI_TONES[2].waveFront} />
           <div className="relative z-[1]">
@@ -322,7 +324,7 @@ export function DashboardOverview({
           </div>
         </div>
         <div
-          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-3 sm:p-3.5 lg:col-start-2 lg:row-start-2 lg:h-full`}
+          className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-2 sm:p-2.5 lg:col-start-2 lg:row-start-2 lg:h-full`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[3].waveBack} front={DASHBOARD_KPI_TONES[3].waveFront} />
           <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
@@ -344,10 +346,10 @@ export function DashboardOverview({
           </div>
         </div>
 
-        <aside className="surface-elevated ui-elevated-panel flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] p-3.5 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:h-full">
+        <aside className="surface-elevated ui-elevated-panel flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5 sm:col-span-2 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:h-full">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
-          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1.5 lg:mt-3 lg:flex-1 lg:flex-col lg:gap-2 lg:pt-1">
+          <div className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-1 lg:mt-2 lg:flex-1 lg:flex-col lg:gap-1.5 lg:pt-1">
             <Link
               href={workHref(basePath, { status: "late" })}
               className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
@@ -379,8 +381,8 @@ export function DashboardOverview({
         </aside>
       </div>
 
-      <div className="grid gap-x-4 gap-y-3 lg:grid-cols-2">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+      <div className="grid gap-x-2.5 gap-y-1.5 lg:grid-cols-2">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
@@ -411,7 +413,7 @@ export function DashboardOverview({
           </ul>
         </div>
 
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
           <div className="mt-2">
@@ -439,7 +441,7 @@ export function DashboardOverview({
       </div>
 
       {stats.subtasksTotal > 0 ? (
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
             Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
@@ -453,10 +455,8 @@ export function DashboardOverview({
         </div>
       ) : null}
 
-      <RoadmapDashboardPanel basePath={basePath} />
-
-      <div className="grid gap-x-4 gap-y-3 lg:grid-cols-2">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+      <div className="grid gap-x-2.5 gap-y-1.5 lg:grid-cols-2">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
@@ -492,7 +492,7 @@ export function DashboardOverview({
           )}
         </div>
 
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
           {stats.topAssignees.length === 0 && !loading ? (

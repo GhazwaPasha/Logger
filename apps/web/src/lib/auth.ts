@@ -102,6 +102,12 @@ export const auth = betterAuth({
     schema: { user, session, account, verification, jwks },
   }),
   emailAndPassword: { enabled: true },
+  socialProviders: {
+    discord: {
+      clientId: process.env.DISCORD_LOGIN_CLIENT_ID ?? "",
+      clientSecret: process.env.DISCORD_LOGIN_CLIENT_SECRET ?? "",
+    },
+  },
   secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
   baseURL: authBaseUrl,
   trustedOrigins: resolveTrustedOrigins,

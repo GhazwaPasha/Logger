@@ -124,7 +124,7 @@ export function AppBootScreen() {
       </div>
 
       <div className="ui-page-enter relative z-[1] mb-[22vh] flex w-full max-w-3xl flex-col items-center gap-5 text-center">
-        <LogBaseMark size={56} decorative />
+        <LogBaseMark size={72} decorative />
         <p className="font-outfit whitespace-nowrap text-[1.5rem] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--fg)] sm:text-5xl" aria-live="polite">
           {BOOT_TEXT.slice(0, charCount)}
           <span className="text-[var(--accent)]" aria-hidden>

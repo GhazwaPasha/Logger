@@ -28,10 +28,10 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
   if (roadmap.milestones.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <RoadmapStatsRow goals={roadmap.goals} milestones={roadmap.milestones} loading={roadmap.isLoading} />
 
-      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-3.5">
+      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Roadmap</h2>

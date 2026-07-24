@@ -17,13 +17,13 @@ type LogBaseMarkProps = {
 
 const VARIANT_PX: Record<LogBaseMarkVariant, number> = {
   /** App shell header (`h-14`): visually matches `text-sm` wordmark + size-9 controls */
-  chrome: 26,
+  chrome: 34,
   /** Marketing nav: pairs with `text-xl` / `text-2xl` without overpowering */
-  marketing: 32,
+  marketing: 44,
   /** Footer column: quieter than nav; still legible at small type sizes */
-  footer: 24,
+  footer: 32,
   /** Auth card: balanced with small caps / headings above the fold */
-  auth: 28,
+  auth: 36,
 };
 
 /**

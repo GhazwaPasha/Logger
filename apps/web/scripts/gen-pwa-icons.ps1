@@ -10,8 +10,8 @@ function Export-SquareIcon {
   param(
     [int]$Size,
     [string]$OutPath,
-    # Logo fill vs canvas. 0.93 = home screen; ~0.55 = Android maskable safe zone.
-    [double]$LogoScale = 0.93,
+    # Logo fill vs canvas. 0.97 = home screen; ~0.62 = Android maskable safe zone.
+    [double]$LogoScale = 0.97,
     # $null = transparent (Windows tiles). Black fill for Android / iOS install icons.
     [System.Drawing.Color]$BackgroundColor = [System.Drawing.Color]::Transparent
   )
@@ -43,7 +43,7 @@ $black = [System.Drawing.Color]::FromArgb(255, 0, 0, 0)
 # Android / Chromium install + notifications (black tile + dark-theme mark)
 Export-SquareIcon -Size 192 -BackgroundColor $black -OutPath (Join-Path $outDir "logbase-app-192.png")
 Export-SquareIcon -Size 512 -BackgroundColor $black -OutPath (Join-Path $outDir "logbase-app-512.png")
-Export-SquareIcon -Size 512 -LogoScale 0.55 -BackgroundColor $black -OutPath (Join-Path $outDir "logbase-app-maskable-512.png")
+Export-SquareIcon -Size 512 -LogoScale 0.62 -BackgroundColor $black -OutPath (Join-Path $outDir "logbase-app-maskable-512.png")
 
 # iOS Add to Home Screen (apple-touch-icon sizes)
 Export-SquareIcon -Size 180 -BackgroundColor $black -OutPath (Join-Path $outDir "logbase-app-180.png")
