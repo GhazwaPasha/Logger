@@ -377,6 +377,7 @@ export class TasksService {
     const statusChanged = parsed.status !== undefined && parsed.status !== oldStatus;
     const priorityChanged = parsed.priority !== undefined && parsed.priority !== oldPriority;
     const titleChanged = parsed.title !== undefined && parsed.title !== task.title;
+    const listChanged = parsed.listId !== undefined && parsed.listId !== task.listId;
     const assigneesChanged = parsed.assigneeUserIds !== undefined;
 
     const oldDueIso = task.dueAt?.toISOString() ?? null;
@@ -408,6 +409,7 @@ export class TasksService {
       statusChanged ||
       priorityChanged ||
       titleChanged ||
+      listChanged ||
       assigneesChanged ||
       dueChanged ||
       repeatChanged ||
@@ -440,11 +442,14 @@ export class TasksService {
       assigneesChanged && JSON.stringify(previousAssigneeSorted) !== JSON.stringify(nextAssigneeSorted);
 
     if (
-      (titleChanged || priorityChanged || assigneesActuallyChanged || dueChanged || repeatChanged ||
+      (titleChanged || priorityChanged || listChanged || assigneesActuallyChanged || dueChanged || repeatChanged ||
         attachmentRequiredChanged || timeTrackingEnabledChanged) &&
       !caps.canEditFields
     ) {
       throw new ForbiddenException("Cannot edit this field");
+    }
+    if (listChanged) {
+      await this.lists.assertListInOrg(orgId, parsed.listId!);
     }
     if ((hasSubtasksCreate || hasSubtasksUpdate || hasSubtasksDelete) && !caps.canEditFields) {
       throw new ForbiddenException("Cannot edit subtasks");
@@ -506,6 +511,7 @@ export class TasksService {
             ...(parsed.status !== undefined ? { status: nextStatus } : {}),
             ...(parsed.priority !== undefined ? { priority: nextPriority } : {}),
             ...(parsed.title !== undefined ? { title: parsed.title } : {}),
+            ...(listChanged ? { listId: parsed.listId } : {}),
             ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
             ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
             ...(discordChannelChanged ? { discordChannelId: parsed.discordChannelId } : {}),
@@ -596,6 +602,19 @@ export class TasksService {
               actorId: userId,
               type: "note",
               payload: { message: "Title updated." },
+            })
+            .returning();
+          ledgerDelta.push(row!);
+        }
+
+        if (listChanged) {
+          const [row] = await tx
+            .insert(activityLedger)
+            .values({
+              taskId,
+              actorId: userId,
+              type: "note",
+              payload: { message: "List updated.", oldListId: task.listId, newListId: parsed.listId },
             })
             .returning();
           ledgerDelta.push(row!);

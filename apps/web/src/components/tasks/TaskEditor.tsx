@@ -27,6 +27,7 @@ import { DiscordSubmissionZone } from "@/components/tasks/DiscordSubmissionZone"
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskFormSyncIndicator } from "@/components/tasks/TaskFormSyncIndicator";
 import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
+import { TaskLevelListField } from "@/components/tasks/TaskLevelListField";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SelectPopover } from "@/components/ui/SelectPopover";
@@ -130,7 +131,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const sessionUserId = session?.user?.id ?? null;
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const queryClient = useQueryClient();
-  const { tasks, lists, members } = useWorkspaceData();
+  const { tasks, lists, members, depts } = useWorkspaceData();
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const [showAssignees, setShowAssignees] = useState(false);
@@ -440,6 +441,20 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   );
                 })()}
               </div>
+            </div>
+
+            <div>
+              <SectionLabel>Level &amp; List</SectionLabel>
+              <TaskLevelListField
+                listId={form.listId}
+                lists={lists}
+                depts={depts}
+                canEdit={caps.canEditFields}
+                onChange={(v) => {
+                  form.setListId(v);
+                  form.scheduleSave();
+                }}
+              />
             </div>
 
             <div>

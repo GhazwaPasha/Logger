@@ -142,6 +142,8 @@ export const patchTaskSchema = z
     status: taskManualStatusInputSchema.optional(),
     priority: taskPrioritySchema.optional(),
     title: z.string().min(1).max(512).optional(),
+    /** Moves the task to a different list (and therefore level/department). */
+    listId: z.string().uuid().optional(),
     assigneeUserIds: z.array(z.string().min(1)).optional(),
     /** Same instant semantics as `POST …/reschedule`: ISO datetime or `null` to clear. Requires reschedule capability when changed. */
     dueAt: z.union([z.string().datetime(), z.null()]).optional(),

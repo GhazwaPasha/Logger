@@ -211,33 +211,6 @@ const LIST_ROW_BADGE_LABEL =
 const TASK_ROW_OVERFLOW_MENU_BTN =
   "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]";
 
-/** List name — outlined ghost pill (shared: task rows, kanban, filter scope). */
-const LIST_BADGE_CLASS =
-  "inline-flex max-w-[min(100%,11rem)] shrink-0 items-center justify-center truncate rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-center text-xs font-medium tabular-nums leading-none text-[var(--fg)]";
-
-/** Level / department — same shell, quieter label color. */
-const LEVEL_BADGE_CLASS =
-  "inline-flex max-w-[min(100%,11rem)] shrink-0 items-center justify-center truncate rounded-md border border-[var(--border)] bg-transparent px-2.5 py-1 text-center text-xs font-medium tabular-nums leading-none text-[var(--muted)]";
-
-/** Create/edit panel: same pills as list row title badges (`ListTaskCard`). */
-function TaskPanelScopeBadges({ level, list }: { level: string | null; list: string | null }) {
-  if (!level && !list) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {level ? (
-        <span className={LEVEL_BADGE_CLASS} title={`${NODE_LABELS.level}: ${level}`}>
-          {level}
-        </span>
-      ) : null}
-      {list ? (
-        <span className={LIST_BADGE_CLASS} title={`List: ${list}`}>
-          {list}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 /** Kanban card meta row: priority tile fills an equal-width cell (matches list-row tile height). */
 const KANBAN_PRIORITY_SHELL_LAYOUT =
   "relative box-border inline-flex h-8 w-full min-h-8 max-h-8 min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-sm border-0 bg-[var(--surface-muted)] px-1 py-0.5 text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]";

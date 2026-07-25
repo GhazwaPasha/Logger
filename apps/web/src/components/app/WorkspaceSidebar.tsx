@@ -186,7 +186,7 @@ export function WorkspaceSidebar({
     pathname === `${base}/work` && boardScope?.levelId == null && boardScope?.listId == null;
 
   const userLabel = session?.user?.name?.trim() || session?.user?.email || "Account";
-  const userSubLabel = session?.user?.email && session.user.name ? session.user.email : null;
+  const orgLabel = selectedOrg?.name ?? "Workspace";
 
   function switchWorkspace(nextId: string) {
     if (nextId === workspaceId) {
@@ -464,8 +464,8 @@ export function WorkspaceSidebar({
             aria-label="Toggle workspace switcher"
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-[var(--fg)]">{userLabel}</p>
-              {userSubLabel && <p className="truncate text-sm text-[var(--muted)]">{userSubLabel}</p>}
+              <p className="truncate text-sm font-bold text-[var(--fg)]">{orgLabel}</p>
+              <p className="truncate text-sm text-[var(--muted)]">{userLabel}</p>
             </div>
             <Chevron open={workspacePickerOpen} />
           </button>
@@ -522,9 +522,7 @@ export function WorkspaceSidebar({
               aria-current={activeAllWorkspaceTasks ? "page" : undefined}
               onClick={() => writeWorkBoardScope(workspaceId, { levelId: null, listId: null })}
             >
-              <span className="truncate text-sm font-bold text-[var(--fg)]">
-                {selectedOrg?.name ?? NODE_LABELS.workspace}
-              </span>
+              <span className="truncate text-sm font-bold text-[var(--fg)]">All Tasks</span>
             </Link>
             <button
               type="button"

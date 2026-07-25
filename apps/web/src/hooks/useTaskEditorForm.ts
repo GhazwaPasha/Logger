@@ -34,6 +34,7 @@ export function useTaskEditorForm(options: {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ManualTaskStatus>("pending");
   const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [listId, setListId] = useState("");
   const [due, setDue] = useState("");
   const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -52,6 +53,7 @@ export function useTaskEditorForm(options: {
         title: titleForPersist(title),
         status,
         priority,
+        listId,
         due,
         dueRepeat,
         assigneeIds: [...assigneeIds].sort(),
@@ -59,7 +61,18 @@ export function useTaskEditorForm(options: {
         attachmentRequired,
         timeTrackingEnabled,
       }),
-    [title, status, priority, due, dueRepeat, assigneeIds, discordChannelId, attachmentRequired, timeTrackingEnabled],
+    [
+      title,
+      status,
+      priority,
+      listId,
+      due,
+      dueRepeat,
+      assigneeIds,
+      discordChannelId,
+      attachmentRequired,
+      timeTrackingEnabled,
+    ],
   );
 
   const { status: syncStatus, error: syncError, hasUnsavedChanges, establishBaseline, flushSave, dueFieldPatch, seedSavedDueAt } =
@@ -73,6 +86,7 @@ export function useTaskEditorForm(options: {
         title: titleForPersist(title),
         status,
         priority,
+        listId,
         assigneeUserIds: assigneeIds,
         dueRepeat,
         discordChannelId,
@@ -91,6 +105,7 @@ export function useTaskEditorForm(options: {
     setDueRepeat(parseTaskDueRepeat(detail.task.dueRepeat));
     setStatus(manualStatusFromStored(normalizeTaskStatus(detail.task.status)));
     setPriority(taskPriority(detail.task));
+    setListId(detail.task.listId);
     setDiscordChannelId(detail.task.discordChannelId ?? null);
     setAttachmentRequiredState(detail.task.attachmentRequired ?? false);
     setTimeTrackingEnabledState(detail.task.timeTrackingEnabled ?? true);
@@ -148,6 +163,8 @@ export function useTaskEditorForm(options: {
     setStatus,
     priority,
     setPriority,
+    listId,
+    setListId,
     due,
     setDue,
     dueRepeat,

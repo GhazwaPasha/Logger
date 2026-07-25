@@ -8,6 +8,7 @@ import {
   listNotificationsQuerySchema,
   listTasksQuerySchema,
   logTimeEntrySchema,
+  patchTaskSchema,
 } from "@work-ledger/contracts";
 import { z } from "zod";
 import { CommentsService } from "../comments/comments.service";
@@ -97,6 +98,19 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
       runTool(async () => capList(await services.departments.list(userId, organizationId), HARD_LIST_CAP)),
   );
 
+  registerTool<{ organizationId: string }>(
+    server,
+    "list_members",
+    {
+      description:
+        "List members of an organization (userId, name, email, role, department) — use this to find the " +
+        "userId needed for task assigneeUserIds or for @[Name](userId) comment mentions.",
+      inputSchema: { organizationId: z.string().uuid() },
+    },
+    async ({ organizationId }) =>
+      runTool(async () => capList(await services.organizations.listMembers(userId, organizationId), HARD_LIST_CAP)),
+  );
+
   registerTool<{ organizationId: string } & z.infer<typeof listTasksQuerySchema>>(
     server,
     "list_tasks",
@@ -146,6 +160,18 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
       inputSchema: { organizationId: z.string().uuid(), ...createTaskSchema.shape },
     },
     async ({ organizationId, ...body }) => runTool(() => services.tasks.create(userId, organizationId, body)),
+  );
+
+  registerTool<{ taskId: string } & z.infer<typeof patchTaskSchema>>(
+    server,
+    "patch_task",
+    {
+      description:
+        "Update fields on an existing task — status, priority, title, due date, assignees, subtasks, etc. " +
+        "Provide at least one field to change besides taskId.",
+      inputSchema: { taskId: z.string().uuid(), ...patchTaskSchema._def.schema.shape },
+    },
+    async ({ taskId, ...body }) => runTool(() => services.tasks.patchTask(userId, taskId, body)),
   );
 
   registerTool<{ taskId: string } & z.infer<typeof logTimeEntrySchema>>(

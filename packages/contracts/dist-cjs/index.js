@@ -124,6 +124,8 @@ exports.patchTaskSchema = zod_1.z
     status: exports.taskManualStatusInputSchema.optional(),
     priority: exports.taskPrioritySchema.optional(),
     title: zod_1.z.string().min(1).max(512).optional(),
+    /** Moves the task to a different list (and therefore level/department). */
+    listId: zod_1.z.string().uuid().optional(),
     assigneeUserIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
     /** Same instant semantics as `POST …/reschedule`: ISO datetime or `null` to clear. Requires reschedule capability when changed. */
     dueAt: zod_1.z.union([zod_1.z.string().datetime(), zod_1.z.null()]).optional(),

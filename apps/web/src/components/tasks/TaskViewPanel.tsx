@@ -16,6 +16,7 @@ import { TimeTracker } from "@/components/tasks/TimeTracker";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
+import { TaskLevelListField } from "@/components/tasks/TaskLevelListField";
 import { StatusPillSelect } from "@/components/tasks/StatusPillSelect";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
@@ -58,7 +59,7 @@ export function TaskViewPanel({
   const router = useRouter();
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
-  const { tasks, lists, members } = useWorkspaceData();
+  const { tasks, lists, members, depts } = useWorkspaceData();
   const { workspaceSlug, workspaceId } = useWorkspaceRoute();
 
   const [showAssignees, setShowAssignees] = useState(false);
@@ -174,6 +175,18 @@ export function TaskViewPanel({
         onDelete={subtaskOps.deleteSubtask}
         getStableKey={subtaskOps.getStableKey}
         pendingSubtaskId={subtaskOps.pendingSubtaskId}
+      />
+
+      {/* Level + List */}
+      <TaskLevelListField
+        listId={form.listId}
+        lists={lists}
+        depts={depts}
+        canEdit={caps.canEditFields}
+        onChange={(v) => {
+          form.setListId(v);
+          form.scheduleSave();
+        }}
       />
 
       {/* Status + Priority */}
