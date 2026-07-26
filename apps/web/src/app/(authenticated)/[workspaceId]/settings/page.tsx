@@ -14,6 +14,8 @@ import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
+import { SettingsCard, SettingsFieldRow } from "@/components/ui/SettingsCard";
+import { faPalette, faUser, faKey, faPlug } from "@fortawesome/free-solid-svg-icons";
 
 const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
 
@@ -125,15 +127,17 @@ export default function UserSettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Your settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Account and appearance for your signed-in user.</p>
       </div>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-        <h2 className="text-sm font-semibold">Appearance</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">Color theme for this browser. System follows your OS light/dark mode.</p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <SettingsCard
+        icon={faPalette}
+        title="Appearance"
+        description="Color theme for this browser. System follows your OS light/dark mode."
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <label className="text-xs font-medium text-[var(--muted)] sm:min-w-[4.5rem]" htmlFor="settings-theme">
             Theme
           </label>
@@ -148,21 +152,19 @@ export default function UserSettingsPage() {
             aria-label="Theme"
           />
         </div>
-      </section>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-        <h2 className="text-sm font-semibold">Profile</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">Information from your login session.</p>
+      </SettingsCard>
+      <SettingsCard icon={faUser} title="Profile" description="Information from your login session.">
         {nameError && (
-          <div className="mt-4">
+          <div className="mb-4">
             <ErrorBanner message={nameError} onDismiss={() => setNameError(null)} />
           </div>
         )}
         {avatarError && (
-          <div className="mt-4">
+          <div className="mb-4">
             <ErrorBanner message={avatarError} onDismiss={() => setAvatarError(null)} />
           </div>
         )}
-        <dl className="mt-4 space-y-3 text-sm">
+        <dl className="space-y-4 text-sm">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Avatar</dt>
             <dd className="mt-1.5">
@@ -218,18 +220,12 @@ export default function UserSettingsPage() {
             <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Email</dt>
             <dd className="mt-0.5 font-mono-ledger text-[var(--fg)]">{user?.email ?? "—"}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]" id="settings-name-label">
-              Name
-            </dt>
-            <dd className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                aria-labelledby="settings-name-label"
-                className="input flex-1 rounded-xl sm:max-w-sm"
-                value={name}
-                disabled={nameSaveBusy}
-                onChange={(e) => setName(e.target.value)}
-              />
+        </dl>
+        <div className="mt-5">
+          <SettingsFieldRow
+            label="Name"
+            htmlFor="settings-name-input"
+            action={
               <button
                 type="button"
                 className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
@@ -240,9 +236,17 @@ export default function UserSettingsPage() {
                 {nameSaveBusy ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
                 <span>{nameSaveBusy ? "Saving" : "Save"}</span>
               </button>
-            </dd>
-          </div>
-        </dl>
+            }
+          >
+            <input
+              id="settings-name-input"
+              className="input rounded-xl"
+              value={name}
+              disabled={nameSaveBusy}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </SettingsFieldRow>
+        </div>
         <p className="mt-6 text-xs text-[var(--muted)]">
           Workspace and organization options live under{" "}
           <Link href={`${base}/organization-settings`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">
@@ -250,14 +254,14 @@ export default function UserSettingsPage() {
           </Link>
           .
         </p>
-      </section>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-        <h2 className="text-sm font-semibold">API keys</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Long-lived credentials for connecting external tools and AI agents (via the MCP endpoint) to your account.
-        </p>
+      </SettingsCard>
+      <SettingsCard
+        icon={faKey}
+        title="API keys"
+        description="Long-lived credentials for connecting external tools and AI agents (via the MCP endpoint) to your account."
+      >
         {createdKey && (
-          <div className="mt-4 rounded-xl border border-amber-400/50 bg-amber-50 p-4 dark:bg-amber-900/20">
+          <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-50 p-4 dark:bg-amber-900/20">
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
               Save this key now — it won't be shown again.
             </p>
@@ -286,26 +290,31 @@ export default function UserSettingsPage() {
             </button>
           </div>
         )}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SettingsFieldRow
+          label="New key"
+          htmlFor="settings-new-key-input"
+          action={
+            <button
+              type="button"
+              className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
+              disabled={createKeyMutation.isPending || !newKeyName.trim()}
+              aria-busy={createKeyMutation.isPending || undefined}
+              onClick={() => createKeyMutation.mutate()}
+            >
+              {createKeyMutation.isPending ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+              <span>{createKeyMutation.isPending ? "Creating" : "Create key"}</span>
+            </button>
+          }
+        >
           <input
-            aria-label="New API key name"
-            className="input flex-1 rounded-xl sm:max-w-sm"
+            id="settings-new-key-input"
+            className="input rounded-xl"
             placeholder="e.g. Claude"
             value={newKeyName}
             disabled={createKeyMutation.isPending}
             onChange={(e) => setNewKeyName(e.target.value)}
           />
-          <button
-            type="button"
-            className="btn-primary inline-flex shrink-0 items-center justify-center gap-2 rounded-xl px-5"
-            disabled={createKeyMutation.isPending || !newKeyName.trim()}
-            aria-busy={createKeyMutation.isPending || undefined}
-            onClick={() => createKeyMutation.mutate()}
-          >
-            {createKeyMutation.isPending ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
-            <span>{createKeyMutation.isPending ? "Creating" : "Create key"}</span>
-          </button>
-        </div>
+        </SettingsFieldRow>
         <div className="mt-5 space-y-2">
           {apiKeysLoading && <p className="text-xs text-[var(--muted)]">Loading…</p>}
           {!apiKeysLoading && apiKeys.length === 0 && (
@@ -314,7 +323,7 @@ export default function UserSettingsPage() {
           {apiKeys.map((k) => (
             <div
               key={k.id}
-              className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2.5"
+              className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-muted)] px-3.5 py-3"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{k.name}</p>
@@ -334,14 +343,13 @@ export default function UserSettingsPage() {
             </div>
           ))}
         </div>
-      </section>
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-        <h2 className="text-sm font-semibold">Connect to Claude</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Let Claude read and update your tasks, time entries, and roadmap directly.
-        </p>
-
-        <div className="mt-4">
+      </SettingsCard>
+      <SettingsCard
+        icon={faPlug}
+        title="Connect to Claude"
+        description="Let Claude read and update your tasks, time entries, and roadmap directly."
+      >
+        <div>
           <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">MCP server URL</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 truncate rounded-lg bg-[var(--surface-muted)] px-3 py-2 font-mono text-xs">
@@ -390,7 +398,7 @@ export default function UserSettingsPage() {
             </pre>
           </div>
         </div>
-      </section>
+      </SettingsCard>
     </div>
   );
 }

@@ -12,6 +12,9 @@ import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/Confir
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
+import { SettingsCard, SettingsFieldRow } from "@/components/ui/SettingsCard";
+import { faBuilding, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { Org } from "@/lib/ledger-types";
 import { discordKeys, orgKeys, workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
@@ -221,7 +224,7 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
+    <div className="mx-auto w-full max-w-3xl space-y-6">
       <ConfirmDialog
         open={orgDeleteDialog != null}
         options={orgDeleteDialog}
@@ -235,7 +238,7 @@ export default function OrganizationSettingsPage() {
       {orgLoading ? (
         <LoadingFrame
           show
-          className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6"
+          className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6 sm:p-7"
           ribbonRadius="2xl"
           aria-label="Loading organization"
         >
@@ -251,42 +254,50 @@ export default function OrganizationSettingsPage() {
       ) : !org ? (
         <p className="text-sm text-[var(--muted)]">Could not load this organization.</p>
       ) : (
-        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-          <h2 className="text-sm font-semibold">Rename organization</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">This updates how the organization appears across your workspace list.</p>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <SettingsCard
+          icon={faBuilding}
+          title="Rename organization"
+          description="This updates how the organization appears across your workspace list."
+        >
+          <SettingsFieldRow
+            label="Name"
+            htmlFor="org-rename-input"
+            action={
+              <button
+                type="button"
+                className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
+                disabled={saveBusy}
+                aria-busy={saveBusy || undefined}
+                onClick={() => void saveWorkspaceName()}
+              >
+                {saveBusy ? (
+                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                ) : null}
+                <span>{saveBusy ? "Saving" : "Save name"}</span>
+              </button>
+            }
+          >
             <input
-              className="input flex-1 rounded-xl"
+              id="org-rename-input"
+              className="input rounded-xl"
               value={rename}
               disabled={saveBusy}
               onChange={(e) => setRename(e.target.value)}
             />
-            <button
-              type="button"
-              className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
-              disabled={saveBusy}
-              aria-busy={saveBusy || undefined}
-              onClick={() => void saveWorkspaceName()}
-            >
-              {saveBusy ? (
-                <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
-              ) : null}
-              <span>{saveBusy ? "Saving" : "Save name"}</span>
-            </button>
-          </div>
-          <p className="mt-3 font-mono-ledger text-xs text-[var(--muted)]">
+          </SettingsFieldRow>
+          <p className="mt-4 font-mono-ledger text-xs text-[var(--muted)]">
             Id <span className="text-[var(--fg)]">{org.id}</span>
           </p>
-        </section>
+        </SettingsCard>
       )}
       {!orgLoading && org && canDeleteOrg ? (
-        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-          <h2 className="text-sm font-semibold">Discord integration</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Invite the bot to your Discord server, then connect it here so task attachments can be posted to a channel picked per task.
-          </p>
+        <SettingsCard
+          icon={faDiscord}
+          title="Discord integration"
+          description="Invite the bot to your Discord server, then connect it here so task attachments can be posted to a channel picked per task."
+        >
           {discordLoading ? (
-            <div className="mt-4 h-10 w-full max-w-md animate-pulse rounded-xl bg-[var(--surface-muted)] motion-reduce:animate-none" />
+            <div className="h-10 w-full max-w-md animate-pulse rounded-xl bg-[var(--surface-muted)] motion-reduce:animate-none" />
           ) : (
             <>
               {discordInviteUrl ? (
@@ -294,7 +305,7 @@ export default function OrganizationSettingsPage() {
                   href={discordInviteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-secondary mt-3 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+                  className="btn-secondary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
                 >
                   Invite bot to your Discord server
                 </a>
@@ -304,18 +315,18 @@ export default function OrganizationSettingsPage() {
                   Connected to server <span className="font-mono-ledger text-[var(--fg)]">{discordConfig.guildId}</span>
                 </p>
               ) : null}
-              <div className="mt-4 flex flex-col gap-3 sm:max-w-md">
-                <label className="text-xs font-medium text-[var(--muted)]">
-                  Server (guild) ID
+              <div className="mt-4">
+                <SettingsFieldRow label="Server (guild) ID" htmlFor="discord-guild-id-input">
                   <input
-                    className="input mt-1.5 w-full rounded-xl"
+                    id="discord-guild-id-input"
+                    className="input rounded-xl"
                     value={discordGuildId}
                     disabled={discordSaveBusy}
                     onChange={(e) => setDiscordGuildId(e.target.value)}
                     placeholder="123456789012345678"
                     autoComplete="off"
                   />
-                </label>
+                </SettingsFieldRow>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <button
@@ -357,35 +368,37 @@ export default function OrganizationSettingsPage() {
               ) : null}
             </>
           )}
-        </section>
+        </SettingsCard>
       ) : null}
       {!orgLoading && org && canDeleteOrg ? (
-        <section className="rounded-2xl border border-red-500/40 bg-red-700 p-6 text-white shadow-md dark:bg-red-900">
-          <h2 className="text-sm font-semibold text-white">Delete organization</h2>
-          <p className="mt-1 text-xs text-white/85">
-            Permanently delete this workspace, all levels, lists, tasks, and members. This cannot be undone.
-          </p>
-          <label className="mt-4 block text-xs font-medium text-white">
-            Type <span className="font-semibold">{org.name}</span> to confirm
-            <input
-              className="mt-1.5 w-full max-w-md rounded-xl border border-white/35 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-white/55 focus:ring-2 focus:ring-white/25"
-              value={deleteConfirm}
-              disabled={deleteBusy}
-              onChange={(e) => setDeleteConfirm(e.target.value)}
-              autoComplete="off"
-              placeholder="Organization name"
-            />
+        <SettingsCard
+          icon={faTriangleExclamation}
+          title="Delete organization"
+          description="Permanently delete this workspace, all levels, lists, tasks, and members. This cannot be undone."
+          tone="danger"
+        >
+          <label className="block text-xs font-medium text-[var(--muted)]" htmlFor="org-delete-confirm-input">
+            Type <span className="font-semibold text-[var(--fg)]">{org.name}</span> to confirm
           </label>
+          <input
+            id="org-delete-confirm-input"
+            className="input mt-1.5 w-full max-w-md rounded-xl focus:!border-red-500 focus-visible:!outline-red-400"
+            value={deleteConfirm}
+            disabled={deleteBusy}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            autoComplete="off"
+            placeholder="Organization name"
+          />
           <button
             type="button"
-            className="mt-4 rounded-xl border-2 border-white/50 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-red-500 px-5 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
             disabled={deleteBusy || deleteConfirm.trim() !== org.name.trim()}
             aria-busy={deleteBusy || undefined}
             onClick={() => openOrgDeleteDialog()}
           >
             {deleteBusy ? "Deleting…" : "Delete organization forever"}
           </button>
-        </section>
+        </SettingsCard>
       ) : null}
     </div>
   );
