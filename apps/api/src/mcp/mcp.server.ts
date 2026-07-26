@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { ListsService } from "../lists/lists.service";
 import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
@@ -27,6 +28,7 @@ export interface McpServices {
   comments: CommentsService;
   organizations: OrganizationsService;
   departments: DepartmentsService;
+  lists: ListsService;
   roadmap: RoadmapService;
   goals: GoalsService;
   milestones: MilestonesService;
@@ -96,6 +98,19 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
     },
     async ({ organizationId }) =>
       runTool(async () => capList(await services.departments.list(userId, organizationId), HARD_LIST_CAP)),
+  );
+
+  registerTool<{ organizationId: string }>(
+    server,
+    "list_lists",
+    {
+      description:
+        "List lists within an organization (id, name, departmentId) — use this to find the listId needed " +
+        "for create_task, or for patch_task's listId to move a task to a different list/level.",
+      inputSchema: { organizationId: z.string().uuid() },
+    },
+    async ({ organizationId }) =>
+      runTool(async () => capList(await services.lists.list(userId, organizationId), HARD_LIST_CAP)),
   );
 
   registerTool<{ organizationId: string }>(

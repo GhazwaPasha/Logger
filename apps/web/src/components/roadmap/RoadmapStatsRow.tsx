@@ -15,7 +15,7 @@ function StatTile({
   loading: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5">
+    <div className="ui-elevated-panel min-w-0 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2.5">
       <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">{label}</p>
       <p
         className={`mt-0.5 text-3xl font-semibold tabular-nums leading-none tracking-tight ${
