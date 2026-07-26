@@ -14,7 +14,7 @@ import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
-import { SettingsCard, SettingsFieldRow } from "@/components/ui/SettingsCard";
+import { SettingsCard, SettingsFieldRow, EditableField } from "@/components/ui/SettingsCard";
 import { faPalette, faUser, faKey, faPlug } from "@fortawesome/free-solid-svg-icons";
 
 const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
@@ -37,6 +37,7 @@ export default function UserSettingsPage() {
   const [nameSynced, setNameSynced] = useState(false);
   const [nameSaveBusy, setNameSaveBusy] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
 
   const queryClient = useQueryClient();
   const apiKeysQueryKey = ["api-keys"];
@@ -95,11 +96,24 @@ export default function UserSettingsPage() {
       const { error } = await authClient.updateUser({ name: trimmed });
       if (error) throw new Error(error.message ?? "Could not update name");
       setName(trimmed);
+      setEditingName(false);
     } catch (e) {
       setNameError(e instanceof Error ? e.message : "Could not update name");
     } finally {
       setNameSaveBusy(false);
     }
+  }
+
+  function startEditName() {
+    setName(user?.name ?? "");
+    setNameError(null);
+    setEditingName(true);
+  }
+
+  function cancelEditName() {
+    setName(user?.name ?? "");
+    setNameError(null);
+    setEditingName(false);
   }
 
   const avatarOptions = (["discord", "google"] as const)
@@ -127,7 +141,7 @@ export default function UserSettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-2">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Your settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Account and appearance for your signed-in user.</p>
@@ -222,9 +236,12 @@ export default function UserSettingsPage() {
           </div>
         </dl>
         <div className="mt-5">
-          <SettingsFieldRow
+          <EditableField
             label="Name"
-            htmlFor="settings-name-input"
+            value={user?.name || "—"}
+            editing={editingName}
+            onEdit={startEditName}
+            onCancel={cancelEditName}
             action={
               <button
                 type="button"
@@ -240,12 +257,14 @@ export default function UserSettingsPage() {
           >
             <input
               id="settings-name-input"
+              aria-label="Name"
               className="input rounded-xl"
               value={name}
               disabled={nameSaveBusy}
               onChange={(e) => setName(e.target.value)}
+              autoFocus
             />
-          </SettingsFieldRow>
+          </EditableField>
         </div>
         <p className="mt-6 text-xs text-[var(--muted)]">
           Workspace and organization options live under{" "}

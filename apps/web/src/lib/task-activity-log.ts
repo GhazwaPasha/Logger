@@ -35,6 +35,11 @@ export function memberDisplayName(members: MemberRow[], userId: string): string 
   return raw || "Unknown";
 }
 
+/** Renders `@[Name](userId)` mention markup down to plain `@Name` for previews/plain-text contexts. */
+export function stripMentionMarkup(text: string): string {
+  return text.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1");
+}
+
 export function isTaskCreatedNote(entry: LedgerRow): boolean {
   if (entry.type !== "note") return false;
   const msg = entry.payload.message;

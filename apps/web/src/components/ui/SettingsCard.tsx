@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { FontAwesomeIcon, type FontAwesomeIconProps } from "@fortawesome/react-fontawesome";
+import { faPen } from "@fortawesome/free-solid-svg-icons";
 
 export function SettingsCard({
   icon,
@@ -71,6 +72,66 @@ export function SettingsFieldRow({
         <div className="min-w-0 flex-1">{children}</div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Read-only value + "Edit" button by default; swaps to an input + Save/Cancel
+ * when `editing` is true. `onEdit`/`onCancel` are omitted (no button shown)
+ * when there's nothing to revert to yet (e.g. a not-yet-saved value).
+ */
+export function EditableField({
+  label,
+  value,
+  editing,
+  onEdit,
+  onCancel,
+  children,
+  action,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  editing: boolean;
+  onEdit?: () => void;
+  onCancel?: () => void;
+  children: ReactNode;
+  action: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+      <span className="text-xs font-medium text-[var(--muted)] sm:w-36 sm:shrink-0">{label}</span>
+      {editing ? (
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">{children}</div>
+          <div className="flex shrink-0 items-center gap-2">
+            {action}
+            {onCancel && (
+              <button
+                type="button"
+                className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <span className="min-w-0 truncate text-sm text-[var(--fg)]">{value}</span>
+          {onEdit && (
+            <button
+              type="button"
+              className="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
+              onClick={onEdit}
+            >
+              <FontAwesomeIcon icon={faPen} className="size-3" aria-hidden />
+              Edit
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

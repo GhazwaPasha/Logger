@@ -58,11 +58,17 @@ function PencilIcon({ className }: { className?: string }) {
   );
 }
 
-function rowBase(active: boolean) {
+function rowBase(active: boolean, compact = false) {
   return [
-    "flex min-w-0 items-center gap-1 rounded-md py-1.5 pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]",
+    `flex min-w-0 items-center gap-1 rounded-md ${compact ? "py-0.5" : "py-1.5"} pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]`,
     active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
   ].join(" ");
+}
+
+const LIST_LAST_SEEN_PREFIX = "wl:list:lastSeen:";
+
+function listLastSeenStorageKey(workspaceId: string, listId: string) {
+  return `${LIST_LAST_SEEN_PREFIX}${workspaceId}:${listId}`;
 }
 
 export function WorkspaceSidebar({
@@ -146,6 +152,49 @@ export function WorkspaceSidebar({
     });
   }, [depts]);
 
+  /** Newest task activity per list — drives the Discord-style unread highlight. */
+  const latestActivityByListId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of tasks) {
+      if (t.deletedAt) continue;
+      const iso = t.lastLedger?.createdAt ?? t.updatedAt ?? t.createdAt;
+      if (!iso) continue;
+      const ts = new Date(iso).getTime();
+      if (Number.isNaN(ts)) continue;
+      if (ts > (m.get(t.listId) ?? 0)) m.set(t.listId, ts);
+    }
+    return m;
+  }, [tasks]);
+
+  const [listLastSeen, setListLastSeen] = useState<Record<string, number>>({});
+
+  /** Hydrate per-list last-seen timestamps from localStorage as lists appear. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setListLastSeen((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const l of lists) {
+        if (next[l.id] != null) continue;
+        const raw = localStorage.getItem(listLastSeenStorageKey(workspaceId, l.id));
+        next[l.id] = raw && !Number.isNaN(Number(raw)) ? Number(raw) : 0;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [lists, workspaceId]);
+
+  const markListSeen = useCallback(
+    (listId: string) => {
+      const ts = Date.now();
+      if (typeof window !== "undefined") {
+        localStorage.setItem(listLastSeenStorageKey(workspaceId, listId), String(ts));
+      }
+      setListLastSeen((prev) => ({ ...prev, [listId]: ts }));
+    },
+    [workspaceId],
+  );
+
   const [boardScopeRev, setBoardScopeRev] = useState(0);
   useEffect(() => {
     const fn = () => setBoardScopeRev((x) => x + 1);
@@ -156,6 +205,16 @@ export function WorkspaceSidebar({
     () => readWorkBoardScope(workspaceId),
     [workspaceId, boardScopeRev],
   );
+
+  /** Keep the currently open list marked as seen while new activity arrives on it. */
+  useEffect(() => {
+    const activeListId = boardScope?.listId;
+    if (!activeListId) return;
+    const latest = latestActivityByListId.get(activeListId) ?? 0;
+    if (latest > (listLastSeen[activeListId] ?? 0)) {
+      markListSeen(activeListId);
+    }
+  }, [boardScope?.listId, latestActivityByListId, listLastSeen, markListSeen]);
 
   useEffect(() => {
     onMobileClose?.();
@@ -513,7 +572,7 @@ export function WorkspaceSidebar({
           </div>
         </div>
 
-        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-2">
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
           <div className="mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
             <Link
               href={`${base}/work`}
@@ -615,7 +674,7 @@ export function WorkspaceSidebar({
                           >
                             <Link
                               href={`${base}/work`}
-                              className="flex min-w-0 flex-1 items-center px-2 py-2 pr-1"
+                              className="flex min-w-0 flex-1 items-center px-2 py-1.5 pr-1"
                               title={`Open ${d.name}`}
                               onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
                             >
@@ -643,7 +702,7 @@ export function WorkspaceSidebar({
                               href={`${base}/work`}
                               tabIndex={-1}
                               aria-hidden
-                              className="shrink-0 px-2 py-2 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
+                              className="shrink-0 px-2 py-1.5 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
                               title={`Open ${d.name}`}
                               onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
                             >
@@ -662,14 +721,24 @@ export function WorkspaceSidebar({
                         </button>
                       </div>
                       {open && (
-                        <ul className="ml-4 border-l border-[var(--border-subtle)] pl-2">
+                        <ul>
                           {levelLists.length === 0 ? (
                             <li className="py-1 pl-1 text-sm text-[var(--muted)]">Empty</li>
                           ) : (
                             levelLists.map((l) => {
                               const listTaskCount = (tasksByList.get(l.id) ?? []).length;
+                              const isActiveList = boardScope?.listId === l.id;
+                              const hasUnread =
+                                !isActiveList &&
+                                (latestActivityByListId.get(l.id) ?? 0) > (listLastSeen[l.id] ?? 0);
                               return (
-                                <li key={l.id}>
+                                <li key={l.id} className="relative">
+                                  {hasUnread && (
+                                    <span
+                                      aria-hidden
+                                      className="absolute -left-2 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-[var(--fg)]"
+                                    />
+                                  )}
                                   <div
                                     className="group/list flex w-full items-center gap-0.5"
                                     onContextMenu={(e) => {
@@ -687,7 +756,7 @@ export function WorkspaceSidebar({
                                   >
                                     {renamingListId === l.id ? (
                                       <div
-                                        className={`${rowBase(boardScope?.listId === l.id)} flex min-w-0 flex-1 items-center gap-2 pl-2 pr-1`}
+                                        className={`${rowBase(boardScope?.listId === l.id, true)} flex min-w-0 flex-1 items-center gap-2 pl-2 pr-1`}
                                       >
                                         <span className="shrink-0 text-[var(--muted)]">#</span>
                                         <input
@@ -717,18 +786,29 @@ export function WorkspaceSidebar({
                                       </div>
                                     ) : (
                                       <div
-                                        className={`${rowBase(boardScope?.listId === l.id)} flex min-w-0 flex-1 items-center pl-2`}
+                                        className={`${rowBase(boardScope?.listId === l.id, true)} flex min-w-0 flex-1 items-center pl-2`}
                                       >
                                         <Link
                                           href={`${base}/work`}
                                           className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-1.5 pr-1"
                                           title={l.name}
-                                          onClick={() =>
-                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
-                                          }
+                                          onClick={() => {
+                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id });
+                                            markListSeen(l.id);
+                                          }}
                                         >
                                           <span className="shrink-0 text-[var(--muted)]">#</span>
-                                          <span className="min-w-0 truncate">{l.name}</span>
+                                          <span
+                                            className={`min-w-0 truncate ${
+                                              hasUnread
+                                                ? "font-bold text-[var(--fg)]"
+                                                : isActiveList
+                                                  ? "font-semibold text-[var(--fg)]"
+                                                  : "font-medium text-[var(--muted)]"
+                                            }`}
+                                          >
+                                            {l.name}
+                                          </span>
                                         </Link>
                                         {canRenameOrgStructure && (
                                           <button
@@ -754,9 +834,10 @@ export function WorkspaceSidebar({
                                           aria-hidden
                                           className="shrink-0 py-1.5 pr-2 pl-1 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
                                           title={l.name}
-                                          onClick={() =>
-                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id })
-                                          }
+                                          onClick={() => {
+                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id });
+                                            markListSeen(l.id);
+                                          }}
                                         >
                                           {listTaskCount}
                                         </Link>

@@ -6,12 +6,16 @@ import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
+import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { Avatar } from "@/components/ui/Avatar";
+import { SettingsCard } from "@/components/ui/SettingsCard";
+import { faUsers, faUserPlus, faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 type EditState = {
   role: "owner" | "manager" | "member";
@@ -41,6 +45,8 @@ export default function PeoplePage() {
   const [editMap, setEditMap] = useState<Map<string, EditState>>(() => new Map());
   // Which member is pending delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -144,8 +150,9 @@ export default function PeoplePage() {
   }
 
   async function deleteMember(userId: string) {
-    if (!token) return;
+    if (!token || removeBusy) return;
     setError(null);
+    setRemoveBusy(true);
     try {
       await apiVoid(`/organizations/${workspaceId}/members/${userId}`, {
         method: "DELETE",
@@ -155,16 +162,19 @@ export default function PeoplePage() {
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not remove member");
+    } finally {
+      setRemoveBusy(false);
     }
   }
 
   async function addMember() {
-    if (!token || !memberEmail.trim()) return;
+    if (!token || !memberEmail.trim() || inviteBusy) return;
     if (memberRole === "manager" && memberDeptIds.size === 0) {
       setError(`Select at least one ${NODE_LABELS.level.toLowerCase()} for managers.`);
       return;
     }
     setError(null);
+    setInviteBusy(true);
     try {
       const body: Record<string, unknown> = { email: memberEmail.trim(), role: memberRole };
       if (memberRole === "manager") body.departmentIds = [...memberDeptIds];
@@ -177,11 +187,13 @@ export default function PeoplePage() {
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add member");
+    } finally {
+      setInviteBusy(false);
     }
   }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-2">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       <div>
@@ -192,8 +204,18 @@ export default function PeoplePage() {
         </p>
       </div>
 
+      <div className="flex items-center gap-2 pt-2">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
+          <FontAwesomeIcon icon={faUsers} className="size-3.5" aria-hidden />
+        </span>
+        <h2 className="text-sm font-semibold">Members</h2>
+        <span className="text-xs text-[var(--muted)]">
+          {members.length} {members.length === 1 ? "person" : "people"} with access
+        </span>
+      </div>
+
       {/* Member cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {members.map((m) => {
             const editing = editMap.get(m.userId);
             const isSelf = m.userId === currentUserId;
@@ -203,7 +225,7 @@ export default function PeoplePage() {
             return (
               <div
                 key={m.userId}
-                className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4 shadow-sm"
+                className="ui-elevated-panel flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4"
               >
                 {/* Header: avatar + name/email + role badge */}
                 <div className="flex items-start gap-3">
@@ -278,15 +300,17 @@ export default function PeoplePage() {
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        className="btn-primary rounded-lg px-3 py-1.5 text-xs"
+                        className="btn-primary inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                         onClick={() => void saveEdit(m)}
                         disabled={editing.saving}
+                        aria-busy={editing.saving || undefined}
                       >
-                        {editing.saving ? "Saving…" : "Save"}
+                        {editing.saving ? <InlineSpinner className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+                        <span>{editing.saving ? "Saving" : "Save"}</span>
                       </button>
                       <button
                         type="button"
-                        className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs hover:bg-[var(--surface-muted)]"
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                         onClick={() => cancelEdit(m.userId)}
                         disabled={editing.saving}
                       >
@@ -298,20 +322,24 @@ export default function PeoplePage() {
 
                 {/* Delete confirmation */}
                 {isConfirmingDelete && !editing && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs dark:border-red-900 dark:bg-red-950/30">
-                    <p className="mb-2 font-medium text-red-700 dark:text-red-400">Remove {m.name} from the workspace?</p>
+                  <div className="rounded-lg border border-red-500/40 bg-red-500/[0.04] p-3 text-xs dark:bg-red-500/[0.06]">
+                    <p className="mb-2 font-medium text-red-700 dark:text-red-300">Remove {m.name} from the workspace?</p>
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        className="rounded-lg bg-red-600 px-3 py-1.5 text-white hover:bg-red-700"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
                         onClick={() => void deleteMember(m.userId)}
+                        disabled={removeBusy}
+                        aria-busy={removeBusy || undefined}
                       >
-                        Remove
+                        {removeBusy ? <InlineSpinner className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+                        <span>{removeBusy ? "Removing" : "Remove"}</span>
                       </button>
                       <button
                         type="button"
-                        className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 hover:bg-[var(--surface-muted)]"
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                         onClick={() => setDeleteConfirm(null)}
+                        disabled={removeBusy}
                       >
                         Cancel
                       </button>
@@ -324,16 +352,18 @@ export default function PeoplePage() {
                   <div className="flex gap-2 border-t border-[var(--border-subtle)] pt-3">
                     <button
                       type="button"
-                      className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs hover:bg-[var(--surface-muted)]"
+                      className="btn-secondary inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                       onClick={() => startEdit(m)}
                     >
+                      <FontAwesomeIcon icon={faPen} className="size-3" aria-hidden />
                       Edit
                     </button>
                     <button
                       type="button"
-                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
                       onClick={() => setDeleteConfirm(m.userId)}
                     >
+                      <FontAwesomeIcon icon={faTrash} className="size-3" aria-hidden />
                       Remove
                     </button>
                   </div>
@@ -343,13 +373,18 @@ export default function PeoplePage() {
           })}
       </div>
 
-      {/* Invite form */}
-      <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-6">
-        <h2 className="text-sm font-semibold">Invite by email</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">They must already have an account. Owners can add or update roles.</p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
+      <SettingsCard
+        icon={faUserPlus}
+        title="Invite by email"
+        description="They must already have an account. Owners can add or update roles."
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="sm:w-64">
+            <label className="mb-1.5 block text-xs text-[var(--muted)]" htmlFor="invite-email-input">
+              Email
+            </label>
             <input
+              id="invite-email-input"
               type="email"
               className="input rounded-xl"
               placeholder="colleague@company.com"
@@ -370,34 +405,41 @@ export default function PeoplePage() {
               aria-label="Role"
             />
           </div>
-          {memberRole === "manager" && (
-            <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-xs text-[var(--muted)]">
-                {NODE_LABELS.level}
-                {` (select one or more)`}
-              </label>
-              <ul className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-[var(--border-subtle)] p-3">
-                {depts.map((d) => (
-                  <li key={d.id}>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="rounded border-[var(--border-subtle)]"
-                        checked={memberDeptIds.has(d.id)}
-                        onChange={() => toggleMemberDept(d.id)}
-                      />
-                      {d.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
-        <button type="button" className="btn-primary mt-4 rounded-xl" onClick={() => void addMember()}>
-          Add or update member
+        {memberRole === "manager" && (
+          <div className="mt-4 sm:max-w-md">
+            <label className="mb-1.5 block text-xs text-[var(--muted)]">
+              {NODE_LABELS.level}
+              {` (select one or more)`}
+            </label>
+            <ul className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-[var(--border-subtle)] p-3">
+              {depts.map((d) => (
+                <li key={d.id}>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="rounded border-[var(--border-subtle)]"
+                      checked={memberDeptIds.has(d.id)}
+                      onChange={() => toggleMemberDept(d.id)}
+                    />
+                    {d.name}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn-primary mt-4 inline-flex min-w-[9rem] items-center justify-center gap-2 rounded-xl px-5"
+          onClick={() => void addMember()}
+          disabled={inviteBusy || !memberEmail.trim()}
+          aria-busy={inviteBusy || undefined}
+        >
+          {inviteBusy ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+          <span>{inviteBusy ? "Adding" : "Invite User"}</span>
         </button>
-      </section>
+      </SettingsCard>
     </div>
   );
 }

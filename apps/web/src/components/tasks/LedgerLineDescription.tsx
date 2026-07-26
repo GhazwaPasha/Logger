@@ -2,7 +2,7 @@
 
 import { Fragment } from "react";
 import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
-import { formatLogTimestamp, memberDisplayName } from "@/lib/task-activity-log";
+import { formatLogTimestamp, memberDisplayName, stripMentionMarkup } from "@/lib/task-activity-log";
 import { normalizeTaskStatus, statusLabelTextClasses, taskStatusDisplayLabel } from "@/lib/task-board";
 
 const USER_LOG_CLASS = "font-medium text-blue-600 dark:text-blue-400";
@@ -240,7 +240,7 @@ export function LedgerLineDescription({ entry, members }: Props) {
         <>
           <UserName>{actor}</UserName> commented
           {typeof preview === "string" && preview.length > 0 && (
-            <span className="text-[var(--muted)]">: "{preview}"</span>
+            <span className="text-[var(--muted)]">: "{stripMentionMarkup(preview)}"</span>
           )}
         </>
       );

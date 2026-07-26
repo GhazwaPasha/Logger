@@ -8,11 +8,12 @@ import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
+import { useDiscordChannels } from "@/hooks/useDiscordChannels";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
-import { SettingsCard, SettingsFieldRow } from "@/components/ui/SettingsCard";
+import { SettingsCard, EditableField } from "@/components/ui/SettingsCard";
 import { faBuilding, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { Org } from "@/lib/ledger-types";
@@ -35,6 +36,7 @@ export default function OrganizationSettingsPage() {
   const [rename, setRename] = useState("");
   const [orgLoading, setOrgLoading] = useState(true);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [editingOrgName, setEditingOrgName] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [orgDeleteDialog, setOrgDeleteDialog] = useState<ConfirmDialogOptions | null>(null);
@@ -45,8 +47,11 @@ export default function OrganizationSettingsPage() {
   const [discordGuildId, setDiscordGuildId] = useState("");
   const [discordSaveBusy, setDiscordSaveBusy] = useState(false);
   const [discordTestBusy, setDiscordTestBusy] = useState(false);
-  const [discordResult, setDiscordResult] = useState<DiscordConnectionResult | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<DiscordConnectionResult | null>(null);
+  const [statusCheckBusy, setStatusCheckBusy] = useState(false);
   const [discordInviteUrl, setDiscordInviteUrl] = useState<string | null>(null);
+  const [editingGuildId, setEditingGuildId] = useState(false);
+  const channelsQuery = useDiscordChannels(discordConfig ? token : null, workspaceId);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -106,39 +111,74 @@ export default function OrganizationSettingsPage() {
     };
   }, [token, workspaceId, canDeleteOrg]);
 
+  // Background live-status check so the card shows the current connection state (server name,
+  // reachability) without requiring a manual "Test connection" click on every page load.
+  useEffect(() => {
+    const guildId = discordConfig?.guildId;
+    if (!token || !guildId) return;
+    setStatusCheckBusy(true);
+    let c = false;
+    void (async () => {
+      try {
+        const result = await apiJson<DiscordConnectionResult>(`/organizations/${workspaceId}/discord-integration/test`, {
+          method: "POST",
+          token,
+        });
+        if (!c) setConnectionStatus(result);
+      } catch {
+        // Best-effort background check — the manual "Test connection" button surfaces real errors.
+      } finally {
+        if (!c) setStatusCheckBusy(false);
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, [token, workspaceId, discordConfig?.guildId]);
+
   async function saveDiscordIntegration() {
     if (!token || !discordGuildId.trim() || discordSaveBusy) return;
     setDiscordSaveBusy(true);
-    setDiscordResult(null);
+    setConnectionStatus(null);
     try {
       const result = await apiJson<DiscordConnectionResult>(`/organizations/${workspaceId}/discord-integration`, {
         method: "PUT",
         token,
         body: JSON.stringify({ guildId: discordGuildId.trim() }),
       });
-      setDiscordResult(result);
+      setConnectionStatus(result);
       const cfg = await apiJson<DiscordIntegrationConfig>(`/organizations/${workspaceId}/discord-integration`, { token });
       setDiscordConfig(cfg);
+      setEditingGuildId(false);
       await queryClient.invalidateQueries({ queryKey: discordKeys.channels(workspaceId) });
     } catch (e) {
-      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Could not save Discord integration" });
+      setConnectionStatus({ ok: false, reason: e instanceof Error ? e.message : "Could not save Discord integration" });
     } finally {
       setDiscordSaveBusy(false);
     }
   }
 
+  function startEditGuildId() {
+    setDiscordGuildId(discordConfig?.guildId ?? "");
+    setEditingGuildId(true);
+  }
+
+  function cancelEditGuildId() {
+    setDiscordGuildId(discordConfig?.guildId ?? "");
+    setEditingGuildId(false);
+  }
+
   async function testDiscordIntegration() {
     if (!token || discordTestBusy) return;
     setDiscordTestBusy(true);
-    setDiscordResult(null);
     try {
       const result = await apiJson<DiscordConnectionResult>(`/organizations/${workspaceId}/discord-integration/test`, {
         method: "POST",
         token,
       });
-      setDiscordResult(result);
+      setConnectionStatus(result);
     } catch (e) {
-      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Connection test failed" });
+      setConnectionStatus({ ok: false, reason: e instanceof Error ? e.message : "Connection test failed" });
     } finally {
       setDiscordTestBusy(false);
     }
@@ -147,14 +187,14 @@ export default function OrganizationSettingsPage() {
   async function disconnectDiscordIntegration() {
     if (!token || discordSaveBusy) return;
     setDiscordSaveBusy(true);
-    setDiscordResult(null);
+    setConnectionStatus(null);
     try {
       await apiVoid(`/organizations/${workspaceId}/discord-integration`, { method: "DELETE", token });
       setDiscordConfig(null);
       setDiscordGuildId("");
       await queryClient.invalidateQueries({ queryKey: discordKeys.channels(workspaceId) });
     } catch (e) {
-      setDiscordResult({ ok: false, reason: e instanceof Error ? e.message : "Could not disconnect Discord" });
+      setConnectionStatus({ ok: false, reason: e instanceof Error ? e.message : "Could not disconnect Discord" });
     } finally {
       setDiscordSaveBusy(false);
     }
@@ -171,6 +211,7 @@ export default function OrganizationSettingsPage() {
         body: JSON.stringify({ name: rename.trim() }),
       });
       setOrg(o);
+      setEditingOrgName(false);
       await reload();
       await reloadWorkspaceList();
     } catch (e) {
@@ -178,6 +219,18 @@ export default function OrganizationSettingsPage() {
     } finally {
       setSaveBusy(false);
     }
+  }
+
+  function startEditOrgName() {
+    setRename(org?.name ?? "");
+    setError(null);
+    setEditingOrgName(true);
+  }
+
+  function cancelEditOrgName() {
+    setRename(org?.name ?? "");
+    setError(null);
+    setEditingOrgName(false);
   }
 
   function openOrgDeleteDialog() {
@@ -224,7 +277,7 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-2">
       <ConfirmDialog
         open={orgDeleteDialog != null}
         options={orgDeleteDialog}
@@ -259,9 +312,12 @@ export default function OrganizationSettingsPage() {
           title="Rename organization"
           description="This updates how the organization appears across your workspace list."
         >
-          <SettingsFieldRow
+          <EditableField
             label="Name"
-            htmlFor="org-rename-input"
+            value={org.name}
+            editing={editingOrgName}
+            onEdit={startEditOrgName}
+            onCancel={cancelEditOrgName}
             action={
               <button
                 type="button"
@@ -279,15 +335,14 @@ export default function OrganizationSettingsPage() {
           >
             <input
               id="org-rename-input"
+              aria-label="Name"
               className="input rounded-xl"
               value={rename}
               disabled={saveBusy}
               onChange={(e) => setRename(e.target.value)}
+              autoFocus
             />
-          </SettingsFieldRow>
-          <p className="mt-4 font-mono-ledger text-xs text-[var(--muted)]">
-            Id <span className="text-[var(--fg)]">{org.id}</span>
-          </p>
+          </EditableField>
         </SettingsCard>
       )}
       {!orgLoading && org && canDeleteOrg ? (
@@ -311,34 +366,86 @@ export default function OrganizationSettingsPage() {
                 </a>
               ) : null}
               {discordConfig ? (
-                <p className="mt-3 text-xs text-[var(--muted)]">
-                  Connected to server <span className="font-mono-ledger text-[var(--fg)]">{discordConfig.guildId}</span>
-                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-[var(--surface-muted)] px-3.5 py-3 text-xs">
+                  <span
+                    className={`inline-flex items-center gap-1.5 font-medium ${
+                      statusCheckBusy
+                        ? "text-[var(--muted)]"
+                        : connectionStatus?.ok
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : connectionStatus && !connectionStatus.ok
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-[var(--muted)]"
+                    }`}
+                  >
+                    <span
+                      className={`size-1.5 shrink-0 rounded-full ${
+                        statusCheckBusy
+                          ? "animate-pulse bg-[var(--muted)]"
+                          : connectionStatus?.ok
+                            ? "bg-emerald-500"
+                            : connectionStatus && !connectionStatus.ok
+                              ? "bg-red-500"
+                              : "bg-[var(--muted)]"
+                      }`}
+                      aria-hidden
+                    />
+                    {statusCheckBusy
+                      ? "Checking connection…"
+                      : connectionStatus?.ok
+                        ? "Connected"
+                        : connectionStatus
+                          ? "Connection issue"
+                          : "Status unknown"}
+                  </span>
+                  {connectionStatus?.ok && <span className="text-[var(--fg)]">{connectionStatus.guildName}</span>}
+                  {connectionStatus && !connectionStatus.ok && (
+                    <span className="text-red-600 dark:text-red-400">{connectionStatus.reason}</span>
+                  )}
+                  <span className="text-[var(--muted)]">
+                    Connected since {new Date(discordConfig.updatedAt).toLocaleDateString()}
+                  </span>
+                  <span className="text-[var(--muted)]">
+                    {channelsQuery.isLoading
+                      ? "Loading channels…"
+                      : `${channelsQuery.data?.length ?? 0} channel${(channelsQuery.data?.length ?? 0) === 1 ? "" : "s"} available`}
+                  </span>
+                </div>
               ) : null}
-              <div className="mt-4">
-                <SettingsFieldRow label="Server (guild) ID" htmlFor="discord-guild-id-input">
+              <div className="mt-3">
+                <EditableField
+                  label="Server (guild) ID"
+                  value={<span className="font-mono-ledger">{discordConfig?.guildId}</span>}
+                  editing={editingGuildId || !discordConfig}
+                  onEdit={discordConfig ? startEditGuildId : undefined}
+                  onCancel={discordConfig ? cancelEditGuildId : undefined}
+                  action={
+                    <button
+                      type="button"
+                      className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
+                      disabled={discordSaveBusy || !discordGuildId.trim()}
+                      aria-busy={discordSaveBusy || undefined}
+                      onClick={() => void saveDiscordIntegration()}
+                    >
+                      {discordSaveBusy ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
+                      <span>{discordSaveBusy ? "Saving" : discordConfig ? "Save" : "Connect"}</span>
+                    </button>
+                  }
+                >
                   <input
                     id="discord-guild-id-input"
+                    aria-label="Server (guild) ID"
                     className="input rounded-xl"
                     value={discordGuildId}
                     disabled={discordSaveBusy}
                     onChange={(e) => setDiscordGuildId(e.target.value)}
                     placeholder="123456789012345678"
                     autoComplete="off"
+                    autoFocus={editingGuildId}
                   />
-                </SettingsFieldRow>
+                </EditableField>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
-                  disabled={discordSaveBusy || !discordGuildId.trim()}
-                  aria-busy={discordSaveBusy || undefined}
-                  onClick={() => void saveDiscordIntegration()}
-                >
-                  {discordSaveBusy ? <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" /> : null}
-                  <span>{discordSaveBusy ? "Saving" : "Save"}</span>
-                </button>
                 {discordConfig ? (
                   <button
                     type="button"
@@ -361,11 +468,6 @@ export default function OrganizationSettingsPage() {
                   </button>
                 ) : null}
               </div>
-              {discordResult ? (
-                <p className={`mt-3 text-xs ${discordResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                  {discordResult.ok ? `Connected as "${discordResult.guildName}"` : discordResult.reason}
-                </p>
-              ) : null}
             </>
           )}
         </SettingsCard>
