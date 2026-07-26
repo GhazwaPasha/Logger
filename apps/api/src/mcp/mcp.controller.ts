@@ -10,7 +10,6 @@ import { ListsService } from "../lists/lists.service";
 import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
-import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
@@ -30,7 +29,6 @@ export class McpController {
     private readonly roadmap: RoadmapService,
     private readonly goals: GoalsService,
     private readonly milestones: MilestonesService,
-    private readonly notifications: NotificationsService,
   ) {}
 
   @Post()
@@ -45,7 +43,6 @@ export class McpController {
       roadmap: this.roadmap,
       goals: this.goals,
       milestones: this.milestones,
-      notifications: this.notifications,
     });
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
-import { activityLedger, taskDependencies, tasks } from "@work-ledger/db";
+import { activityLedger, taskAssignees, taskDependencies, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { PushNotificationsService } from "../push/push-notifications.service";
 import { CollaborationService } from "../realtime/collaboration.service";
 
 @Injectable()
@@ -12,7 +13,32 @@ export class DependenciesService {
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
     private readonly collaboration: CollaborationService,
+    private readonly pushNotifications: PushNotificationsService,
   ) {}
+
+  private async notifyLedger(
+    access: { task: { organizationId: string; title: string; assignerId: string } },
+    userId: string,
+    taskId: string,
+    entry: typeof activityLedger.$inferSelect,
+  ) {
+    const assignees = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    void this.pushNotifications
+      .notifyLedgerActivity({
+        organizationId: access.task.organizationId,
+        actorUserId: userId,
+        taskId,
+        taskTitle: access.task.title,
+        assignerUserId: access.task.assignerId,
+        assigneeUserIds: assignees.map((a) => a.userId),
+        ledgerDelta: [entry],
+      })
+      .catch(() => {});
+  }
 
   private async wouldCreateCycle(taskId: string, dependsOnTaskId: string): Promise<boolean> {
     // Check if dependsOnTaskId is reachable FROM taskId following existing deps
@@ -52,13 +78,17 @@ export class DependenciesService {
       .values({ taskId, dependsOnTaskId })
       .onConflictDoNothing();
 
-    await this.db.insert(activityLedger).values({
-      taskId,
-      actorId: userId,
-      type: "dependency_added",
-      payload: { dependsOnTaskId, dependsOnTaskTitle: blockerAccess.task.title },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId,
+        actorId: userId,
+        type: "dependency_added",
+        payload: { dependsOnTaskId, dependsOnTaskTitle: blockerAccess.task.title },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
   }
 
@@ -77,13 +107,17 @@ export class DependenciesService {
       .delete(taskDependencies)
       .where(and(eq(taskDependencies.taskId, taskId), eq(taskDependencies.dependsOnTaskId, dependsOnTaskId)));
 
-    await this.db.insert(activityLedger).values({
-      taskId,
-      actorId: userId,
-      type: "dependency_removed",
-      payload: { dependsOnTaskId, dependsOnTaskTitle: blockerRow?.title ?? dependsOnTaskId },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId,
+        actorId: userId,
+        type: "dependency_removed",
+        payload: { dependsOnTaskId, dependsOnTaskTitle: blockerRow?.title ?? dependsOnTaskId },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
   }
 

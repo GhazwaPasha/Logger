@@ -300,15 +300,3 @@ export const createApiKeySchema = z.object({
   name: z.string().min(1).max(128),
 });
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
-
-export const markNotificationsReadSchema = z.object({
-  ids: z.array(z.string().uuid()).min(1).max(100),
-});
-export const markAllNotificationsReadSchema = z.object({
-  orgId: z.string().uuid(),
-});
-export const listNotificationsQuerySchema = z.object({
-  orgId: z.string().uuid(),
-  unreadOnly: z.enum(["true", "false"]).optional().transform((v) => v === "true"),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
-});

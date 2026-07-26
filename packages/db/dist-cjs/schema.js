@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.notifications = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.notificationsRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = void 0;
+exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -521,26 +521,6 @@ exports.timeEntries = (0, pg_core_1.pgTable)("time_entries", {
     (0, pg_core_1.index)("time_entries_task_idx").on(t.taskId),
     (0, pg_core_1.index)("time_entries_user_idx").on(t.userId),
 ]);
-/** In-app notification inbox for users. */
-exports.notifications = (0, pg_core_1.pgTable)("notifications", {
-    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
-    userId: (0, pg_core_1.text)("user_id")
-        .notNull()
-        .references(() => exports.user.id, { onDelete: "cascade" }),
-    organizationId: (0, pg_core_1.uuid)("organization_id")
-        .notNull()
-        .references(() => exports.organizations.id, { onDelete: "cascade" }),
-    taskId: (0, pg_core_1.uuid)("task_id").references(() => exports.tasks.id, { onDelete: "cascade" }),
-    type: (0, pg_core_1.text)("type").notNull(), // 'mention' | 'comment' | 'status_change' | 'assignment' | 'dependency_unblocked' | 'webhook_fail'
-    title: (0, pg_core_1.text)("title").notNull(),
-    body: (0, pg_core_1.text)("body").notNull(),
-    href: (0, pg_core_1.text)("href"),
-    readAt: (0, pg_core_1.timestamp)("read_at", { withTimezone: true }),
-    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [
-    (0, pg_core_1.index)("notifications_user_org_idx").on(t.userId, t.organizationId),
-    (0, pg_core_1.index)("notifications_unread_idx").on(t.readAt),
-]);
 /** Browser Web Push subscriptions (FCM/Apple/APNs via browser endpoint). */
 exports.pushSubscriptions = (0, pg_core_1.pgTable)("push_subscriptions", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -655,11 +635,6 @@ exports.pushSubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.pushSu
 exports.apiKeysRelations = (0, drizzle_orm_1.relations)(exports.apiKeys, ({ one }) => ({
     user: one(exports.user, { fields: [exports.apiKeys.userId], references: [exports.user.id] }),
 }));
-exports.notificationsRelations = (0, drizzle_orm_1.relations)(exports.notifications, ({ one }) => ({
-    user: one(exports.user, { fields: [exports.notifications.userId], references: [exports.user.id] }),
-    organization: one(exports.organizations, { fields: [exports.notifications.organizationId], references: [exports.organizations.id] }),
-    task: one(exports.tasks, { fields: [exports.notifications.taskId], references: [exports.tasks.id] }),
-}));
 exports.taskDependenciesRelations = (0, drizzle_orm_1.relations)(exports.taskDependencies, ({ one }) => ({
     task: one(exports.tasks, { fields: [exports.taskDependencies.taskId], references: [exports.tasks.id], relationName: "blockedBy" }),
     dependsOn: one(exports.tasks, { fields: [exports.taskDependencies.dependsOnTaskId], references: [exports.tasks.id], relationName: "blocking" }),
@@ -753,7 +728,6 @@ exports.appSchema = {
     taskAssignees: exports.taskAssignees,
     activityLedger: exports.activityLedger,
     pushSubscriptions: exports.pushSubscriptions,
-    notifications: exports.notifications,
     taskDependencies: exports.taskDependencies,
     attachmentBlobs: exports.attachmentBlobs,
     taskAttachments: exports.taskAttachments,
@@ -777,7 +751,6 @@ exports.appSchema = {
     taskAssigneesRelations: exports.taskAssigneesRelations,
     activityLedgerRelations: exports.activityLedgerRelations,
     pushSubscriptionsRelations: exports.pushSubscriptionsRelations,
-    notificationsRelations: exports.notificationsRelations,
     taskDependenciesRelations: exports.taskDependenciesRelations,
     attachmentBlobsRelations: exports.attachmentBlobsRelations,
     taskAttachmentsRelations: exports.taskAttachmentsRelations,

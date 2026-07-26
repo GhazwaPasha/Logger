@@ -218,6 +218,13 @@
       "when": 1747440019000,
       "tag": "0030_oauth_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1747440020000,
+      "tag": "0031_remove_notifications",
+      "breakpoints": true
     }
   ]
 }

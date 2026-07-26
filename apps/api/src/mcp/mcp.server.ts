@@ -5,7 +5,6 @@ import {
   createGoalSchema,
   createMilestoneSchema,
   createTaskSchema,
-  listNotificationsQuerySchema,
   listTasksQuerySchema,
   logTimeEntrySchema,
   patchTaskSchema,
@@ -17,7 +16,6 @@ import { ListsService } from "../lists/lists.service";
 import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
-import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsService } from "../organizations/organizations.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
@@ -32,7 +30,6 @@ export interface McpServices {
   roadmap: RoadmapService;
   goals: GoalsService;
   milestones: MilestonesService;
-  notifications: NotificationsService;
 }
 
 /** Runs a service call and translates thrown Nest HTTP exceptions into an MCP tool error result instead of a transport-level 500. */
@@ -275,17 +272,6 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
       inputSchema: { organizationId: z.string().uuid(), ...createMilestoneSchema.shape },
     },
     async ({ organizationId, ...body }) => runTool(() => services.milestones.create(userId, organizationId, body)),
-  );
-
-  registerTool<z.infer<typeof listNotificationsQuerySchema>>(
-    server,
-    "list_notifications",
-    {
-      description: "List the current user's notifications for an organization.",
-      inputSchema: listNotificationsQuerySchema.shape,
-    },
-    async ({ orgId, unreadOnly, limit }) =>
-      runTool(() => services.notifications.listForUser(userId, orgId, { unreadOnly, limit })),
   );
 
   return server;

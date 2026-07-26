@@ -1,10 +1,10 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, eq, isNull } from "drizzle-orm";
-import { activityLedger, commentMentions, comments, user } from "@work-ledger/db";
+import { activityLedger, commentMentions, comments, taskAssignees, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
-import { NotificationsService } from "../notifications/notifications.service";
+import { PushNotificationsService } from "../push/push-notifications.service";
 import { CollaborationService } from "../realtime/collaboration.service";
 
 const MENTION_REGEX = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -24,9 +24,33 @@ export class CommentsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
-    private readonly notifications: NotificationsService,
+    private readonly pushNotifications: PushNotificationsService,
     private readonly collaboration: CollaborationService,
   ) {}
+
+  private async notifyLedger(
+    access: { task: { organizationId: string; title: string; assignerId: string } },
+    userId: string,
+    taskId: string,
+    entry: typeof activityLedger.$inferSelect,
+  ) {
+    const assignees = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    void this.pushNotifications
+      .notifyLedgerActivity({
+        organizationId: access.task.organizationId,
+        actorUserId: userId,
+        taskId,
+        taskTitle: access.task.title,
+        assignerUserId: access.task.assignerId,
+        assigneeUserIds: assignees.map((a) => a.userId),
+        ledgerDelta: [entry],
+      })
+      .catch(() => {});
+  }
 
   async listForTask(userId: string, taskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
@@ -77,24 +101,19 @@ export class CommentsService {
         .insert(commentMentions)
         .values({ commentId: comment.id, mentionedUserId: mention.userId })
         .onConflictDoNothing();
-      await this.notifications.create({
-        userId: mention.userId,
-        organizationId: access.task.organizationId,
-        taskId,
-        type: "mention",
-        title: `You were mentioned in a comment`,
-        body: `On task: ${access.task.title}`,
-        href: null,
-      });
     }
 
-    await this.db.insert(activityLedger).values({
-      taskId,
-      actorId: userId,
-      type: "comment_added",
-      payload: { commentId: comment!.id, preview: body.body.slice(0, 80) },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId,
+        actorId: userId,
+        type: "comment_added",
+        payload: { commentId: comment!.id, preview: body.body.slice(0, 80) },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return comment;
   }
@@ -112,12 +131,17 @@ export class CommentsService {
       .returning();
 
     const access = await this.authz.getTaskAccess(userId, comment.taskId);
-    await this.db.insert(activityLedger).values({
-      taskId: comment.taskId,
-      actorId: userId,
-      type: "comment_edited",
-      payload: { commentId },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId: comment.taskId,
+        actorId: userId,
+        type: "comment_edited",
+        payload: { commentId },
+      })
+      .returning();
+
+    await this.notifyLedger(access, userId, comment.taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, comment.taskId);
     return updated;
   }
@@ -136,13 +160,17 @@ export class CommentsService {
       .set({ deletedAt: new Date() })
       .where(and(eq(comments.id, commentId), isNull(comments.deletedAt)));
 
-    await this.db.insert(activityLedger).values({
-      taskId: comment.taskId,
-      actorId: userId,
-      type: "comment_deleted",
-      payload: { commentId },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId: comment.taskId,
+        actorId: userId,
+        type: "comment_deleted",
+        payload: { commentId },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, comment.taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, comment.taskId);
   }
 }

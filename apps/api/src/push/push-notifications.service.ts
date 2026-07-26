@@ -2,9 +2,10 @@ import { BadRequestException, Inject, Injectable, Logger, OnModuleInit } from "@
 import { ConfigService } from "@nestjs/config";
 import { and, eq, inArray } from "drizzle-orm";
 import webpush from "web-push";
-import { activityLedger, organizations, pushSubscriptions } from "@work-ledger/db";
+import { activityLedger, organizations, pushSubscriptions, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
+import { ledgerEntryUserIds, summarizeLedgerEntries, truncate } from "./ledger-copy";
 
 type LedgerInsertRow = typeof activityLedger.$inferSelect;
 
@@ -117,8 +118,16 @@ export class PushNotificationsService implements OnModuleInit {
     // Path-only so notificationclick opens on the subscriber's origin (prod, preview, custom domain).
     const url = `/${slug}/work?task=${encodeURIComponent(opts.taskId)}`;
 
-    const summary = summarizeLedgerDelta(opts.ledgerDelta);
-    const title = "LogBase";
+    const nameIds = new Set<string>([opts.actorUserId]);
+    for (const row of opts.ledgerDelta) for (const id of ledgerEntryUserIds(row)) nameIds.add(id);
+    const nameRows = await this.db
+      .select({ id: user.id, name: user.name })
+      .from(user)
+      .where(inArray(user.id, [...nameIds]));
+    const names = new Map(nameRows.map((r) => [r.id, r.name]));
+
+    const summary = summarizeLedgerEntries(opts.ledgerDelta, names);
+    const title = names.get(opts.actorUserId) ?? "Someone";
     const body = `${truncate(opts.taskTitle, 80)} · ${summary}`;
     const payload = JSON.stringify({ title, body, url });
 
@@ -143,36 +152,5 @@ export class PushNotificationsService implements OnModuleInit {
         }
       }),
     );
-  }
-}
-
-function truncate(s: string, max: number): string {
-  const t = s.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
-}
-
-function summarizeLedgerDelta(rows: LedgerInsertRow[]): string {
-  const skipCreationNote = rows.filter(
-    (r) => !(r.type === "note" && r.payload && (r.payload as { message?: string }).message === "Task created."),
-  );
-  const row = skipCreationNote[skipCreationNote.length - 1] ?? rows[rows.length - 1];
-  if (!row) return "Updated";
-
-  switch (row.type) {
-    case "assignee_change":
-      return "Assignment updated";
-    case "status_change":
-      return "Status changed";
-    case "reschedule":
-      return "Due date changed";
-    case "archive":
-      return "Task archived";
-    case "ack":
-      return "Assignment acknowledged";
-    case "note":
-      return "New note";
-    default:
-      return "Task updated";
   }
 }

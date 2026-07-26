@@ -665,31 +665,6 @@ export const timeEntries = pgTable(
   ],
 );
 
-/** In-app notification inbox for users. */
-export const notifications = pgTable(
-  "notifications",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
-    type: text("type").notNull(), // 'mention' | 'comment' | 'status_change' | 'assignment' | 'dependency_unblocked' | 'webhook_fail'
-    title: text("title").notNull(),
-    body: text("body").notNull(),
-    href: text("href"),
-    readAt: timestamp("read_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [
-    index("notifications_user_org_idx").on(t.userId, t.organizationId),
-    index("notifications_unread_idx").on(t.readAt),
-  ],
-);
-
 /** Browser Web Push subscriptions (FCM/Apple/APNs via browser endpoint). */
 export const pushSubscriptions = pgTable(
   "push_subscriptions",
@@ -828,12 +803,6 @@ export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
   user: one(user, { fields: [apiKeys.userId], references: [user.id] }),
 }));
 
-export const notificationsRelations = relations(notifications, ({ one }) => ({
-  user: one(user, { fields: [notifications.userId], references: [user.id] }),
-  organization: one(organizations, { fields: [notifications.organizationId], references: [organizations.id] }),
-  task: one(tasks, { fields: [notifications.taskId], references: [tasks.id] }),
-}));
-
 export const taskDependenciesRelations = relations(taskDependencies, ({ one }) => ({
   task: one(tasks, { fields: [taskDependencies.taskId], references: [tasks.id], relationName: "blockedBy" }),
   dependsOn: one(tasks, { fields: [taskDependencies.dependsOnTaskId], references: [tasks.id], relationName: "blocking" }),
@@ -941,7 +910,6 @@ export const appSchema = {
   taskAssignees,
   activityLedger,
   pushSubscriptions,
-  notifications,
   taskDependencies,
   attachmentBlobs,
   taskAttachments,
@@ -965,7 +933,6 @@ export const appSchema = {
   taskAssigneesRelations,
   activityLedgerRelations,
   pushSubscriptionsRelations,
-  notificationsRelations,
   taskDependenciesRelations,
   attachmentBlobsRelations,
   taskAttachmentsRelations,

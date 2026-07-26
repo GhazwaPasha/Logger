@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
-import { NotificationsModule } from "../notifications/notifications.module";
+import { PushModule } from "../push/push.module";
 import { RealtimeModule } from "../realtime/realtime.module";
 import { CommentsController } from "./comments.controller";
 import { CommentsService } from "./comments.service";
 
 @Module({
-  imports: [NotificationsModule, RealtimeModule],
+  imports: [PushModule, RealtimeModule],
   controllers: [CommentsController],
   providers: [CommentsService],
   exports: [CommentsService],

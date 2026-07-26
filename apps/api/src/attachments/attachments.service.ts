@@ -3,10 +3,11 @@ import { count, eq } from "drizzle-orm";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
-import { activityLedger, attachmentBlobs, taskAttachments } from "@work-ledger/db";
+import { activityLedger, attachmentBlobs, taskAssignees, taskAttachments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { PushNotificationsService } from "../push/push-notifications.service";
 import { CollaborationService } from "../realtime/collaboration.service";
 import {
   acquireLegacyBlob,
@@ -70,7 +71,32 @@ export class AttachmentsService {
     private readonly authz: AuthorizationService,
     private readonly collaboration: CollaborationService,
     private readonly discordNotify: DiscordNotifyService,
+    private readonly pushNotifications: PushNotificationsService,
   ) {}
+
+  private async notifyLedger(
+    access: { task: { organizationId: string; title: string; assignerId: string } },
+    userId: string,
+    taskId: string,
+    entry: typeof activityLedger.$inferSelect,
+  ) {
+    const assignees = await this.db
+      .select({ userId: taskAssignees.userId })
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    void this.pushNotifications
+      .notifyLedgerActivity({
+        organizationId: access.task.organizationId,
+        actorUserId: userId,
+        taskId,
+        taskTitle: access.task.title,
+        assignerUserId: access.task.assignerId,
+        assigneeUserIds: assignees.map((a) => a.userId),
+        ledgerDelta: [entry],
+      })
+      .catch(() => {});
+  }
 
   isR2Configured(): boolean {
     return Boolean(this.s3 && this.bucket);
@@ -127,13 +153,17 @@ export class AttachmentsService {
       })
       .returning();
 
-    await this.db.insert(activityLedger).values({
-      taskId,
-      actorId: userId,
-      type: "attachment_added",
-      payload: { fileName: opts.fileName, mimeType: opts.mimeType },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId,
+        actorId: userId,
+        type: "attachment_added",
+        payload: { fileName: opts.fileName, mimeType: opts.mimeType },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return row;
   }
@@ -291,13 +321,17 @@ export class AttachmentsService {
     const s3 = this.assertR2();
     await releaseBlobRef(this.db, s3, this.bucket, attachment.blobId);
 
-    await this.db.insert(activityLedger).values({
-      taskId: attachment.taskId,
-      actorId: userId,
-      type: "attachment_deleted",
-      payload: { fileName: attachment.fileName },
-    });
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId: attachment.taskId,
+        actorId: userId,
+        type: "attachment_deleted",
+        payload: { fileName: attachment.fileName },
+      })
+      .returning();
 
+    await this.notifyLedger(access, userId, attachment.taskId, entry!);
     this.collaboration.notifyOrgChanged(access.task.organizationId, attachment.taskId);
   }
 

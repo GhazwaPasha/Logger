@@ -44,14 +44,4 @@ export class CollaborationService {
       /* ignore realtime failures */
     }
   }
-
-  /** Push a real-time event to a specific user's personal room — never throws. */
-  notifyUser(userId: string, payload: Record<string, unknown>): void {
-    try {
-      if (!this.server) return;
-      this.server.to(userSocketRoom(userId)).emit(payload["event"] as string, payload);
-    } catch {
-      /* ignore realtime failures */
-    }
-  }
 }

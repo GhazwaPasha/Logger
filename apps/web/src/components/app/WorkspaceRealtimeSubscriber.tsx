@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
-import { notificationKeys, roadmapKeys, workspaceKeys } from "@/lib/query-keys";
+import { roadmapKeys, workspaceKeys } from "@/lib/query-keys";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
@@ -97,15 +97,9 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
       }
     };
 
-    const onNotificationNew = () => {
-      void queryClient.invalidateQueries({ queryKey: notificationKeys.list(workspaceId) });
-      void queryClient.invalidateQueries({ queryKey: notificationKeys.count(workspaceId) });
-    };
-
     socket.on("workspace_changed", onWorkspaceChanged);
     socket.on("presence_sync", onPresenceSync);
     socket.on("presence_update", onPresenceUpdate);
-    socket.on("notification_new", onNotificationNew);
     socket.on("collaboration_auth_error", onAuthError);
     socket.on("connect_error", onConnectError);
 
@@ -133,7 +127,6 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
       socket.off("workspace_changed", onWorkspaceChanged);
       socket.off("presence_sync", onPresenceSync);
       socket.off("presence_update", onPresenceUpdate);
-      socket.off("notification_new", onNotificationNew);
       socket.off("collaboration_auth_error", onAuthError);
       socket.off("connect_error", onConnectError);
       socket.disconnect();

@@ -13,7 +13,6 @@ import { TasksModule } from "./tasks/tasks.module";
 import { HealthController } from "./health.controller";
 import { AttachmentsModule } from "./attachments/attachments.module";
 import { CommentsModule } from "./comments/comments.module";
-import { NotificationsModule } from "./notifications/notifications.module";
 import { ReportsModule } from "./reports/reports.module";
 import { SearchModule } from "./search/search.module";
 import { DependenciesModule } from "./dependencies/dependencies.module";
@@ -44,7 +43,6 @@ import { WellKnownModule } from "./well-known/well-known.module";
     TasksModule,
     AttachmentsModule,
     CommentsModule,
-    NotificationsModule,
     SearchModule,
     ReportsModule,
     DependenciesModule,

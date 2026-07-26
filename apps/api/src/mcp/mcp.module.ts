@@ -6,7 +6,6 @@ import { CommentsModule } from "../comments/comments.module";
 import { DepartmentsModule } from "../departments/departments.module";
 import { ListsModule } from "../lists/lists.module";
 import { RoadmapModule } from "../roadmap/roadmap.module";
-import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { TimeModule } from "../time/time.module";
@@ -24,7 +23,6 @@ import { McpController } from "./mcp.controller";
     DepartmentsModule,
     ListsModule,
     RoadmapModule,
-    NotificationsModule,
   ],
   controllers: [McpController],
 })
