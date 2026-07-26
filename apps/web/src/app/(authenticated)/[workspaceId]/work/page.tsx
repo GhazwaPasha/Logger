@@ -349,7 +349,7 @@ function WorkItemsInner() {
   );
   const [taskActionConfirm, setTaskActionConfirm] = useState<ConfirmDialogOptions | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [listRowExpanded, setListRowExpanded] = useState<Set<string>>(() => new Set());
+  const [listRowCollapsed, setListRowCollapsed] = useState<Set<string>>(() => new Set());
   const [subtasksByTaskId, setSubtasksByTaskId] = useState<Record<string, SubtaskRow[] | "loading">>({});
   const subtasksByTaskIdRef = useRef(subtasksByTaskId);
   subtasksByTaskIdRef.current = subtasksByTaskId;
@@ -840,7 +840,7 @@ function WorkItemsInner() {
     const task = tasks.find((t) => t.id === taskId);
     const embedded = task?.subtasks ?? [];
 
-    setListRowExpanded((prev) => {
+    setListRowCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(taskId)) {
         next.delete(taskId);
@@ -1043,7 +1043,7 @@ function WorkItemsInner() {
     const checklistDone = flowCol === "done";
     const checklistDisabled = flowCol === "cancelled";
     const advanceTo = nextWorkflowManualStatus(storedStatus);
-    const expanded = listRowExpanded.has(task.id);
+    const expanded = !listRowCollapsed.has(task.id);
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
