@@ -21,6 +21,10 @@ function MilestoneCard({
     <button
       type="button"
       onClick={() => onOpen(milestone)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onOpen(milestone);
+      }}
       className="w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3.5 text-left shadow-sm transition-[border-color,transform,box-shadow] duration-150 hover:-translate-y-px hover:border-[var(--border)] hover:shadow-md"
     >
       <div className="flex items-center gap-1.5">

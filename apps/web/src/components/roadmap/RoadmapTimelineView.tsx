@@ -208,6 +208,10 @@ function GoalTimelineCard({
             type="button"
             className="min-w-0 truncate text-left text-xs font-semibold uppercase tracking-wide text-[var(--fg)] hover:underline"
             onClick={() => onEditGoal(goal)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onEditGoal(goal);
+            }}
           >
             {goal.title}
           </button>
@@ -324,6 +328,10 @@ function GoalTimelineCard({
                               e.preventDefault();
                               onEditMilestone(milestone);
                             }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            onEditMilestone(milestone);
                           }}
                           title={`${goal.title} › ${milestone.title} — ${formatRange(milestone.periodStart, milestone.periodEnd)} — ${milestone.progress.pct}% done`}
                           aria-label={`Edit ${milestone.title}, ${formatRange(milestone.periodStart, milestone.periodEnd)}, ${milestone.progress.pct}% done`}

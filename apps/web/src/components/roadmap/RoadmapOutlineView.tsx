@@ -33,6 +33,10 @@ function MilestoneRowItem({
       <div
         className="group flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--surface-hover)]"
         style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onOpen(milestone);
+        }}
       >
         <button
           type="button"
@@ -133,7 +137,13 @@ function GoalSection({
 
   return (
     <div className="surface-elevated ui-elevated-panel overflow-hidden rounded-2xl border border-[var(--border-subtle)]">
-      <div className="group flex items-center gap-2.5 px-4 py-3">
+      <div
+        className="group flex items-center gap-2.5 px-4 py-3"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onOpenGoal(goal);
+        }}
+      >
         <button
           type="button"
           className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)]"

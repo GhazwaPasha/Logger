@@ -333,7 +333,14 @@ export function RoadmapGrandView({
                       ? Math.max(0, Math.min(100, ((new Date(firstMilestone.periodStart).getTime() - axisStart) / axisSpan) * 100))
                       : 0;
                     return (
-                      <div key={`goal-${row.goal.id}`} className="flex items-center gap-2">
+                      <div
+                        key={`goal-${row.goal.id}`}
+                        className="flex items-center gap-2"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          onEditGoal(row.goal);
+                        }}
+                      >
                         <div className="relative h-8 flex-1 rounded-md bg-[var(--surface-muted)]">
                           <button
                             type="button"
@@ -399,6 +406,10 @@ export function RoadmapGrandView({
                               e.preventDefault();
                               onEditMilestone(milestone);
                             }
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            onEditMilestone(milestone);
                           }}
                           title={`${goal.title} › ${milestone.title} — ${formatRange(milestone.periodStart, milestone.periodEnd)} — ${milestone.progress.pct}% done`}
                           aria-label={`Edit ${milestone.title}, ${formatRange(milestone.periodStart, milestone.periodEnd)}, ${milestone.progress.pct}% done`}
