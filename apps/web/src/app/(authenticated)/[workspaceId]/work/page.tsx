@@ -1303,11 +1303,16 @@ function WorkItemsInner() {
   function DueIconBtn({ task }: { task: TaskRow }) {
     const isLate = taskShowsLateFooter(task);
     const hasDue = Boolean(task.dueAt);
+    const flowCol = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
     const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const tooltip = dueSummary
       ? `Due ${dueSummary}${isLate ? " — Overdue" : ""}`
       : "No due date — click to set";
-    const color = isLate ? "text-red-500 dark:text-red-400" : "text-[var(--muted)]";
+    const color = isLate
+      ? "text-red-500 dark:text-red-400"
+      : hasDue && flowCol === "in_progress"
+        ? "text-green-600 dark:text-green-400"
+        : "text-[var(--muted)]";
     return (
       <button
         type="button"
