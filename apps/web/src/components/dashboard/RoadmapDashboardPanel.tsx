@@ -25,7 +25,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
     return active.slice(0, 5);
   }, [roadmap.milestones]);
 
-  if (roadmap.milestones.length === 0) return null;
+  if (!roadmap.isLoading && roadmap.goals.length === 0 && roadmap.milestones.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -42,7 +42,20 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
           </Link>
         </div>
 
-        {activeMilestones.length === 0 ? (
+        {roadmap.isLoading ? (
+          <ul className="mt-2.5 space-y-2.5" aria-hidden aria-busy>
+            {[0, 1, 2].map((i) => (
+              <li key={i}>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                  <span className="h-3.5 max-w-[65%] flex-1 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                  <span className="h-3.5 w-6 shrink-0 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
+                </div>
+                <div className="mt-1 h-1.5 animate-pulse rounded-full bg-[var(--surface-muted)] motion-reduce:animate-none" />
+              </li>
+            ))}
+          </ul>
+        ) : activeMilestones.length === 0 ? (
           <p className="mt-3 text-sm text-[var(--muted)]">No milestones cover today&apos;s date.</p>
         ) : (
           <ul className="mt-2.5 space-y-2.5">
