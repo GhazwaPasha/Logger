@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { getApiBaseUrl } from "@/lib/api";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 type TimeEntry = {
   id: string;
@@ -119,6 +121,7 @@ export function TimeTracker({
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: timeKey }),
   });
 
+  const prefersReduced = useReducedMotion();
   const [showManual, setShowManual] = useState(false);
   const [manualStart, setManualStart] = useState("");
   const [manualEnd, setManualEnd] = useState("");
@@ -219,8 +222,16 @@ export function TimeTracker({
       )}
 
       {/* Manual log form */}
-      {!viewOnly && showManual && (
-        <div className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3">
+      <AnimatePresence initial={false}>
+        {!viewOnly && showManual && (
+          <motion.div
+            className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
+            style={{ overflow: "hidden" }}
+          >
           <div className="space-y-1.5">
             <div>
               <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">Start</label>
@@ -270,34 +281,45 @@ export function TimeTracker({
               Cancel
             </button>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Entry list */}
       {completedEntries.length > 0 && (
         <ul className="space-y-1">
-          {completedEntries.map((e) => (
-            <li key={e.id} className="flex items-start gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-2 text-xs">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium">{e.userName}</span>
-                  <span className="text-[var(--muted)]">{formatDuration(parseInt(e.duration ?? "0", 10))}</span>
+          <AnimatePresence initial={false}>
+            {completedEntries.map((e) => (
+              <motion.li
+                key={e.id}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                className="flex items-start gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-2 text-xs"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">{e.userName}</span>
+                    <span className="text-[var(--muted)]">{formatDuration(parseInt(e.duration ?? "0", 10))}</span>
+                  </div>
+                  <div className="text-[var(--muted)]">{formatDateTime(e.startedAt)}</div>
+                  {e.note && <div className="mt-0.5 italic text-[var(--muted)]">{e.note}</div>}
                 </div>
-                <div className="text-[var(--muted)]">{formatDateTime(e.startedAt)}</div>
-                {e.note && <div className="mt-0.5 italic text-[var(--muted)]">{e.note}</div>}
-              </div>
-              {!viewOnly && e.userId === userId && (
-                <button
-                  type="button"
-                  onClick={() => deleteMutation.mutate(e.id)}
-                  className="shrink-0 text-[var(--muted)] hover:text-red-500"
-                  aria-label="Delete entry"
-                >
-                  ×
-                </button>
-              )}
-            </li>
-          ))}
+                {!viewOnly && e.userId === userId && (
+                  <button
+                    type="button"
+                    onClick={() => deleteMutation.mutate(e.id)}
+                    className="shrink-0 text-[var(--muted)] hover:text-red-500"
+                    aria-label="Delete entry"
+                  >
+                    ×
+                  </button>
+                )}
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       )}
     </div>

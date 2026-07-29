@@ -2,7 +2,9 @@
 
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { TaskDueRepeat } from "@/lib/ledger-types";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 const REPEAT_OPTIONS: { value: TaskDueRepeat; label: string }[] = [
   { value: "daily", label: "Daily" },
@@ -48,6 +50,7 @@ export function DueRepeatPopover({
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const panelId = useId();
   const dueSet = dueLocalValue.trim().length > 0;
+  const prefersReduced = useReducedMotion();
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -124,46 +127,54 @@ export function DueRepeatPopover({
       >
         <span className="block truncate">{label}</span>
       </button>
-      {open &&
-        dueSet &&
-        typeof window !== "undefined" &&
+      {typeof window !== "undefined" &&
         createPortal(
-          <div
-            ref={panelRef}
-            id={panelId}
-            role="dialog"
-            aria-label="Due repeat"
-            className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
-            style={{
-              top: pos.top,
-              left: pos.left,
-              width: PANEL_W,
-              maxHeight: "min(78vh, 280px)",
-            }}
-          >
-            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Repeat</p>
-            <div className="grid grid-cols-2 gap-1">
-              {REPEAT_OPTIONS.map(({ value: rv, label: optLabel }) => {
-                const active = value === rv;
-                return (
-                  <button
-                    key={rv}
-                    type="button"
-                    onClick={() => onChange(active ? null : rv)}
-                    aria-pressed={active}
-                    className={`rounded-md border px-2 py-1.5 text-center text-[11px] font-medium transition-colors ${
-                      active
-                        ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--fg)]"
-                        : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--muted)] hover:border-[var(--border)] hover:text-[var(--fg)]"
-                    }`}
-                  >
-                    {optLabel}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]">Tap again to clear. Stored on the task.</p>
-          </div>,
+          <AnimatePresence>
+            {open && dueSet && (
+              <motion.div
+                ref={panelRef}
+                id={panelId}
+                role="dialog"
+                aria-label="Due repeat"
+                className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
+                style={{
+                  top: pos.top,
+                  left: pos.left,
+                  width: PANEL_W,
+                  maxHeight: "min(78vh, 280px)",
+                  transformOrigin: "top",
+                }}
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              >
+                <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Repeat</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {REPEAT_OPTIONS.map(({ value: rv, label: optLabel }) => {
+                    const active = value === rv;
+                    return (
+                      <button
+                        key={rv}
+                        type="button"
+                        onClick={() => onChange(active ? null : rv)}
+                        aria-pressed={active}
+                        className={`rounded-md border px-2 py-1.5 text-center text-[11px] font-medium transition-colors ${
+                          active
+                            ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--fg)]"
+                            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--muted)] hover:border-[var(--border)] hover:text-[var(--fg)]"
+                        }`}
+                      >
+                        {optLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]">Tap again to clear. Stored on the task.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </>

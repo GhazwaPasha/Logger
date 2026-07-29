@@ -33,11 +33,13 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiJson } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
+import { POP_EASE, backdropVariants, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 import { taskEditCaps } from "@/lib/workspace-permissions";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -77,6 +79,7 @@ import {
   TASK_FLOW_ORDER,
   TASK_LATE_DUE_CHROME_CLASS,
   type DatePreset,
+  type BoardTaskStatus,
   type ManualTaskStatus,
   type SortMode,
   type TaskPriority,
@@ -263,7 +266,7 @@ function WorkBoardStatsCard({
       aria-live="polite"
       aria-label="Task counts by workflow stage"
     >
-      <div className="relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <div className="ui-elevated-panel relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--accent)_45%,transparent)] to-transparent opacity-90"
           aria-hidden
@@ -326,6 +329,7 @@ function WorkItemsInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const prefersReduced = useReducedMotion();
   const [boardScopeTick, setBoardScopeTick] = useState(0);
   useEffect(() => {
     const fn = () => setBoardScopeTick((n) => n + 1);
@@ -711,6 +715,9 @@ function WorkItemsInner() {
   });
 
   const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
+  /** Native HTML5 DnD gives no visual affordance on its own — track drag state to highlight valid/invalid drop columns and dim the source card. */
+  const [dragState, setDragState] = useState<{ taskId: string; status: BoardTaskStatus } | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   const loadMoreColumn = useCallback(
     async (status: string) => {
@@ -1115,7 +1122,9 @@ function WorkItemsInner() {
               if (advanceTo) void patchTask(task.id, { status: advanceTo });
             }}
           >
-            {checklistDone ? (
+            {taskPatchSyncing ? (
+              <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
+            ) : checklistDone ? (
               <FontAwesomeIcon icon={faCheck} className="size-[11px] shrink-0" aria-hidden />
             ) : null}
           </button>
@@ -1426,13 +1435,18 @@ function WorkItemsInner() {
         onDragStart={(e) => {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
+          setDragState({ taskId: task.id, status: normalizeTaskStatus(task.status) });
+        }}
+        onDragEnd={() => {
+          setDragState(null);
+          setDragOverCol(null);
         }}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
-        className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
+        className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform,opacity] duration-200 ${
           taskPatchSyncing
             ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
             : "cursor-grab border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
-        }`}
+        } ${dragState?.taskId === task.id ? "opacity-40" : ""}`}
       >
         {taskPatchSyncing ? (
           <div className="task-sync-ribbon-track" aria-hidden>
@@ -1695,18 +1709,35 @@ function WorkItemsInner() {
                 (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
               );
               const label = FLOW_COLUMN_LABELS[col];
+              const isDropTarget = dragState != null && dragOverCol === col;
+              const dropAllowed = dragState != null && kanbanTransitionAllowedFromStored(dragState.status, col);
               return (
                 <div
                   key={col}
                   role="region"
                   aria-label={`${label}, ${colTasks.length} tasks`}
-                  className="flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 sm:min-w-[17rem]"
+                  className={`flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:min-w-[17rem] ${
+                    isDropTarget
+                      ? dropAllowed
+                        ? "border-[var(--accent)] bg-[var(--accent-glow-soft)]"
+                        : "border-red-400/50 bg-red-500/[0.04]"
+                      : ""
+                  }`}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    setDragOverCol(col);
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = "move";
                   }}
+                  onDragLeave={(e) => {
+                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                    setDragOverCol((c) => (c === col ? null : c));
+                  }}
                 onDrop={(e) => {
                   e.preventDefault();
+                  setDragOverCol(null);
                   const id = e.dataTransfer.getData("taskId");
                   if (!id) return;
                   const task = rows.find((t) => t.id === id);
@@ -1968,51 +1999,65 @@ function WorkItemsInner() {
       </header>
 
       {toolbarMenusMounted &&
-        sortMenuOpen &&
         createPortal(
-          <div
-            ref={sortPanelRef}
-            style={sortPanelStyle}
-            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2"
-            role="menu"
-            aria-label="Sort options"
-          >
-            <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Sort by</p>
-            <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
-              {SORT_OPTIONS.map((opt) => (
-                <li key={opt.value}>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`w-full rounded-lg px-2.5 py-2.5 text-left text-sm leading-snug ${
-                      sortMode === opt.value
-                        ? "bg-[var(--accent-muted)] font-medium text-[var(--fg)]"
-                        : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                    }`}
-                    onClick={() => {
-                      setSortMode(opt.value);
-                      setSortMenuOpen(false);
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>,
+          <AnimatePresence>
+            {sortMenuOpen && (
+              <motion.div
+                ref={sortPanelRef}
+                style={{ ...sortPanelStyle, transformOrigin: sortPanelStyle.bottom != null ? "bottom" : "top" }}
+                className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2"
+                role="menu"
+                aria-label="Sort options"
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              >
+                <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Sort by</p>
+                <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
+                  {SORT_OPTIONS.map((opt) => (
+                    <li key={opt.value}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`w-full rounded-lg px-2.5 py-2.5 text-left text-sm leading-snug ${
+                          sortMode === opt.value
+                            ? "bg-[var(--accent-muted)] font-medium text-[var(--fg)]"
+                            : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                        }`}
+                        onClick={() => {
+                          setSortMode(opt.value);
+                          setSortMenuOpen(false);
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
 
       {toolbarMenusMounted &&
-        dateMenuOpen &&
         createPortal(
-          <div
-            ref={datePanelRef}
-            style={datePanelStyle}
-            className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)]"
-            role="dialog"
-            aria-label="Due date filter"
-          >
+          <AnimatePresence>
+            {dateMenuOpen && (
+              <motion.div
+                ref={datePanelRef}
+                style={{ ...datePanelStyle, transformOrigin: datePanelStyle.bottom != null ? "bottom" : "top" }}
+                className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)]"
+                role="dialog"
+                aria-label="Due date filter"
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              >
             <div className="max-h-[min(420px,85vh)] overflow-y-auto p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -2072,7 +2117,9 @@ function WorkItemsInner() {
                 </button>
               )}
             </div>
-          </div>,
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
 
@@ -2098,29 +2145,41 @@ function WorkItemsInner() {
         )}
       </section>
 
-      {viewTaskId &&
-        toolbarMenusMounted &&
+      {toolbarMenusMounted &&
         createPortal(
-          <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
-            <div
-              className="absolute inset-0 backdrop-blur-sm"
-              aria-hidden
-              onClick={() => setViewTaskId(null)}
-            />
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-label="Task details"
-              className="surface-elevated scrollbar-hide absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-[var(--border-subtle)] p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <TaskViewPanel
-                taskId={viewTaskId}
-                onClose={() => setViewTaskId(null)}
-                onOpenTask={(id: string) => setViewTaskId(id)}
-              />
-            </section>
-          </div>,
+          <AnimatePresence>
+            {viewTaskId && (
+              <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
+                <motion.div
+                  className="absolute inset-0 backdrop-blur-sm"
+                  aria-hidden
+                  onClick={() => setViewTaskId(null)}
+                  variants={backdropVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  transition={{ duration: motionDuration(0.2, prefersReduced) }}
+                />
+                <motion.section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Task details"
+                  className="surface-elevated scrollbar-hide absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-[var(--border-subtle)] p-6"
+                  onClick={(e) => e.stopPropagation()}
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ duration: motionDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <TaskViewPanel
+                    taskId={viewTaskId}
+                    onClose={() => setViewTaskId(null)}
+                    onOpenTask={(id: string) => setViewTaskId(id)}
+                  />
+                </motion.section>
+              </div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { faLayerGroup, faListUl } from "@fortawesome/free-solid-svg-icons";
 import {
   readWorkBoardScope,
@@ -25,6 +26,7 @@ import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -90,6 +92,7 @@ export function WorkspaceSidebar({
   const { token, session } = useApiSession();
   const { orgs } = useOrganizationsState();
   const { depts, lists, tasks, members, setError, isLoading: workspaceLoading } = useWorkspaceData();
+  const prefersReduced = useReducedMotion();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const [orgTreeOpen, setOrgTreeOpen] = useState(true);
@@ -595,9 +598,17 @@ export function WorkspaceSidebar({
               <Chevron open={orgTreeOpen} />
             </button>
           </div>
-          {orgTreeOpen &&
-            (
-              <div className="space-y-2">
+          <AnimatePresence initial={false}>
+            {orgTreeOpen && (
+              <motion.div
+                key="org-tree"
+                className="space-y-2"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                transition={{ duration: motionDuration(0.24, prefersReduced), ease: POP_EASE }}
+                style={{ overflow: "hidden" }}
+              >
                 {workspaceLoading ? (
                   <LoadingFrame show className="rounded-lg px-2 py-1" aria-label="Loading levels">
                     <div className="space-y-2" aria-hidden>
@@ -722,8 +733,16 @@ export function WorkspaceSidebar({
                           <Chevron open={open} />
                         </button>
                       </div>
-                      {open && (
-                        <ul>
+                      <AnimatePresence initial={false}>
+                        {open && (
+                          <motion.ul
+                            key="lists"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
+                            style={{ overflow: "hidden" }}
+                          >
                           {levelLists.length === 0 ? (
                             <li className="py-1 pl-1">
                               <EmptyState icon={faListUl} title="No lists yet" size="compact" />
@@ -909,8 +928,9 @@ export function WorkspaceSidebar({
                               </div>
                             )}
                           </li>
-                        </ul>
-                      )}
+                          </motion.ul>
+                        )}
+                      </AnimatePresence>
                     </li>
                   );
                 })}
@@ -981,8 +1001,9 @@ export function WorkspaceSidebar({
                     Webhooks
                   </Link>
                 </div>
-              </div>
+              </motion.div>
             )}
+          </AnimatePresence>
         </div>
       </nav>
     </aside>

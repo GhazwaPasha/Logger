@@ -2,8 +2,12 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { faLink } from "@fortawesome/free-solid-svg-icons";
 import { getApiBaseUrl } from "@/lib/api";
 import type { TaskRow } from "@/lib/ledger-types";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 type DependencyTask = { id: string; title: string; status: string };
 
@@ -54,6 +58,7 @@ function DependencyPicker({
 }) {
   const [filter, setFilter] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const prefersReduced = useReducedMotion();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -72,7 +77,15 @@ function DependencyPicker({
   );
 
   return (
-    <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] shadow-xl">
+    <motion.div
+      className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] shadow-xl"
+      style={{ transformOrigin: "top" }}
+      variants={panelPopVariants}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+      transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+    >
       <div className="border-b border-[var(--border-subtle)] p-2">
         <input
           ref={inputRef}
@@ -99,7 +112,7 @@ function DependencyPicker({
           </li>
         ))}
       </ul>
-    </div>
+    </motion.div>
   );
 }
 
@@ -119,6 +132,7 @@ export function DependencySection({
   const queryClient = useQueryClient();
   const [showBlockerPicker, setShowBlockerPicker] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const prefersReduced = useReducedMotion();
 
   const blockersKey = ["dependencies", "blockers", taskId];
   const blockingKey = ["dependencies", "blocking", taskId];
@@ -198,44 +212,56 @@ export function DependencySection({
               >
                 + Add
               </button>
-              {showBlockerPicker && (
-                <DependencyPicker
-                  taskId={taskId}
-                  tasks={allTasks}
-                  existingIds={existingBlockerIds}
-                  onAdd={(id) => addMutation.mutate(id)}
-                  onClose={() => setShowBlockerPicker(false)}
-                />
-              )}
+              <AnimatePresence>
+                {showBlockerPicker && (
+                  <DependencyPicker
+                    taskId={taskId}
+                    tasks={allTasks}
+                    existingIds={existingBlockerIds}
+                    onAdd={(id) => addMutation.mutate(id)}
+                    onClose={() => setShowBlockerPicker(false)}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
         {blockers.length === 0 ? (
-          <p className="text-xs text-[var(--muted)]">No blockers</p>
+          <EmptyState icon={faLink} title="No blockers" size="compact" />
         ) : (
           <ul className="space-y-1">
-            {blockers.map((b) => (
-              <li key={b.id} className="flex items-center gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenTask?.(b.id)}
-                  className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+            <AnimatePresence initial={false}>
+              {blockers.map((b) => (
+                <motion.li
+                  key={b.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                  className="flex items-center gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5"
                 >
-                  {b.title}
-                </button>
-                <StatusChip status={b.status} />
-                {canEdit && (
                   <button
                     type="button"
-                    onClick={() => removeMutation.mutate(b.id)}
-                    className="ml-1 text-[var(--muted)] hover:text-red-500"
-                    aria-label="Remove blocker"
+                    onClick={() => onOpenTask?.(b.id)}
+                    className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
                   >
-                    ×
+                    {b.title}
                   </button>
-                )}
-              </li>
-            ))}
+                  <StatusChip status={b.status} />
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => removeMutation.mutate(b.id)}
+                      className="ml-1 text-[var(--muted)] hover:text-red-500"
+                      aria-label="Remove blocker"
+                    >
+                      ×
+                    </button>
+                  )}
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
@@ -245,18 +271,28 @@ export function DependencySection({
         <div>
           <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">Blocking</p>
           <ul className="space-y-1">
-            {blocking.map((b) => (
-              <li key={b.id} className="flex items-center gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5">
-                <button
-                  type="button"
-                  onClick={() => onOpenTask?.(b.id)}
-                  className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+            <AnimatePresence initial={false}>
+              {blocking.map((b) => (
+                <motion.li
+                  key={b.id}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                  className="flex items-center gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5"
                 >
-                  {b.title}
-                </button>
-                <StatusChip status={b.status} />
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    onClick={() => onOpenTask?.(b.id)}
+                    className="min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                  >
+                    {b.title}
+                  </button>
+                  <StatusChip status={b.status} />
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         </div>
       )}

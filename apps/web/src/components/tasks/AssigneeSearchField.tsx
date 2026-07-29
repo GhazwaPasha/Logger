@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { MemberRow } from "@/lib/ledger-types";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 function primaryLabel(m: MemberRow): string {
   return (m.name?.trim() || m.email || "").trim() || "Unknown";
@@ -33,6 +35,7 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
   const uid = useId();
   const inputId = `${uid}-assignee-query`;
   const optionsId = `${uid}-assignee-options`;
+  const prefersReduced = useReducedMotion();
 
   const available = useMemo(() => {
     return members
@@ -63,30 +66,37 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
 
       {assigneeIds.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {assigneeIds.map((id) => {
-            const m = members.find((row) => row.userId === id);
-            const main = m ? primaryLabel(m) : "Unknown member";
-            const sub = m ? secondaryLine(m) : null;
-            return (
-              <span
-                key={id}
-                className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm text-[var(--fg)]"
-              >
-                <span className="min-w-0 truncate" title={sub ?? main}>
-                  {main}
-                  {sub ? <span className="text-[var(--muted)]"> · {sub}</span> : null}
-                </span>
-                <button
-                  type="button"
-                  className="shrink-0 rounded px-1 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                  aria-label={`Remove ${main}`}
-                  onClick={() => onToggleAssignee(id)}
+          <AnimatePresence initial={false}>
+            {assigneeIds.map((id) => {
+              const m = members.find((row) => row.userId === id);
+              const main = m ? primaryLabel(m) : "Unknown member";
+              const sub = m ? secondaryLine(m) : null;
+              return (
+                <motion.span
+                  key={id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.85 }}
+                  transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+                  className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm text-[var(--fg)]"
                 >
-                  ×
-                </button>
-              </span>
-            );
-          })}
+                  <span className="min-w-0 truncate" title={sub ?? main}>
+                    {main}
+                    {sub ? <span className="text-[var(--muted)]"> · {sub}</span> : null}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded px-1 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                    aria-label={`Remove ${main}`}
+                    onClick={() => onToggleAssignee(id)}
+                  >
+                    ×
+                  </button>
+                </motion.span>
+              );
+            })}
+          </AnimatePresence>
         </div>
       ) : null}
 
@@ -113,39 +123,47 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
             if (e.key === "Escape") setOpen(false);
           }}
         />
-        {open ? (
-          <ul
-            id={optionsId}
-            role="listbox"
-            aria-label="Team members"
-            className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
-          >
-            {available.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-[var(--muted)]">{emptyListMessage}</li>
-            ) : (
-              available.map((m) => {
-                const extra = secondaryLine(m);
-                return (
-                  <li key={m.userId} role="presentation">
-                    <button
-                      type="button"
-                      role="option"
-                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-hover)]"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        onToggleAssignee(m.userId);
-                        setQuery("");
-                      }}
-                    >
-                      <span className="font-medium text-[var(--fg)]">{primaryLabel(m)}</span>
-                      {extra ? <span className="text-xs text-[var(--muted)]">{extra}</span> : null}
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-        ) : null}
+        <AnimatePresence>
+          {open && (
+            <motion.ul
+              id={optionsId}
+              role="listbox"
+              aria-label="Team members"
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              style={{ transformOrigin: "top" }}
+              variants={panelPopVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+            >
+              {available.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-[var(--muted)]">{emptyListMessage}</li>
+              ) : (
+                available.map((m) => {
+                  const extra = secondaryLine(m);
+                  return (
+                    <li key={m.userId} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-hover)]"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          onToggleAssignee(m.userId);
+                          setQuery("");
+                        }}
+                      >
+                        <span className="font-medium text-[var(--fg)]">{primaryLabel(m)}</span>
+                        {extra ? <span className="text-xs text-[var(--muted)]">{extra}</span> : null}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </motion.ul>
+          )}
+        </AnimatePresence>
       </div>
       <p className="text-[11px] text-[var(--muted)]">
         Pick from the list to assign. Already assigned people are hidden until removed.

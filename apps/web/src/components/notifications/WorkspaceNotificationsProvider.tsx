@@ -3,12 +3,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { liveIsland } from "@/components/app/live-island";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { backdropVariants, motionDuration } from "@/components/ui/motion-presets";
 import type { OrgActivityLedgerRow } from "@/lib/ledger-types";
 import { isLedgerEntryNotifiableToUser } from "@/lib/notification-eligibility";
 import { isTaskCreatedNote, formatLogTimestamp } from "@/lib/task-activity-log";
@@ -58,6 +62,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const prefersReduced = useReducedMotion();
   const [lastSeenTs, setLastSeenTs] = useState(0);
   const [clearedBeforeTs, setClearedBeforeTs] = useState(0);
   const pushSyncInFlightRef = useRef(false);
@@ -263,21 +268,31 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     <WorkspaceNotificationsContext.Provider value={ctx}>
       {children}
       {mounted &&
-        panelOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[60]">
-            <div
-              className="absolute inset-0 backdrop-blur-sm"
-              aria-hidden
-              onClick={() => setPanelOpen(false)}
-            />
-            <section
-              role="dialog"
-              aria-modal="true"
-              aria-label="Notifications"
-              className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--border-subtle)]"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <AnimatePresence>
+            {panelOpen && (
+              <div className="fixed inset-0 z-[60]">
+                <motion.div
+                  className="absolute inset-0 backdrop-blur-sm"
+                  aria-hidden
+                  onClick={() => setPanelOpen(false)}
+                  variants={backdropVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  transition={{ duration: motionDuration(0.2, prefersReduced) }}
+                />
+                <motion.section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Notifications"
+                  className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--border-subtle)]"
+                  onClick={(e) => e.stopPropagation()}
+                  initial={{ x: "100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "100%" }}
+                  transition={{ duration: motionDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
+                >
               <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-6">
                 <div className={NOTIF_PANEL_HEADER_ROW}>
                   <h2 className={NOTIF_PANEL_HEADER_TITLE}>Notifications</h2>
@@ -303,7 +318,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                     {(activityQuery.error as Error).message || "Could not load notifications"}
                   </p>
                 ) : panelEntries.length === 0 ? (
-                  <p className="text-sm text-[var(--muted)]">You are all caught up.</p>
+                  <EmptyState icon={faCircleCheck} title="You are all caught up" />
                 ) : (
                   <ul className="space-y-3">
                     {panelEntries.map((e) => {
@@ -329,8 +344,10 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                   </ul>
                 )}
               </div>
-            </section>
-          </div>,
+                </motion.section>
+              </div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </WorkspaceNotificationsContext.Provider>

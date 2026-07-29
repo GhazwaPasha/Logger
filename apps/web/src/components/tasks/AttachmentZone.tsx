@@ -2,9 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 type AttachmentRow = {
   id: string;
@@ -43,6 +45,7 @@ type Props = {
 export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
+  const prefersReduced = useReducedMotion();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -132,44 +135,54 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
 
       {query.data && query.data.length > 0 && (
         <ul className="space-y-1">
-          {query.data.map((a) => (
-            <li key={a.id} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2">
-              <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
-              <div className="min-w-0 flex-1">
-                <a
-                  href={a.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-sm font-medium text-[var(--fg)] hover:underline"
-                >
-                  {a.fileName}
-                </a>
-                <p className="font-mono-ledger text-[10px] text-[var(--muted)]">{formatBytes(a.fileSize)}</p>
-              </div>
-              {a.discordDeliveredAt && (
-                <span
-                  title={`Sent to Discord ${new Date(a.discordDeliveredAt).toLocaleString()}`}
-                  className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
-                >
-                  Discord
-                </span>
-              )}
-              {!viewOnly && (a.uploadedBy === userId) && (
-                <button
-                  type="button"
-                  onClick={() => deleteMutation.mutate(a.id)}
-                  disabled={deleteMutation.isPending}
-                  aria-label="Delete attachment"
-                  className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] transition-colors"
-                >
-                  <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5" aria-hidden>
-                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                    <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                  </svg>
-                </button>
-              )}
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {query.data.map((a) => (
+              <motion.li
+                key={a.id}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                className="flex items-center gap-2 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2"
+              >
+                <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block truncate text-sm font-medium text-[var(--fg)] hover:underline"
+                  >
+                    {a.fileName}
+                  </a>
+                  <p className="font-mono-ledger text-[10px] text-[var(--muted)]">{formatBytes(a.fileSize)}</p>
+                </div>
+                {a.discordDeliveredAt && (
+                  <span
+                    title={`Sent to Discord ${new Date(a.discordDeliveredAt).toLocaleString()}`}
+                    className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
+                  >
+                    Discord
+                  </span>
+                )}
+                {!viewOnly && (a.uploadedBy === userId) && (
+                  <button
+                    type="button"
+                    onClick={() => deleteMutation.mutate(a.id)}
+                    disabled={deleteMutation.isPending}
+                    aria-label="Delete attachment"
+                    className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] transition-colors"
+                  >
+                    <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5" aria-hidden>
+                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                      <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                    </svg>
+                  </button>
+                )}
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       )}
     </div>

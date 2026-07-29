@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
 import type { DiscordChannelOption } from "@/lib/ledger-types";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 function matchesQuery(c: DiscordChannelOption, q: string): boolean {
   const s = q.trim().toLowerCase();
@@ -24,6 +26,7 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
   const uid = useId();
   const inputId = `${uid}-discord-channel-query`;
   const optionsId = `${uid}-discord-channel-options`;
+  const prefersReduced = useReducedMotion();
 
   const selected = channels.find((c) => c.id === value) ?? null;
 
@@ -87,39 +90,47 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
             if (e.key === "Escape") setOpen(false);
           }}
         />
-        {open ? (
-          <ul
-            id={optionsId}
-            role="listbox"
-            aria-label="Discord channels"
-            className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
-          >
-            {available.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches · try another channel name.</li>
-            ) : (
-              available.map((c) => (
-                <li key={c.id} role="presentation">
-                  <button
-                    type="button"
-                    role="option"
-                    className="flex w-full items-center gap-1 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-hover)]"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      onChange(c.id);
-                      setQuery("");
-                      setOpen(false);
-                    }}
-                  >
-                    <span className="font-medium text-[var(--fg)]">#{c.name}</span>
-                    {c.isPrivate && (
-                      <FontAwesomeIcon icon={faLock} className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
-                    )}
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        ) : null}
+        <AnimatePresence>
+          {open && (
+            <motion.ul
+              id={optionsId}
+              role="listbox"
+              aria-label="Discord channels"
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              style={{ transformOrigin: "top" }}
+              variants={panelPopVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+            >
+              {available.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches · try another channel name.</li>
+              ) : (
+                available.map((c) => (
+                  <li key={c.id} role="presentation">
+                    <button
+                      type="button"
+                      role="option"
+                      className="flex w-full items-center gap-1 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--surface-hover)]"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onChange(c.id);
+                        setQuery("");
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="font-medium text-[var(--fg)]">#{c.name}</span>
+                      {c.isPrivate && (
+                        <FontAwesomeIcon icon={faLock} className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
+                      )}
+                    </button>
+                  </li>
+                ))
+              )}
+            </motion.ul>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

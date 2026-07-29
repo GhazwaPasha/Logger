@@ -23,7 +23,7 @@ export function RoadmapPipelineBar({ goals, loading }: { goals: GoalRow[]; loadi
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] lg:w-1/2"
+      className="ui-elevated-panel relative w-full overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] lg:w-1/2"
       aria-live="polite"
       aria-label="Goal counts by status"
     >

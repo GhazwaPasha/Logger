@@ -1,10 +1,12 @@
 "use client";
 
 import { startTransition, useCallback, useId, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWandMagicSparkles } from "@fortawesome/free-solid-svg-icons";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { Toggle } from "@/components/ui/Toggle";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import type { MemberRow } from "@/lib/ledger-types";
 import type {
   TaskAiExistingDraft,
@@ -66,6 +68,7 @@ export function TaskPanelAiFill({ members, existingDraft = null, onApply }: Task
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [okHint, setOkHint] = useState<string | null>(null);
+  const prefersReduced = useReducedMotion();
 
   const apply = useCallback(async () => {
     const prompt = text.trim();
@@ -134,8 +137,17 @@ export function TaskPanelAiFill({ members, existingDraft = null, onApply }: Task
           }}
         />
       </div>
-      {open && (
-        <div id={panelId} className="space-y-2">
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={panelId}
+            className="space-y-2"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
+            style={{ overflow: "hidden" }}
+          >
           <textarea
             className={[
               "min-h-[5.5rem] w-full resize-y rounded-md border border-[var(--border-subtle)] px-3 py-2 text-sm text-[var(--fg)]",
@@ -181,8 +193,9 @@ export function TaskPanelAiFill({ members, existingDraft = null, onApply }: Task
           </button>
           {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           {okHint && !error && <p className="text-xs text-emerald-700 dark:text-emerald-400">{okHint}</p>}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

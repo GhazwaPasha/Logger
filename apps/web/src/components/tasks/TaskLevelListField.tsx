@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Dept, ListRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 /** Level / department chip — quieter label color than the list chip. */
 const LEVEL_CHIP_CLASS =
@@ -50,6 +52,7 @@ export function TaskLevelListField({
   const uid = useId();
   const inputId = `${uid}-level-list-query`;
   const optionsId = `${uid}-level-list-options`;
+  const prefersReduced = useReducedMotion();
 
   const cancel = () => {
     setMode("idle");
@@ -192,55 +195,64 @@ export function TaskLevelListField({
               if (e.key === "Escape") cancel();
             }}
           />
-          <ul
-            id={optionsId}
-            role="listbox"
-            aria-label={mode === "picking-level" ? `${NODE_LABELS.level}s` : "Lists"}
-            className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
-          >
-            {mode === "picking-level" ? (
-              deptOptions.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches.</li>
+          <AnimatePresence>
+            <motion.ul
+              key={mode}
+              id={optionsId}
+              role="listbox"
+              aria-label={mode === "picking-level" ? `${NODE_LABELS.level}s` : "Lists"}
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              style={{ transformOrigin: "top" }}
+              variants={panelPopVariants}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+            >
+              {mode === "picking-level" ? (
+                deptOptions.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches.</li>
+                ) : (
+                  deptOptions.map((d) => (
+                    <li key={d.id} role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setStagedDeptId(d.id);
+                          setMode("picking-list");
+                          setQuery("");
+                        }}
+                      >
+                        {d.name}
+                      </button>
+                    </li>
+                  ))
+                )
+              ) : listOptions.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-[var(--muted)]">No lists in this {NODE_LABELS.level.toLowerCase()}.</li>
               ) : (
-                deptOptions.map((d) => (
-                  <li key={d.id} role="presentation">
+                listOptions.map((l) => (
+                  <li key={l.id} role="presentation">
                     <button
                       type="button"
                       role="option"
                       className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
-                        setStagedDeptId(d.id);
-                        setMode("picking-list");
-                        setQuery("");
+                        onChange(l.id);
+                        cancel();
                       }}
                     >
-                      {d.name}
+                      {l.name}
                     </button>
                   </li>
                 ))
-              )
-            ) : listOptions.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-[var(--muted)]">No lists in this {NODE_LABELS.level.toLowerCase()}.</li>
-            ) : (
-              listOptions.map((l) => (
-                <li key={l.id} role="presentation">
-                  <button
-                    type="button"
-                    role="option"
-                    className="flex w-full items-center px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      onChange(l.id);
-                      cancel();
-                    }}
-                  >
-                    {l.name}
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
+              )}
+            </motion.ul>
+          </AnimatePresence>
         </div>
       ) : null}
     </div>

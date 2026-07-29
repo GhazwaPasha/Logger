@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { MemberRow, TaskRow } from "@/lib/ledger-types";
 import { normalizeTaskStatus } from "@/lib/task-board";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 type Props = {
   tasks: TaskRow[];
@@ -23,6 +25,7 @@ function memberName(members: MemberRow[], userId: string): string {
 /** Groups recurring task chain into a single collapsible card (Done/Cancelled columns). */
 export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const prefersReduced = useReducedMotion();
 
   // Sort newest-first by createdAt
   const sorted = [...tasks].sort(
@@ -80,29 +83,38 @@ export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
       </div>
 
       {/* Occurrence list */}
-      {expanded && (
-        <ul className="border-t border-[var(--border-subtle)]/50 divide-y divide-[var(--border-subtle)]/30">
-          {sorted.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 px-3 py-2">
-              <span className="min-w-0 flex-1 font-mono-ledger text-[11px] text-[var(--muted)]">
-                {formatDate(t.dueAt)}
-                {t.assigneeUserIds?.length ? (
-                  <span className="ml-1.5 text-[var(--fg)]/70">
-                    {t.assigneeUserIds.map((id) => memberName(members, id)).join(", ")}
-                  </span>
-                ) : null}
-              </span>
-              <button
-                type="button"
-                onClick={() => onOpenTask(t.id)}
-                className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors"
-              >
-                Open
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.ul
+            className="divide-y divide-[var(--border-subtle)]/30 border-t border-[var(--border-subtle)]/50"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
+            style={{ overflow: "hidden" }}
+          >
+            {sorted.map((t) => (
+              <li key={t.id} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 font-mono-ledger text-[11px] text-[var(--muted)]">
+                  {formatDate(t.dueAt)}
+                  {t.assigneeUserIds?.length ? (
+                    <span className="ml-1.5 text-[var(--fg)]/70">
+                      {t.assigneeUserIds.map((id) => memberName(members, id)).join(", ")}
+                    </span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenTask(t.id)}
+                  className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors"
+                >
+                  Open
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </li>
   );
 }

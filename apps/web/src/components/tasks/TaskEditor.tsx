@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
@@ -26,6 +27,7 @@ import { AttachmentZone } from "@/components/tasks/AttachmentZone";
 import { DiscordSubmissionZone } from "@/components/tasks/DiscordSubmissionZone";
 import { CommentThread } from "@/components/tasks/CommentThread";
 import { TaskFormSyncIndicator } from "@/components/tasks/TaskFormSyncIndicator";
+import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
 import { TaskLevelListField } from "@/components/tasks/TaskLevelListField";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
@@ -50,6 +52,7 @@ import {
 } from "@/lib/task-default-title";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   pending: "Pending",
@@ -98,6 +101,7 @@ function ToggleSection({
   toggleActiveClassName?: string;
   children?: React.ReactNode;
 }) {
+  const prefersReduced = useReducedMotion();
   return (
     <div
       className={
@@ -116,7 +120,19 @@ function ToggleSection({
           activeClassName={toggleActiveClassName}
         />
       </div>
-      {checked && children}
+      <AnimatePresence initial={false}>
+        {checked && children && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
+            style={{ overflow: "hidden" }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -134,6 +150,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const { tasks, lists, members, depts } = useWorkspaceData();
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
+  const prefersReduced = useReducedMotion();
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
@@ -371,6 +388,10 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
               members={members}
             />
           )}
+
+          {detail && (
+            <TaskPanelHistoryCard task={detail.task} ledger={detail.ledger} members={members} />
+          )}
         </div>
 
         <div className="w-full space-y-1 lg:w-72 lg:shrink-0">
@@ -558,15 +579,24 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   <span className="text-sm text-[var(--muted)]">Unassigned</span>
                 )}
               </div>
-              {caps.canEditFields && showAssignees && (
-                <div className="mt-2">
-                  <AssigneeSearchField
-                    members={members}
-                    assigneeIds={form.assigneeIds}
-                    onToggleAssignee={form.toggleAssignee}
-                  />
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {caps.canEditFields && showAssignees && (
+                  <motion.div
+                    className="mt-2"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+                    exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                    transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <AssigneeSearchField
+                      members={members}
+                      assigneeIds={form.assigneeIds}
+                      onToggleAssignee={form.toggleAssignee}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 

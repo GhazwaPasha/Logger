@@ -2,9 +2,11 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSquareCheck, faClock, faUserClock, faSquareXmark } from "@fortawesome/free-solid-svg-icons";
 import { FLOW_COLUMN_LABELS, statusPillPaletteClasses, type ManualTaskStatus } from "@/lib/task-board";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 /** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
 export const STATUS_PILL_LAYOUT =
@@ -48,6 +50,7 @@ export function StatusPillSelect({
   const menuRef = useRef<HTMLUListElement>(null);
   const listboxId = useId();
   const paletteKey = value;
+  const prefersReduced = useReducedMotion();
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) {
@@ -116,48 +119,57 @@ export function StatusPillSelect({
           {FLOW_COLUMN_LABELS[value]}
         </span>
       </button>
-      {open && menuPos
-        ? createPortal(
-            <ul
-              ref={menuRef}
-              id={listboxId}
-              role="listbox"
-              style={{
-                position: "fixed",
-                top: menuPos.top,
-                left: menuPos.left,
-                minWidth: menuPos.width,
-                zIndex: 80,
-              }}
-              className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 dark:bg-[var(--surface-base)]"
-            >
-              {options.map((s) => (
-                <li key={s} role="presentation" className="px-1">
-                  <button
-                    type="button"
-                    role="option"
-                    id={`${listboxId}-opt-${s}`}
-                    aria-selected={s === value}
-                    className={`flex w-full min-w-[8rem] items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
-                      s === value
-                        ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
-                        : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                    }`}
-                    onClick={() => {
-                      setOpen(false);
-                      if (s !== value) onChange(s);
-                      queueMicrotask(() => triggerRef.current?.focus());
-                    }}
-                  >
-                    <StatusIcon status={s} size={16} className="opacity-70" />
-                    {FLOW_COLUMN_LABELS[s]}
-                  </button>
-                </li>
-              ))}
-            </ul>,
-            document.body,
-          )
-        : null}
+      {typeof window !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuPos && (
+              <motion.ul
+                ref={menuRef}
+                id={listboxId}
+                role="listbox"
+                style={{
+                  position: "fixed",
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  minWidth: menuPos.width,
+                  zIndex: 80,
+                  transformOrigin: "top",
+                }}
+                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 dark:bg-[var(--surface-base)]"
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+              >
+                {options.map((s) => (
+                  <li key={s} role="presentation" className="px-1">
+                    <button
+                      type="button"
+                      role="option"
+                      id={`${listboxId}-opt-${s}`}
+                      aria-selected={s === value}
+                      className={`flex w-full min-w-[8rem] items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
+                        s === value
+                          ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
+                          : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                      onClick={() => {
+                        setOpen(false);
+                        if (s !== value) onChange(s);
+                        queueMicrotask(() => triggerRef.current?.focus());
+                      }}
+                    >
+                      <StatusIcon status={s} size={16} className="opacity-70" />
+                      {FLOW_COLUMN_LABELS[s]}
+                    </button>
+                  </li>
+                ))}
+              </motion.ul>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
     </div>
   );
 }

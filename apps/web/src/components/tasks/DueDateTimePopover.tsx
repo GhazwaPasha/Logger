@@ -9,7 +9,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { DueDateTimePanel } from "./DueDateTimePanel";
+import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 
 function formatDueTriggerLabel(value: string): string {
   const t = value.trim();
@@ -46,6 +48,7 @@ export function DueDateTimePopover({
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const panelId = useId();
+  const prefersReduced = useReducedMotion();
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -119,30 +122,39 @@ export function DueDateTimePopover({
       >
         {formatDueTriggerLabel(value)}
       </button>
-      {open &&
-        typeof window !== "undefined" &&
+      {typeof window !== "undefined" &&
         createPortal(
-          <div
-            ref={panelRef}
-            id={panelId}
-            role="dialog"
-            aria-label="Due date and time"
-            className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
-            style={{
-              top: pos.top,
-              left: pos.left,
-              width: POPOVER_W,
-              maxHeight: "min(78vh, 420px)",
-            }}
-          >
-            <DueDateTimePanel
-              compact
-              value={value}
-              onChange={onChange}
-              onClear={handleClear}
-              onSave={() => onOpenChange(false)}
-            />
-          </div>,
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                ref={panelRef}
+                id={panelId}
+                role="dialog"
+                aria-label="Due date and time"
+                className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
+                style={{
+                  top: pos.top,
+                  left: pos.left,
+                  width: POPOVER_W,
+                  maxHeight: "min(78vh, 420px)",
+                  transformOrigin: "top",
+                }}
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              >
+                <DueDateTimePanel
+                  compact
+                  value={value}
+                  onChange={onChange}
+                  onClear={handleClear}
+                  onSave={() => onOpenChange(false)}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </>

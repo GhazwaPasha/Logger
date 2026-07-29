@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import type { SubtaskRow } from "@/lib/ledger-types";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -38,6 +40,7 @@ export function TaskSubtaskList({
   /** Id of the row whose create/update/delete is currently in flight, for a per-row spinner. */
   pendingSubtaskId?: string | null;
 }) {
+  const prefersReduced = useReducedMotion();
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingVal, setEditingVal] = useState("");
@@ -80,11 +83,17 @@ export function TaskSubtaskList({
         </p>
       )}
       <div className="space-y-0.5">
-        {ordered.map((item) => (
-          <div
-            key={getStableKey ? getStableKey(item.id) : item.id}
-            className="group flex items-center gap-2.5 py-1.5"
-          >
+        <AnimatePresence initial={false}>
+          {ordered.map((item) => (
+            <motion.div
+              key={getStableKey ? getStableKey(item.id) : item.id}
+              layout
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              className="group flex items-center gap-2.5 overflow-hidden py-1.5"
+            >
             <button
               type="button"
               disabled={disabled || rowBusy(item.id)}
@@ -141,8 +150,9 @@ export function TaskSubtaskList({
                 Remove
               </button>
             )}
-          </div>
-        ))}
+            </motion.div>
+          ))}
+        </AnimatePresence>
         {!toggleOnly && (
           <div className="flex items-center gap-2.5 py-1.5">
             <span className="text-sm text-[var(--muted)]">+</span>

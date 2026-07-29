@@ -1,8 +1,10 @@
 "use client";
 
 import { useId, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { LedgerRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { LedgerLineDescription, ledgerLogUserClassName } from "@/components/tasks/LedgerLineDescription";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import {
   formatCreatorDisplay,
   formatLogTimestamp,
@@ -39,6 +41,7 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
   const headingId = useId();
   const regionId = useId();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prefersReduced = useReducedMotion();
 
   const creatorName = formatCreatorDisplay(memberDisplayName(members, task.assignerId));
   const entriesOldestFirst = ledger.filter((e) => !isTaskCreatedNote(e)).slice().reverse();
@@ -62,28 +65,41 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
         <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">History</span>
         <IconChevronDisclosure open={expanded} className="text-[var(--muted)]" />
       </button>
-      <div id={regionId} role="region" aria-labelledby={headingId} hidden={!expanded}>
-        <div
-          className="mt-3 space-y-2 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
-          aria-label="Task activity log"
-        >
-          <p className="break-words">
-            <span className={ledgerLogUserClassName}>{creatorName}</span>
-            <span className="text-[var(--muted)]"> created this task · </span>
-            <span className="break-all text-[var(--muted)]">{task.id}</span>
-          </p>
-          {entriesOldestFirst.map((entry) => (
-            <p key={entry.id}>
-              <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
-              <span className="text-[var(--muted)]">: </span>
-              <span>
-                <LedgerLineDescription entry={entry} members={members} />
-              </span>
-            </p>
-          ))}
-          <div ref={bottomRef} />
-        </div>
-      </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            id={regionId}
+            role="region"
+            aria-labelledby={headingId}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+            transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
+            style={{ overflow: "hidden" }}
+          >
+            <div
+              className="mt-3 space-y-2 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
+              aria-label="Task activity log"
+            >
+              <p className="break-words">
+                <span className={ledgerLogUserClassName}>{creatorName}</span>
+                <span className="text-[var(--muted)]"> created this task · </span>
+                <span className="break-all text-[var(--muted)]">{task.id}</span>
+              </p>
+              {entriesOldestFirst.map((entry) => (
+                <p key={entry.id}>
+                  <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+                  <span className="text-[var(--muted)]">: </span>
+                  <span>
+                    <LedgerLineDescription entry={entry} members={members} />
+                  </span>
+                </p>
+              ))}
+              <div ref={bottomRef} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
@@ -34,6 +35,7 @@ import { faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
+import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -62,6 +64,7 @@ export function TaskViewPanel({
   const { tasks, lists, members, depts } = useWorkspaceData();
   const { workspaceSlug, workspaceId } = useWorkspaceRoute();
 
+  const prefersReduced = useReducedMotion();
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
@@ -269,35 +272,42 @@ export function TaskViewPanel({
           {form.assigneeIds.length === 0 && !caps.canEditFields ? (
             <p className="text-sm text-[var(--muted)]">Unassigned</p>
           ) : (
-            form.assigneeIds.map((id) => {
-              const m = members.find((r) => r.userId === id);
-              const name = m ? ((m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown") : "Unknown";
-              return (
-                <span
-                  key={id}
-                  className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
-                >
-                  <Avatar
-                    name={m?.name}
-                    email={m?.email}
-                    image={m?.image}
-                    size="size-5"
-                    className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
-                  />
-                  {name}
-                  {caps.canEditFields && (
-                    <button
-                      type="button"
-                      className="shrink-0 leading-none text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-                      onClick={() => form.toggleAssignee(id)}
-                      aria-label={`Remove ${name}`}
-                    >
-                      ×
-                    </button>
-                  )}
-                </span>
-              );
-            })
+            <AnimatePresence initial={false}>
+              {form.assigneeIds.map((id) => {
+                const m = members.find((r) => r.userId === id);
+                const name = m ? ((m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown") : "Unknown";
+                return (
+                  <motion.span
+                    key={id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
+                  >
+                    <Avatar
+                      name={m?.name}
+                      email={m?.email}
+                      image={m?.image}
+                      size="size-5"
+                      className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                    />
+                    {name}
+                    {caps.canEditFields && (
+                      <button
+                        type="button"
+                        className="shrink-0 leading-none text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                        onClick={() => form.toggleAssignee(id)}
+                        aria-label={`Remove ${name}`}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </motion.span>
+                );
+              })}
+            </AnimatePresence>
           )}
           {caps.canEditFields && (
             <button
@@ -309,15 +319,24 @@ export function TaskViewPanel({
             </button>
           )}
         </div>
-        {caps.canEditFields && showAssignees && (
-          <div className="mt-2">
-            <AssigneeSearchField
-              members={members}
-              assigneeIds={form.assigneeIds}
-              onToggleAssignee={form.toggleAssignee}
-            />
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {caps.canEditFields && showAssignees && (
+            <motion.div
+              className="mt-2"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
+              exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+              transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
+              style={{ overflow: "hidden" }}
+            >
+              <AssigneeSearchField
+                members={members}
+                assigneeIds={form.assigneeIds}
+                onToggleAssignee={form.toggleAssignee}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Due date */}
