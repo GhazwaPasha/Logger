@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { POP_EASE, motionDuration, panelPopVariants } from "./motion-presets";
 
 export type SimpleContextMenuItem = {
   id: string;
@@ -26,6 +28,7 @@ export function SimpleContextMenu({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const prefersReduced = useReducedMotion();
 
   useLayoutEffect(() => {
     if (!open || !ref.current) return;
@@ -61,30 +64,39 @@ export function SimpleContextMenu({
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [open, onClose]);
 
-  if (!open || items.length === 0 || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div
-      ref={ref}
-      role="menu"
-      className="fixed z-[100] min-w-[8rem] max-w-[min(100vw-1rem,14rem)] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg shadow-black/15 dark:shadow-black/50"
-      style={{ left: x, top: y, maxHeight: MENU_MAX_H }}
-    >
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          role="menuitem"
-          className="flex w-full px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
-          onClick={() => {
-            onClose();
-            queueMicrotask(() => item.onSelect());
-          }}
+    <AnimatePresence>
+      {open && items.length > 0 && (
+        <motion.div
+          ref={ref}
+          role="menu"
+          className="fixed z-[100] min-w-[8rem] max-w-[min(100vw-1rem,14rem)] overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] py-1 shadow-lg shadow-black/15 dark:shadow-black/50"
+          style={{ left: x, top: y, maxHeight: MENU_MAX_H, transformOrigin: "top left" }}
+          variants={panelPopVariants}
+          initial="hidden"
+          animate="visible"
+          exit="hidden"
+          transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
         >
-          {item.label}
-        </button>
-      ))}
-    </div>,
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="menuitem"
+              className="flex w-full px-3 py-2 text-left text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+              onClick={() => {
+                onClose();
+                queueMicrotask(() => item.onSelect());
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

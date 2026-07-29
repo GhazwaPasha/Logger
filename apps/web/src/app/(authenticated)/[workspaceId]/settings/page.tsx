@@ -15,6 +15,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
 import { SettingsCard, SettingsFieldRow, EditableField } from "@/components/ui/SettingsCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { faPalette, faUser, faKey, faPlug } from "@fortawesome/free-solid-svg-icons";
 
 const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
@@ -337,7 +338,7 @@ export default function UserSettingsPage() {
         <div className="mt-5 space-y-2">
           {apiKeysLoading && <p className="text-xs text-[var(--muted)]">Loading…</p>}
           {!apiKeysLoading && apiKeys.length === 0 && (
-            <p className="text-xs text-[var(--muted)]">No API keys yet.</p>
+            <EmptyState icon={faKey} title="No API keys yet" size="compact" />
           )}
           {apiKeys.map((k) => (
             <div

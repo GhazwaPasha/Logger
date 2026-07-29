@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { faPlug, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
 
 const ALLOWED_EVENTS = ["task.created", "task.status_changed", "task.ledger_added", "member.added"];
 
@@ -211,7 +213,7 @@ export default function WebhooksPage() {
       <section className="space-y-3">
         {isLoading && <p className="text-sm text-[var(--muted)]">Loading…</p>}
         {!isLoading && endpoints.length === 0 && (
-          <p className="text-sm text-[var(--muted)]">No webhooks configured yet.</p>
+          <EmptyState icon={faPlug} title="No webhooks configured yet" size="compact" />
         )}
         {endpoints.map((ep) => (
           <div
@@ -267,7 +269,9 @@ export default function WebhooksPage() {
             {viewDeliveriesId === ep.id && (
               <div className="mt-4 space-y-1.5">
                 <p className="text-xs font-semibold text-[var(--muted)]">Recent Deliveries</p>
-                {deliveries.length === 0 && <p className="text-xs text-[var(--muted)]">No deliveries yet.</p>}
+                {deliveries.length === 0 && (
+                  <EmptyState icon={faClockRotateLeft} title="No deliveries yet" size="compact" />
+                )}
                 {deliveries.map((d) => (
                   <div key={d.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                     <button

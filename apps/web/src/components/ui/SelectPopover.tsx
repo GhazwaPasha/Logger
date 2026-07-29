@@ -9,8 +9,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCaretDown } from "@fortawesome/free-solid-svg-icons";
+import { POP_EASE, motionDuration, panelPopVariants } from "./motion-presets";
 
 export type SelectOption<T extends string = string> = {
   value: T;
@@ -48,7 +50,8 @@ export function SelectPopover<T extends string>({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const prefersReduced = useReducedMotion();
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, flipped: false });
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -63,9 +66,13 @@ export function SelectPopover<T extends string>({
     if (left < pad) left = pad;
 
     let top = rect.bottom + 4;
-    if (top + panelEstH > window.innerHeight - pad) top = Math.max(pad, rect.top - panelEstH - 4);
+    let flipped = false;
+    if (top + panelEstH > window.innerHeight - pad) {
+      top = Math.max(pad, rect.top - panelEstH - 4);
+      flipped = true;
+    }
 
-    setPos({ top, left, width: panelW });
+    setPos({ top, left, width: panelW, flipped });
   }, [options.length]);
 
   useLayoutEffect(() => {
@@ -129,40 +136,54 @@ export function SelectPopover<T extends string>({
         )}
       </button>
 
-      {open &&
-        typeof window !== "undefined" &&
+      {typeof window !== "undefined" &&
         createPortal(
-          <div
-            ref={panelRef}
-            id={panelId}
-            role="listbox"
-            aria-label={ariaLabel}
-            className="fixed z-[200] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg shadow-black/10 dark:shadow-black/40"
-            style={{ top: pos.top, left: pos.left, width: pos.width, minWidth: PANEL_MIN_W }}
-          >
-            {options.map((opt) => {
-              const active = opt.value === value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  className={`flex w-full items-center rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
-                    active
-                      ? "bg-[var(--accent-muted)] font-semibold text-[var(--fg)]"
-                      : "font-medium text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                  }`}
-                  onClick={() => {
-                    onChange(opt.value);
-                    setOpen(false);
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>,
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                ref={panelRef}
+                id={panelId}
+                role="listbox"
+                aria-label={ariaLabel}
+                className="fixed z-[200] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg shadow-black/10 dark:shadow-black/40"
+                style={{
+                  top: pos.top,
+                  left: pos.left,
+                  width: pos.width,
+                  minWidth: PANEL_MIN_W,
+                  transformOrigin: pos.flipped ? "bottom" : "top",
+                }}
+                variants={panelPopVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+              >
+                {options.map((opt) => {
+                  const active = opt.value === value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={`flex w-full items-center rounded-md px-3 py-1.5 text-left text-sm transition-colors ${
+                        active
+                          ? "bg-[var(--accent-muted)] font-semibold text-[var(--fg)]"
+                          : "font-medium text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                      }`}
+                      onClick={() => {
+                        onChange(opt.value);
+                        setOpen(false);
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </>

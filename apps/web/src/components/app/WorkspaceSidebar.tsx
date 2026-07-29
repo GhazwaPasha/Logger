@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { faLayerGroup, faListUl } from "@fortawesome/free-solid-svg-icons";
 import {
   readWorkBoardScope,
   writeWorkBoardScope,
@@ -23,6 +24,7 @@ import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -605,7 +607,7 @@ export function WorkspaceSidebar({
                     </div>
                   </LoadingFrame>
                 ) : depts.length === 0 ? (
-                  <p className="px-2 text-sm leading-relaxed text-[var(--muted)]">No levels yet.</p>
+                  <EmptyState icon={faLayerGroup} title="No levels yet." size="compact" />
                 ) : (
                   <ul className="space-y-0.5">
                 {depts.map((d) => {
@@ -723,7 +725,9 @@ export function WorkspaceSidebar({
                       {open && (
                         <ul>
                           {levelLists.length === 0 ? (
-                            <li className="py-1 pl-1 text-sm text-[var(--muted)]">Empty</li>
+                            <li className="py-1 pl-1">
+                              <EmptyState icon={faListUl} title="No lists yet" size="compact" />
+                            </li>
                           ) : (
                             levelLists.map((l) => {
                               const listTaskCount = (tasksByList.get(l.id) ?? []).length;

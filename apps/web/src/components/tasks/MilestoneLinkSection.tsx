@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { SelectPopover } from "@/components/ui/SelectPopover";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 export function MilestoneLinkSection({ taskId, token }: { taskId: string; token: string | null }) {
@@ -27,15 +28,20 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
 
   if (roadmap.milestones.length === 0) {
     return (
-      <div className="space-y-1.5 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Milestones</h3>
-        <p className="text-sm text-[var(--muted)]">
-          No milestones yet.{" "}
-          <Link href={`/${workspaceSlug}/roadmap`} className="font-medium text-[var(--accent)] hover:underline">
-            Create one from the Roadmap page
-          </Link>{" "}
-          to link this task to it.
-        </p>
+      <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+        <EmptyState
+          icon={faFlag}
+          title="No milestones yet"
+          description={
+            <>
+              <Link href={`/${workspaceSlug}/roadmap`} className="font-medium text-[var(--accent)] hover:underline">
+                Create one from the Roadmap page
+              </Link>{" "}
+              to link this task to it.
+            </>
+          }
+          size="compact"
+        />
       </div>
     );
   }

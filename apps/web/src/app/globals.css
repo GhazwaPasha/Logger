@@ -1007,6 +1007,8 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   }
 }
 
+/* Route-level enter/exit now lives in Motion (see the two `template.tsx` files) — this class
+   remains for direct opacity-fade-in use elsewhere (e.g. AppBootScreen). */
 .ui-page-enter {
   animation: ui-page-enter 0.44s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPaperPlane, faPen, faTrashCan, faComment } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
+import { EmptyState } from "@/components/ui/EmptyState";
 import type { MemberRow } from "@/lib/ledger-types";
 
 type CommentRow = {
@@ -398,7 +399,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
         {query.isPending && <p className="text-sm text-[var(--muted)]">Loading…</p>}
         {query.error && <p className="text-sm text-red-600">{(query.error as Error).message}</p>}
         {query.data && roots.length === 0 && !viewOnly && (
-          <p className="py-2 text-sm text-[var(--muted)]">No comments yet. Be the first to comment.</p>
+          <EmptyState icon={faComment} title="No comments yet" description="Be the first to comment." size="compact" />
         )}
         {query.data && roots.map((c) => <CommentRow key={c.id} comment={c} />)}
       </div>
