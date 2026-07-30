@@ -325,7 +325,7 @@ export function WorkspaceSidebar({
         };
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add list");
+      setError(e instanceof Error ? e.message : `Could not add ${NODE_LABELS.list.toLowerCase()}`);
     } finally {
       setAddingList(false);
     }
@@ -410,7 +410,7 @@ export function WorkspaceSidebar({
       }
       await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete list");
+      setError(e instanceof Error ? e.message : `Could not delete ${NODE_LABELS.list.toLowerCase()}`);
     }
   }
 
@@ -441,7 +441,7 @@ export function WorkspaceSidebar({
       });
       cancelRenameList();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not rename list");
+      setError(e instanceof Error ? e.message : `Could not rename ${NODE_LABELS.list.toLowerCase()}`);
     } finally {
       setRenamingListBusy(false);
     }
@@ -461,7 +461,7 @@ export function WorkspaceSidebar({
                 const name = structureMenu.name;
                 setStructureActionConfirm({
                   title: `Delete this ${NODE_LABELS.level.toLowerCase()}?`,
-                  description: `“${name}” and every list and task under it will be permanently removed.`,
+                  description: `“${name}” and every ${NODE_LABELS.list.toLowerCase()} and task under it will be permanently removed.`,
                   confirmLabel: `Delete ${NODE_LABELS.level}`,
                   variant: "danger",
                   onConfirm: () => void deleteLevelById(deptId),
@@ -472,16 +472,16 @@ export function WorkspaceSidebar({
         : [
             {
               id: "delete-list",
-              label: "Delete list",
+              label: `Delete ${NODE_LABELS.list}`,
               destructive: true,
               onSelect: () => {
                 const listId = structureMenu.listId;
                 const deptId = structureMenu.deptId;
                 const name = structureMenu.name;
                 setStructureActionConfirm({
-                  title: "Delete this list?",
+                  title: `Delete this ${NODE_LABELS.list.toLowerCase()}?`,
                   description: `“${name}” and every task in it will be permanently removed.`,
-                  confirmLabel: "Delete list",
+                  confirmLabel: `Delete ${NODE_LABELS.list}`,
                   variant: "danger",
                   onConfirm: () => void deleteListById(listId, deptId),
                 });
@@ -592,7 +592,11 @@ export function WorkspaceSidebar({
               type="button"
               className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
               aria-expanded={orgTreeOpen}
-              aria-label={orgTreeOpen ? "Collapse levels and lists" : "Expand levels and lists"}
+              aria-label={
+                orgTreeOpen
+                  ? `Collapse ${NODE_LABELS.level.toLowerCase()}s and ${NODE_LABELS.list.toLowerCase()}s`
+                  : `Expand ${NODE_LABELS.level.toLowerCase()}s and ${NODE_LABELS.list.toLowerCase()}s`
+              }
               onClick={() => setOrgTreeOpen((v) => !v)}
             >
               <Chevron open={orgTreeOpen} />
@@ -610,7 +614,11 @@ export function WorkspaceSidebar({
                 style={{ overflow: "hidden" }}
               >
                 {workspaceLoading ? (
-                  <LoadingFrame show className="rounded-lg px-2 py-1" aria-label="Loading levels">
+                  <LoadingFrame
+                    show
+                    className="rounded-lg px-2 py-1"
+                    aria-label={`Loading ${NODE_LABELS.level.toLowerCase()}s`}
+                  >
                     <div className="space-y-2" aria-hidden>
                       <div className="h-8 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
                       <div className="h-8 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
@@ -618,7 +626,7 @@ export function WorkspaceSidebar({
                     </div>
                   </LoadingFrame>
                 ) : depts.length === 0 ? (
-                  <EmptyState icon={faLayerGroup} title="No levels yet." size="compact" />
+                  <EmptyState icon={faLayerGroup} title={`No ${NODE_LABELS.level.toLowerCase()}s yet.`} size="compact" />
                 ) : (
                   <ul className="space-y-0.5">
                 {depts.map((d) => {
@@ -745,7 +753,7 @@ export function WorkspaceSidebar({
                           >
                           {levelLists.length === 0 ? (
                             <li className="py-1 pl-1">
-                              <EmptyState icon={faListUl} title="No lists yet" size="compact" />
+                              <EmptyState icon={faListUl} title={`No ${NODE_LABELS.list.toLowerCase()}s yet`} size="compact" />
                             </li>
                           ) : (
                             levelLists.map((l) => {
@@ -786,7 +794,7 @@ export function WorkspaceSidebar({
                                           autoFocus
                                           disabled={renamingListBusy}
                                           className="input h-8 min-w-0 flex-1 rounded-lg px-2 text-sm font-semibold"
-                                          aria-label="Rename list"
+                                          aria-label={`Rename ${NODE_LABELS.list}`}
                                           value={renameListDraft}
                                           onChange={(e) => setRenameListDraft(e.target.value)}
                                           onBlur={() => {
@@ -837,8 +845,8 @@ export function WorkspaceSidebar({
                                           <button
                                             type="button"
                                             className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
-                                            aria-label={`Rename list ${l.name}`}
-                                            title="Rename list"
+                                            aria-label={`Rename ${NODE_LABELS.list} ${l.name}`}
+                                            title={`Rename ${NODE_LABELS.list}`}
                                             onClick={(e) => {
                                               e.preventDefault();
                                               e.stopPropagation();
@@ -882,7 +890,7 @@ export function WorkspaceSidebar({
                                   setNewListName("");
                                 }}
                               >
-                                + Add list
+                                + Add {NODE_LABELS.list}
                               </button>
                             ) : (
                               <div
@@ -893,7 +901,7 @@ export function WorkspaceSidebar({
                                   autoFocus
                                   disabled={addingList && showAddListForLevel === d.id}
                                   className="input h-8 w-full rounded-lg px-2 py-1 pr-9 text-sm disabled:opacity-70"
-                                  placeholder="Name your list"
+                                  placeholder={`Name your ${NODE_LABELS.list.toLowerCase()}`}
                                   value={newListName}
                                   onChange={(e) => setNewListName(e.target.value)}
                                   onBlur={() => {

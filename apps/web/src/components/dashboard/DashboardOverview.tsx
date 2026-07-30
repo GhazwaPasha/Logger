@@ -269,7 +269,8 @@ export function DashboardOverview({
         <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5 text-center">
           <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Add {NODE_LABELS.level}s and lists under Work, then create your first {NODE_LABELS.workItem.toLowerCase()}.
+            Add {NODE_LABELS.level}s and {NODE_LABELS.list.toLowerCase()}s under Work, then create your first{" "}
+            {NODE_LABELS.workItem.toLowerCase()}.
           </p>
           <Link href={`${basePath}/work`} className="btn-primary mt-6 inline-flex rounded-xl px-5">
             Go to Work
@@ -339,7 +340,7 @@ export function DashboardOverview({
                 <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : depts.length}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-[11px] text-[var(--muted)]">Lists</dt>
+                <dt className="text-[11px] text-[var(--muted)]">{NODE_LABELS.list}s</dt>
                 <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : lists.length}</dd>
               </div>
             </dl>
@@ -460,7 +461,9 @@ export function DashboardOverview({
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">Pipeline tasks grouped by list&apos;s level</p>
+          <p className="mt-0.5 text-sm text-[var(--muted)]">
+            Pipeline tasks grouped by {NODE_LABELS.list.toLowerCase()}&apos;s {NODE_LABELS.level.toLowerCase()}
+          </p>
           {stats.levelRows.length === 0 && !loading ? (
             <p className="mt-2 text-sm text-[var(--muted)]">No pipeline tasks to show.</p>
           ) : (

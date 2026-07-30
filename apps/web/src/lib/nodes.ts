@@ -11,7 +11,8 @@
 
 export const NODE_LABELS = {
   workspace: "Workspace",
-  level: "Level",
+  level: "Category",
+  list: "Channel",
   workItem: "Task",
 } as const;
 

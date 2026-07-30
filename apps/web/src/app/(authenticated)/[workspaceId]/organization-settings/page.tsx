@@ -21,6 +21,7 @@ import { discordKeys, orgKeys, workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
+import { NODE_LABELS } from "@/lib/nodes";
 
 type DiscordIntegrationConfig = { guildId: string; updatedAt: string } | null;
 type DiscordConnectionResult = { ok: true; guildName: string } | { ok: false; reason: string };
@@ -242,7 +243,7 @@ export default function OrganizationSettingsPage() {
     setError(null);
     setOrgDeleteDialog({
       title: "Delete this organization?",
-      description: `“${org.name}” and all of its levels, lists, tasks, and members will be permanently removed. This cannot be undone.`,
+      description: `“${org.name}” and all of its ${NODE_LABELS.level.toLowerCase()}s, ${NODE_LABELS.list.toLowerCase()}s, tasks, and members will be permanently removed. This cannot be undone.`,
       confirmLabel: "Delete forever",
       variant: "danger",
       onConfirm: () => void performOrganizationDelete(),
@@ -476,7 +477,7 @@ export default function OrganizationSettingsPage() {
         <SettingsCard
           icon={faTriangleExclamation}
           title="Delete organization"
-          description="Permanently delete this workspace, all levels, lists, tasks, and members. This cannot be undone."
+          description={`Permanently delete this workspace, all ${NODE_LABELS.level.toLowerCase()}s, ${NODE_LABELS.list.toLowerCase()}s, tasks, and members. This cannot be undone.`}
           tone="danger"
         >
           <label className="block text-xs font-medium text-[var(--muted)]" htmlFor="org-delete-confirm-input">

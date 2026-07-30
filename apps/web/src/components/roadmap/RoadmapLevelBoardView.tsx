@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_DOT_CLASS, STATUS_LABELS } from "@/lib/roadmap-format";
+import { NODE_LABELS } from "@/lib/nodes";
 import type { Dept, GoalRow, MilestoneRow } from "@/lib/ledger-types";
 
 const ORG_WIDE_KEY = "__org__";
@@ -92,7 +93,9 @@ export function RoadmapLevelBoardView({
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">Milestones will appear here grouped by level once created.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Milestones will appear here grouped by {NODE_LABELS.level.toLowerCase()} once created.
+          </p>
         </div>
       </div>
     );

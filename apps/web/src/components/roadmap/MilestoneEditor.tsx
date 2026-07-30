@@ -23,6 +23,7 @@ import type {
 } from "@/lib/ledger-types";
 import type { useRoadmap } from "@/hooks/useRoadmap";
 import { defaultMilestoneRange, formatDate, STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
+import { NODE_LABELS } from "@/lib/nodes";
 
 export type MilestoneEditorMode =
   | { kind: "create"; goalId: string; parent: MilestoneRow | null; departmentId: string | null }
@@ -316,7 +317,7 @@ export function MilestoneEditor({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Level
+                {NODE_LABELS.level}
               </label>
               <SelectPopover
                 value={departmentId || "__org__"}
@@ -400,7 +401,7 @@ export function MilestoneEditor({
               {suggestedTasks.length > 0 && !taskQuery.trim() && (
                 <div className="mt-2.5">
                   <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
-                    Suggested — same level or due in range
+                    Suggested — same {NODE_LABELS.level.toLowerCase()} or due in range
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {suggestedTasks.map((t) => {
@@ -458,7 +459,9 @@ export function MilestoneEditor({
                   </button>
                 </div>
               ) : (
-                <p className="mt-2.5 text-xs text-[var(--muted)]">Create a list under Work before adding tasks here.</p>
+                <p className="mt-2.5 text-xs text-[var(--muted)]">
+                  Create a {NODE_LABELS.list.toLowerCase()} under Work before adding tasks here.
+                </p>
               )}
               <p className="mt-1 text-xs text-[var(--muted)]">
                 New tasks default to due {formatDate(editing.periodEnd)} — edit the task afterward to change it.

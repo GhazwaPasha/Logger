@@ -9,6 +9,7 @@ import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/Confir
 import type { Dept, GoalRow, MemberRow, RoadmapStatus } from "@/lib/ledger-types";
 import type { useRoadmap } from "@/hooks/useRoadmap";
 import { STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
+import { NODE_LABELS } from "@/lib/nodes";
 
 export type GoalEditorMode = { kind: "create" } | { kind: "edit"; goal: GoalRow };
 
@@ -145,7 +146,7 @@ export function GoalEditor({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                Level
+                {NODE_LABELS.level}
               </label>
               <SelectPopover
                 value={departmentId || "__org__"}

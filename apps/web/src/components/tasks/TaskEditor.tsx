@@ -30,6 +30,7 @@ import { TaskFormSyncIndicator } from "@/components/tasks/TaskFormSyncIndicator"
 import { TaskPanelHistoryCard } from "@/components/tasks/TaskPanelHistoryCard";
 import { TaskSubtaskList } from "@/components/tasks/TaskSubtaskList";
 import { TaskLevelListField } from "@/components/tasks/TaskLevelListField";
+import { NODE_LABELS } from "@/lib/nodes";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SelectPopover } from "@/components/ui/SelectPopover";
@@ -465,7 +466,9 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             </div>
 
             <div>
-              <SectionLabel>Level &amp; List</SectionLabel>
+              <SectionLabel>
+                {NODE_LABELS.level} &amp; {NODE_LABELS.list}
+              </SectionLabel>
               <TaskLevelListField
                 listId={form.listId}
                 lists={lists}

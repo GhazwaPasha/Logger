@@ -97,7 +97,7 @@ export function TaskLevelListField({
           </span>
         ) : null}
         {committedList ? (
-          <span className={LIST_CHIP_CLASS} title={`List: ${committedList.name}`}>
+          <span className={LIST_CHIP_CLASS} title={`${NODE_LABELS.list}: ${committedList.name}`}>
             {committedList.name}
           </span>
         ) : null}
@@ -130,7 +130,7 @@ export function TaskLevelListField({
             <button
               type="button"
               className="shrink-0 rounded px-1 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-              aria-label="Change list"
+              aria-label={`Change ${NODE_LABELS.list}`}
               onClick={() => {
                 setStagedDeptId(committedDept?.id ?? null);
                 setMode("picking-list");
@@ -165,7 +165,7 @@ export function TaskLevelListField({
             className="inline-flex items-center rounded-full border border-dashed border-[var(--border-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={() => setMode("picking-level")}
           >
-            Search {NODE_LABELS.level.toLowerCase()} &amp; list
+            Search {NODE_LABELS.level.toLowerCase()} &amp; {NODE_LABELS.list.toLowerCase()}
           </button>
         ) : null}
       </div>
@@ -173,7 +173,9 @@ export function TaskLevelListField({
       {mode !== "idle" ? (
         <div className="relative">
           <label htmlFor={inputId} className="sr-only">
-            {mode === "picking-level" ? `Search ${NODE_LABELS.level.toLowerCase()}s` : "Search lists"}
+            {mode === "picking-level"
+              ? `Search ${NODE_LABELS.level.toLowerCase()}s`
+              : `Search ${NODE_LABELS.list.toLowerCase()}s`}
           </label>
           <input
             ref={inputRef}
@@ -186,7 +188,7 @@ export function TaskLevelListField({
             placeholder={
               mode === "picking-level"
                 ? `Search ${NODE_LABELS.level.toLowerCase()}s…`
-                : `Search lists in ${stagedDept?.name ?? ""}…`
+                : `Search ${NODE_LABELS.list.toLowerCase()}s in ${stagedDept?.name ?? ""}…`
             }
             className="input w-full rounded-xl text-sm"
             value={query}
@@ -200,7 +202,7 @@ export function TaskLevelListField({
               key={mode}
               id={optionsId}
               role="listbox"
-              aria-label={mode === "picking-level" ? `${NODE_LABELS.level}s` : "Lists"}
+              aria-label={mode === "picking-level" ? `${NODE_LABELS.level}s` : `${NODE_LABELS.list}s`}
               className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
               style={{ transformOrigin: "top" }}
               variants={panelPopVariants}
@@ -232,7 +234,9 @@ export function TaskLevelListField({
                   ))
                 )
               ) : listOptions.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-[var(--muted)]">No lists in this {NODE_LABELS.level.toLowerCase()}.</li>
+                <li className="px-3 py-2 text-sm text-[var(--muted)]">
+                  No {NODE_LABELS.list.toLowerCase()}s in this {NODE_LABELS.level.toLowerCase()}.
+                </li>
               ) : (
                 listOptions.map((l) => (
                   <li key={l.id} role="presentation">

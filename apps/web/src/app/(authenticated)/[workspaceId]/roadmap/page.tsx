@@ -17,6 +17,7 @@ import { RoadmapPipelineBar } from "@/components/roadmap/RoadmapPipelineBar";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
+import { NODE_LABELS } from "@/lib/nodes";
 
 type RoadmapView = "outline" | "timeline" | "grand" | "level";
 
@@ -24,7 +25,7 @@ const VIEW_LABELS: Record<RoadmapView, string> = {
   outline: "Outline",
   timeline: "Timeline",
   grand: "Grand Roadmap",
-  level: "By level",
+  level: `By ${NODE_LABELS.level.toLowerCase()}`,
 };
 
 type EditorMode =
