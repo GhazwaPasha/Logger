@@ -139,7 +139,7 @@ function FeatureStoryStatic() {
         return (
           <li key={item.eyebrow}>
             <Reveal delayMs={index * 70}>
-              <div className="group flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-[var(--border)] hover:shadow-[0_20px_50px_-28px_color-mix(in_srgb,var(--fg)_18%,transparent)] xl:p-7 2xl:p-8">
+              <div className="group flex h-full flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 transition-[border-color,transform] duration-300 hover:-translate-y-1 hover:border-[var(--border)] xl:p-7 2xl:p-8">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)] transition-colors duration-300 group-hover:scale-105 group-hover:text-[var(--fg)]">
                   <Icon className="h-5 w-5" />
                 </div>
@@ -184,10 +184,17 @@ export function FeatureStory() {
     <section id="capabilities" className="scroll-mt-24" aria-labelledby="capabilities-heading">
       <div className="mx-auto w-full max-w-7xl px-4 pt-10 sm:px-6 sm:pt-12 lg:max-w-[90rem] lg:px-8 2xl:max-w-[min(100%,100rem)] 2xl:px-10">
         {header}
+        {/* Below `lg` the rail and ghost numeral (both `lg:` gated for space reasons) disappear,
+            leaving the pinned stage more than half blank for the entire scroll—there isn't
+            enough width for a cinematic pin to earn its keep, so use the compact card grid
+            instead. Pure CSS visibility (no JS branch) so this can't hydration-mismatch. */}
+        <div className="lg:hidden">
+          <FeatureStoryStatic />
+        </div>
       </div>
-      <ScrollPin steps={3}>
-        {(progress) => <FeatureStoryPinned progress={progress} />}
-      </ScrollPin>
+      <div className="hidden lg:block">
+        <ScrollPin steps={3}>{(progress) => <FeatureStoryPinned progress={progress} />}</ScrollPin>
+      </div>
     </section>
   );
 }

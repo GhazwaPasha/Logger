@@ -83,7 +83,7 @@ function HowItWorksStatic() {
       {steps.map((item, index) => (
         <li key={item.step}>
           <Reveal delayMs={index * 80}>
-            <div className="group relative h-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/50 p-6 pt-8 transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] hover:shadow-[0_16px_44px_-26px_color-mix(in_srgb,var(--fg)_14%,transparent)] xl:p-7 xl:pt-9 2xl:p-8 2xl:pt-10">
+            <div className="group relative h-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/50 p-6 pt-8 transition-[border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] xl:p-7 xl:pt-9 2xl:p-8 2xl:pt-10">
               <span className="absolute left-6 top-0 flex h-8 -translate-y-1/2 items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 font-mono-ledger text-xs font-semibold text-[var(--accent)] transition-transform duration-300 group-hover:scale-[1.03]">
                 {item.step}
               </span>

@@ -42,11 +42,11 @@ export function MarketingNav({ wordmarkClassName }: MarketingNavProps) {
           </a>
           <Link
             href="/login?next=%2Fapp%2Fworkspaces"
-            className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+            className="inline-flex h-11 items-center rounded-lg px-3 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
           >
             Log in
           </Link>
-          <Link href="/login" className="btn-primary inline-flex h-10 items-center justify-center rounded-xl px-5 text-sm font-medium">
+          <Link href="/login" className="btn-primary inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-medium">
             Get started
           </Link>
         </nav>
