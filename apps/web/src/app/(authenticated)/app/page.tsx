@@ -29,7 +29,7 @@ export default function AppEntryPage() {
     router.replace(`/${workspaceUrlSegment(target)}/dashboard`);
   }, [isPending, token, orgsLoading, orgs, router, deactivate]);
 
-  if (orgsLoading || orgs.length > 0) return null;
+  if (isPending || !token || orgsLoading || orgs.length > 0) return null;
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--surface-base)]">
