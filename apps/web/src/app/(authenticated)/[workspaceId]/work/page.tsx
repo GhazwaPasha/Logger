@@ -51,7 +51,6 @@ import { TaskMilestoneIconBtn } from "@/components/roadmap/TaskMilestoneIconBtn"
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
-import { SelectPopover } from "@/components/ui/SelectPopover";
 import { Avatar } from "@/components/ui/Avatar";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -79,13 +78,13 @@ import {
   TASK_ASSIGNED_CHROME_CLASS,
   TASK_FLOW_ORDER,
   TASK_LATE_DUE_CHROME_CLASS,
-  type DatePreset,
+  type DueWindow,
   type BoardTaskStatus,
   type ManualTaskStatus,
   type SortMode,
   type TaskPriority,
   type UrlStatusFilter,
-  dueQueryToDatePreset,
+  isDueWindow,
   kanbanTransitionAllowedFromStored,
   manualStatusFromStored,
   nextWorkflowManualStatus,
@@ -98,8 +97,7 @@ import {
   statusLabelTextClasses,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
-  taskMatchesDatePreset,
-  taskMatchesDueRange,
+  taskMatchesDueWindow,
   taskMatchesUrlStatusFilter,
   taskPriority,
   taskShowsLateFooter,
@@ -140,15 +138,16 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
   { value: "due_desc", label: "Due · latest" },
 ];
 
-const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
-  { value: "all", label: "All dates" },
-  { value: "late", label: "Late" },
-  { value: "this_week", label: "Due this week" },
-  { value: "no_due", label: "No due date" },
+const DUE_WINDOW_OPTIONS: { value: DueWindow; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "1d", label: "1D" },
+  { value: "2d", label: "2D" },
+  { value: "3d", label: "3D" },
+  { value: "1w", label: "1W" },
+  { value: "1m", label: "1M" },
 ];
 
 const SORT_PANEL_MIN_W = 224;
-const DATE_PANEL_MIN_W = 288;
 const MENU_VIEWPORT_GUTTER = 12;
 
 function firstAssigneeLabel(task: TaskRow, memberRows: MemberRow[]): string | null {
@@ -365,23 +364,19 @@ function WorkItemsInner() {
   const subtasksByTaskIdRef = useRef(subtasksByTaskId);
   subtasksByTaskIdRef.current = subtasksByTaskId;
   const [sortMode, setSortMode] = useState<SortMode>("priority_desc");
-  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [dueWindow, setDueWindow] = useState<DueWindow>("all");
   const [urlStatusFilter, setUrlStatusFilter] = useState<UrlStatusFilter | null>(null);
   const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
   const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
   const [goalFilter, setGoalFilter] = useState<string | null>(null);
   const [milestoneFilter, setMilestoneFilter] = useState<string | null>(null);
-  const [dueFrom, setDueFrom] = useState("");
-  const [dueTo, setDueTo] = useState("");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [dueWindowOpen, setDueWindowOpen] = useState(false);
   const [toolbarMenusMounted, setToolbarMenusMounted] = useState(false);
   const [sortPanelStyle, setSortPanelStyle] = useState<CSSProperties>({});
-  const [datePanelStyle, setDatePanelStyle] = useState<CSSProperties>({});
   const sortTriggerRef = useRef<HTMLButtonElement>(null);
-  const dateTriggerRef = useRef<HTMLButtonElement>(null);
   const sortPanelRef = useRef<HTMLDivElement>(null);
-  const datePanelRef = useRef<HTMLDivElement>(null);
+  const dueWindowContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -439,48 +434,31 @@ function WorkItemsInner() {
     };
   }, [sortMenuOpen]);
 
-  useLayoutEffect(() => {
-    if (!dateMenuOpen || !dateTriggerRef.current) return;
-    const update = () => {
-      const el = dateTriggerRef.current;
-      if (!el) return;
-      setDatePanelStyle(computePopoverStyle(el, DATE_PANEL_MIN_W, 420));
-    };
-    update();
-    window.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [dateMenuOpen]);
-
   useEffect(() => {
-    if (!sortMenuOpen && !dateMenuOpen) return;
+    if (!sortMenuOpen && !dueWindowOpen) return;
     function handlePointerDown(e: PointerEvent) {
       const t = e.target as Node;
       const inSortTrigger = sortTriggerRef.current?.contains(t);
       const inSortPanel = sortPanelRef.current?.contains(t);
-      const inDateTrigger = dateTriggerRef.current?.contains(t);
-      const inDatePanel = datePanelRef.current?.contains(t);
+      const inDueWindow = dueWindowContainerRef.current?.contains(t);
       if (sortMenuOpen && !inSortTrigger && !inSortPanel) setSortMenuOpen(false);
-      if (dateMenuOpen && !inDateTrigger && !inDatePanel) setDateMenuOpen(false);
+      if (dueWindowOpen && !inDueWindow) setDueWindowOpen(false);
     }
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [sortMenuOpen, dateMenuOpen]);
+  }, [sortMenuOpen, dueWindowOpen]);
 
   useEffect(() => {
-    if (!sortMenuOpen && !dateMenuOpen) return;
+    if (!sortMenuOpen && !dueWindowOpen) return;
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setSortMenuOpen(false);
-        setDateMenuOpen(false);
+        setDueWindowOpen(false);
       }
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [sortMenuOpen, dateMenuOpen]);
+  }, [sortMenuOpen, dueWindowOpen]);
 
   useEffect(() => {
     const levelLists = levelPref ? lists.filter((l) => l.departmentId === levelPref) : lists;
@@ -548,11 +526,7 @@ function WorkItemsInner() {
 
   useEffect(() => {
     const dueRaw = searchParams.get("due");
-    if (!dueRaw) setDatePreset("all");
-    else {
-      const preset = dueQueryToDatePreset(dueRaw);
-      if (preset) setDatePreset(preset);
-    }
+    setDueWindow(dueRaw && isDueWindow(dueRaw) ? dueRaw : "all");
 
     const statusRaw = searchParams.get("status");
     setUrlStatusFilter(statusRaw ? parseUrlStatusFilter(statusRaw) : null);
@@ -949,11 +923,7 @@ function WorkItemsInner() {
         if (assignees.length > 0) return false;
       }
       if (urlAssigneeUserId && !assignees.includes(urlAssigneeUserId)) return false;
-      if (!taskMatchesDatePreset(t, datePreset)) return false;
-      if (dueFrom || dueTo) {
-        if (!t.dueAt) return false;
-        if (!taskMatchesDueRange(t, dueFrom, dueTo)) return false;
-      }
+      if (!taskMatchesDueWindow(t, dueWindow)) return false;
       if (goalFilter) {
         const linked = roadmap.milestones.some((m) => m.goalId === goalFilter && m.linkedTaskIds.includes(t.id));
         if (!linked) return false;
@@ -966,9 +936,7 @@ function WorkItemsInner() {
     });
   }, [
     visibleTasks,
-    datePreset,
-    dueFrom,
-    dueTo,
+    dueWindow,
     urlStatusFilter,
     urlAssigneeScope,
     urlAssigneeUserId,
@@ -1915,6 +1883,20 @@ function WorkItemsInner() {
             ))}
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
+            <button
+              type="button"
+              className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
+              onClick={() => openNewTask(listId || undefined)}
+              disabled={isOpeningNewTask}
+              aria-busy={isOpeningNewTask || undefined}
+            >
+              {isOpeningNewTask ? (
+                <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <FontAwesomeIcon icon={faPlus} className="size-3.5" />
+              )}
+              New task
+            </button>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
               <div
                 className="inline-flex items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
@@ -1956,7 +1938,7 @@ function WorkItemsInner() {
                 title={SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? "Sort"}
                 onClick={() => {
                   setSortMenuOpen((o) => !o);
-                  setDateMenuOpen(false);
+                  setDueWindowOpen(false);
                 }}
                 aria-expanded={sortMenuOpen}
                 aria-haspopup="menu"
@@ -1964,43 +1946,69 @@ function WorkItemsInner() {
               >
                 <FontAwesomeIcon icon={faArrowsUpDown} className="size-[18px] pointer-events-none" aria-hidden />
               </button>
-              <button
-                ref={dateTriggerRef}
-                type="button"
-                className={`relative ${tasksToolbarIconButtonClasses(dateMenuOpen)}`}
-                title="Due date filter"
-                onClick={() => {
-                  setDateMenuOpen((o) => !o);
-                  setSortMenuOpen(false);
-                }}
-                aria-expanded={dateMenuOpen}
-                aria-haspopup="dialog"
-                aria-label={
-                  datePreset !== "all" || dueFrom || dueTo
-                    ? "Due date filter, filters active"
-                    : "Due date filter"
-                }
-              >
-                <FontAwesomeIcon icon={faCalendarDays} className="size-[18px] pointer-events-none" aria-hidden />
-                {(datePreset !== "all" || dueFrom || dueTo) && (
-                  <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--surface-elevated)]" aria-hidden />
-                )}
-              </button>
+              <div ref={dueWindowContainerRef} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className={`relative ${tasksToolbarIconButtonClasses(dueWindowOpen || dueWindow !== "all")}`}
+                  title="Due date filter"
+                  onClick={() => {
+                    setDueWindowOpen((o) => !o);
+                    setSortMenuOpen(false);
+                  }}
+                  aria-expanded={dueWindowOpen}
+                  aria-label={
+                    dueWindow !== "all"
+                      ? `Due date filter: ${DUE_WINDOW_OPTIONS.find((o) => o.value === dueWindow)?.label}`
+                      : "Due date filter"
+                  }
+                >
+                  <FontAwesomeIcon icon={faCalendarDays} className="size-[18px] pointer-events-none" aria-hidden />
+                  {dueWindow !== "all" && (
+                    <span
+                      className="absolute -right-1 -bottom-1 inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-bold leading-none text-[var(--on-accent)] ring-2 ring-[var(--surface-base)]"
+                      aria-hidden
+                    >
+                      {DUE_WINDOW_OPTIONS.find((o) => o.value === dueWindow)?.label}
+                    </span>
+                  )}
+                </button>
+                <AnimatePresence initial={false}>
+                  {dueWindowOpen && (
+                    <motion.div
+                      className="flex items-center gap-1 overflow-hidden"
+                      initial={{ width: 0, opacity: 0 }}
+                      animate={{ width: "auto", opacity: 1 }}
+                      exit={{ width: 0, opacity: 0 }}
+                      transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                      role="group"
+                      aria-label="Due date range"
+                    >
+                      {DUE_WINDOW_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                            dueWindow === opt.value
+                              ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                              : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                          }`}
+                          onClick={() => {
+                            setDueWindow(opt.value);
+                            replaceWorkQuery((p) => {
+                              if (opt.value === "all") p.delete("due");
+                              else p.set("due", opt.value);
+                            });
+                          }}
+                          aria-pressed={dueWindow === opt.value}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
-            <button
-              type="button"
-              className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
-              onClick={() => openNewTask(listId || undefined)}
-              disabled={isOpeningNewTask}
-              aria-busy={isOpeningNewTask || undefined}
-            >
-              {isOpeningNewTask ? (
-                <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
-              ) : (
-                <FontAwesomeIcon icon={faPlus} className="size-3.5" />
-              )}
-              New task
-            </button>
           </div>
           <WorkBoardStatsCard
             counts={boardStatusCounts}
@@ -2048,87 +2056,6 @@ function WorkItemsInner() {
                     </li>
                   ))}
                 </ul>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
-
-      {toolbarMenusMounted &&
-        createPortal(
-          <AnimatePresence>
-            {dateMenuOpen && (
-              <motion.div
-                ref={datePanelRef}
-                style={{ ...datePanelStyle, transformOrigin: datePanelStyle.bottom != null ? "bottom" : "top" }}
-                className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)]"
-                role="dialog"
-                aria-label="Due date filter"
-                variants={panelPopVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-              >
-            <div className="max-h-[min(420px,85vh)] overflow-y-auto p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Preset</span>
-                  <SelectPopover
-                    value={datePreset}
-                    onChange={(v) => {
-                      const vt = v as DatePreset;
-                      setDatePreset(vt);
-                      replaceWorkQuery((p) => {
-                        if (vt === "all") p.delete("due");
-                        else p.set("due", vt);
-                      });
-                    }}
-                    options={DATE_PRESET_OPTIONS}
-                    triggerClassName="inline-flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-                    aria-label="Date preset"
-                  />
-                </div>
-              </div>
-              <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Due date range</p>
-              <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="date"
-                  className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
-                  value={dueFrom}
-                  onChange={(e) => {
-                    setDueFrom(e.target.value);
-                    replaceWorkQuery((p) => p.delete("due"));
-                  }}
-                  aria-label="Due from"
-                />
-                <input
-                  type="date"
-                  className="input h-10 min-w-0 flex-1 rounded-lg text-sm"
-                  value={dueTo}
-                  onChange={(e) => {
-                    setDueTo(e.target.value);
-                    replaceWorkQuery((p) => p.delete("due"));
-                  }}
-                  aria-label="Due to"
-                />
-              </div>
-              <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]">Optional range narrows tasks that have a due date.</p>
-              {(datePreset !== "all" || dueFrom || dueTo) && (
-                <button
-                  type="button"
-                  className="mt-3 w-full rounded-lg border border-[var(--border-subtle)] py-2 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                  onClick={() => {
-                    setDatePreset("all");
-                    setDueFrom("");
-                    setDueTo("");
-                    replaceWorkQuery((p) => p.delete("due"));
-                  }}
-                >
-                  Clear date filters
-                </button>
-              )}
-            </div>
               </motion.div>
             )}
           </AnimatePresence>,

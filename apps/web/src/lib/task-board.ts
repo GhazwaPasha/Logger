@@ -226,19 +226,6 @@ export function prioritySortKey(p: TaskPriority): number {
 
 export type DatePreset = "all" | "late" | "this_week" | "no_due";
 
-const DATE_PRESETS = ["all", "late", "this_week", "no_due"] as const satisfies readonly DatePreset[];
-
-export function isDatePreset(v: string): v is DatePreset {
-  return (DATE_PRESETS as readonly string[]).includes(v);
-}
-
-/** Map `due=` query to preset; accepts legacy `overdue` as alias for the **Late** due preset. */
-export function dueQueryToDatePreset(v: string): DatePreset | null {
-  if (v === "overdue") return "late";
-  if (isDatePreset(v)) return v;
-  return null;
-}
-
 /** Parse `status=` query values from dashboard / deep links (aliases tolerated). */
 export function parseUrlStatusFilter(raw: string): UrlStatusFilter | null {
   const k = raw
@@ -303,19 +290,25 @@ export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolea
   return true;
 }
 
-export function taskMatchesDueRange(task: TaskRow, fromYmd: string, toYmd: string): boolean {
-  if (!fromYmd && !toYmd) return true;
+export type DueWindow = "all" | "1d" | "2d" | "3d" | "1w" | "1m";
+
+const DUE_WINDOWS = ["all", "1d", "2d", "3d", "1w", "1m"] as const satisfies readonly DueWindow[];
+
+export function isDueWindow(v: string): v is DueWindow {
+  return (DUE_WINDOWS as readonly string[]).includes(v);
+}
+
+/** Tasks due between now and the end of the window (upcoming only — past-due tasks fall outside every window but "all"). */
+export function taskMatchesDueWindow(task: TaskRow, window: DueWindow): boolean {
+  if (window === "all") return true;
   const due = task.dueAt ? new Date(task.dueAt) : null;
   if (!due) return false;
-  if (fromYmd) {
-    const from = startOfLocalDay(new Date(`${fromYmd}T12:00:00`));
-    if (due < from) return false;
-  }
-  if (toYmd) {
-    const to = endOfLocalDay(new Date(`${toYmd}T12:00:00`));
-    if (due > to) return false;
-  }
-  return true;
+  const now = new Date();
+  const end = new Date(now);
+  if (window === "1w") end.setDate(end.getDate() + 7);
+  else if (window === "1m") end.setMonth(end.getMonth() + 1);
+  else end.setDate(end.getDate() + Number(window[0]));
+  return due >= now && due <= end;
 }
 
 export type SortMode = "priority_desc" | "priority_asc" | "due_asc" | "due_desc";
