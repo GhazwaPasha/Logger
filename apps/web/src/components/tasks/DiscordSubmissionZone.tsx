@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch } from "@/lib/api";
 
 type DiscordSubmitResponse = {
@@ -15,6 +16,8 @@ type DiscordSubmitResponse = {
 type Props = {
   taskId: string;
   token: string;
+  /** Shows "(Required)*" inline with the label instead of a separate line. */
+  required?: boolean;
 };
 
 /**
@@ -22,7 +25,7 @@ type Props = {
  * task's Discord channel, synchronously, so success/failure is shown immediately rather than silently
  * failing in the background. The uploaded file still shows up in the shared Attachments list below.
  */
-export function DiscordSubmissionZone({ taskId, token }: Props) {
+export function DiscordSubmissionZone({ taskId, token, required }: Props) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +78,11 @@ export function DiscordSubmissionZone({ taskId, token }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Discord submission</h3>
+        <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <FontAwesomeIcon icon={faDiscord} className="size-3.5 shrink-0 text-[#5865F2]" aria-hidden />
+          Discord submission
+          {required && <span className="normal-case tracking-normal">(Required)*</span>}
+        </h3>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
