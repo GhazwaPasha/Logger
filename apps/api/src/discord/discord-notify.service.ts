@@ -20,10 +20,26 @@ export type NotifyAttachmentOpts = {
   uploaderId: string;
   fileName: string;
   mimeType: string;
+  /** Task's due date at submission time; null if the task has none set. */
+  dueAt: Date | null;
+  /** When the submission was received (not when Discord delivery completes). */
+  submittedAt: Date;
   source: DiscordAttachmentSource;
 };
 
 export type DiscordDeliveryResult = { ok: true } | { ok: false; reason: string };
+
+function formatDueDate(d: Date): string {
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** `null` when the task has no due date — timing isn't meaningful without one. */
+function timingLabel(dueAt: Date | null, submittedAt: Date): string | null {
+  if (!dueAt) return null;
+  return submittedAt.getTime() > dueAt.getTime()
+    ? `⏰ late — was due ${formatDueDate(dueAt)}`
+    : `✅ on time — due ${formatDueDate(dueAt)}`;
+}
 
 /** Posts a task attachment into the workspace's configured Discord channel; caller awaits the outcome. */
 @Injectable()
@@ -69,7 +85,9 @@ export class DiscordNotifyService {
     const baseUrl = this.config.get<string>("WEB_APP_BASE_URL")?.trim().replace(/\/$/, "");
     const taskUrl = baseUrl && slug ? `\n${baseUrl}/${slug}/work?task=${encodeURIComponent(opts.taskId)}` : "";
 
-    const content = `📎 Discord submission on **${opts.taskTitle}** · submitted by ${uploaderName}${taskUrl}`;
+    const timing = timingLabel(opts.dueAt, opts.submittedAt);
+    const timingSuffix = timing ? ` · ${timing}` : "";
+    const content = `📎 Discord submission on **${opts.taskTitle}** · submitted by ${uploaderName}${timingSuffix}${taskUrl}`;
 
     try {
       await this.discordApi.postFileMessage(opts.discordChannelId, {

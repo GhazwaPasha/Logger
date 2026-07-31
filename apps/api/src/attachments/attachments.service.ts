@@ -193,6 +193,7 @@ export class AttachmentsService {
    * so the caller gets immediate success/failure feedback instead of a silent background attempt.
    */
   async discordSubmit(userId: string, taskId: string, file: AttachmentUploadFile) {
+    const submittedAt = new Date();
     const fileName = file.originalname.trim() || "upload";
     const mimeType = resolveMime(fileName, file.mimetype);
     const access = await this.assertCanUpload(userId, taskId, mimeType, file.size);
@@ -219,6 +220,8 @@ export class AttachmentsService {
       uploaderId: userId,
       fileName,
       mimeType,
+      dueAt: access.task.dueAt,
+      submittedAt,
       source: { fileBuffer: file.buffer },
     });
 
