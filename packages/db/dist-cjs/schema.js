@@ -247,7 +247,7 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     /** At least one attachment (any source) is required before the task can be marked done. */
     attachmentRequired: (0, pg_core_1.boolean)("attachment_required").notNull().default(false),
     /** Controls whether the time-tracking UI renders for this task at all. */
-    timeTrackingEnabled: (0, pg_core_1.boolean)("time_tracking_enabled").notNull().default(true),
+    timeTrackingEnabled: (0, pg_core_1.boolean)("time_tracking_enabled").notNull().default(false),
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })

@@ -26,6 +26,7 @@ import { SelectPopover } from "@/components/ui/SelectPopover";
 import {
   FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
+  dueIndicatorColorClass,
   normalizeTaskStatus,
   stageControlDropdownOptions,
   type TaskPriority,
@@ -125,6 +126,7 @@ export function TaskViewPanel({
 
   const dueFormatted = formatDueDate(task.dueAt);
   const dueRepeat = parseTaskDueRepeat(task.dueRepeat);
+  const dueColorClass = dueIndicatorColorClass(task);
 
   return (
     <div className="flex flex-col gap-5">
@@ -360,6 +362,7 @@ export function TaskViewPanel({
                 form.setDueRepeat(null);
                 form.scheduleSave();
               }}
+              triggerColorClassName={dueColorClass}
             />
             <DueRepeatPopover
               open={showRepeatPanel}
@@ -377,7 +380,7 @@ export function TaskViewPanel({
           </div>
         ) : dueFormatted ? (
           <>
-            <p className="text-sm text-[var(--fg)]">{dueFormatted}</p>
+            <p className={`text-sm font-medium ${dueColorClass}`}>{dueFormatted}</p>
             {dueRepeat && (
               <p className="mt-0.5 text-xs text-[var(--muted)]">
                 Repeats {REPEAT_LABELS[dueRepeat] ?? dueRepeat}

@@ -232,6 +232,13 @@
       "when": 1747440021000,
       "tag": "0032_discord_submission_required",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1747440022000,
+      "tag": "0033_time_tracking_default_off",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,7 @@ import { isWorkspaceOwner, taskEditCaps } from "@/lib/workspace-permissions";
 import {
   TASK_FLOW_ORDER,
   PRIORITY_LABELS,
+  dueIndicatorColorClass,
   statusPillPaletteClasses,
   type ManualTaskStatus,
   type TaskPriority,
@@ -501,6 +502,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                       form.setDueRepeat(null);
                       form.scheduleSave();
                     }}
+                    triggerColorClassName={detail ? dueIndicatorColorClass(detail.task) : undefined}
                   />
                   <DueRepeatPopover
                     open={showRepeatPanel}
@@ -520,9 +522,10 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 (() => {
                   const dueFormatted = formatDueDate(detail?.task.dueAt ?? null);
                   const dueRepeat = parseTaskDueRepeat(detail?.task.dueRepeat);
+                  const dueColorClass = detail ? dueIndicatorColorClass(detail.task) : "text-[var(--muted)]";
                   return dueFormatted ? (
                     <>
-                      <p className="text-sm text-[var(--fg)]">{dueFormatted}</p>
+                      <p className={`text-sm font-medium ${dueColorClass}`}>{dueFormatted}</p>
                       {dueRepeat && (
                         <p className="mt-0.5 text-xs text-[var(--muted)]">
                           Repeats {REPEAT_LABELS[dueRepeat] ?? dueRepeat}

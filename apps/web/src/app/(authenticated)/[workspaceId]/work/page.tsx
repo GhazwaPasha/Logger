@@ -99,6 +99,7 @@ import {
   statusLabelTextClasses,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
+  dueIndicatorColorClass,
   taskMatchesDueRange,
   taskMatchesDueWindow,
   taskMatchesUrlStatusFilter,
@@ -715,9 +716,24 @@ function WorkItemsInner() {
   });
 
   const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
-  /** Native HTML5 DnD gives no visual affordance on its own — track drag state to highlight valid/invalid drop columns and dim the source card. */
-  const [dragState, setDragState] = useState<{ taskId: string; status: BoardTaskStatus } | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  /**
+   * Native HTML5 DnD gives no visual affordance on its own, so drag/dragover handlers normally
+   * track state to highlight valid/invalid drop columns and dim the source card. That state must
+   * NOT live in React state here: TaskCard/KanbanBoard/VirtualColumnList are components defined
+   * inside this render function, so any state update re-renders WorkItemsInner and recreates them
+   * as new function identities, which makes React unmount+remount the dragged <li> mid-gesture —
+   * the browser cancels native drag the instant its source node leaves the DOM, so the drop (and
+   * the status patch it triggers) never fires. Track drag state in refs and toggle highlight
+   * classes imperatively instead, so no re-render happens between dragstart and drop.
+   */
+  const dragStateRef = useRef<{ taskId: string; status: BoardTaskStatus } | null>(null);
+  const dragOverElRef = useRef<HTMLDivElement | null>(null);
+  const DROP_VALID_CLASSES = ["border-[var(--accent)]", "bg-[var(--accent-glow-soft)]"];
+  const DROP_INVALID_CLASSES = ["border-red-400/50", "bg-red-500/[0.04]"];
+  function clearDropHighlight() {
+    dragOverElRef.current?.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+    dragOverElRef.current = null;
+  }
 
   const loadMoreColumn = useCallback(
     async (status: string) => {
@@ -1310,16 +1326,11 @@ function WorkItemsInner() {
   function DueIconBtn({ task }: { task: TaskRow }) {
     const isLate = taskShowsLateFooter(task);
     const hasDue = Boolean(task.dueAt);
-    const flowCol = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
     const dueSummary = task.dueAt ? formatDueForListPill(task.dueAt) : null;
     const tooltip = dueSummary
       ? `Due ${dueSummary}${isLate ? " — Overdue" : ""}`
       : "No due date — click to set";
-    const color = isLate
-      ? "text-red-500 dark:text-red-400"
-      : hasDue && flowCol === "in_progress"
-        ? "text-green-600 dark:text-green-400"
-        : "text-[var(--muted)]";
+    const color = dueIndicatorColorClass(task);
     return (
       <button
         type="button"
@@ -1438,18 +1449,20 @@ function WorkItemsInner() {
         onDragStart={(e) => {
           e.dataTransfer.setData("taskId", task.id);
           e.dataTransfer.effectAllowed = "move";
-          setDragState({ taskId: task.id, status: normalizeTaskStatus(task.status) });
+          dragStateRef.current = { taskId: task.id, status: normalizeTaskStatus(task.status) };
+          e.currentTarget.classList.add("opacity-40");
         }}
-        onDragEnd={() => {
-          setDragState(null);
-          setDragOverCol(null);
+        onDragEnd={(e) => {
+          e.currentTarget.classList.remove("opacity-40");
+          dragStateRef.current = null;
+          clearDropHighlight();
         }}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
         className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform,opacity] duration-200 ${
           taskPatchSyncing
             ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
             : "cursor-grab border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
-        } ${dragState?.taskId === task.id ? "opacity-40" : ""}`}
+        }`}
       >
         {taskPatchSyncing ? (
           <div className="task-sync-ribbon-track" aria-hidden>
@@ -1712,23 +1725,24 @@ function WorkItemsInner() {
                 (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
               );
               const label = FLOW_COLUMN_LABELS[col];
-              const isDropTarget = dragState != null && dragOverCol === col;
-              const dropAllowed = dragState != null && kanbanTransitionAllowedFromStored(dragState.status, col);
               return (
                 <div
                   key={col}
                   role="region"
                   aria-label={`${label}, ${colTasks.length} tasks`}
-                  className={`flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:min-w-[17rem] ${
-                    isDropTarget
-                      ? dropAllowed
-                        ? "border-[var(--accent)] bg-[var(--accent-glow-soft)]"
-                        : "border-red-400/50 bg-red-500/[0.04]"
-                      : ""
-                  }`}
+                  className="flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:min-w-[17rem]"
                   onDragEnter={(e) => {
                     e.preventDefault();
-                    setDragOverCol(col);
+                    const el = e.currentTarget;
+                    if (dragOverElRef.current && dragOverElRef.current !== el) {
+                      dragOverElRef.current.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                    }
+                    dragOverElRef.current = el;
+                    const allowed =
+                      dragStateRef.current != null &&
+                      kanbanTransitionAllowedFromStored(dragStateRef.current.status, col);
+                    el.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                    el.classList.add(...(allowed ? DROP_VALID_CLASSES : DROP_INVALID_CLASSES));
                   }}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -1736,11 +1750,13 @@ function WorkItemsInner() {
                   }}
                   onDragLeave={(e) => {
                     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    setDragOverCol((c) => (c === col ? null : c));
+                    e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                    if (dragOverElRef.current === e.currentTarget) dragOverElRef.current = null;
                   }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  setDragOverCol(null);
+                  e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                  dragOverElRef.current = null;
                   const id = e.dataTransfer.getData("taskId");
                   if (!id) return;
                   const task = rows.find((t) => t.id === id);

@@ -4,6 +4,7 @@ import { AuthModule } from "../auth/auth.module";
 import { OAuthResourceVerifierModule } from "../auth/oauth-resource-verifier.module";
 import { CommentsModule } from "../comments/comments.module";
 import { DepartmentsModule } from "../departments/departments.module";
+import { DiscordModule } from "../discord/discord.module";
 import { ListsModule } from "../lists/lists.module";
 import { RoadmapModule } from "../roadmap/roadmap.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -21,6 +22,7 @@ import { McpController } from "./mcp.controller";
     CommentsModule,
     OrganizationsModule,
     DepartmentsModule,
+    DiscordModule,
     ListsModule,
     RoadmapModule,
   ],

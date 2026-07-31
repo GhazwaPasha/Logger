@@ -6,6 +6,7 @@ import { Public } from "../auth/public.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { DiscordIntegrationService } from "../discord/discord-integration.service";
 import { ListsService } from "../lists/lists.service";
 import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
@@ -25,6 +26,7 @@ export class McpController {
     private readonly comments: CommentsService,
     private readonly organizations: OrganizationsService,
     private readonly departments: DepartmentsService,
+    private readonly discord: DiscordIntegrationService,
     private readonly lists: ListsService,
     private readonly roadmap: RoadmapService,
     private readonly goals: GoalsService,
@@ -39,6 +41,7 @@ export class McpController {
       comments: this.comments,
       organizations: this.organizations,
       departments: this.departments,
+      discord: this.discord,
       lists: this.lists,
       roadmap: this.roadmap,
       goals: this.goals,

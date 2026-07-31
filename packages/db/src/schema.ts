@@ -308,7 +308,7 @@ export const tasks = pgTable(
     /** At least one attachment (any source) is required before the task can be marked done. */
     attachmentRequired: boolean("attachment_required").notNull().default(false),
     /** Controls whether the time-tracking UI renders for this task at all. */
-    timeTrackingEnabled: boolean("time_tracking_enabled").notNull().default(true),
+    timeTrackingEnabled: boolean("time_tracking_enabled").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

@@ -7,6 +7,6 @@ import { DiscordChannelsController, DiscordController, DiscordIntegrationControl
 @Module({
   controllers: [DiscordController, DiscordIntegrationController, DiscordChannelsController],
   providers: [DiscordApiService, DiscordIntegrationService, DiscordNotifyService],
-  exports: [DiscordNotifyService],
+  exports: [DiscordNotifyService, DiscordIntegrationService],
 })
 export class DiscordModule {}

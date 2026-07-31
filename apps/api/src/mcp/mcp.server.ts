@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { DiscordIntegrationService } from "../discord/discord-integration.service";
 import { ListsService } from "../lists/lists.service";
 import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
@@ -26,6 +27,7 @@ export interface McpServices {
   comments: CommentsService;
   organizations: OrganizationsService;
   departments: DepartmentsService;
+  discord: DiscordIntegrationService;
   lists: ListsService;
   roadmap: RoadmapService;
   goals: GoalsService;
@@ -123,6 +125,20 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
       runTool(async () => capList(await services.organizations.listMembers(userId, organizationId), HARD_LIST_CAP)),
   );
 
+  registerTool<{ organizationId: string }>(
+    server,
+    "list_discord_channels",
+    {
+      description:
+        "List the Discord text channels available in an organization's connected server (id, name, position, " +
+        "isPrivate) — use this to find the channelId needed for patch_task's discordChannelId. Returns an empty " +
+        "list if the organization hasn't connected a Discord server.",
+      inputSchema: { organizationId: z.string().uuid() },
+    },
+    async ({ organizationId }) =>
+      runTool(async () => capList(await services.discord.listChannelsForOrg(userId, organizationId), HARD_LIST_CAP)),
+  );
+
   registerTool<{ organizationId: string } & z.infer<typeof listTasksQuerySchema>>(
     server,
     "list_tasks",
@@ -180,6 +196,9 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
     {
       description:
         "Update fields on an existing task — status, priority, title, due date, assignees, subtasks, etc. " +
+        "Also controls Discord: set discordChannelId (use list_discord_channels to find a valid id, or null to " +
+        "disable posting for this task) and discordSubmissionRequired (whether a Discord submission is required " +
+        "before the task can be marked done — only meaningful once a channel is set). " +
         "Provide at least one field to change besides taskId.",
       inputSchema: { taskId: z.string().uuid(), ...patchTaskSchema._def.schema.shape },
     },

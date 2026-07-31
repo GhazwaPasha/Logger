@@ -65,6 +65,15 @@ export function taskShowsLateFooter(task: TaskRow, now: Date = new Date()): bool
   return manual === "in_progress" && taskIsOverdue(task, now);
 }
 
+/** Shared due-date indicator color (list/kanban clock icon, side panel, editor): red once late, green while actively worked on, blue for any other due date, muted when unset. */
+export function dueIndicatorColorClass(task: TaskRow, now: Date = new Date()): string {
+  if (taskShowsLateFooter(task, now)) return "text-red-500 dark:text-red-400";
+  if (!task.dueAt) return "text-[var(--muted)]";
+  const flowCol = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
+  if (flowCol === "in_progress") return "text-green-600 dark:text-green-400";
+  return "text-blue-500 dark:text-blue-400";
+}
+
 /** Assignee control chrome (sky) when the task has at least one assignee. */
 export const TASK_ASSIGNED_CHROME_CLASS =
   "border-sky-500/35 bg-sky-500/14 text-sky-800 dark:border-sky-500/28 dark:bg-sky-500/10 dark:text-sky-200";

@@ -35,6 +35,8 @@ type DueDateTimePopoverProps = {
   value: string;
   onChange: (localValue: string) => void;
   onClear: () => void;
+  /** Overrides the trigger's default muted text color (e.g. to flag an overdue or upcoming due date). */
+  triggerColorClassName?: string;
 };
 
 export function DueDateTimePopover({
@@ -43,6 +45,7 @@ export function DueDateTimePopover({
   value,
   onChange,
   onClear,
+  triggerColorClassName,
 }: DueDateTimePopoverProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -114,7 +117,7 @@ export function DueDateTimePopover({
       <button
         ref={triggerRef}
         type="button"
-        className={`rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
+        className={`rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium transition-colors hover:text-[var(--fg)] ${triggerColorClassName ?? "text-[var(--muted)]"} ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"

@@ -41,7 +41,7 @@ export function useTaskEditorForm(options: {
   const [discordChannelId, setDiscordChannelId] = useState<string | null>(null);
   const [discordSubmissionRequired, setDiscordSubmissionRequiredState] = useState(true);
   const [attachmentRequired, setAttachmentRequiredState] = useState(false);
-  const [timeTrackingEnabled, setTimeTrackingEnabledState] = useState(true);
+  const [timeTrackingEnabled, setTimeTrackingEnabledState] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export function useTaskEditorForm(options: {
     setDiscordChannelId(detail.task.discordChannelId ?? null);
     setDiscordSubmissionRequiredState(detail.task.discordSubmissionRequired ?? true);
     setAttachmentRequiredState(detail.task.attachmentRequired ?? false);
-    setTimeTrackingEnabledState(detail.task.timeTrackingEnabled ?? true);
+    setTimeTrackingEnabledState(detail.task.timeTrackingEnabled ?? false);
     seedSavedDueAt(detail.task.dueAt);
     setInitialized(true);
   }, [detail, initialized, seedSavedDueAt]);
