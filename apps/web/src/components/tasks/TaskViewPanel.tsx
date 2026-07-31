@@ -415,8 +415,15 @@ export function TaskViewPanel({
         </div>
       )}
 
-      {/* Discord submission — live for everyone with access, when a channel is assigned */}
-      {token && form.discordChannelId && <DiscordSubmissionZone taskId={taskId} token={token} />}
+      {/* Discord submission — live for everyone with access, when a channel is assigned; the required toggle lives in the full editor only */}
+      {token && form.discordChannelId && (
+        <div className="space-y-2">
+          {form.discordSubmissionRequired && (
+            <p className="text-xs font-medium text-[var(--muted)]">Discord submission required before marking done</p>
+          )}
+          <DiscordSubmissionZone taskId={taskId} token={token} />
+        </div>
+      )}
 
       {/* Comments — live for everyone with access */}
       {token && sessionUserId && (

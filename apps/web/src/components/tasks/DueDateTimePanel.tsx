@@ -46,6 +46,11 @@ function mergeCalendarDayWithTime(day: Date, hour: number, minute: number): Date
 /** Same native `type="date"` shell as the task page due filter toolbar. */
 const DUE_DATE_INPUT_CLASS = "input h-10 min-w-0 w-full flex-1 rounded-lg text-sm";
 
+function todayLocalDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 /** Popover header actions (no global `.btn-*` — padding matches). */
 const COMPACT_DUE_ACTION_BASE =
   "box-border inline-flex h-6 items-center justify-center rounded-md border border-solid px-1.5 text-[10px] font-medium leading-none transition-colors";
@@ -155,6 +160,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
           type="date"
           className={`${DUE_DATE_INPUT_CLASS} mt-1`}
           value={dateInputValue}
+          min={todayLocalDateString()}
           onChange={onDateInputChange}
           aria-label="Due date"
         />

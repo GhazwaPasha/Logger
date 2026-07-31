@@ -225,6 +225,13 @@
       "when": 1747440020000,
       "tag": "0031_remove_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1747440021000,
+      "tag": "0032_discord_submission_required",
+      "breakpoints": true
     }
   ]
 }

@@ -52,6 +52,7 @@ import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { SelectPopover } from "@/components/ui/SelectPopover";
+import { Avatar } from "@/components/ui/Avatar";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
   type MemberRow,
@@ -159,6 +160,12 @@ function firstAssigneeLabel(task: TaskRow, memberRows: MemberRow[]): string | nu
   const firstToken = raw.split(/\s+/)[0];
   if (firstToken) return firstToken;
   return raw;
+}
+
+function firstAssigneeMember(task: TaskRow, memberRows: MemberRow[]): MemberRow | null {
+  const ids = task.assigneeUserIds ?? [];
+  if (ids.length === 0) return null;
+  return memberRows.find((row) => row.userId === ids[0]) ?? null;
 }
 
 /** Task panel assignee toggle: summary label or “Add assignee”. */
@@ -1342,8 +1349,7 @@ function WorkItemsInner() {
   }
 
   function AssigneeIconBtn({ task }: { task: TaskRow }) {
-    const name = firstAssigneeLabel(task, members);
-    const initial = name?.trim().charAt(0).toUpperCase() ?? "";
+    const member = firstAssigneeMember(task, members);
     const allNames = assigneeNamesForTask(task, members);
     const tooltip = allNames ? `Assignees: ${allNames}` : "No assignee — click to assign";
     return (
@@ -1354,10 +1360,14 @@ function WorkItemsInner() {
         aria-label={tooltip}
         className="flex size-6 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        {name ? (
-          <span className="flex size-6 items-center justify-center rounded-full bg-sky-500/20 text-[10px] font-bold leading-none tabular-nums text-[var(--fg)]" aria-hidden>
-            {initial}
-          </span>
+        {member ? (
+          <Avatar
+            name={member.name}
+            email={member.email}
+            image={member.image}
+            size="size-6"
+            className="bg-sky-500/20 text-[10px] font-bold leading-none tabular-nums text-[var(--fg)]"
+          />
         ) : (
           <FontAwesomeIcon icon={faUserPlus} className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
         )}
@@ -1393,15 +1403,17 @@ function WorkItemsInner() {
     );
   }
 
-  /** Shown only when the task has a Discord channel assigned — flags that a Discord submission is required. */
+  /** Shown only when the task has a Discord channel assigned; label reflects whether submission is required or optional. */
   function DiscordIconBtn({ task }: { task: TaskRow }) {
     if (!task.discordChannelId) return null;
+    const label =
+      (task.discordSubmissionRequired ?? true) ? "Discord submission required" : "Discord submission (optional)";
     return (
       <button
         type="button"
         onClick={() => openViewTask(task.id)}
-        title="Discord submission required"
-        aria-label="Discord submission required"
+        title={label}
+        aria-label={label}
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         <svg viewBox="0 0 127.14 96.36" fill="currentColor" className="size-4" aria-hidden>

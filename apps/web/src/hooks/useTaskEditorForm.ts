@@ -39,6 +39,7 @@ export function useTaskEditorForm(options: {
   const [dueRepeat, setDueRepeat] = useState<TaskDueRepeat | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [discordChannelId, setDiscordChannelId] = useState<string | null>(null);
+  const [discordSubmissionRequired, setDiscordSubmissionRequiredState] = useState(true);
   const [attachmentRequired, setAttachmentRequiredState] = useState(false);
   const [timeTrackingEnabled, setTimeTrackingEnabledState] = useState(true);
   const [initialized, setInitialized] = useState(false);
@@ -58,6 +59,7 @@ export function useTaskEditorForm(options: {
         dueRepeat,
         assigneeIds: [...assigneeIds].sort(),
         discordChannelId,
+        discordSubmissionRequired,
         attachmentRequired,
         timeTrackingEnabled,
       }),
@@ -70,6 +72,7 @@ export function useTaskEditorForm(options: {
       dueRepeat,
       assigneeIds,
       discordChannelId,
+      discordSubmissionRequired,
       attachmentRequired,
       timeTrackingEnabled,
     ],
@@ -90,6 +93,7 @@ export function useTaskEditorForm(options: {
         assigneeUserIds: assigneeIds,
         dueRepeat,
         discordChannelId,
+        discordSubmissionRequired,
         attachmentRequired,
         timeTrackingEnabled,
         ...dueFieldPatch(due),
@@ -107,6 +111,7 @@ export function useTaskEditorForm(options: {
     setPriority(taskPriority(detail.task));
     setListId(detail.task.listId);
     setDiscordChannelId(detail.task.discordChannelId ?? null);
+    setDiscordSubmissionRequiredState(detail.task.discordSubmissionRequired ?? true);
     setAttachmentRequiredState(detail.task.attachmentRequired ?? false);
     setTimeTrackingEnabledState(detail.task.timeTrackingEnabled ?? true);
     seedSavedDueAt(detail.task.dueAt);
@@ -135,6 +140,14 @@ export function useTaskEditorForm(options: {
   const setDiscordChannel = useCallback(
     (channelId: string | null) => {
       setDiscordChannelId(channelId);
+      queueMicrotask(() => flushSave());
+    },
+    [flushSave],
+  );
+
+  const setDiscordSubmissionRequired = useCallback(
+    (v: boolean) => {
+      setDiscordSubmissionRequiredState(v);
       queueMicrotask(() => flushSave());
     },
     [flushSave],
@@ -174,6 +187,8 @@ export function useTaskEditorForm(options: {
     toggleAssignee,
     discordChannelId,
     setDiscordChannel,
+    discordSubmissionRequired,
+    setDiscordSubmissionRequired,
     attachmentRequired,
     setAttachmentRequired,
     timeTrackingEnabled,

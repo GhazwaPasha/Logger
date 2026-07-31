@@ -141,6 +141,8 @@ exports.patchTaskSchema = zod_1.z
     subtasksToDelete: zod_1.z.array(zod_1.z.string().uuid()).max(exports.MAX_SUBTASKS_PER_TASK_MUTATION).optional(),
     /** Discord channel snowflake ID attachments should post to; `null` disables Discord posting for this task. */
     discordChannelId: zod_1.z.string().min(1).max(64).nullable().optional(),
+    /** When a Discord channel is set, whether a Discord submission is required before the task can be marked done. */
+    discordSubmissionRequired: zod_1.z.boolean().optional(),
     /** Requires at least one attachment (any source) before the task can be marked done. */
     attachmentRequired: zod_1.z.boolean().optional(),
     /** Controls whether the time-tracking UI is shown for this task at all. */
@@ -157,6 +159,7 @@ exports.patchTaskSchema = zod_1.z
         d.dueAt !== undefined ||
         d.dueRepeat !== undefined ||
         d.discordChannelId !== undefined ||
+        d.discordSubmissionRequired !== undefined ||
         d.attachmentRequired !== undefined ||
         d.timeTrackingEnabled !== undefined ||
         hasSubCreate || hasSubUpdate || hasSubDelete);

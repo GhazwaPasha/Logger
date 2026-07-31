@@ -242,6 +242,8 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     spawnedFromTaskId: (0, pg_core_1.uuid)("spawned_from_task_id"),
     /** Discord channel snowflake ID attachments on this task are posted to; null = Discord posting disabled. */
     discordChannelId: (0, pg_core_1.text)("discord_channel_id"),
+    /** When a Discord channel is set, whether a Discord submission is required before the task can be marked done. */
+    discordSubmissionRequired: (0, pg_core_1.boolean)("discord_submission_required").notNull().default(true),
     /** At least one attachment (any source) is required before the task can be marked done. */
     attachmentRequired: (0, pg_core_1.boolean)("attachment_required").notNull().default(false),
     /** Controls whether the time-tracking UI renders for this task at all. */

@@ -42,6 +42,9 @@ export class TasksService {
     await this.lists.assertListInOrg(organizationId, parsed.listId);
 
     const dueAt = parsed.dueAt ? new Date(parsed.dueAt) : null;
+    if (dueAt && dueAt < new Date()) {
+      throw new BadRequestException("Due date cannot be in the past");
+    }
     const dueRepeat = dueAt ? (parsed.dueRepeat ?? null) : null;
     const initialSubtasks = parsed.initialSubtasks;
 
@@ -85,7 +88,11 @@ export class TasksService {
       }
 
       if (initialSubtasks.length > 0) {
-        await tx.insert(subtasks).values(initialSubtasks.map((s) => ({ taskId: createdId, title: s.title })));
+        // Bulk insert shares one transaction-scoped now(); stagger createdAt so ORDER BY has no ties.
+        const baseMs = Date.now();
+        await tx.insert(subtasks).values(
+          initialSubtasks.map((s, i) => ({ taskId: createdId, title: s.title, createdAt: new Date(baseMs + i) })),
+        );
       }
 
       const [noteRow] = await tx
@@ -274,6 +281,9 @@ export class TasksService {
     if (oldIso === newIso) {
       return this.taskMutationResult(userId, taskId, []);
     }
+    if (newDue && newDue < new Date()) {
+      throw new BadRequestException("Due date cannot be in the past");
+    }
 
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
     await this.db.transaction(async (tx) => {
@@ -395,6 +405,14 @@ export class TasksService {
     const discordChannelChanged =
       parsed.discordChannelId !== undefined && parsed.discordChannelId !== (task.discordChannelId ?? null);
 
+    const nextDiscordSubmissionRequired =
+      parsed.discordSubmissionRequired !== undefined
+        ? parsed.discordSubmissionRequired
+        : task.discordSubmissionRequired;
+    const discordSubmissionRequiredChanged =
+      parsed.discordSubmissionRequired !== undefined &&
+      parsed.discordSubmissionRequired !== task.discordSubmissionRequired;
+
     const nextAttachmentRequired =
       parsed.attachmentRequired !== undefined ? parsed.attachmentRequired : task.attachmentRequired;
     const attachmentRequiredChanged =
@@ -414,6 +432,7 @@ export class TasksService {
       dueChanged ||
       repeatChanged ||
       discordChannelChanged ||
+      discordSubmissionRequiredChanged ||
       attachmentRequiredChanged ||
       timeTrackingEnabledChanged;
 
@@ -443,7 +462,7 @@ export class TasksService {
 
     if (
       (titleChanged || priorityChanged || listChanged || assigneesActuallyChanged || dueChanged || repeatChanged ||
-        attachmentRequiredChanged || timeTrackingEnabledChanged) &&
+        discordSubmissionRequiredChanged || attachmentRequiredChanged || timeTrackingEnabledChanged) &&
       !caps.canEditFields
     ) {
       throw new ForbiddenException("Cannot edit this field");
@@ -460,16 +479,20 @@ export class TasksService {
       throw new ForbiddenException("Only the workspace owner can change a task's Discord channel");
     }
 
+    if (dueChanged && parsed.dueAt !== null && new Date(parsed.dueAt!) < new Date()) {
+      throw new BadRequestException("Due date cannot be in the past");
+    }
+
     const nextDiscordChannelId =
       parsed.discordChannelId !== undefined ? parsed.discordChannelId : (task.discordChannelId ?? null);
-    if (statusChanged && nextStatus === "done" && nextDiscordChannelId) {
+    if (statusChanged && nextStatus === "done" && nextDiscordChannelId && nextDiscordSubmissionRequired) {
       const [{ deliveredCount }] = await this.db
         .select({ deliveredCount: count() })
         .from(taskAttachments)
         .where(and(eq(taskAttachments.taskId, taskId), isNotNull(taskAttachments.discordDeliveredAt)));
       if ((deliveredCount ?? 0) === 0) {
         throw new BadRequestException(
-          "This task has a Discord channel assigned — submit a file to Discord before marking it done",
+          "This task requires a Discord submission — submit a file to Discord before marking it done",
         );
       }
     }
@@ -515,6 +538,9 @@ export class TasksService {
             ...(dueChanged ? { dueAt: parsed.dueAt === null ? null : new Date(parsed.dueAt!) } : {}),
             ...(repeatChanged ? { dueRepeat: nextRepeat } : {}),
             ...(discordChannelChanged ? { discordChannelId: parsed.discordChannelId } : {}),
+            ...(discordSubmissionRequiredChanged
+              ? { discordSubmissionRequired: parsed.discordSubmissionRequired }
+              : {}),
             ...(attachmentRequiredChanged ? { attachmentRequired: parsed.attachmentRequired } : {}),
             ...(timeTrackingEnabledChanged ? { timeTrackingEnabled: parsed.timeTrackingEnabled } : {}),
             updatedAt: now,
@@ -624,7 +650,11 @@ export class TasksService {
       }
 
       if (hasSubtasksCreate) {
-        await tx.insert(subtasks).values(subtasksToCreate.map((s) => ({ taskId, title: s.title })));
+        // Bulk insert shares one transaction-scoped now(); stagger createdAt so ORDER BY has no ties.
+        const baseMs = Date.now();
+        await tx.insert(subtasks).values(
+          subtasksToCreate.map((s, i) => ({ taskId, title: s.title, createdAt: new Date(baseMs + i) })),
+        );
       }
 
       if (hasSubtasksUpdate) {

@@ -46,6 +46,7 @@ export type TaskAccess = {
   isOwner: boolean;
   isDeptManager: boolean;
   isAssignee: boolean;
+  isAssigner: boolean;
 };
 
 @Injectable()
@@ -134,6 +135,7 @@ export class AuthorizationService {
         .limit(1),
     ]);
     const isAssignee = assigneeRows.length > 0;
+    const isAssigner = task.assignerId === userId;
     const membership = memberRows[0];
 
     const isOwner = membership?.role === "owner";
@@ -147,7 +149,7 @@ export class AuthorizationService {
     const isDeptManager =
       membership?.role === "manager" && managedDeptIds.includes(list.departmentId);
 
-    const canParticipate = isOwner || isDeptManager || isAssignee;
+    const canParticipate = isOwner || isDeptManager || isAssignee || isAssigner;
     if (!canParticipate) {
       throw new ForbiddenException("No access to this task");
     }
@@ -160,14 +162,14 @@ export class AuthorizationService {
           ? "member"
           : "assignee_only";
 
-    return { task, role, isOwner, isDeptManager, isAssignee };
+    return { task, role, isOwner, isDeptManager, isAssignee, isAssigner };
   }
 
   taskCapabilities(access: TaskAccess, userId: string) {
     const t = access.task;
     const active = t.deletedAt == null;
     /** Managers archive tasks in their levels; owners and creators use delete (same soft-delete endpoint). */
-    const isAssigner = access.task.assignerId === userId;
+    const isAssigner = access.isAssigner;
     const canArchiveTask = active && access.isDeptManager && !access.isOwner;
     const canDeleteTask = active && (access.isOwner || isAssigner);
     /** Structural/scope edits: title, priority, due/recurrence, assignees, subtask add/edit/delete. */

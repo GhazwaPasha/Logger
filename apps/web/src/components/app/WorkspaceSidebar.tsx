@@ -464,7 +464,7 @@ export function WorkspaceSidebar({
                   description: `“${name}” and every ${NODE_LABELS.list.toLowerCase()} and task under it will be permanently removed.`,
                   confirmLabel: `Delete ${NODE_LABELS.level}`,
                   variant: "danger",
-                  onConfirm: () => void deleteLevelById(deptId),
+                  onConfirm: () => deleteLevelById(deptId),
                 });
               },
             },
@@ -483,7 +483,7 @@ export function WorkspaceSidebar({
                   description: `“${name}” and every task in it will be permanently removed.`,
                   confirmLabel: `Delete ${NODE_LABELS.list}`,
                   variant: "danger",
-                  onConfirm: () => void deleteListById(listId, deptId),
+                  onConfirm: () => deleteListById(listId, deptId),
                 });
               },
             },
@@ -658,27 +658,40 @@ export function WorkspaceSidebar({
                                 : ""
                             }`}
                           >
-                            <input
-                              autoFocus
-                              disabled={renamingLevelBusy}
-                              className="input h-8 min-w-0 flex-1 rounded-lg px-2 text-sm font-semibold"
-                              aria-label={`Rename ${NODE_LABELS.level}`}
-                              value={renameLevelDraft}
-                              onChange={(e) => setRenameLevelDraft(e.target.value)}
-                              onBlur={() => {
-                                if (renamingLevelBusy) return;
-                                void commitRenameLevel(d.id);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
+                            <div
+                              className="relative min-w-0 flex-1"
+                              aria-busy={renamingLevelBusy ? true : undefined}
+                            >
+                              <input
+                                autoFocus
+                                disabled={renamingLevelBusy}
+                                className="input h-8 w-full rounded-lg px-2 pr-8 text-sm font-semibold disabled:opacity-70"
+                                aria-label={`Rename ${NODE_LABELS.level}`}
+                                value={renameLevelDraft}
+                                onChange={(e) => setRenameLevelDraft(e.target.value)}
+                                onBlur={() => {
+                                  if (renamingLevelBusy) return;
                                   void commitRenameLevel(d.id);
-                                }
-                                if (e.key === "Escape" && !renamingLevelBusy) {
-                                  cancelRenameLevel();
-                                }
-                              }}
-                            />
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    void commitRenameLevel(d.id);
+                                  }
+                                  if (e.key === "Escape" && !renamingLevelBusy) {
+                                    cancelRenameLevel();
+                                  }
+                                }}
+                              />
+                              {renamingLevelBusy ? (
+                                <span
+                                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                                  aria-hidden
+                                >
+                                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
                               {levelLists.length}
                             </span>
@@ -790,27 +803,40 @@ export function WorkspaceSidebar({
                                         className={`${rowBase(boardScope?.listId === l.id, true)} flex min-w-0 flex-1 items-center gap-2 pl-2 pr-1`}
                                       >
                                         <span className="shrink-0 text-[var(--muted)]">#</span>
-                                        <input
-                                          autoFocus
-                                          disabled={renamingListBusy}
-                                          className="input h-8 min-w-0 flex-1 rounded-lg px-2 text-sm font-semibold"
-                                          aria-label={`Rename ${NODE_LABELS.list}`}
-                                          value={renameListDraft}
-                                          onChange={(e) => setRenameListDraft(e.target.value)}
-                                          onBlur={() => {
-                                            if (renamingListBusy) return;
-                                            void commitRenameList(l.id);
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                              e.preventDefault();
+                                        <div
+                                          className="relative min-w-0 flex-1"
+                                          aria-busy={renamingListBusy ? true : undefined}
+                                        >
+                                          <input
+                                            autoFocus
+                                            disabled={renamingListBusy}
+                                            className="input h-8 w-full rounded-lg px-2 pr-8 text-sm font-semibold disabled:opacity-70"
+                                            aria-label={`Rename ${NODE_LABELS.list}`}
+                                            value={renameListDraft}
+                                            onChange={(e) => setRenameListDraft(e.target.value)}
+                                            onBlur={() => {
+                                              if (renamingListBusy) return;
                                               void commitRenameList(l.id);
-                                            }
-                                            if (e.key === "Escape" && !renamingListBusy) {
-                                              cancelRenameList();
-                                            }
-                                          }}
-                                        />
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                void commitRenameList(l.id);
+                                              }
+                                              if (e.key === "Escape" && !renamingListBusy) {
+                                                cancelRenameList();
+                                              }
+                                            }}
+                                          />
+                                          {renamingListBusy ? (
+                                            <span
+                                              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                                              aria-hidden
+                                            >
+                                              <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                                            </span>
+                                          ) : null}
+                                        </div>
                                         <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
                                           {listTaskCount}
                                         </span>

@@ -625,6 +625,24 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                     onChange={(v) => form.setDiscordChannel(v)}
                   />
                 </div>
+                {form.discordChannelId && (
+                  caps.canEditFields ? (
+                    <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
+                      <span>Require Discord submission</span>
+                      <Toggle
+                        checked={form.discordSubmissionRequired}
+                        aria-label="Require a Discord submission before marking done"
+                        onChange={(next) => form.setDiscordSubmissionRequired(next)}
+                      />
+                    </div>
+                  ) : (
+                    form.discordSubmissionRequired && (
+                      <p className="text-xs font-medium text-[var(--muted)]">
+                        Discord submission required before marking done
+                      </p>
+                    )
+                  )
+                )}
                 {detail && token && form.discordChannelId && (
                   <DiscordSubmissionZone taskId={taskId} token={token} />
                 )}

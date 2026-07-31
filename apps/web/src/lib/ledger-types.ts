@@ -59,6 +59,8 @@ export type TaskRow = {
   spawnedFromTaskId?: string | null;
   /** Discord channel snowflake ID attachments post to; `null`/omitted = Discord posting disabled. */
   discordChannelId?: string | null;
+  /** When a Discord channel is set, whether a Discord submission is required to mark this task done; defaults true server-side. */
+  discordSubmissionRequired?: boolean;
   /** At least one attachment (any source) is required to mark this task done. */
   attachmentRequired?: boolean;
   /** Controls whether the time-tracking UI renders for this task; defaults true server-side. */
