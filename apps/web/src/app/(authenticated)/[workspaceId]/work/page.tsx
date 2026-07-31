@@ -4,7 +4,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBell,
   faArrowUp,
+  faArrowRight,
   faArrowsUpDown,
+  faCalendar,
   faCalendarDays,
   faCalendarPlus,
   faAnglesDown,
@@ -97,6 +99,7 @@ import {
   statusLabelTextClasses,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
+  taskMatchesDueRange,
   taskMatchesDueWindow,
   taskMatchesUrlStatusFilter,
   taskPriority,
@@ -141,10 +144,10 @@ const SORT_OPTIONS: { value: SortMode; label: string }[] = [
 const DUE_WINDOW_OPTIONS: { value: DueWindow; label: string }[] = [
   { value: "all", label: "All" },
   { value: "1d", label: "1D" },
-  { value: "2d", label: "2D" },
   { value: "3d", label: "3D" },
   { value: "1w", label: "1W" },
   { value: "1m", label: "1M" },
+  { value: "custom", label: "X" },
 ];
 
 const SORT_PANEL_MIN_W = 224;
@@ -237,14 +240,28 @@ function priorityLabelShort(p: TaskPriority): string {
   return "MED";
 }
 
+const CUSTOM_DUE_CHIP_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** Formats a `yyyy-mm-dd` date-input value as e.g. "3 Aug 26" for the custom due-range chips. */
+function formatCustomDueChip(ymd: string): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ymd;
+  return `${d.getDate()} ${CUSTOM_DUE_CHIP_MONTHS[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
+}
+
+/** Toolbar icon buttons all share one footprint (`size-10`) and one icon size ({@link TASKS_TOOLBAR_ICON_CLASS}) so hover highlights line up. */
 function tasksToolbarIconButtonClasses(active: boolean) {
   return [
-    "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors",
+    "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors",
     "hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]",
     active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--muted)]",
   ].join(" ");
 }
+
+const TASKS_TOOLBAR_ICON_CLASS = "size-4 pointer-events-none";
 
 const BOARD_STATS_SEGMENTS: { status: ManualTaskStatus; label: string; title: string }[] = [
   { status: "pending", label: "Pending", title: FLOW_COLUMN_LABELS.pending },
@@ -365,6 +382,8 @@ function WorkItemsInner() {
   subtasksByTaskIdRef.current = subtasksByTaskId;
   const [sortMode, setSortMode] = useState<SortMode>("priority_desc");
   const [dueWindow, setDueWindow] = useState<DueWindow>("all");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
   const [urlStatusFilter, setUrlStatusFilter] = useState<UrlStatusFilter | null>(null);
   const [urlAssigneeScope, setUrlAssigneeScope] = useState<"all" | "mine" | "unassigned">("all");
   const [urlAssigneeUserId, setUrlAssigneeUserId] = useState<string | null>(null);
@@ -923,7 +942,9 @@ function WorkItemsInner() {
         if (assignees.length > 0) return false;
       }
       if (urlAssigneeUserId && !assignees.includes(urlAssigneeUserId)) return false;
-      if (!taskMatchesDueWindow(t, dueWindow)) return false;
+      if (dueWindow === "custom") {
+        if (!taskMatchesDueRange(t, dueFrom, dueTo)) return false;
+      } else if (!taskMatchesDueWindow(t, dueWindow)) return false;
       if (goalFilter) {
         const linked = roadmap.milestones.some((m) => m.goalId === goalFilter && m.linkedTaskIds.includes(t.id));
         if (!linked) return false;
@@ -937,6 +958,8 @@ function WorkItemsInner() {
   }, [
     visibleTasks,
     dueWindow,
+    dueFrom,
+    dueTo,
     urlStatusFilter,
     urlAssigneeScope,
     urlAssigneeUserId,
@@ -1885,15 +1908,15 @@ function WorkItemsInner() {
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
             <button
               type="button"
-              className="btn-primary inline-flex h-8 shrink-0 items-center gap-1 rounded-lg px-2.5 text-xs font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
+              className="btn-primary inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
               onClick={() => openNewTask(listId || undefined)}
               disabled={isOpeningNewTask}
               aria-busy={isOpeningNewTask || undefined}
             >
               {isOpeningNewTask ? (
-                <InlineSpinner className="size-3.5 animate-spin motion-reduce:animate-none" />
+                <InlineSpinner className="size-4 animate-spin motion-reduce:animate-none" />
               ) : (
-                <FontAwesomeIcon icon={faPlus} className="size-3.5" />
+                <FontAwesomeIcon icon={faPlus} className="size-4" />
               )}
               New task
             </button>
@@ -1905,29 +1928,21 @@ function WorkItemsInner() {
               >
                 <button
                   type="button"
-                  className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                    viewMode === "list"
-                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                  }`}
+                  className={tasksToolbarIconButtonClasses(viewMode === "list")}
                   onClick={() => setViewMode("list")}
                   aria-label="List view"
                   aria-pressed={viewMode === "list"}
                 >
-                  <FontAwesomeIcon icon={faTableList} className="size-[18px]" aria-hidden />
+                  <FontAwesomeIcon icon={faTableList} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
                 </button>
                 <button
                   type="button"
-                  className={`inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
-                    viewMode === "kanban"
-                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-                  }`}
+                  className={tasksToolbarIconButtonClasses(viewMode === "kanban")}
                   onClick={() => setViewMode("kanban")}
                   aria-label="Kanban view"
                   aria-pressed={viewMode === "kanban"}
                 >
-                  <FontAwesomeIcon icon={faTableColumns} className="size-[18px]" aria-hidden />
+                  <FontAwesomeIcon icon={faTableColumns} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
                 </button>
               </div>
               <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
@@ -1944,7 +1959,7 @@ function WorkItemsInner() {
                 aria-haspopup="menu"
                 aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
               >
-                <FontAwesomeIcon icon={faArrowsUpDown} className="size-[18px] pointer-events-none" aria-hidden />
+                <FontAwesomeIcon icon={faArrowsUpDown} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
               </button>
               <div ref={dueWindowContainerRef} className="flex items-center gap-1">
                 <button
@@ -1962,7 +1977,7 @@ function WorkItemsInner() {
                       : "Due date filter"
                   }
                 >
-                  <FontAwesomeIcon icon={faCalendarDays} className="size-[18px] pointer-events-none" aria-hidden />
+                  <FontAwesomeIcon icon={faCalendarDays} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
                   {dueWindow !== "all" && (
                     <span
                       className="absolute -right-1 -bottom-1 inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-bold leading-none text-[var(--on-accent)] ring-2 ring-[var(--surface-base)]"
@@ -2004,6 +2019,45 @@ function WorkItemsInner() {
                           {opt.label}
                         </button>
                       ))}
+                      {dueWindow === "custom" && (
+                        <div className="ml-1 flex shrink-0 items-center gap-1 rounded-full bg-[var(--surface-muted)] p-1">
+                          <div className="relative flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-[var(--surface-hover)]">
+                            {dueFrom ? (
+                              <span className="pointer-events-none whitespace-nowrap text-[11px] font-medium leading-none text-[var(--fg)]">
+                                {formatCustomDueChip(dueFrom)}
+                              </span>
+                            ) : (
+                              <FontAwesomeIcon icon={faCalendar} className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                            )}
+                            <input
+                              type="date"
+                              className="absolute inset-0 size-full cursor-pointer opacity-0"
+                              value={dueFrom}
+                              onChange={(e) => setDueFrom(e.target.value)}
+                              aria-label="Due from"
+                              title={dueFrom ? formatCustomDueChip(dueFrom) : "Due from"}
+                            />
+                          </div>
+                          <FontAwesomeIcon icon={faArrowRight} className="size-3 shrink-0 text-[var(--muted)]" aria-hidden />
+                          <div className="relative flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-[var(--surface-hover)]">
+                            {dueTo ? (
+                              <span className="pointer-events-none whitespace-nowrap text-[11px] font-medium leading-none text-[var(--fg)]">
+                                {formatCustomDueChip(dueTo)}
+                              </span>
+                            ) : (
+                              <FontAwesomeIcon icon={faCalendar} className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                            )}
+                            <input
+                              type="date"
+                              className="absolute inset-0 size-full cursor-pointer opacity-0"
+                              value={dueTo}
+                              onChange={(e) => setDueTo(e.target.value)}
+                              aria-label="Due to"
+                              title={dueTo ? formatCustomDueChip(dueTo) : "Due to"}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>

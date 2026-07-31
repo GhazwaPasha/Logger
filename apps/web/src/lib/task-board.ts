@@ -290,17 +290,17 @@ export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolea
   return true;
 }
 
-export type DueWindow = "all" | "1d" | "2d" | "3d" | "1w" | "1m";
+export type DueWindow = "all" | "1d" | "3d" | "1w" | "1m" | "custom";
 
-const DUE_WINDOWS = ["all", "1d", "2d", "3d", "1w", "1m"] as const satisfies readonly DueWindow[];
+const DUE_WINDOWS = ["all", "1d", "3d", "1w", "1m", "custom"] as const satisfies readonly DueWindow[];
 
 export function isDueWindow(v: string): v is DueWindow {
   return (DUE_WINDOWS as readonly string[]).includes(v);
 }
 
-/** Tasks due between now and the end of the window (upcoming only — past-due tasks fall outside every window but "all"). */
+/** Tasks due between now and the end of the window (upcoming only — past-due tasks fall outside every window but "all"). "custom" is matched separately via {@link taskMatchesDueRange}. */
 export function taskMatchesDueWindow(task: TaskRow, window: DueWindow): boolean {
-  if (window === "all") return true;
+  if (window === "all" || window === "custom") return true;
   const due = task.dueAt ? new Date(task.dueAt) : null;
   if (!due) return false;
   const now = new Date();
@@ -309,6 +309,22 @@ export function taskMatchesDueWindow(task: TaskRow, window: DueWindow): boolean 
   else if (window === "1m") end.setMonth(end.getMonth() + 1);
   else end.setDate(end.getDate() + Number(window[0]));
   return due >= now && due <= end;
+}
+
+/** Custom range match for the "custom" due window; `fromYmd`/`toYmd` are `yyyy-mm-dd` date-input values, either may be blank. */
+export function taskMatchesDueRange(task: TaskRow, fromYmd: string, toYmd: string): boolean {
+  if (!fromYmd && !toYmd) return true;
+  const due = task.dueAt ? new Date(task.dueAt) : null;
+  if (!due) return false;
+  if (fromYmd) {
+    const from = startOfLocalDay(new Date(`${fromYmd}T12:00:00`));
+    if (due < from) return false;
+  }
+  if (toYmd) {
+    const to = endOfLocalDay(new Date(`${toYmd}T12:00:00`));
+    if (due > to) return false;
+  }
+  return true;
 }
 
 export type SortMode = "priority_desc" | "priority_asc" | "due_asc" | "due_desc";
