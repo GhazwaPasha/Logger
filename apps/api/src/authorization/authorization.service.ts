@@ -419,7 +419,7 @@ export class AuthorizationService {
     }));
   }
 
-  /** Batches subtasks for list/board views (newest first per task, same as listSubtasks). */
+  /** Batches subtasks for list/board views (oldest first per task, same as listSubtasks). */
   private async attachSubtasks<T extends { id: string }>(taskRows: T[]) {
     if (taskRows.length === 0) return [];
     const ids = taskRows.map((t) => t.id);
@@ -434,7 +434,7 @@ export class AuthorizationService {
       else map.set(r.taskId, [r]);
     }
     for (const arr of map.values()) {
-      arr.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      arr.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     }
     return taskRows.map((t) => ({
       ...t,
