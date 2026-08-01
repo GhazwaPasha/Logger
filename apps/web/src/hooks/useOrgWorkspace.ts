@@ -1,10 +1,20 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
+
+/**
+ * Statuses counted toward the sidebar's per-list "active work" badge (see WorkspaceSidebar's
+ * tasksByList). Those badges read straight off the `tasks` array, so if a status is capped by
+ * pagination the badge silently undercounts — it has no idea tasks are missing. Eagerly draining
+ * these two in the background (independent of scroll/view) keeps the badge correct without the
+ * badge itself needing to know pagination exists. done/cancelled aren't counted, so they stay
+ * lazily paginated (click/scroll only) — no need to eagerly pull historical tasks.
+ */
+const EAGERLY_LOADED_STATUSES = ["pending", "in_progress"] as const;
 
 export type ColumnMeta = {
   nextCursor: string | null;
@@ -114,6 +124,59 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
 
   const data = q.data ?? empty;
 
+  const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
+
+  const loadMoreColumn = useCallback(
+    async (status: string) => {
+      if (!token || !orgId) return;
+      const meta = data.columnMeta[status];
+      if (!meta?.nextCursor) return;
+      setLoadingMoreColumn(status);
+      try {
+        const result = await apiJson<TaskPageResponse>(
+          `/organizations/${orgId}/tasks?status=${status}&cursor=${meta.nextCursor}&limit=25&includeSubtasks=true`,
+          { token },
+        );
+        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(orgId), (old) => {
+          if (!old) return old;
+          const existingIds = new Set(old.tasks.map((t) => t.id));
+          const newTasks = result.tasks.filter((t) => !existingIds.has(t.id));
+          return {
+            ...old,
+            tasks: [...old.tasks, ...newTasks],
+            columnMeta: {
+              ...old.columnMeta,
+              [status]: { nextCursor: result.nextCursor, total: result.total },
+            },
+          };
+        });
+      } catch {
+        // non-critical — caller can retry
+      } finally {
+        setLoadingMoreColumn(null);
+      }
+    },
+    [token, orgId, data.columnMeta, queryClient],
+  );
+
+  /**
+   * Drains pending/in_progress in the background so per-list counters (sidebar badge) are never
+   * computed off a truncated task list. Tracks the last cursor it attempted per status so a
+   * failed request doesn't retry in a tight loop — the guard only lifts once that status's
+   * cursor actually advances (i.e. a later successful load, e.g. a manual retry elsewhere).
+   */
+  const attemptedCursorRef = useRef<Record<string, string | null>>({});
+  useEffect(() => {
+    for (const status of EAGERLY_LOADED_STATUSES) {
+      const meta = data.columnMeta[status];
+      if (!meta?.nextCursor) continue;
+      if (loadingMoreColumn === status) continue;
+      if (attemptedCursorRef.current[status] === meta.nextCursor) continue;
+      attemptedCursorRef.current[status] = meta.nextCursor;
+      void loadMoreColumn(status);
+    }
+  }, [data.columnMeta, loadingMoreColumn, loadMoreColumn]);
+
   return {
     depts: data.depts,
     lists: data.lists,
@@ -124,5 +187,7 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     setError,
     reload,
     isLoading: q.isPending && Boolean(token && orgId),
+    loadMoreColumn,
+    loadingMoreColumn,
   };
 }

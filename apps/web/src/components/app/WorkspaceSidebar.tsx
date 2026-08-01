@@ -1278,6 +1278,9 @@ export function WorkspaceSidebar({
             )}
           </AnimatePresence>
           <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">
+            <Link href={`${base}/archived`} className={`${rowBase(activeArchived)} pl-2`}>
+              Archived
+            </Link>
             <Link href={`${base}/people`} className={`${rowBase(activePeople)} pl-2`}>
               Team
             </Link>
@@ -1289,9 +1292,6 @@ export function WorkspaceSidebar({
             </Link>
             <Link href={`${base}/webhooks`} className={`${rowBase(activeWebhooks)} pl-2`}>
               Webhooks
-            </Link>
-            <Link href={`${base}/archived`} className={`${rowBase(activeArchived)} pl-2`}>
-              Archived
             </Link>
           </div>
         </div>

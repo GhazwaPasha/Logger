@@ -366,7 +366,18 @@ function WorkItemsInner() {
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
   const queryClient = useQueryClient();
-  const { tasks, lists, members, depts, columnMeta, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
+  const {
+    tasks,
+    lists,
+    members,
+    depts,
+    columnMeta,
+    error,
+    setError,
+    isLoading: workspaceLoading,
+    loadMoreColumn,
+    loadingMoreColumn,
+  } = useWorkspaceData();
   const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
   const roadmap = useRoadmap(token, workspaceId);
   const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
@@ -715,7 +726,6 @@ function WorkItemsInner() {
     },
   });
 
-  const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
   /**
    * Native HTML5 DnD gives no visual affordance on its own, so drag/dragover handlers normally
    * track state to highlight valid/invalid drop columns and dim the source card. That state must
@@ -734,39 +744,6 @@ function WorkItemsInner() {
     dragOverElRef.current?.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
     dragOverElRef.current = null;
   }
-
-  const loadMoreColumn = useCallback(
-    async (status: string) => {
-      if (!token || !workspaceId) return;
-      const meta = columnMeta[status];
-      if (!meta?.nextCursor) return;
-      setLoadingMoreColumn(status);
-      try {
-        const result = await apiJson<{ tasks: TaskRow[]; nextCursor: string | null; total: number }>(
-          `/organizations/${workspaceId}/tasks?status=${status}&cursor=${meta.nextCursor}&limit=25&includeSubtasks=true`,
-          { token },
-        );
-        queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
-          if (!old) return old;
-          const existingIds = new Set(old.tasks.map((t) => t.id));
-          const newTasks = result.tasks.filter((t) => !existingIds.has(t.id));
-          return {
-            ...old,
-            tasks: [...old.tasks, ...newTasks],
-            columnMeta: {
-              ...old.columnMeta,
-              [status]: { nextCursor: result.nextCursor, total: result.total },
-            },
-          };
-        });
-      } catch {
-        // non-critical — user can retry
-      } finally {
-        setLoadingMoreColumn(null);
-      }
-    },
-    [token, workspaceId, columnMeta, queryClient],
-  );
 
   const patchTaskPendingId =
     patchTaskMutation.isPending && patchTaskMutation.variables
@@ -1594,6 +1571,43 @@ function WorkItemsInner() {
     for (const [seriesId, tasks] of seriesGroups) {
       items.push({ kind: "series", seriesId, tasks });
     }
+
+    // Statuses still missing pages. pending/in_progress get drained in the background by
+    // useOrgWorkspace, so in practice this is almost always just done/cancelled — but it stays
+    // generic so it's correct at any point mid-load too.
+    const pendingStatuses = TASK_FLOW_ORDER.filter((s) => columnMeta[s]?.nextCursor);
+    const pendingKey = pendingStatuses.join(",");
+    const anyLoading = pendingStatuses.some((s) => loadingMoreColumn === s);
+
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    /** Same cursor-tracking guard as the kanban view: stops a failed fetch from retrying every intersection tick. */
+    const attemptedCursorRef = useRef<Record<string, string | null>>({});
+    const stalledStatuses = pendingStatuses.filter(
+      (s) => loadingMoreColumn !== s && attemptedCursorRef.current[s] === columnMeta[s]?.nextCursor,
+    );
+
+    useEffect(() => {
+      if (pendingStatuses.length === 0) return;
+      const el = sentinelRef.current;
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries[0]?.isIntersecting) return;
+          for (const status of pendingStatuses) {
+            if (loadingMoreColumn === status) continue;
+            const cursor = columnMeta[status]?.nextCursor;
+            if (!cursor || attemptedCursorRef.current[status] === cursor) continue;
+            attemptedCursorRef.current[status] = cursor;
+            void loadMoreColumn(status);
+          }
+        },
+        { rootMargin: "400px" },
+      );
+      observer.observe(el);
+      return () => observer.disconnect();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingKey, loadingMoreColumn]);
+
     return (
       <div>
         <div className="columns-1 gap-3">
@@ -1613,6 +1627,29 @@ function WorkItemsInner() {
             )
           )}
         </div>
+        {pendingStatuses.length > 0 && (
+          <div ref={sentinelRef} className="flex flex-col gap-2 pt-2">
+            {anyLoading && (
+              <>
+                <TaskCardSkeleton />
+                <TaskCardSkeleton />
+              </>
+            )}
+            {stalledStatuses.map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => {
+                  attemptedCursorRef.current[status] = null;
+                  void loadMoreColumn(status);
+                }}
+                className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+              >
+                Couldn&apos;t load more {FLOW_COLUMN_LABELS[status]} tasks · retry
+              </button>
+            ))}
+          </div>
+        )}
         <div className="pt-4">
           <button
             type="button"
@@ -1637,6 +1674,18 @@ function WorkItemsInner() {
     | { kind: "series"; seriesId: string; tasks: TaskRow[] }
     | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
 
+  function TaskCardSkeleton() {
+    return (
+      <div
+        className="animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-2.5"
+        aria-hidden
+      >
+        <div className="h-3 w-3/4 rounded bg-[var(--surface-hover)]" />
+        <div className="mt-2.5 h-2.5 w-1/2 rounded bg-[var(--surface-hover)]" />
+      </div>
+    );
+  }
+
   function VirtualColumnList({ items, col }: { items: ColumnItem[]; col: string }) {
     const parentRef = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
@@ -1646,12 +1695,36 @@ function WorkItemsInner() {
       overscan: 5,
       measureElement: (el) => el.getBoundingClientRect().height,
     });
+    const virtualItems = virtualizer.getVirtualItems();
+
+    /**
+     * Auto-fetch the next page once the "load-more" sentinel scrolls into the virtualizer's
+     * rendered range (viewport + overscan) — mirrors infinite-scroll feeds instead of requiring
+     * a click. Tracks the last cursor it attempted so a failed fetch doesn't retry in a tight
+     * loop on every re-render; the loaded cursor only changes on success, which lifts the guard.
+     */
+    const attemptedCursorRef = useRef<string | null>(null);
+    useEffect(() => {
+      const loadMoreItem = items.find((it) => it.kind === "load-more");
+      if (!loadMoreItem || loadMoreItem.kind !== "load-more") return;
+      const sentinelVisible = virtualItems.some((v) => items[v.index]?.kind === "load-more");
+      if (!sentinelVisible || loadMoreItem.loading) return;
+      const meta = columnMeta[col];
+      if (!meta?.nextCursor || attemptedCursorRef.current === meta.nextCursor) return;
+      attemptedCursorRef.current = meta.nextCursor;
+      void loadMoreColumn(col);
+    }, [items, virtualItems, col]);
 
     return (
       <div ref={parentRef} className="flex-1 overflow-y-auto min-h-24">
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {virtualizer.getVirtualItems().map((vItem) => {
+          {virtualItems.map((vItem) => {
             const item = items[vItem.index]!;
+            const stalled =
+              item.kind === "load-more" &&
+              !item.loading &&
+              attemptedCursorRef.current !== null &&
+              attemptedCursorRef.current === columnMeta[col]?.nextCursor;
             return (
               <div
                 key={vItem.key}
@@ -1674,16 +1747,24 @@ function WorkItemsInner() {
                     onOpenTask={openViewTask}
                   />
                 )}
-                {item.kind === "load-more" && (
-                  <button
-                    type="button"
-                    onClick={() => void loadMoreColumn(item.status)}
-                    disabled={item.loading}
-                    className="w-full rounded-lg border border-[var(--border-subtle)] px-3 py-2 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
-                  >
-                    {item.loading ? "Loading…" : `Load more · ${item.loaded} of ${item.total}`}
-                  </button>
-                )}
+                {item.kind === "load-more" &&
+                  (stalled ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        attemptedCursorRef.current = null;
+                        void loadMoreColumn(item.status);
+                      }}
+                      className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+                    >
+                      Couldn&apos;t load more · retry ({item.loaded} of {item.total})
+                    </button>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <TaskCardSkeleton />
+                      <TaskCardSkeleton />
+                    </div>
+                  ))}
               </div>
             );
           })}
@@ -1755,7 +1836,9 @@ function WorkItemsInner() {
                     <div className="flex items-center justify-between gap-1.5">
                       <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
                       <span className="tabular-nums text-[10px] font-medium opacity-80">
-                        {columnMeta[col]?.total ?? colTasks.length}
+                        {columnMeta[col]?.nextCursor
+                          ? `${colTasks.length}/${columnMeta[col]!.total}`
+                          : (columnMeta[col]?.total ?? colTasks.length)}
                       </span>
                     </div>
                   </div>
