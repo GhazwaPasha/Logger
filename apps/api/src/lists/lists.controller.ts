@@ -21,6 +21,15 @@ export class ListsController {
     return this.lists.create(user.id, organizationId, body);
   }
 
+  @Post("reorder")
+  reorder(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.lists.reorder(user.id, organizationId, body);
+  }
+
   @Patch(":listId")
   patch(
     @CurrentUser() user: RequestUser,

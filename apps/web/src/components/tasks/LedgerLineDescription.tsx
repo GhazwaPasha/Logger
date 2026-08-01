@@ -213,6 +213,12 @@ export function LedgerLineDescription({ entry, members }: Props) {
           <UserName>{actor}</UserName> archived this task
         </>
       );
+    case "unarchive":
+      return (
+        <>
+          <UserName>{actor}</UserName> restored this task
+        </>
+      );
     case "ack":
       return (
         <>
@@ -255,6 +261,12 @@ export function LedgerLineDescription({ entry, members }: Props) {
       return (
         <>
           <UserName>{actor}</UserName> deleted a comment
+        </>
+      );
+    case "comment_restored":
+      return (
+        <>
+          <UserName>{actor}</UserName> restored a comment
         </>
       );
     case "attachment_added": {

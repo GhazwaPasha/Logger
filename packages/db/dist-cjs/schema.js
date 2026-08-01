@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.timeEntries = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = void 0;
+exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -165,6 +165,8 @@ exports.departments = (0, pg_core_1.pgTable)("departments", {
         .notNull()
         .references(() => exports.organizations.id, { onDelete: "cascade" }),
     name: (0, pg_core_1.text)("name").notNull(),
+    /** Manual sidebar sort order among sibling departments; lower sorts first. */
+    orderIndex: (0, pg_core_1.integer)("order_index").notNull().default(0),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("departments_org_idx").on(t.organizationId)]);
 exports.organizationMembers = (0, pg_core_1.pgTable)("organization_members", {
@@ -210,6 +212,8 @@ exports.lists = (0, pg_core_1.pgTable)("lists", {
         .notNull()
         .references(() => exports.departments.id, { onDelete: "cascade" }),
     name: (0, pg_core_1.text)("name").notNull(),
+    /** Manual sidebar sort order among sibling lists within the same department; lower sorts first. */
+    orderIndex: (0, pg_core_1.integer)("order_index").notNull().default(0),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
         .notNull()
@@ -303,6 +307,17 @@ exports.ledgerTypeEnum = (0, pg_core_1.pgEnum)("ledger_type", [
     "dependency_added",
     "dependency_removed",
     "priority_change",
+    "unarchive",
+    "comment_restored",
+]);
+exports.deletionEntityTypeEnum = (0, pg_core_1.pgEnum)("deletion_entity_type", [
+    "task",
+    "list",
+    "department",
+    "organization",
+    "goal",
+    "milestone",
+    "discord_integration",
 ]);
 exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -504,6 +519,24 @@ exports.apiKeys = (0, pg_core_1.pgTable)("api_keys", {
     lastUsedAt: (0, pg_core_1.timestamp)("last_used_at", { withTimezone: true }),
     revokedAt: (0, pg_core_1.timestamp)("revoked_at", { withTimezone: true }),
 }, (t) => [(0, pg_core_1.index)("api_keys_user_idx").on(t.userId)]);
+/**
+ * Permanent tombstone for every hard-deleted entity, written right before the delete executes.
+ * Deliberately has no FK to the deleted entity (or its organization) — nothing here may ever
+ * cascade away, since this is the one record meant to outlive the entity, its parent org, and
+ * `activity_ledger` (which cascades with its task and is therefore not durable on its own).
+ */
+exports.deletionLog = (0, pg_core_1.pgTable)("deletion_log", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    entityType: (0, exports.deletionEntityTypeEnum)("entity_type").notNull(),
+    entityId: (0, pg_core_1.uuid)("entity_id").notNull(),
+    organizationId: (0, pg_core_1.uuid)("organization_id").notNull(),
+    actorId: (0, pg_core_1.text)("actor_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    /** Denormalized snapshot of the deleted entity (name/title, cascaded children, etc). Shape varies by entityType. */
+    snapshot: (0, pg_core_1.jsonb)("snapshot").notNull().$type(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("deletion_log_org_created_idx").on(t.organizationId, t.createdAt)]);
 /** Time entries: manual or timer-based work log per task per user. */
 exports.timeEntries = (0, pg_core_1.pgTable)("time_entries", {
     id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
@@ -743,6 +776,7 @@ exports.appSchema = {
     goals: exports.goals,
     milestones: exports.milestones,
     milestoneTasks: exports.milestoneTasks,
+    deletionLog: exports.deletionLog,
     organizationsRelations: exports.organizationsRelations,
     organizationMembersRelations: exports.organizationMembersRelations,
     organizationMemberManagedDepartmentsRelations: exports.organizationMemberManagedDepartmentsRelations,

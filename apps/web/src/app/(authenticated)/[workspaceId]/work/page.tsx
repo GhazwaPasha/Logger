@@ -818,26 +818,6 @@ function WorkItemsInner() {
         },
       },
     ];
-    if (caps.canDeleteTask) {
-      items.push({
-        id: "delete",
-        label: "Delete task",
-        destructive: true,
-        onSelect: () => {
-          const taskId = task.id;
-          setTaskActionConfirm({
-            title: "Delete this task?",
-            description:
-              "It will be removed from the board. You can still rely on exports or backups outside LogBase if you need a record.",
-            confirmLabel: "Delete task",
-            variant: "danger",
-            onConfirm: async () => {
-              await runTaskArchive(taskId);
-            },
-          });
-        },
-      });
-    }
     if (caps.canArchiveTask) {
       items.push({
         id: "archive",

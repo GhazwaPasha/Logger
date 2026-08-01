@@ -7,6 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 
 type AttachmentRow = {
   id: string;
@@ -48,6 +49,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const prefersReduced = useReducedMotion();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmDialogOptions | null>(null);
 
   const query = useQuery({
     queryKey: ["attachments", taskId],
@@ -103,6 +105,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
 
   return (
     <div className="space-y-2">
+      <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Attachments</h3>
         {!viewOnly && (
@@ -169,7 +172,15 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                 {!viewOnly && (a.uploadedBy === userId) && (
                   <button
                     type="button"
-                    onClick={() => deleteMutation.mutate(a.id)}
+                    onClick={() =>
+                      setConfirm({
+                        title: "Delete this attachment?",
+                        description: `This will permanently remove "${a.fileName}". This cannot be undone.`,
+                        confirmLabel: "Delete",
+                        variant: "danger",
+                        onConfirm: () => deleteMutation.mutate(a.id),
+                      })
+                    }
                     disabled={deleteMutation.isPending}
                     aria-label="Delete attachment"
                     className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] transition-colors"

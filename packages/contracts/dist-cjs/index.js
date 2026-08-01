@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
@@ -72,6 +72,10 @@ exports.createDepartmentSchema = zod_1.z.object({
 exports.updateDepartmentSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
 });
+/** Full sibling order for an organization's departments; server rejects anything but a permutation of the existing set. */
+exports.reorderDepartmentsSchema = zod_1.z.object({
+    orderedIds: zod_1.z.array(zod_1.z.string().uuid()).min(1),
+});
 exports.createSubtaskSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).max(512),
 });
@@ -105,6 +109,11 @@ exports.createListSchema = zod_1.z.object({
 });
 exports.updateListSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
+});
+/** Full sibling order for one department's lists; server rejects anything but a permutation of that department's existing set. */
+exports.reorderListsSchema = zod_1.z.object({
+    departmentId: zod_1.z.string().uuid(),
+    orderedIds: zod_1.z.array(zod_1.z.string().uuid()).min(1),
 });
 exports.appendLedgerSchema = zod_1.z.object({
     type: exports.appendableLedgerTypeSchema,
@@ -189,6 +198,11 @@ exports.listTasksQuerySchema = zod_1.z.object({
         .enum(["true", "false"])
         .optional()
         .transform((v) => v !== "false"),
+    /** When "true", returns archived tasks (the Archived page) instead of active ones. */
+    archived: zod_1.z
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v === "true"),
 });
 exports.createCommentSchema = zod_1.z.object({
     body: zod_1.z.string().min(1).max(4000),

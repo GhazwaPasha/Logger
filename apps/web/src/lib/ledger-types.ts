@@ -1,10 +1,11 @@
 export type Org = { id: string; name: string; slug?: string };
-export type Dept = { id: string; name: string; organizationId: string };
+export type Dept = { id: string; name: string; organizationId: string; orderIndex: number };
 export type ListRow = {
   id: string;
   name: string;
   organizationId: string;
   departmentId: string;
+  orderIndex: number;
 };
 export type MemberRow = {
   userId: string;
@@ -42,6 +43,17 @@ export type LedgerRow = {
   actorId: string;
   createdAt: string;
   clientMutationId: string | null;
+};
+
+/** Permanent tombstone row from the Deletion log (owner-only) — survives independent of activity_ledger. */
+export type DeletionLogEntry = {
+  id: string;
+  entityType: "task" | "list" | "department" | "organization" | "goal" | "milestone" | "discord_integration";
+  entityId: string;
+  organizationId: string;
+  actorId: string;
+  snapshot: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type TaskRow = {
@@ -83,7 +95,9 @@ export type TaskDetail = {
   task: TaskRow;
   capabilities: {
     canArchiveTask: boolean;
-    canDeleteTask: boolean;
+    /** Restore/purge only ever apply to an already-archived task (see the Archived page). */
+    canRestoreTask: boolean;
+    canPurgeTask: boolean;
     /** Structural/scope edits: title, priority, due/recurrence, assignees, subtask add/edit/delete. */
     canEditFields: boolean;
     /** Status change, subtask toggle, comments, attachments, Discord submit, dependencies, time log. */

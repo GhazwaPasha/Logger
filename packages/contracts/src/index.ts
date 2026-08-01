@@ -81,6 +81,11 @@ export const updateDepartmentSchema = z.object({
   name: z.string().min(1).max(256),
 });
 
+/** Full sibling order for an organization's departments; server rejects anything but a permutation of the existing set. */
+export const reorderDepartmentsSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1),
+});
+
 export const createSubtaskSchema = z.object({
   title: z.string().min(1).max(512),
 });
@@ -119,6 +124,12 @@ export const createListSchema = z.object({
 
 export const updateListSchema = z.object({
   name: z.string().min(1).max(256),
+});
+
+/** Full sibling order for one department's lists; server rejects anything but a permutation of that department's existing set. */
+export const reorderListsSchema = z.object({
+  departmentId: z.string().uuid(),
+  orderedIds: z.array(z.string().uuid()).min(1),
 });
 
 export const appendLedgerSchema = z.object({
@@ -218,6 +229,11 @@ export const listTasksQuerySchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v !== "false"),
+  /** When "true", returns archived tasks (the Archived page) instead of active ones. */
+  archived: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
 });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

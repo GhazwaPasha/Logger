@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { getApiBaseUrl } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
+import { isWorkspaceOwner } from "@/lib/workspace-permissions";
+import type { MemberRow } from "@/lib/ledger-types";
 
 type TimeEntry = {
   id: string;
@@ -56,18 +59,23 @@ export function TimeTracker({
   taskId,
   token,
   userId,
+  members,
   viewOnly,
   embedded,
 }: {
   taskId: string;
   token: string;
   userId: string;
+  /** When provided, the workspace owner may also delete other members' entries (not just their own). */
+  members?: MemberRow[];
   viewOnly?: boolean;
   /** Skip the outer card chrome when nested inside another card (e.g. a ToggleSection). */
   embedded?: boolean;
 }) {
   const queryClient = useQueryClient();
   const timeKey = ["time", taskId];
+  const isOrgOwner = isWorkspaceOwner(members ?? [], userId);
+  const [confirm, setConfirm] = useState<ConfirmDialogOptions | null>(null);
 
   const { data: entries = [] } = useQuery<TimeEntry[]>({
     queryKey: timeKey,
@@ -167,6 +175,7 @@ export function TimeTracker({
           : "space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5"
       }
     >
+      <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       {(!embedded || totalSeconds > 0) && (
         <div className="flex items-center justify-between">
           {!embedded && (
@@ -307,10 +316,18 @@ export function TimeTracker({
                   <div className="text-[var(--muted)]">{formatDateTime(e.startedAt)}</div>
                   {e.note && <div className="mt-0.5 italic text-[var(--muted)]">{e.note}</div>}
                 </div>
-                {!viewOnly && e.userId === userId && (
+                {!viewOnly && (e.userId === userId || isOrgOwner) && (
                   <button
                     type="button"
-                    onClick={() => deleteMutation.mutate(e.id)}
+                    onClick={() =>
+                      setConfirm({
+                        title: "Delete this time entry?",
+                        description: "This will permanently remove the logged time. This cannot be undone.",
+                        confirmLabel: "Delete",
+                        variant: "danger",
+                        onConfirm: () => deleteMutation.mutate(e.id),
+                      })
+                    }
                     className="shrink-0 text-[var(--muted)] hover:text-red-500"
                     aria-label="Delete entry"
                   >

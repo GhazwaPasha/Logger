@@ -206,6 +206,8 @@ export const departments = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** Manual sidebar sort order among sibling departments; lower sorts first. */
+    orderIndex: integer("order_index").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("departments_org_idx").on(t.organizationId)],
@@ -266,6 +268,8 @@ export const lists = pgTable(
       .notNull()
       .references(() => departments.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /** Manual sidebar sort order among sibling lists within the same department; lower sorts first. */
+    orderIndex: integer("order_index").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -377,6 +381,18 @@ export const ledgerTypeEnum = pgEnum("ledger_type", [
   "dependency_added",
   "dependency_removed",
   "priority_change",
+  "unarchive",
+  "comment_restored",
+]);
+
+export const deletionEntityTypeEnum = pgEnum("deletion_entity_type", [
+  "task",
+  "list",
+  "department",
+  "organization",
+  "goal",
+  "milestone",
+  "discord_integration",
 ]);
 
 export const activityLedger = pgTable(
@@ -641,6 +657,29 @@ export const apiKeys = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (t) => [index("api_keys_user_idx").on(t.userId)],
+);
+
+/**
+ * Permanent tombstone for every hard-deleted entity, written right before the delete executes.
+ * Deliberately has no FK to the deleted entity (or its organization) — nothing here may ever
+ * cascade away, since this is the one record meant to outlive the entity, its parent org, and
+ * `activity_ledger` (which cascades with its task and is therefore not durable on its own).
+ */
+export const deletionLog = pgTable(
+  "deletion_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    entityType: deletionEntityTypeEnum("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    /** Denormalized snapshot of the deleted entity (name/title, cascaded children, etc). Shape varies by entityType. */
+    snapshot: jsonb("snapshot").notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("deletion_log_org_created_idx").on(t.organizationId, t.createdAt)],
 );
 
 /** Time entries: manual or timer-based work log per task per user. */
@@ -925,6 +964,7 @@ export const appSchema = {
   goals,
   milestones,
   milestoneTasks,
+  deletionLog,
   organizationsRelations,
   organizationMembersRelations,
   organizationMemberManagedDepartmentsRelations,

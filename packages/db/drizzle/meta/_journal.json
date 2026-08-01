@@ -239,6 +239,20 @@
       "when": 1747440022000,
       "tag": "0033_time_tracking_default_off",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785541356923,
+      "tag": "0034_deletion_log_and_restore",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1785600000000,
+      "tag": "0035_department_list_order_index",
+      "breakpoints": true
     }
   ]
 }

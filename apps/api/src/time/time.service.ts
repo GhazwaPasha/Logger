@@ -118,7 +118,10 @@ export class TimeService {
       .limit(1);
 
     if (!entry) throw new NotFoundException("Time entry not found");
-    if (entry.userId !== userId) throw new ForbiddenException("Cannot delete another user's time entry");
+    if (entry.userId !== userId) {
+      const access = await this.authz.getTaskAccess(userId, entry.taskId);
+      if (!access.isOwner) throw new ForbiddenException("Cannot delete another user's time entry");
+    }
 
     await this.db.delete(timeEntries).where(eq(timeEntries.id, entryId));
   }

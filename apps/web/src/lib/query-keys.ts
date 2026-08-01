@@ -6,6 +6,8 @@ export const workspaceKeys = {
   all: ["workspace"] as const,
   workspace: (organizationId: string) => [...workspaceKeys.all, organizationId] as const,
   activity: (organizationId: string) => [...workspaceKeys.all, organizationId, "activity"] as const,
+  archivedTasks: (organizationId: string) => [...workspaceKeys.all, organizationId, "archived-tasks"] as const,
+  deletionLog: (organizationId: string) => [...workspaceKeys.all, organizationId, "deletion-log"] as const,
 };
 
 export const taskKeys = {

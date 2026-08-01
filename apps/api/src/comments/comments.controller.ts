@@ -38,4 +38,9 @@ export class CommentsController {
   remove(@CurrentUser() user: RequestUser, @Param("commentId") commentId: string) {
     return this.comments.remove(user.id, commentId);
   }
+
+  @Post("comments/:commentId/restore")
+  restore(@CurrentUser() user: RequestUser, @Param("commentId") commentId: string) {
+    return this.comments.restore(user.id, commentId);
+  }
 }

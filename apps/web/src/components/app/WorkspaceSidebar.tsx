@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { faLayerGroup, faListUl } from "@fortawesome/free-solid-svg-icons";
 import {
@@ -62,6 +62,46 @@ function PencilIcon({ className }: { className?: string }) {
   );
 }
 
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function GripIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden className={className} viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </svg>
+  );
+}
+
+/** Reinserts `draggedId` immediately before `targetId`, preserving the rest of the order. */
+function moveBefore<T extends string>(order: T[], draggedId: T, targetId: T): T[] {
+  if (draggedId === targetId) return order;
+  const next = order.filter((id) => id !== draggedId);
+  const idx = next.indexOf(targetId);
+  if (idx === -1) return order;
+  next.splice(idx, 0, draggedId);
+  return next;
+}
+
 function rowBase(active: boolean, compact = false) {
   return [
     `flex min-w-0 items-center gap-1 rounded-md ${compact ? "py-0.5" : "py-1.5"} pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]`,
@@ -114,6 +154,11 @@ export function WorkspaceSidebar({
     | { x: number; y: number; kind: "list"; listId: string; deptId: string; name: string }
   >(null);
   const [structureActionConfirm, setStructureActionConfirm] = useState<ConfirmDialogOptions | null>(null);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [dragOverDeptId, setDragOverDeptId] = useState<string | null>(null);
+  const [dragOverListId, setDragOverListId] = useState<string | null>(null);
+  const draggedDeptIdRef = useRef<string | null>(null);
+  const draggedListRef = useRef<{ listId: string; deptId: string } | null>(null);
 
   const base = `/${workspaceSlug}`;
 
@@ -131,15 +176,30 @@ export function WorkspaceSidebar({
       const list = m.get(l.departmentId);
       if (list) list.push(l);
     }
-    for (const list of m.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+    for (const list of m.values()) list.sort((a, b) => a.orderIndex - b.orderIndex);
     return m;
   }, [lists, depts]);
+
+  const sortedDepts = useMemo(
+    () => [...depts].sort((a, b) => a.orderIndex - b.orderIndex),
+    [depts],
+  );
+
+  useEffect(() => {
+    if (reorderMode) return;
+    draggedDeptIdRef.current = null;
+    draggedListRef.current = null;
+    setDragOverDeptId(null);
+    setDragOverListId(null);
+  }, [reorderMode]);
 
   const tasksByList = useMemo(() => {
     const m = new Map<string, TaskRow[]>();
     for (const l of lists) m.set(l.id, []);
     for (const t of tasks) {
       if (t.deletedAt) continue;
+      // Sidebar badge tracks open work — finished tasks (esp. piled-up recurring completions) shouldn't inflate it.
+      if (t.status === "done" || t.status === "cancelled") continue;
       const list = m.get(t.listId);
       if (list) list.push(t);
     }
@@ -243,6 +303,7 @@ export function WorkspaceSidebar({
   const activeOrganizationSettings = pathname.startsWith(`${base}/organization-settings`);
   const activeUserSettings = pathname.startsWith(`${base}/settings`);
   const activeWebhooks = pathname.startsWith(`${base}/webhooks`);
+  const activeArchived = pathname.startsWith(`${base}/archived`);
   const activeAddWorkspace = pathname.startsWith(`${base}/add-workspace`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
   /** Work page scoped to whole workspace (level/list live in sessionStorage, not the URL). */
@@ -294,7 +355,7 @@ export function WorkspaceSidebar({
         if (old.depts.some((d) => d.id === created.id)) return old;
         return {
           ...old,
-          depts: [...old.depts, created].sort((a, b) => a.name.localeCompare(b.name)),
+          depts: [...old.depts, created],
         };
       });
     } catch (e) {
@@ -321,7 +382,7 @@ export function WorkspaceSidebar({
         if (old.lists.some((l) => l.id === created.id)) return old;
         return {
           ...old,
-          lists: [...old.lists, created].sort((a, b) => a.name.localeCompare(b.name)),
+          lists: [...old.lists, created],
         };
       });
     } catch (e) {
@@ -361,9 +422,7 @@ export function WorkspaceSidebar({
         if (!old) return old;
         return {
           ...old,
-          depts: old.depts
-            .map((x) => (x.id === deptId ? updated : x))
-            .sort((a, b) => a.name.localeCompare(b.name)),
+          depts: old.depts.map((x) => (x.id === deptId ? updated : x)),
         };
       });
       cancelRenameLevel();
@@ -434,9 +493,7 @@ export function WorkspaceSidebar({
         if (!old) return old;
         return {
           ...old,
-          lists: old.lists
-            .map((x) => (x.id === listId ? updated : x))
-            .sort((a, b) => a.name.localeCompare(b.name)),
+          lists: old.lists.map((x) => (x.id === listId ? updated : x)),
         };
       });
       cancelRenameList();
@@ -444,6 +501,54 @@ export function WorkspaceSidebar({
       setError(e instanceof Error ? e.message : `Could not rename ${NODE_LABELS.list.toLowerCase()}`);
     } finally {
       setRenamingListBusy(false);
+    }
+  }
+
+  async function reorderDepartments(orderedIds: string[]) {
+    if (!token) return;
+    const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+    queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        depts: old.depts.map((d) =>
+          indexById.has(d.id) ? { ...d, orderIndex: indexById.get(d.id)! } : d,
+        ),
+      };
+    });
+    try {
+      await apiJson(`/organizations/${workspaceId}/departments/reorder`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ orderedIds }),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not reorder ${NODE_LABELS.level.toLowerCase()}s`);
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+    }
+  }
+
+  async function reorderLists(deptId: string, orderedIds: string[]) {
+    if (!token) return;
+    const indexById = new Map(orderedIds.map((id, i) => [id, i]));
+    queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        lists: old.lists.map((l) =>
+          l.departmentId === deptId && indexById.has(l.id) ? { ...l, orderIndex: indexById.get(l.id)! } : l,
+        ),
+      };
+    });
+    try {
+      await apiJson(`/organizations/${workspaceId}/lists/reorder`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ departmentId: deptId, orderedIds }),
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not reorder ${NODE_LABELS.list.toLowerCase()}s`);
+      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
     }
   }
 
@@ -578,7 +683,7 @@ export function WorkspaceSidebar({
         </div>
 
         <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-          <div className="mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+          <div className="group/alltasks mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
             <Link
               href={`${base}/work`}
               className={`${rowBase(activeAllWorkspaceTasks)} flex min-w-0 flex-1 items-center pl-2`}
@@ -588,6 +693,42 @@ export function WorkspaceSidebar({
             >
               <span className="truncate text-sm font-bold text-[var(--fg)]">All Tasks</span>
             </Link>
+            {canRenameOrgStructure && (
+              <button
+                type="button"
+                className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-[color,background-color,opacity] duration-150 ${
+                  reorderMode
+                    ? "bg-[var(--accent)] text-[var(--on-accent)]"
+                    : "pointer-events-none text-[var(--muted)] opacity-0 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                }`}
+                aria-pressed={reorderMode}
+                aria-label={
+                  reorderMode
+                    ? "Done reordering"
+                    : `Reorder ${NODE_LABELS.level.toLowerCase()}s and ${NODE_LABELS.list.toLowerCase()}s`
+                }
+                title={reorderMode ? "Done reordering" : "Edit order"}
+                onClick={() => {
+                  setReorderMode((v) => !v);
+                  if (!reorderMode) setOrgTreeOpen(true);
+                }}
+              >
+                {reorderMode ? "Done" : "Edit"}
+              </button>
+            )}
+            <button
+              type="button"
+              className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+              aria-label={`Add ${NODE_LABELS.level}`}
+              title={`Add ${NODE_LABELS.level}`}
+              onClick={() => {
+                setOrgTreeOpen(true);
+                setShowAddLevelInput(true);
+                setNewLevelName("");
+              }}
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+            </button>
             <button
               type="button"
               className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
@@ -629,13 +770,46 @@ export function WorkspaceSidebar({
                   <EmptyState icon={faLayerGroup} title={`No ${NODE_LABELS.level.toLowerCase()}s yet.`} size="compact" />
                 ) : (
                   <ul className="space-y-0.5">
-                {depts.map((d) => {
+                {sortedDepts.map((d) => {
                   const open = expanded.has(d.id);
                   const levelLists = listsByLevel.get(d.id) ?? [];
                   return (
                     <li key={d.id} className="select-none">
                       <div
-                        className="group/level flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]"
+                        className={`group/level flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)] ${
+                          reorderMode && dragOverDeptId === d.id
+                            ? "outline outline-2 outline-offset-[-2px] outline-[var(--accent)]"
+                            : ""
+                        }`}
+                        draggable={reorderMode && canRenameOrgStructure}
+                        onDragStart={(e) => {
+                          if (!reorderMode) return;
+                          draggedDeptIdRef.current = d.id;
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", d.id);
+                        }}
+                        onDragOver={(e) => {
+                          if (!reorderMode || !draggedDeptIdRef.current) return;
+                          e.preventDefault();
+                          if (dragOverDeptId !== d.id) setDragOverDeptId(d.id);
+                        }}
+                        onDragLeave={() => {
+                          setDragOverDeptId((cur) => (cur === d.id ? null : cur));
+                        }}
+                        onDrop={(e) => {
+                          if (!reorderMode || !draggedDeptIdRef.current) return;
+                          e.preventDefault();
+                          const draggedId = draggedDeptIdRef.current;
+                          draggedDeptIdRef.current = null;
+                          setDragOverDeptId(null);
+                          if (draggedId === d.id) return;
+                          const nextOrder = moveBefore(sortedDepts.map((x) => x.id), draggedId, d.id);
+                          void reorderDepartments(nextOrder);
+                        }}
+                        onDragEnd={() => {
+                          draggedDeptIdRef.current = null;
+                          setDragOverDeptId(null);
+                        }}
                         onContextMenu={(e) => {
                           if (!canRenameOrgStructure || renamingLevelId === d.id) return;
                           e.preventDefault();
@@ -706,15 +880,31 @@ export function WorkspaceSidebar({
                                 : ""
                             }`}
                           >
+                            {reorderMode && canRenameOrgStructure && (
+                              <span
+                                className="shrink-0 cursor-grab pl-2 text-[var(--muted)] active:cursor-grabbing"
+                                aria-hidden
+                              >
+                                <GripIcon className="h-3.5 w-3.5" />
+                              </span>
+                            )}
                             <Link
                               href={`${base}/work`}
-                              className="flex min-w-0 flex-1 items-center px-2 py-1.5 pr-1"
+                              className={`flex min-w-0 flex-1 items-center px-2 py-1.5 pr-1 ${
+                                reorderMode ? "cursor-grab active:cursor-grabbing" : ""
+                              }`}
                               title={`Open ${d.name}`}
-                              onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
+                              onClick={(e) => {
+                                if (reorderMode) {
+                                  e.preventDefault();
+                                  return;
+                                }
+                                writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null });
+                              }}
                             >
                               <span className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</span>
                             </Link>
-                            {canRenameOrgStructure && (
+                            {!reorderMode && canRenameOrgStructure && (
                               <button
                                 type="button"
                                 className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
@@ -732,13 +922,41 @@ export function WorkspaceSidebar({
                                 <PencilIcon className="h-3.5 w-3.5" />
                               </button>
                             )}
+                            {!reorderMode && (
+                              <button
+                                type="button"
+                                className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                aria-label={`Add ${NODE_LABELS.list} to ${d.name}`}
+                                title={`Add ${NODE_LABELS.list}`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setExpanded((prev) => {
+                                    if (prev.has(d.id)) return prev;
+                                    const n = new Set(prev);
+                                    n.add(d.id);
+                                    return n;
+                                  });
+                                  setShowAddListForLevel(d.id);
+                                  setNewListName("");
+                                }}
+                              >
+                                <PlusIcon className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             <Link
                               href={`${base}/work`}
                               tabIndex={-1}
                               aria-hidden
                               className="shrink-0 px-2 py-1.5 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
                               title={`Open ${d.name}`}
-                              onClick={() => writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null })}
+                              onClick={(e) => {
+                                if (reorderMode) {
+                                  e.preventDefault();
+                                  return;
+                                }
+                                writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null });
+                              }}
                             >
                               {levelLists.length}
                             </Link>
@@ -784,7 +1002,45 @@ export function WorkspaceSidebar({
                                     />
                                   )}
                                   <div
-                                    className="group/list flex w-full items-center gap-0.5"
+                                    className={`group/list flex w-full items-center gap-0.5 ${
+                                      reorderMode && dragOverListId === l.id
+                                        ? "outline outline-2 outline-offset-[-2px] outline-[var(--accent)]"
+                                        : ""
+                                    }`}
+                                    draggable={reorderMode && canRenameOrgStructure}
+                                    onDragStart={(e) => {
+                                      if (!reorderMode) return;
+                                      draggedListRef.current = { listId: l.id, deptId: d.id };
+                                      e.dataTransfer.effectAllowed = "move";
+                                      e.dataTransfer.setData("text/plain", l.id);
+                                      e.stopPropagation();
+                                    }}
+                                    onDragOver={(e) => {
+                                      if (!reorderMode || draggedListRef.current?.deptId !== d.id) return;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (dragOverListId !== l.id) setDragOverListId(l.id);
+                                    }}
+                                    onDragLeave={(e) => {
+                                      e.stopPropagation();
+                                      setDragOverListId((cur) => (cur === l.id ? null : cur));
+                                    }}
+                                    onDrop={(e) => {
+                                      if (!reorderMode || draggedListRef.current?.deptId !== d.id) return;
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const draggedId = draggedListRef.current!.listId;
+                                      draggedListRef.current = null;
+                                      setDragOverListId(null);
+                                      if (draggedId === l.id) return;
+                                      const nextOrder = moveBefore(levelLists.map((x) => x.id), draggedId, l.id);
+                                      void reorderLists(d.id, nextOrder);
+                                    }}
+                                    onDragEnd={(e) => {
+                                      e.stopPropagation();
+                                      draggedListRef.current = null;
+                                      setDragOverListId(null);
+                                    }}
                                     onContextMenu={(e) => {
                                       if (!canRenameOrgStructure || renamingListId === l.id) return;
                                       e.preventDefault();
@@ -845,11 +1101,25 @@ export function WorkspaceSidebar({
                                       <div
                                         className={`${rowBase(boardScope?.listId === l.id, true)} flex min-w-0 flex-1 items-center pl-2`}
                                       >
+                                        {reorderMode && canRenameOrgStructure && (
+                                          <span
+                                            className="shrink-0 cursor-grab text-[var(--muted)] active:cursor-grabbing"
+                                            aria-hidden
+                                          >
+                                            <GripIcon className="h-3.5 w-3.5" />
+                                          </span>
+                                        )}
                                         <Link
                                           href={`${base}/work`}
-                                          className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-1.5 pr-1"
+                                          className={`flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-1.5 pr-1 ${
+                                            reorderMode ? "cursor-grab active:cursor-grabbing" : ""
+                                          }`}
                                           title={l.name}
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            if (reorderMode) {
+                                              e.preventDefault();
+                                              return;
+                                            }
                                             writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id });
                                             markListSeen(l.id);
                                           }}
@@ -867,7 +1137,7 @@ export function WorkspaceSidebar({
                                             {l.name}
                                           </span>
                                         </Link>
-                                        {canRenameOrgStructure && (
+                                        {!reorderMode && canRenameOrgStructure && (
                                           <button
                                             type="button"
                                             className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
@@ -891,7 +1161,11 @@ export function WorkspaceSidebar({
                                           aria-hidden
                                           className="shrink-0 py-1.5 pr-2 pl-1 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
                                           title={l.name}
-                                          onClick={() => {
+                                          onClick={(e) => {
+                                            if (reorderMode) {
+                                              e.preventDefault();
+                                              return;
+                                            }
                                             writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id });
                                             markListSeen(l.id);
                                           }}
@@ -905,27 +1179,15 @@ export function WorkspaceSidebar({
                               );
                             })
                           )}
-                          <li className="py-1 pl-1">
-                            {showAddListForLevel !== d.id ? (
-                              <button
-                                type="button"
-                                disabled={addingList || addingLevel}
-                                className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-45"
-                                onClick={() => {
-                                  setShowAddListForLevel(d.id);
-                                  setNewListName("");
-                                }}
-                              >
-                                + Add {NODE_LABELS.list}
-                              </button>
-                            ) : (
+                          {showAddListForLevel === d.id && (
+                            <li className="py-1 pl-1">
                               <div
                                 className="relative"
-                                aria-busy={addingList && showAddListForLevel === d.id ? true : undefined}
+                                aria-busy={addingList ? true : undefined}
                               >
                                 <input
                                   autoFocus
-                                  disabled={addingList && showAddListForLevel === d.id}
+                                  disabled={addingList}
                                   className="input h-8 w-full rounded-lg px-2 py-1 pr-9 text-sm disabled:opacity-70"
                                   placeholder={`Name your ${NODE_LABELS.list.toLowerCase()}`}
                                   value={newListName}
@@ -951,7 +1213,7 @@ export function WorkspaceSidebar({
                                     }
                                   }}
                                 />
-                                {addingList && showAddListForLevel === d.id ? (
+                                {addingList ? (
                                   <span
                                     className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted)]"
                                     aria-hidden
@@ -960,8 +1222,8 @@ export function WorkspaceSidebar({
                                   </span>
                                 ) : null}
                               </div>
-                            )}
-                          </li>
+                            </li>
+                          )}
                           </motion.ul>
                         )}
                       </AnimatePresence>
@@ -970,17 +1232,8 @@ export function WorkspaceSidebar({
                 })}
                   </ul>
                 )}
-                <div className="px-2">
-                  {!showAddLevelInput ? (
-                    <button
-                      type="button"
-                      disabled={addingList || addingLevel}
-                      className="text-sm font-semibold text-[var(--muted)] hover:text-[var(--fg)] disabled:cursor-not-allowed disabled:opacity-45"
-                      onClick={() => setShowAddLevelInput(true)}
-                    >
-                      + Add {NODE_LABELS.level}
-                    </button>
-                  ) : (
+                {showAddLevelInput && (
+                  <div className="px-2">
                     <div className="relative" aria-busy={addingLevel ? true : undefined}>
                       <input
                         autoFocus
@@ -1019,25 +1272,28 @@ export function WorkspaceSidebar({
                         </span>
                       ) : null}
                     </div>
-                  )}
-                </div>
-                <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">
-                  <Link href={`${base}/people`} className={`${rowBase(activePeople)} pl-2`}>
-                    Team
-                  </Link>
-                  <Link href={`${base}/settings`} className={`${rowBase(activeUserSettings)} pl-2`}>
-                    Your settings
-                  </Link>
-                  <Link href={`${base}/organization-settings`} className={`${rowBase(activeOrganizationSettings)} pl-2`}>
-                    Organization settings
-                  </Link>
-                  <Link href={`${base}/webhooks`} className={`${rowBase(activeWebhooks)} pl-2`}>
-                    Webhooks
-                  </Link>
-                </div>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
+          <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">
+            <Link href={`${base}/people`} className={`${rowBase(activePeople)} pl-2`}>
+              Team
+            </Link>
+            <Link href={`${base}/settings`} className={`${rowBase(activeUserSettings)} pl-2`}>
+              Your settings
+            </Link>
+            <Link href={`${base}/organization-settings`} className={`${rowBase(activeOrganizationSettings)} pl-2`}>
+              Organization settings
+            </Link>
+            <Link href={`${base}/webhooks`} className={`${rowBase(activeWebhooks)} pl-2`}>
+              Webhooks
+            </Link>
+            <Link href={`${base}/archived`} className={`${rowBase(activeArchived)} pl-2`}>
+              Archived
+            </Link>
+          </div>
         </div>
       </nav>
     </aside>

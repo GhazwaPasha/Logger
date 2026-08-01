@@ -7,7 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
-import { apiJson, apiVoid } from "@/lib/api";
+import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useTaskFormNavigationGuard } from "@/hooks/useTaskFormNavigationGuard";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
@@ -212,24 +212,6 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
     [token, queryClient, workspaceId, goToWork],
   );
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      if (!token) return;
-      queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(workspaceId), (old) => {
-        if (!old) return old;
-        return { ...old, tasks: old.tasks.filter((t) => t.id !== id) };
-      });
-      queryClient.removeQueries({ queryKey: taskKeys.detail(id) });
-      goToWork();
-      try {
-        await apiVoid(`/tasks/${id}`, { method: "DELETE", token });
-      } finally {
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-      }
-    },
-    [token, queryClient, workspaceId, goToWork],
-  );
-
   const { requestLeave } = useTaskFormNavigationGuard({
     hasUnsavedChanges: requiresTitle ? false : hasUnsavedChanges,
     requiresTitle,
@@ -289,7 +271,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
 
   const caps = detail
     ? taskEditCaps(detail.task, lists, sessionUserId, members)
-    : { canArchiveTask: false, canDeleteTask: false, canEditFields: false };
+    : { canArchiveTask: false, canEditFields: false };
 
   const subtasksForList = detail?.subtasks ?? [];
 
@@ -608,7 +590,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
 
           {(discordChannelOptions.length > 0 || form.discordChannelId) && (
             <ToggleSection
-              label="Discord Submission"
+              label="Send to Discord"
               checked={discordEnabled}
               ariaLabel="Enable Discord submission for this task"
               icon={<FontAwesomeIcon icon={faDiscord} className="size-6 text-[#5865F2]" />}
@@ -647,7 +629,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   )
                 )}
                 {detail && token && form.discordChannelId && (
-                  <DiscordSubmissionZone taskId={taskId} token={token} />
+                  <DiscordSubmissionZone taskId={taskId} token={token} embedded />
                 )}
               </div>
             </ToggleSection>
@@ -660,7 +642,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
               ariaLabel="Show time tracking"
               onChange={(next) => form.setTimeTrackingEnabled(next)}
             >
-              <TimeTracker taskId={taskId} token={token} userId={sessionUserId} embedded />
+              <TimeTracker taskId={taskId} token={token} userId={sessionUserId} members={members} embedded />
             </ToggleSection>
           )}
 
@@ -684,42 +666,24 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             </div>
           )}
 
-          {(caps.canDeleteTask || caps.canArchiveTask) && (
+          {caps.canArchiveTask && (
             <div className="flex flex-col gap-2">
-              {caps.canArchiveTask && (
-                <button
-                  type="button"
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-                  onClick={() =>
-                    setConfirm({
-                      title: "Archive this task?",
-                      description: "It will be hidden from the board and treated as archived.",
-                      confirmLabel: "Archive",
-                      variant: "default",
-                      onConfirm: () => handleArchive(taskId),
-                    })
-                  }
-                >
-                  Archive task
-                </button>
-              )}
-              {caps.canDeleteTask && (
-                <button
-                  type="button"
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400"
-                  onClick={() =>
-                    setConfirm({
-                      title: "Delete this task?",
-                      description: "This will permanently remove the task and all its data. This cannot be undone.",
-                      confirmLabel: "Delete task",
-                      variant: "danger",
-                      onConfirm: () => handleDelete(taskId),
-                    })
-                  }
-                >
-                  Delete task
-                </button>
-              )}
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                onClick={() =>
+                  setConfirm({
+                    title: "Archive this task?",
+                    description:
+                      "It will be hidden from the board. You can restore it, or permanently delete it, from the Archived page.",
+                    confirmLabel: "Archive",
+                    variant: "default",
+                    onConfirm: () => handleArchive(taskId),
+                  })
+                }
+              >
+                Archive task
+              </button>
             </div>
           )}
         </div>

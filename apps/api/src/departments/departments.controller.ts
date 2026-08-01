@@ -24,6 +24,15 @@ export class DepartmentsController {
     return this.departments.create(user.id, organizationId, body);
   }
 
+  @Post("reorder")
+  reorder(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Body() body: unknown,
+  ) {
+    return this.departments.reorder(user.id, organizationId, body);
+  }
+
   @Patch(":departmentId")
   patch(
     @CurrentUser() user: RequestUser,

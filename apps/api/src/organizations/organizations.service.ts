@@ -8,6 +8,7 @@ import {
 } from "@work-ledger/contracts";
 import {
   activityLedger,
+  deletionLog,
   organizationMemberManagedDepartments,
   organizationMembers,
   organizations,
@@ -17,6 +18,7 @@ import {
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
+import { AttachmentsService } from "../attachments/attachments.service";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { ListsService } from "../lists/lists.service";
@@ -32,6 +34,7 @@ export class OrganizationsService {
     private readonly departments: DepartmentsService,
     private readonly lists: ListsService,
     private readonly collaboration: CollaborationService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   private slugifyName(name: string): string {
@@ -173,9 +176,44 @@ export class OrganizationsService {
       throw new ForbiddenException("Only owners can delete this organization");
     }
     const rows = await this.db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
-    if (rows.length === 0) throw new NotFoundException("Organization not found");
+    const org = rows[0];
+    if (!org) throw new NotFoundException("Organization not found");
+
+    const cascadedTasks = await this.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.organizationId, organizationId));
+    await this.attachments.releaseForTaskIds(cascadedTasks.map((t) => t.id));
+
+    await this.db.insert(deletionLog).values({
+      entityType: "organization",
+      entityId: organizationId,
+      organizationId,
+      actorId: userId,
+      snapshot: {
+        name: org.name,
+        cascadedTaskCount: cascadedTasks.length,
+        cascadedTaskIds: cascadedTasks.map((t) => t.id),
+      },
+    });
+
     this.collaboration.notifyOrgChanged(organizationId, null);
     await this.db.delete(organizations).where(eq(organizations.id, organizationId));
+  }
+
+  /** Owner only. Permanent tombstone record for anything hard-deleted in this org (survives independent of activity_ledger). */
+  async deletionLogFeed(userId: string, organizationId: string, opts?: { limit?: number }) {
+    await this.authz.assertOrgOwner(userId, organizationId);
+    const raw = opts?.limit;
+    const limit =
+      typeof raw === "number" && Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 1), 500) : 150;
+
+    return this.db
+      .select()
+      .from(deletionLog)
+      .where(eq(deletionLog.organizationId, organizationId))
+      .orderBy(desc(deletionLog.createdAt))
+      .limit(limit);
   }
 
   async listMembers(requesterId: string, organizationId: string) {

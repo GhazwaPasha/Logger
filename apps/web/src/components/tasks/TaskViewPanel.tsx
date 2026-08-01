@@ -8,6 +8,7 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
+import { useDiscordChannels } from "@/hooks/useDiscordChannels";
 import { useRouter } from "next/navigation";
 import { taskEditCaps } from "@/lib/workspace-permissions";
 import { DependencySection } from "@/components/tasks/DependencySection";
@@ -78,6 +79,9 @@ export function TaskViewPanel({
 
   const form = useTaskEditorForm({ taskId, workspaceId, token, detail });
   const subtaskOps = useTaskSubtasks(taskId, token, workspaceId);
+  const discordChannels = useDiscordChannels(token, workspaceId);
+  const discordChannelName =
+    discordChannels.data?.find((c) => c.id === form.discordChannelId)?.name ?? null;
 
   useEffect(() => {
     const el = titleRef.current;
@@ -420,9 +424,13 @@ export function TaskViewPanel({
 
       {/* Discord submission — live for everyone with access, when a channel is assigned; the required toggle lives in the full editor only */}
       {token && form.discordChannelId && (
-        <div className="space-y-2">
-          <DiscordSubmissionZone taskId={taskId} token={token} required={form.discordSubmissionRequired} />
-        </div>
+        <DiscordSubmissionZone
+          taskId={taskId}
+          token={token}
+          required={form.discordSubmissionRequired}
+          channelName={discordChannelName}
+          channelNameLoading={discordChannels.isLoading}
+        />
       )}
 
       {/* Comments — live for everyone with access */}

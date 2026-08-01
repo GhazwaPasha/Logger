@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import { createMilestoneSchema, linkMilestoneTasksSchema, updateMilestoneSchema } from "@work-ledger/contracts";
-import { milestones, milestoneTasks, tasks } from "@work-ledger/db";
+import { deletionLog, milestones, milestoneTasks, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -122,6 +122,15 @@ export class MilestonesService {
   async remove(userId: string, organizationId: string, milestoneId: string) {
     const existing = await this.getMilestoneOrThrow(organizationId, milestoneId);
     await this.assertCanWrite(userId, organizationId, existing.departmentId);
+
+    await this.db.insert(deletionLog).values({
+      entityType: "milestone",
+      entityId: milestoneId,
+      organizationId,
+      actorId: userId,
+      snapshot: { title: existing.title, description: existing.description },
+    });
+
     await this.db
       .delete(milestones)
       .where(and(eq(milestones.id, milestoneId), eq(milestones.organizationId, organizationId)));

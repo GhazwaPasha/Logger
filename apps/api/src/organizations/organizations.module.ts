@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AttachmentsModule } from "../attachments/attachments.module";
 import { DepartmentsModule } from "../departments/departments.module";
 import { ListsModule } from "../lists/lists.module";
 import { RealtimeModule } from "../realtime/realtime.module";
@@ -7,7 +8,7 @@ import { OrganizationsController } from "./organizations.controller";
 import { OrganizationsService } from "./organizations.service";
 
 @Module({
-  imports: [DepartmentsModule, ListsModule, RealtimeModule],
+  imports: [AttachmentsModule, DepartmentsModule, ListsModule, RealtimeModule],
   controllers: [OrganizationsController, OrganizationMembersController],
   providers: [OrganizationsService],
   exports: [OrganizationsService],

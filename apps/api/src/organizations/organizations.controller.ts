@@ -39,6 +39,18 @@ export class OrganizationsController {
     });
   }
 
+  @Get(":organizationId/deletion-log")
+  deletionLog(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query("limit") limitRaw?: string,
+  ) {
+    const n = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    return this.orgs.deletionLogFeed(user.id, organizationId, {
+      limit: n !== undefined && Number.isFinite(n) ? n : undefined,
+    });
+  }
+
   @Get(":organizationId")
   getOne(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
     return this.orgs.getById(user.id, organizationId);

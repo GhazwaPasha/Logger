@@ -9,8 +9,18 @@ import {
   updateSubtaskSchema,
   updateTaskStatusSchema,
 } from "@work-ledger/contracts";
-import { activityLedger, organizationMembers, subtasks, taskAssignees, taskAttachments, tasks } from "@work-ledger/db";
+import {
+  activityLedger,
+  comments,
+  deletionLog,
+  organizationMembers,
+  subtasks,
+  taskAssignees,
+  taskAttachments,
+  tasks,
+} from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
+import { AttachmentsService } from "../attachments/attachments.service";
 import { AuthorizationService, type ListTasksOpts } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { ListsService } from "../lists/lists.service";
@@ -28,6 +38,7 @@ export class TasksService {
     private readonly lists: ListsService,
     private readonly pushNotifications: PushNotificationsService,
     private readonly collaboration: CollaborationService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   async list(userId: string, organizationId: string, opts?: ListTasksOpts) {
@@ -320,7 +331,7 @@ export class TasksService {
     const isAssigner = access.task.assignerId === userId;
     if (!access.isOwner && !access.isDeptManager && !isAssigner) {
       throw new ForbiddenException(
-        "Only owners, department managers, or the task creator can delete tasks",
+        "Only owners, department managers, or the task creator can archive tasks",
       );
     }
 
@@ -348,13 +359,77 @@ export class TasksService {
     return archived;
   }
 
-  async deleteTask(userId: string, taskId: string) {
+  async restore(userId: string, taskId: string) {
     const access = await this.authz.getTaskAccess(userId, taskId);
+    if (!access.task.deletedAt) {
+      throw new ForbiddenException("Task is not archived");
+    }
+    const isAssigner = access.task.assignerId === userId;
+    if (!access.isOwner && !access.isDeptManager && !isAssigner) {
+      throw new ForbiddenException(
+        "Only owners, department managers, or the task creator can restore archived tasks",
+      );
+    }
+
+    const now = new Date();
+    const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(tasks)
+        .set({ deletedAt: null, updatedAt: now })
+        .where(eq(tasks.id, taskId));
+      const [row] = await tx
+        .insert(activityLedger)
+        .values({
+          taskId,
+          actorId: userId,
+          type: "unarchive",
+          payload: { restoredAt: now.toISOString() },
+        })
+        .returning();
+      ledgerDelta.push(row!);
+    });
+
+    const restored = await this.taskMutationResult(userId, taskId, ledgerDelta);
+    this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
+    return restored;
+  }
+
+  /** Permanent delete ("purge"). Only ever allowed on an already-archived task, and only for owners/creators. */
+  async purge(userId: string, taskId: string) {
+    const access = await this.authz.getTaskAccess(userId, taskId);
+    if (!access.task.deletedAt) {
+      throw new ForbiddenException("Archive the task before deleting it permanently");
+    }
     const caps = this.authz.taskCapabilities(access, userId);
-    if (!caps.canDeleteTask) {
+    if (!caps.canPurgeTask) {
       throw new ForbiddenException("Only owners and task creators can permanently delete tasks");
     }
     const orgId = access.task.organizationId;
+
+    const [ledgerRows, subtaskCount, attachmentCount, commentCount] = await Promise.all([
+      this.db.select().from(activityLedger).where(eq(activityLedger.taskId, taskId)),
+      this.db.select({ value: count() }).from(subtasks).where(eq(subtasks.taskId, taskId)),
+      this.db.select({ value: count() }).from(taskAttachments).where(eq(taskAttachments.taskId, taskId)),
+      this.db.select({ value: count() }).from(comments).where(eq(comments.taskId, taskId)),
+    ]);
+
+    await this.attachments.releaseForTaskIds([taskId]);
+
+    await this.db.insert(deletionLog).values({
+      entityType: "task",
+      entityId: taskId,
+      organizationId: orgId,
+      actorId: userId,
+      snapshot: {
+        title: access.task.title,
+        subtaskCount: subtaskCount[0]?.value ?? 0,
+        attachmentCount: attachmentCount[0]?.value ?? 0,
+        commentCount: commentCount[0]?.value ?? 0,
+        ledger: ledgerRows,
+      },
+    });
+
     await this.db.delete(tasks).where(eq(tasks.id, taskId));
     this.collaboration.notifyOrgChanged(orgId, taskId);
   }

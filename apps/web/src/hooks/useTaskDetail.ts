@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { taskKeys } from "@/lib/query-keys";
 import type { ListRow, MemberRow, TaskDetail, TaskRow } from "@/lib/ledger-types";
-import { taskEditCaps } from "@/lib/workspace-permissions";
+import { archivedTaskCaps, taskEditCaps } from "@/lib/workspace-permissions";
 
 type PlaceholderContext = {
   lists: ListRow[];
@@ -17,12 +17,16 @@ type PlaceholderContext = {
 function taskRowToPlaceholderDetail(row: TaskRow, ctx?: PlaceholderContext): TaskDetail {
   const caps = ctx?.userId
     ? taskEditCaps(row, ctx.lists, ctx.userId, ctx.members)
-    : { canArchiveTask: false, canDeleteTask: false, canEditFields: false };
+    : { canArchiveTask: false, canEditFields: false };
+  const archivedCaps = ctx?.userId
+    ? archivedTaskCaps(row, ctx.lists, ctx.userId, ctx.members)
+    : { canRestore: false, canPurge: false };
   return {
     task: row,
     capabilities: {
       canArchiveTask: caps.canArchiveTask,
-      canDeleteTask: caps.canDeleteTask,
+      canRestoreTask: archivedCaps.canRestore,
+      canPurgeTask: archivedCaps.canPurge,
       canEditFields: caps.canEditFields,
       canParticipate: true,
     },

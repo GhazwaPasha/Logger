@@ -10,5 +10,6 @@ import { AttachmentsService } from "./attachments.service";
   imports: [RealtimeModule, DiscordModule, PushModule],
   controllers: [AttachmentsController],
   providers: [AttachmentsService, AttachmentsOrphanCleanupService],
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

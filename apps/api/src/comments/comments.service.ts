@@ -75,7 +75,7 @@ export class CommentsService {
 
     return rows.map((r) => ({
       ...r,
-      body: r.deletedAt ? null : r.body,
+      body: r.deletedAt && !access.isOwner && r.authorId !== userId ? null : r.body,
     }));
   }
 
@@ -166,6 +166,32 @@ export class CommentsService {
         taskId: comment.taskId,
         actorId: userId,
         type: "comment_deleted",
+        payload: { commentId },
+      })
+      .returning();
+
+    await this.notifyLedger(access, userId, comment.taskId, entry!);
+    this.collaboration.notifyOrgChanged(access.task.organizationId, comment.taskId);
+  }
+
+  async restore(userId: string, commentId: string) {
+    const [comment] = await this.db.select().from(comments).where(eq(comments.id, commentId)).limit(1);
+    if (!comment) throw new NotFoundException("Comment not found");
+    if (!comment.deletedAt) throw new ForbiddenException("Comment is not deleted");
+
+    const access = await this.authz.getTaskAccess(userId, comment.taskId);
+    const isAuthor = comment.authorId === userId;
+    const isOwner = access.isOwner;
+    if (!isAuthor && !isOwner) throw new ForbiddenException("Cannot restore this comment");
+
+    await this.db.update(comments).set({ deletedAt: null }).where(eq(comments.id, commentId));
+
+    const [entry] = await this.db
+      .insert(activityLedger)
+      .values({
+        taskId: comment.taskId,
+        actorId: userId,
+        type: "comment_restored",
         payload: { commentId },
       })
       .returning();

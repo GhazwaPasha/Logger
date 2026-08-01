@@ -37,6 +37,7 @@ export class TasksController {
       dueDateTo: query.dueDateTo,
       limit: query.limit,
       cursor: query.cursor,
+      archivedOnly: query.archived,
     });
   }
 
@@ -130,12 +131,17 @@ export class TasksByIdController {
 
   @Delete(":taskId")
   deleteTask(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
-    return this.tasks.deleteTask(user.id, taskId);
+    return this.tasks.purge(user.id, taskId);
   }
 
   @Post(":taskId/archive")
   archive(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
     return this.tasks.archive(user.id, taskId);
+  }
+
+  @Post(":taskId/restore")
+  restore(@CurrentUser() user: RequestUser, @Param("taskId") taskId: string) {
+    return this.tasks.restore(user.id, taskId);
   }
 
   @Get(":taskId/report.pdf")

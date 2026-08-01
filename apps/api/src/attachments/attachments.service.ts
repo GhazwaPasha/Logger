@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { count, eq } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
@@ -341,5 +341,34 @@ export class AttachmentsService {
   async runOrphanCleanup(): Promise<{ scanned: number; deleted: number } | null> {
     if (!this.isR2Configured()) return null;
     return cleanupOrphanR2Objects(this.db, this.assertR2(), this.bucket);
+  }
+
+  /**
+   * Releases blob refs (and deletes the attachment rows) for every attachment under the given tasks,
+   * before those tasks are hard-deleted. Cascading FK deletes bypass `releaseBlobRef` entirely, which
+   * otherwise leaks `attachment_blobs` rows and their R2 objects forever — callers that are about to
+   * hard-delete a task (or a list/department/organization that cascades through tasks) must call this
+   * first so ref-counts and storage stay accurate.
+   */
+  async releaseForTaskIds(taskIds: string[]): Promise<void> {
+    if (taskIds.length === 0) return;
+    const rows = await this.db
+      .select({ id: taskAttachments.id, blobId: taskAttachments.blobId })
+      .from(taskAttachments)
+      .where(inArray(taskAttachments.taskId, taskIds));
+    if (rows.length === 0) return;
+
+    if (this.isR2Configured()) {
+      const s3 = this.assertR2();
+      for (const row of rows) {
+        await releaseBlobRef(this.db, s3, this.bucket, row.blobId);
+      }
+    }
+    await this.db.delete(taskAttachments).where(
+      inArray(
+        taskAttachments.id,
+        rows.map((r) => r.id),
+      ),
+    );
   }
 }

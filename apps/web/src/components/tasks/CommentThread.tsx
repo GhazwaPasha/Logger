@@ -7,6 +7,7 @@ import { faPaperPlane, faPen, faTrashCan, faComment } from "@fortawesome/free-so
 import { apiFetch, apiJson } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
 
 type CommentRow = {
@@ -219,6 +220,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
   const [replyMention, setReplyMention] = useState("");
   const [showInput, setShowInput] = useState(false);
   const currentMember = members.find((m) => m.userId === userId);
+  const isOrgOwner = isWorkspaceOwner(members, userId);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
 
@@ -232,6 +234,12 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
   const deleteMutation = useMutation({
     mutationFn: (commentId: string) =>
       apiFetch(`/comments/${commentId}`, { token, method: "DELETE" }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["comments", taskId] }),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (commentId: string) =>
+      apiFetch(`/comments/${commentId}/restore`, { token, method: "POST" }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["comments", taskId] }),
   });
 
@@ -276,30 +284,41 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               <span className="text-[10px] text-[var(--muted)]">{formatRelative(comment.createdAt)}</span>
               {comment.editedAt && <span className="text-[10px] text-[var(--muted)]">(edited)</span>}
               {isOwn && !comment.deletedAt && !viewOnly && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { setEditingId(comment.id); setEditBody(comment.body ?? ""); }}
-                    className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
-                    aria-label="Edit"
-                  >
-                    <FontAwesomeIcon icon={faPen} className="size-[11px]" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteMutation.mutate(comment.id)}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-red-500 transition-opacity"
-                    aria-label="Delete"
-                  >
-                    <FontAwesomeIcon icon={faTrashCan} className="size-[11px]" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => { setEditingId(comment.id); setEditBody(comment.body ?? ""); }}
+                  className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
+                  aria-label="Edit"
+                >
+                  <FontAwesomeIcon icon={faPen} className="size-[11px]" />
+                </button>
+              )}
+              {(isOwn || isOrgOwner) && !comment.deletedAt && !viewOnly && (
+                <button
+                  type="button"
+                  onClick={() => deleteMutation.mutate(comment.id)}
+                  className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-red-500 transition-opacity"
+                  aria-label="Delete"
+                >
+                  <FontAwesomeIcon icon={faTrashCan} className="size-[11px]" />
+                </button>
               )}
             </div>
 
             {/* Body */}
             {comment.deletedAt ? (
-              <p className="text-sm italic text-[var(--muted)]">Comment removed.</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm italic text-[var(--muted)]">Comment removed.</p>
+                {(isOwn || isOrgOwner) && !viewOnly && (
+                  <button
+                    type="button"
+                    onClick={() => restoreMutation.mutate(comment.id)}
+                    className="text-[10px] font-medium text-[var(--muted)] underline hover:text-[var(--fg)]"
+                  >
+                    Restore
+                  </button>
+                )}
+              </div>
             ) : editingId === comment.id ? (
               <div>
                 <textarea

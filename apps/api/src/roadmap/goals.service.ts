@@ -1,7 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { createGoalSchema, updateGoalSchema } from "@work-ledger/contracts";
-import { goals } from "@work-ledger/db";
+import { deletionLog, goals, milestones } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -101,6 +101,24 @@ export class GoalsService {
   async remove(userId: string, organizationId: string, goalId: string) {
     const existing = await this.getGoalOrThrow(organizationId, goalId);
     await this.assertCanWrite(userId, organizationId, existing, existing.departmentId);
+
+    const cascadedMilestones = await this.db
+      .select({ id: milestones.id, title: milestones.title })
+      .from(milestones)
+      .where(eq(milestones.goalId, goalId));
+
+    await this.db.insert(deletionLog).values({
+      entityType: "goal",
+      entityId: goalId,
+      organizationId,
+      actorId: userId,
+      snapshot: {
+        title: existing.title,
+        description: existing.description,
+        cascadedMilestoneIds: cascadedMilestones.map((m) => m.id),
+      },
+    });
+
     await this.db.delete(goals).where(and(eq(goals.id, goalId), eq(goals.organizationId, organizationId)));
     this.collaboration.notifyOrgChanged(organizationId, goalId);
   }

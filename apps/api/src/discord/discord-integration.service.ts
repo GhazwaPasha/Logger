@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { discordIntegrationConfigSchema } from "@work-ledger/contracts";
-import { discordIntegrations } from "@work-ledger/db";
+import { deletionLog, discordIntegrations } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -55,6 +55,16 @@ export class DiscordIntegrationService {
 
   async deleteConfig(userId: string, organizationId: string) {
     await this.authz.assertOrgOwner(userId, organizationId);
+    const existing = await this.getRow(organizationId);
+    if (existing) {
+      await this.db.insert(deletionLog).values({
+        entityType: "discord_integration",
+        entityId: existing.id,
+        organizationId,
+        actorId: userId,
+        snapshot: { guildId: existing.guildId },
+      });
+    }
     await this.db.delete(discordIntegrations).where(eq(discordIntegrations.organizationId, organizationId));
     return { ok: true as const };
   }

@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { type SQL, and, count, desc, eq, gte, inArray, isNull, lt, lte, max, or } from "drizzle-orm";
+import { type SQL, and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, or } from "drizzle-orm";
 import {
   activityLedger,
   lists,
@@ -22,6 +22,8 @@ export interface ListTasksOpts {
   dueDateTo?: string;
   limit?: number;
   cursor?: string;
+  /** When true, returns archived tasks (deletedAt set) instead of active ones — same role-based scoping either way. */
+  archivedOnly?: boolean;
 }
 
 function encodeCursor(task: { createdAt: Date; id: string }): string {
@@ -168,17 +170,21 @@ export class AuthorizationService {
   taskCapabilities(access: TaskAccess, userId: string) {
     const t = access.task;
     const active = t.deletedAt == null;
-    /** Managers archive tasks in their levels; owners and creators use delete (same soft-delete endpoint). */
     const isAssigner = access.isAssigner;
-    const canArchiveTask = active && access.isDeptManager && !access.isOwner;
-    const canDeleteTask = active && (access.isOwner || isAssigner);
+    /** Two-step delete: owners, department managers, and the task creator can all archive (reversible). */
+    const canArchiveTask = active && (access.isOwner || access.isDeptManager || isAssigner);
+    /** Restoring an archived task follows the same circle of people who could have archived it. */
+    const canRestoreTask = !active && (access.isOwner || access.isDeptManager || isAssigner);
+    /** Permanent delete ("purge") only ever applies to an already-archived task, and only to owners/creators. */
+    const canPurgeTask = !active && (access.isOwner || isAssigner);
     /** Structural/scope edits: title, priority, due/recurrence, assignees, subtask add/edit/delete. */
     const canEditFields = active && (access.isOwner || access.isDeptManager || isAssigner);
     /** Status change, subtask toggle, comments, attachments, Discord submit, dependencies, time log — any participant while active. */
     const canParticipate = active;
     return {
       canArchiveTask,
-      canDeleteTask,
+      canRestoreTask,
+      canPurgeTask,
       canEditFields,
       canParticipate,
     };
@@ -269,11 +275,12 @@ export class AuthorizationService {
       .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
       .limit(1);
     const m = memberRow[0];
+    const deletedCondition = opts?.archivedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt);
 
     // Role-scoped base conditions
     const roleConditions: (SQL | undefined)[] = [
       eq(tasks.organizationId, organizationId),
-      isNull(tasks.deletedAt),
+      deletedCondition,
     ];
 
     if (m?.role === "manager") {
@@ -290,7 +297,7 @@ export class AuthorizationService {
         .select({ taskId: taskAssignees.taskId })
         .from(taskAssignees)
         .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
+        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), deletedCondition));
       const ids = assignedIds.map((r) => r.taskId);
       if (ids.length === 0) return { tasks: [], nextCursor: null, total: 0 };
       roleConditions.push(inArray(tasks.id, ids));
