@@ -780,6 +780,10 @@ export class TasksService {
               dueRepeat: preRepeat,
               recurringSeriesId: seriesId,
               spawnedFromTaskId: taskId,
+              discordChannelId: task.discordChannelId,
+              discordSubmissionRequired: task.discordSubmissionRequired,
+              attachmentRequired: task.attachmentRequired,
+              timeTrackingEnabled: task.timeTrackingEnabled,
             })
             .returning();
           const newId = spawned!.id;
@@ -797,9 +801,25 @@ export class TasksService {
               .onConflictDoNothing({ target: [taskAssignees.taskId, taskAssignees.userId] });
           }
 
+          const curSubtasks = await tx
+            .select({ title: subtasks.title })
+            .from(subtasks)
+            .where(eq(subtasks.taskId, taskId))
+            .orderBy(asc(subtasks.createdAt));
+          if (curSubtasks.length > 0) {
+            // Stagger createdAt so ORDER BY has no ties, matching the bulk-insert pattern elsewhere in this file.
+            const baseMs = Date.now();
+            await tx.insert(subtasks).values(
+              curSubtasks.map((s, i) => ({ taskId: newId, title: s.title, createdAt: new Date(baseMs + i) })),
+            );
+          }
+
+          // Attributed to the assigner, not to userId (whoever completed the previous occurrence) —
+          // this entry describes the carried-over assignment from the original task, not an action
+          // the completer took on the new one.
           await tx.insert(activityLedger).values({
             taskId: newId,
-            actorId: userId,
+            actorId: task.assignerId,
             type: "note",
             payload: { message: "Task created.", title: nextTitle },
           });
@@ -807,7 +827,7 @@ export class TasksService {
           if (sortedAssignees.length > 0) {
             await tx.insert(activityLedger).values({
               taskId: newId,
-              actorId: userId,
+              actorId: task.assignerId,
               type: "assignee_change",
               payload: {
                 previousAssigneeUserIds: [] as string[],
