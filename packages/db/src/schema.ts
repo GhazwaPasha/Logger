@@ -195,6 +195,8 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   /** URL segment for web routes (`/<slug>/…`). Immutable after create. */
   slug: text("slug").notNull().unique(),
+  /** IANA timezone (e.g. `Asia/Karachi`) all due dates and timestamps are displayed in for this org. */
+  timeZone: text("time_zone").notNull().default("Asia/Karachi"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -313,6 +315,10 @@ export const tasks = pgTable(
     attachmentRequired: boolean("attachment_required").notNull().default(false),
     /** Controls whether the time-tracking UI renders for this task at all. */
     timeTrackingEnabled: boolean("time_tracking_enabled").notNull().default(false),
+    /** Set when status transitions to `done`; cleared if moved away from `done`. Compare to `dueAt` for on-time/late. */
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Set on a successful Discord submission (see `attachmentsService.discordSubmit`); independent of completion. */
+    lastSubmittedAt: timestamp("last_submitted_at", { withTimezone: true }),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })

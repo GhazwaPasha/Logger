@@ -75,7 +75,7 @@ export function WorkspaceShell({
   const workspaceSlug = workspaceUrlSegment(resolved);
 
   return (
-    <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug }}>
+    <WorkspaceRouteContext.Provider value={{ workspaceId, workspaceSlug, timeZone: resolved.timeZone }}>
       <OnlinePresenceProvider>
       <WorkspaceDataProvider workspaceId={workspaceId}>
         <WorkspaceRealtimeSubscriber workspaceId={workspaceId} />

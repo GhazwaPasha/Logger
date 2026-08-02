@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { eq } from "drizzle-orm";
+import { formatInTimeZone } from "@work-ledger/contracts";
 import { discordIntegrations, organizations, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
@@ -15,7 +16,6 @@ export type DiscordAttachmentSource = { fileBuffer: Buffer } | { storageKey: str
 export type NotifyAttachmentOpts = {
   organizationId: string;
   taskId: string;
-  taskTitle: string;
   discordChannelId: string;
   uploaderId: string;
   fileName: string;
@@ -29,16 +29,16 @@ export type NotifyAttachmentOpts = {
 
 export type DiscordDeliveryResult = { ok: true } | { ok: false; reason: string };
 
-function formatDueDate(d: Date): string {
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+function formatDueDate(d: Date, timeZone: string): string {
+  return formatInTimeZone(d, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 /** `null` when the task has no due date — timing isn't meaningful without one. */
-function timingLabel(dueAt: Date | null, submittedAt: Date): string | null {
+function timingLabel(dueAt: Date | null, submittedAt: Date, timeZone: string): string | null {
   if (!dueAt) return null;
   return submittedAt.getTime() > dueAt.getTime()
-    ? `⏰ late — was due ${formatDueDate(dueAt)}`
-    : `✅ on time — due ${formatDueDate(dueAt)}`;
+    ? `⏰ late — was due ${formatDueDate(dueAt, timeZone)}`
+    : `✅ on time — due ${formatDueDate(dueAt, timeZone)}`;
 }
 
 /** Posts a task attachment into the workspace's configured Discord channel; caller awaits the outcome. */
@@ -78,16 +78,21 @@ export class DiscordNotifyService {
 
     const [uploaderRow, orgRow] = await Promise.all([
       this.db.select({ name: user.name }).from(user).where(eq(user.id, opts.uploaderId)).limit(1),
-      this.db.select({ slug: organizations.slug }).from(organizations).where(eq(organizations.id, opts.organizationId)).limit(1),
+      this.db
+        .select({ slug: organizations.slug, timeZone: organizations.timeZone })
+        .from(organizations)
+        .where(eq(organizations.id, opts.organizationId))
+        .limit(1),
     ]);
     const uploaderName = uploaderRow[0]?.name ?? "Someone";
     const slug = orgRow[0]?.slug;
+    const timeZone = orgRow[0]?.timeZone ?? "UTC";
     const baseUrl = this.config.get<string>("WEB_APP_BASE_URL")?.trim().replace(/\/$/, "");
     const taskUrl = baseUrl && slug ? `\n${baseUrl}/${slug}/work?task=${encodeURIComponent(opts.taskId)}` : "";
 
-    const timing = timingLabel(opts.dueAt, opts.submittedAt);
+    const timing = timingLabel(opts.dueAt, opts.submittedAt, timeZone);
     const timingSuffix = timing ? ` · ${timing}` : "";
-    const content = `📎 Discord submission on **${opts.taskTitle}** · submitted by ${uploaderName}${timingSuffix}${taskUrl}`;
+    const content = `Submitted by ${uploaderName}${timingSuffix}${taskUrl}`;
 
     try {
       await this.discordApi.postFileMessage(opts.discordChannelId, {

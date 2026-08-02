@@ -11,6 +11,7 @@ import {
   isTaskCreatedNote,
   memberDisplayName,
 } from "@/lib/task-activity-log";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 /** Collapsed → right; expanded → down (same affordance as list rows on the work board). */
 function IconChevronDisclosure({ className, open }: { className?: string; open: boolean }) {
@@ -37,6 +38,7 @@ type Props = {
 };
 
 export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   const [expanded, setExpanded] = useState(false);
   const headingId = useId();
   const regionId = useId();
@@ -88,7 +90,7 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
               </p>
               {entriesOldestFirst.map((entry) => (
                 <p key={entry.id}>
-                  <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+                  <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
                   <span className="text-[var(--muted)]">: </span>
                   <span>
                     <LedgerLineDescription entry={entry} members={members} />

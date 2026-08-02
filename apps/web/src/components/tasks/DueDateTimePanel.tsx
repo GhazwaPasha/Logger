@@ -2,6 +2,8 @@
 
 import { useCallback, useId, useMemo, type ChangeEvent } from "react";
 import type { TaskDueRepeat } from "@/lib/ledger-types";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { getZonedParts } from "@/lib/date";
 
 type DueDateTimePanelProps = {
   /** `datetime-local` shape (`YYYY-MM-DDTHH:mm`) or `""`. */
@@ -46,9 +48,11 @@ function mergeCalendarDayWithTime(day: Date, hour: number, minute: number): Date
 /** Same native `type="date"` shell as the task page due filter toolbar. */
 const DUE_DATE_INPUT_CLASS = "input h-10 min-w-0 w-full flex-1 rounded-lg text-sm";
 
-function todayLocalDateString(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+/** "Today" as read on the org's clock, not the viewer's browser clock — matters near midnight when
+ *  the two can disagree on which calendar day it is. */
+function todayZonedDateString(timeZone: string): string {
+  const p = getZonedParts(new Date(), timeZone);
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`;
 }
 
 /** Popover header actions (no global `.btn-*` — padding matches). */
@@ -58,6 +62,7 @@ const COMPACT_DUE_ACTION_GRID_CELL = `${COMPACT_DUE_ACTION_BASE} w-full min-w-0`
 
 /** Single due: native date + time (matches task filter date inputs). */
 export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, dueRepeat, onDueRepeatChange }: DueDateTimePanelProps) {
+  const { timeZone } = useWorkspaceRoute();
   const selected = useMemo(() => parseDueLocalValue(value), [value]);
 
   const dateInputValue = useMemo(() => {
@@ -160,7 +165,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
           type="date"
           className={`${DUE_DATE_INPUT_CLASS} mt-1`}
           value={dateInputValue}
-          min={todayLocalDateString()}
+          min={todayZonedDateString(timeZone)}
           onChange={onDateInputChange}
           aria-label="Due date"
         />

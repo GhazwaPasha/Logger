@@ -1,4 +1,4 @@
-export type Org = { id: string; name: string; slug?: string };
+export type Org = { id: string; name: string; slug?: string; timeZone: string };
 export type Dept = { id: string; name: string; organizationId: string; orderIndex: number };
 export type ListRow = {
   id: string;
@@ -83,6 +83,10 @@ export type TaskRow = {
   createdAt?: string;
   updatedAt?: string;
   deletedAt: string | null;
+  /** Set when status transitions to `done`; cleared if moved away from `done`. Compare to `dueAt` for on-time/late. */
+  completedAt?: string | null;
+  /** Set on the most recent successful Discord submission; independent of completion. */
+  lastSubmittedAt?: string | null;
   /** Present on organization task list responses; resolved from task assignees. */
   assigneeUserIds?: string[];
   /** On workspace bootstrap and list APIs when subtasks are included (batched on the server). */

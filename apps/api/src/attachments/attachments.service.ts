@@ -3,7 +3,7 @@ import { count, eq, inArray } from "drizzle-orm";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
-import { activityLedger, attachmentBlobs, taskAssignees, taskAttachments } from "@work-ledger/db";
+import { activityLedger, attachmentBlobs, taskAssignees, taskAttachments, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
@@ -215,7 +215,6 @@ export class AttachmentsService {
     const delivery = await this.discordNotify.notifyAttachment({
       organizationId: access.task.organizationId,
       taskId,
-      taskTitle: access.task.title,
       discordChannelId: access.task.discordChannelId,
       uploaderId: userId,
       fileName,
@@ -232,6 +231,10 @@ export class AttachmentsService {
         .update(taskAttachments)
         .set({ discordDeliveredAt })
         .where(eq(taskAttachments.id, row.id));
+      await this.db
+        .update(tasks)
+        .set({ lastSubmittedAt: discordDeliveredAt })
+        .where(eq(tasks.id, taskId));
     }
 
     return {

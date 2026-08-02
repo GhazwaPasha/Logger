@@ -4,6 +4,7 @@ import type React from "react";
 import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 type Props = {
   entry: LedgerRow;
@@ -21,13 +22,14 @@ type Props = {
 
 /** Ledger preview for list (under title) or kanban (card footer). */
 export function TaskCardLastActivity({ entry, members, compact, variant = "footer", right }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   const lineClamp = compact ? "line-clamp-2" : variant === "inline" ? "line-clamp-2" : "line-clamp-3";
 
   if (variant === "inline") {
     return (
       <div className="min-w-0 font-mono-ledger text-[11px] leading-snug" aria-label="Last activity">
         <p className={`min-w-0 text-[var(--muted)] ${lineClamp}`}>
-          <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+          <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
           <span className="text-[var(--muted)]">: </span>
           <span className="text-[var(--fg)]/90">
             <LedgerLineDescription entry={entry} members={members} />
@@ -43,7 +45,7 @@ export function TaskCardLastActivity({ entry, members, compact, variant = "foote
       aria-label="Last activity"
     >
       <p className={`min-w-0 flex-1 text-[var(--muted)] ${lineClamp}`}>
-        <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+        <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
         <span className="text-[var(--muted)]">: </span>
         <span className="text-[var(--fg)]/90">
           <LedgerLineDescription entry={entry} members={members} />

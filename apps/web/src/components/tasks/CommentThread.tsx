@@ -9,6 +9,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { formatInTimeZone } from "@/lib/date";
 
 type CommentRow = {
   id: string;
@@ -24,7 +26,7 @@ type CommentRow = {
   createdAt: string;
 };
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, timeZone: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
   if (s < 60) return "just now";
@@ -32,7 +34,7 @@ function formatRelative(iso: string): string {
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatInTimeZone(new Date(iso), timeZone, { month: "short", day: "numeric" });
 }
 
 function MentionHighlightedBody({ body }: { body: string }) {
@@ -215,6 +217,7 @@ type Props = {
 };
 
 export function CommentThread({ taskId, token, userId, members, viewOnly }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyMention, setReplyMention] = useState("");
@@ -281,7 +284,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               <span className={`text-xs font-semibold ${isOwn ? "text-[var(--accent)]" : "text-[var(--fg)]"}`}>
                 {comment.authorName ?? comment.authorEmail}
               </span>
-              <span className="text-[10px] text-[var(--muted)]">{formatRelative(comment.createdAt)}</span>
+              <span className="text-[10px] text-[var(--muted)]">{formatRelative(comment.createdAt, timeZone)}</span>
               {comment.editedAt && <span className="text-[10px] text-[var(--muted)]">(edited)</span>}
               {isOwn && !comment.deletedAt && !viewOnly && (
                 <button

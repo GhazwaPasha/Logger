@@ -14,7 +14,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { SettingsCard, EditableField } from "@/components/ui/SettingsCard";
-import { faBuilding, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faBuilding, faClock, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { Org } from "@/lib/ledger-types";
 import { discordKeys, orgKeys, workspaceKeys } from "@/lib/query-keys";
@@ -22,6 +22,8 @@ import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import { NODE_LABELS } from "@/lib/nodes";
+import { TIMEZONE_GROUPS } from "@/lib/timezones";
+import { formatInTimeZone } from "@/lib/date";
 
 type DiscordIntegrationConfig = { guildId: string; updatedAt: string } | null;
 type DiscordConnectionResult = { ok: true; guildName: string } | { ok: false; reason: string };
@@ -38,6 +40,9 @@ export default function OrganizationSettingsPage() {
   const [orgLoading, setOrgLoading] = useState(true);
   const [saveBusy, setSaveBusy] = useState(false);
   const [editingOrgName, setEditingOrgName] = useState(false);
+  const [timeZoneDraft, setTimeZoneDraft] = useState("");
+  const [editingTimeZone, setEditingTimeZone] = useState(false);
+  const [timeZoneSaveBusy, setTimeZoneSaveBusy] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [orgDeleteDialog, setOrgDeleteDialog] = useState<ConfirmDialogOptions | null>(null);
@@ -71,6 +76,7 @@ export default function OrganizationSettingsPage() {
         if (!c) {
           setOrg(o);
           setRename(o.name);
+          setTimeZoneDraft(o.timeZone);
         }
       } catch {
         if (!c) setOrg(null);
@@ -234,6 +240,39 @@ export default function OrganizationSettingsPage() {
     setEditingOrgName(false);
   }
 
+  async function saveTimeZone() {
+    if (!token || !timeZoneDraft || timeZoneSaveBusy) return;
+    setTimeZoneSaveBusy(true);
+    setError(null);
+    try {
+      const o = await apiJson<Org>(`/organizations/${workspaceId}`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ timeZone: timeZoneDraft }),
+      });
+      setOrg(o);
+      setEditingTimeZone(false);
+      await reload();
+      await reloadWorkspaceList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update timezone");
+    } finally {
+      setTimeZoneSaveBusy(false);
+    }
+  }
+
+  function startEditTimeZone() {
+    setTimeZoneDraft(org?.timeZone ?? "");
+    setError(null);
+    setEditingTimeZone(true);
+  }
+
+  function cancelEditTimeZone() {
+    setTimeZoneDraft(org?.timeZone ?? "");
+    setError(null);
+    setEditingTimeZone(false);
+  }
+
   function openOrgDeleteDialog() {
     if (!org) return;
     if (deleteConfirm.trim() !== org.name.trim()) {
@@ -346,6 +385,55 @@ export default function OrganizationSettingsPage() {
           </EditableField>
         </SettingsCard>
       )}
+      {!orgLoading && org ? (
+        <SettingsCard
+          icon={faClock}
+          title="Time zone"
+          description="Due dates, activity timestamps, and the Discord bot all display times in this timezone."
+        >
+          <EditableField
+            label="Time zone"
+            value={TIMEZONE_GROUPS.flatMap((g) => g.zones).find((z) => z.value === org.timeZone)?.label ?? org.timeZone}
+            editing={editingTimeZone}
+            onEdit={startEditTimeZone}
+            onCancel={cancelEditTimeZone}
+            action={
+              <button
+                type="button"
+                className="btn-primary inline-flex min-w-[7.5rem] shrink-0 items-center justify-center gap-2 rounded-xl px-5"
+                disabled={timeZoneSaveBusy}
+                aria-busy={timeZoneSaveBusy || undefined}
+                onClick={() => void saveTimeZone()}
+              >
+                {timeZoneSaveBusy ? (
+                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                ) : null}
+                <span>{timeZoneSaveBusy ? "Saving" : "Save time zone"}</span>
+              </button>
+            }
+          >
+            <select
+              id="org-timezone-select"
+              aria-label="Time zone"
+              className="input rounded-xl"
+              value={timeZoneDraft}
+              disabled={timeZoneSaveBusy}
+              onChange={(e) => setTimeZoneDraft(e.target.value)}
+              autoFocus
+            >
+              {TIMEZONE_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.zones.map((z) => (
+                    <option key={z.value} value={z.value}>
+                      {z.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </EditableField>
+        </SettingsCard>
+      ) : null}
       {!orgLoading && org && canDeleteOrg ? (
         <SettingsCard
           icon={faDiscord}
@@ -404,7 +492,7 @@ export default function OrganizationSettingsPage() {
                     <span className="text-red-600 dark:text-red-400">{connectionStatus.reason}</span>
                   )}
                   <span className="text-[var(--muted)]">
-                    Connected since {new Date(discordConfig.updatedAt).toLocaleDateString()}
+                    Connected since {formatInTimeZone(new Date(discordConfig.updatedAt), org.timeZone, { month: "short", day: "numeric", year: "numeric" })}
                   </span>
                   <span className="text-[var(--muted)]">
                     {channelsQuery.isLoading

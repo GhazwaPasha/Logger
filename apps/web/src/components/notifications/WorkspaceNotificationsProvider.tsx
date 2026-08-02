@@ -55,7 +55,7 @@ export function useOptionalWorkspaceNotifications(): WorkspaceNotificationsConte
 }
 
 export function WorkspaceNotificationsProvider({ children }: { children: ReactNode }) {
-  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
+  const { workspaceId, workspaceSlug, timeZone } = useWorkspaceRoute();
   const { token, session } = useApiSession();
   const userId = session?.user?.id ?? null;
   const { tasks, members } = useWorkspaceData();
@@ -333,7 +333,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                           >
                             <p className="text-xs font-medium text-[var(--fg)]">{title}</p>
                             <p className="mt-1 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]">
-                              <span className="text-[var(--muted)]">{formatLogTimestamp(e.createdAt)}</span>
+                              <span className="text-[var(--muted)]">{formatLogTimestamp(e.createdAt, timeZone)}</span>
                               <span className="text-[var(--muted)]"> · </span>
                               <LedgerLineDescription entry={e} members={members} />
                             </p>

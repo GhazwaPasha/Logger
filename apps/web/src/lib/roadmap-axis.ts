@@ -48,8 +48,11 @@ export function fitZoomToRange(range: { start: number; end: number }): { zoomLev
   return { zoomLevel: bestIdx, centerDate: (range.start + range.end) / 2 };
 }
 
+// Ticks are built entirely from UTC calendar math (see cursor computation below), so labels must
+// format in UTC too — formatting in the viewer's local zone would show the wrong weekday/month for
+// anyone west of UTC (a UTC-midnight cursor can read as "yesterday" locally).
 function fmtMonthShort(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: "short" });
+  return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
 }
 
 /** Granularity-aware gridline ticks between axisStart/axisEnd, positioned as % across the span. */
@@ -65,7 +68,7 @@ export function buildTicks(axisStart: number, axisEnd: number, granularity: Tick
     while (cursor < axisEnd) {
       const d = new Date(cursor);
       const month = d.getUTCMonth();
-      const weekday = d.toLocaleDateString(undefined, { weekday: "short" });
+      const weekday = d.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" });
       const label = month !== lastMonth ? `${weekday} ${fmtMonthShort(d)} ${d.getUTCDate()}` : `${weekday} ${d.getUTCDate()}`;
       lastMonth = month;
       ticks.push({ pos: pos(cursor), label });

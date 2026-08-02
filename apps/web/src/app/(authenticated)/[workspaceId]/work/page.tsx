@@ -43,6 +43,7 @@ import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/Confir
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
 import { POP_EASE, backdropVariants, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
 import { taskEditCaps } from "@/lib/workspace-permissions";
+import { formatInTimeZone, getZonedParts } from "@/lib/date";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
@@ -349,7 +350,7 @@ function WorkBoardStatsCard({
 }
 
 function WorkItemsInner() {
-  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
+  const { workspaceId, workspaceSlug, timeZone } = useWorkspaceRoute();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -916,7 +917,7 @@ function WorkItemsInner() {
       }
       if (urlAssigneeUserId && !assignees.includes(urlAssigneeUserId)) return false;
       if (dueWindow === "custom") {
-        if (!taskMatchesDueRange(t, dueFrom, dueTo)) return false;
+        if (!taskMatchesDueRange(t, dueFrom, dueTo, timeZone)) return false;
       } else if (!taskMatchesDueWindow(t, dueWindow)) return false;
       if (goalFilter) {
         const linked = roadmap.milestones.some((m) => m.goalId === goalFilter && m.linkedTaskIds.includes(t.id));
@@ -940,6 +941,7 @@ function WorkItemsInner() {
     goalFilter,
     milestoneFilter,
     roadmap.milestones,
+    timeZone,
   ]);
 
   const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortMode), [filteredTasks, sortMode]);
@@ -1002,15 +1004,14 @@ function WorkItemsInner() {
   function formatDueForListPill(dueAt: string) {
     const d = new Date(dueAt);
     if (Number.isNaN(d.getTime())) return "—";
-    const now = new Date();
-    const sameYear = d.getFullYear() === now.getFullYear();
-    return new Intl.DateTimeFormat(undefined, {
+    const sameYear = getZonedParts(d, timeZone).year === getZonedParts(new Date(), timeZone).year;
+    return formatInTimeZone(d, timeZone, {
       month: "short",
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
       ...(sameYear ? {} : { year: "numeric" }),
-    }).format(d);
+    });
   }
 
   function ListTaskCard({ task }: { task: TaskRow }) {

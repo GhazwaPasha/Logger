@@ -8,6 +8,8 @@ import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { formatInTimeZone } from "@/lib/date";
 
 type AttachmentRow = {
   id: string;
@@ -44,6 +46,7 @@ type Props = {
 };
 
 export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const prefersReduced = useReducedMotion();
@@ -163,7 +166,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                 </div>
                 {a.discordDeliveredAt && (
                   <span
-                    title={`Sent to Discord ${new Date(a.discordDeliveredAt).toLocaleString()}`}
+                    title={`Sent to Discord ${formatInTimeZone(new Date(a.discordDeliveredAt), timeZone, { dateStyle: "medium", timeStyle: "short" })}`}
                     className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
                   >
                     Discord

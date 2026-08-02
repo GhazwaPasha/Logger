@@ -8,6 +8,8 @@ import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { formatInTimeZone } from "@/lib/date";
 
 type TimeEntry = {
   id: string;
@@ -39,8 +41,8 @@ function formatDuration(sec: number): string {
   return `${sec}s`;
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+function formatDateTime(iso: string, timeZone: string): string {
+  return formatInTimeZone(new Date(iso), timeZone, { dateStyle: "short", timeStyle: "short" });
 }
 
 function useElapsedSeconds(startedAt: string | null): number {
@@ -72,6 +74,7 @@ export function TimeTracker({
   /** Skip the outer card chrome when nested inside another card (e.g. a ToggleSection). */
   embedded?: boolean;
 }) {
+  const { timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
   const timeKey = ["time", taskId];
   const isOrgOwner = isWorkspaceOwner(members ?? [], userId);
@@ -313,7 +316,7 @@ export function TimeTracker({
                     <span className="font-medium">{e.userName}</span>
                     <span className="text-[var(--muted)]">{formatDuration(parseInt(e.duration ?? "0", 10))}</span>
                   </div>
-                  <div className="text-[var(--muted)]">{formatDateTime(e.startedAt)}</div>
+                  <div className="text-[var(--muted)]">{formatDateTime(e.startedAt, timeZone)}</div>
                   {e.note && <div className="mt-0.5 italic text-[var(--muted)]">{e.note}</div>}
                 </div>
                 {!viewOnly && (e.userId === userId || isOrgOwner) && (

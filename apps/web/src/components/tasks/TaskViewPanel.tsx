@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { formatInTimeZone } from "@/lib/date";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
@@ -46,9 +47,9 @@ const REPEAT_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
-function formatDueDate(iso: string | null | undefined): string | null {
+function formatDueDate(iso: string | null | undefined, timeZone: string): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return formatInTimeZone(new Date(iso), timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function TaskViewPanel({
@@ -64,7 +65,7 @@ export function TaskViewPanel({
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
   const { tasks, lists, members, depts } = useWorkspaceData();
-  const { workspaceSlug, workspaceId } = useWorkspaceRoute();
+  const { workspaceSlug, workspaceId, timeZone } = useWorkspaceRoute();
 
   const prefersReduced = useReducedMotion();
   const [showAssignees, setShowAssignees] = useState(false);
@@ -128,7 +129,7 @@ export function TaskViewPanel({
   const stored = normalizeTaskStatus(task.status);
   const statusMenuOptions = stageControlDropdownOptions(stored);
 
-  const dueFormatted = formatDueDate(task.dueAt);
+  const dueFormatted = formatDueDate(task.dueAt, timeZone);
   const dueRepeat = parseTaskDueRepeat(task.dueRepeat);
   const dueColorClass = dueIndicatorColorClass(task);
 

@@ -157,6 +157,8 @@ exports.organizations = (0, pg_core_1.pgTable)("organizations", {
     name: (0, pg_core_1.text)("name").notNull(),
     /** URL segment for web routes (`/<slug>/…`). Immutable after create. */
     slug: (0, pg_core_1.text)("slug").notNull().unique(),
+    /** IANA timezone (e.g. `Asia/Karachi`) all due dates and timestamps are displayed in for this org. */
+    timeZone: (0, pg_core_1.text)("time_zone").notNull().default("Asia/Karachi"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 exports.departments = (0, pg_core_1.pgTable)("departments", {
@@ -252,6 +254,10 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     attachmentRequired: (0, pg_core_1.boolean)("attachment_required").notNull().default(false),
     /** Controls whether the time-tracking UI renders for this task at all. */
     timeTrackingEnabled: (0, pg_core_1.boolean)("time_tracking_enabled").notNull().default(false),
+    /** Set when status transitions to `done`; cleared if moved away from `done`. Compare to `dueAt` for on-time/late. */
+    completedAt: (0, pg_core_1.timestamp)("completed_at", { withTimezone: true }),
+    /** Set on a successful Discord submission (see `attachmentsService.discordSubmit`); independent of completion. */
+    lastSubmittedAt: (0, pg_core_1.timestamp)("last_submitted_at", { withTimezone: true }),
     deletedAt: (0, pg_core_1.timestamp)("deleted_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })

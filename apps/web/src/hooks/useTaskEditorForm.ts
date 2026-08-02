@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTaskFieldsSync } from "@/hooks/useTaskFieldsSync";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { dueAtToZonedInput } from "@/lib/date";
 import {
   manualStatusFromStored,
   normalizeTaskStatus,
@@ -15,14 +17,6 @@ import {
   titleForPersist,
 } from "@/lib/task-default-title";
 
-function dueAtToLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 export function useTaskEditorForm(options: {
   taskId: string;
   workspaceId: string;
@@ -30,6 +24,7 @@ export function useTaskEditorForm(options: {
   detail: TaskDetail | null | undefined;
 }) {
   const { taskId, workspaceId, token, detail } = options;
+  const { timeZone } = useWorkspaceRoute();
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ManualTaskStatus>("pending");
@@ -83,6 +78,7 @@ export function useTaskEditorForm(options: {
       workspaceId,
       token,
       taskId,
+      timeZone,
       ready: initialized && !!detail && !!token,
       fingerprint: formFingerprint,
       buildPatchPayload: () => ({
@@ -105,7 +101,7 @@ export function useTaskEditorForm(options: {
     if (!detail || initialized) return;
     setTitle(titleForDisplay(detail.task.title));
     setAssigneeIds([...detail.assigneeUserIds]);
-    setDue(dueAtToLocalInput(detail.task.dueAt));
+    setDue(dueAtToZonedInput(detail.task.dueAt, timeZone));
     setDueRepeat(parseTaskDueRepeat(detail.task.dueRepeat));
     setStatus(manualStatusFromStored(normalizeTaskStatus(detail.task.status)));
     setPriority(taskPriority(detail.task));
@@ -116,7 +112,7 @@ export function useTaskEditorForm(options: {
     setTimeTrackingEnabledState(detail.task.timeTrackingEnabled ?? false);
     seedSavedDueAt(detail.task.dueAt);
     setInitialized(true);
-  }, [detail, initialized, seedSavedDueAt]);
+  }, [detail, initialized, seedSavedDueAt, timeZone]);
 
   const baselineEstablishedRef = useRef(false);
   useLayoutEffect(() => {

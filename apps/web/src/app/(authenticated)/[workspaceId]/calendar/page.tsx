@@ -6,6 +6,7 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import type { TaskRow } from "@/lib/ledger-types";
 import { normalizeTaskStatus, storedStatusToFlowColumn } from "@/lib/task-board";
+import { formatZonedDateKey, getZonedParts } from "@/lib/date";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { CalendarRoadmapStrip } from "@/components/roadmap/CalendarRoadmapStrip";
 import { NODE_LABELS } from "@/lib/nodes";
@@ -43,9 +44,9 @@ function isoDateStr(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-function taskDueDate(task: TaskRow): string | null {
+function taskDueDate(task: TaskRow, timeZone: string): string | null {
   if (!task.dueAt) return null;
-  return new Date(task.dueAt).toISOString().slice(0, 10);
+  return formatZonedDateKey(new Date(task.dueAt), timeZone);
 }
 
 function sortDayTasks(tasks: TaskRow[], mode: SortMode): TaskRow[] {
@@ -68,12 +69,12 @@ function sortDayTasks(tasks: TaskRow[], mode: SortMode): TaskRow[] {
 
 export default function CalendarPage() {
   const router = useRouter();
-  const { workspaceSlug } = useWorkspaceRoute();
+  const { workspaceSlug, timeZone } = useWorkspaceRoute();
   const { tasks, lists, depts, members } = useWorkspaceData();
 
-  const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth());
+  const today = getZonedParts(new Date(), timeZone);
+  const [year, setYear] = useState(today.year);
+  const [month, setMonth] = useState(today.month - 1);
 
   // Filters
   const [filterDept, setFilterDept] = useState("");
@@ -190,7 +191,7 @@ export default function CalendarPage() {
   const tasksByDate = useMemo(() => {
     const m = new Map<string, TaskRow[]>();
     for (const t of activeTasks) {
-      const d = taskDueDate(t);
+      const d = taskDueDate(t, timeZone);
       if (!d) continue;
       const prev = m.get(d) ?? [];
       prev.push(t);
@@ -200,9 +201,9 @@ export default function CalendarPage() {
       m.set(key, sortDayTasks(dayTasks, sortMode));
     }
     return m;
-  }, [activeTasks, sortMode]);
+  }, [activeTasks, sortMode, timeZone]);
 
-  const todayStr = isoDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayStr = isoDateStr(today.year, today.month - 1, today.day);
 
   const dropdownClass = "inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]";
 
@@ -222,7 +223,7 @@ export default function CalendarPage() {
           <button type="button" onClick={nextMonth} className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium">→</button>
           <button
             type="button"
-            onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); }}
+            onClick={() => { setYear(today.year); setMonth(today.month - 1); }}
             className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
           >
             Today

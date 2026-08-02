@@ -5,6 +5,7 @@ import { LoadingFrame, LoadingLinesBlock } from "@/components/ui/LoadingFrame";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
 import type { MemberRow, OrgActivityLedgerRow, OrgActivityTaskMeta } from "@/lib/ledger-types";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 type Props = {
   entries: OrgActivityLedgerRow[];
@@ -23,6 +24,7 @@ export function OrgActivityTerminal({
   isLoading,
   errorMessage,
 }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   if (errorMessage) {
     return <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>;
   }
@@ -59,7 +61,7 @@ export function OrgActivityTerminal({
           const taskLink = `${workHrefBase}/work?task=${encodeURIComponent(entry.taskId)}`;
           return (
             <p key={entry.id} className="break-words">
-              <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt)}</span>
+              <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
               <span className="text-[var(--muted)]">: </span>
               <Link
                 href={taskLink}

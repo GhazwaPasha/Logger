@@ -23,6 +23,7 @@ import type { AppDatabase } from "@work-ledger/db";
 import { AttachmentsService } from "../attachments/attachments.service";
 import { AuthorizationService, type ListTasksOpts } from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
+import { getOrganizationTimeZone } from "../db/org-timezone.util";
 import { ListsService } from "../lists/lists.service";
 import { PushNotificationsService } from "../push/push-notifications.service";
 import { CollaborationService } from "../realtime/collaboration.service";
@@ -618,6 +619,8 @@ export class TasksService {
               : {}),
             ...(attachmentRequiredChanged ? { attachmentRequired: parsed.attachmentRequired } : {}),
             ...(timeTrackingEnabledChanged ? { timeTrackingEnabled: parsed.timeTrackingEnabled } : {}),
+            ...(statusChanged && nextStatus === "done" ? { completedAt: now } : {}),
+            ...(statusChanged && oldStatus === "done" && nextStatus !== "done" ? { completedAt: null } : {}),
             updatedAt: now,
           })
           .where(eq(tasks.id, taskId));
@@ -760,7 +763,8 @@ export class TasksService {
           .where(eq(tasks.spawnedFromTaskId, taskId))
           .limit(1);
         if (!existingChild) {
-          const nextDue = computeNextDue(preDue, preRepeat);
+          const orgTimeZone = await getOrganizationTimeZone(tx, orgId);
+          const nextDue = computeNextDue(preDue, preRepeat, orgTimeZone);
           const seriesId = task.recurringSeriesId ?? task.id;
           if (!task.recurringSeriesId) {
             await tx.update(tasks).set({ recurringSeriesId: seriesId }).where(eq(tasks.id, taskId));
@@ -904,7 +908,7 @@ export class TasksService {
     };
   }
 
-  /** Ledger note + push for subtask-only updates (and similar lightweight activity). */
+  /** Ledger note for subtask-only updates (and similar lightweight activity). Intentionally no push notification — subtask churn is too noisy to page assignees for. */
   private async recordTaskActivityNote(
     userId: string,
     taskId: string,
@@ -921,23 +925,6 @@ export class TasksService {
         payload: { message, ...extra },
       })
       .returning();
-
-    const assignees = await this.db
-      .select({ userId: taskAssignees.userId })
-      .from(taskAssignees)
-      .where(eq(taskAssignees.taskId, taskId));
-
-    void this.pushNotifications
-      .notifyLedgerActivity({
-        organizationId: access.task.organizationId,
-        actorUserId: userId,
-        taskId,
-        taskTitle: access.task.title,
-        assignerUserId: access.task.assignerId,
-        assigneeUserIds: assignees.map((a) => a.userId),
-        ledgerDelta: [entry!],
-      })
-      .catch(() => {});
 
     this.collaboration.notifyOrgChanged(access.task.organizationId, taskId);
     return entry!;

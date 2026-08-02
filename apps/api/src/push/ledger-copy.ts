@@ -1,3 +1,4 @@
+import { formatInTimeZone } from "@work-ledger/contracts";
 import type { activityLedger } from "@work-ledger/db";
 
 type LedgerRow = typeof activityLedger.$inferSelect;
@@ -28,11 +29,11 @@ function priorityLabel(raw: unknown): string {
   return typeof raw === "string" ? (PRIORITY_LABELS[raw] ?? raw) : "unknown";
 }
 
-function dueLabel(iso: unknown): string {
+function dueLabel(iso: unknown, timeZone: string): string {
   if (typeof iso !== "string") return "none";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "none";
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return formatInTimeZone(d, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function idsOf(raw: unknown): string[] {
@@ -53,7 +54,7 @@ export function ledgerEntryUserIds(row: LedgerRow): string[] {
 }
 
 /** Human-readable "what happened" phrase for one ledger row, e.g. "changed status to Done". */
-export function describeLedgerEntry(row: LedgerRow, names: Map<string, string>): string {
+export function describeLedgerEntry(row: LedgerRow, names: Map<string, string>, timeZone: string): string {
   const p = row.payload as Record<string, unknown>;
 
   switch (row.type) {
@@ -66,7 +67,7 @@ export function describeLedgerEntry(row: LedgerRow, names: Map<string, string>):
     }
     case "reschedule": {
       const reason = typeof p.reason === "string" && p.reason.trim() ? ` — ${truncate(p.reason, 100)}` : "";
-      return `moved the due date to ${dueLabel(p.newDueAt)}${reason}`;
+      return `moved the due date to ${dueLabel(p.newDueAt, timeZone)}${reason}`;
     }
     case "archive":
       return "archived this task";
@@ -98,14 +99,14 @@ export function describeLedgerEntry(row: LedgerRow, names: Map<string, string>):
 }
 
 /** Push-body summary across one mutation's worth of ledger rows (a patch can touch several fields at once). */
-export function summarizeLedgerEntries(rows: LedgerRow[], names: Map<string, string>): string {
+export function summarizeLedgerEntries(rows: LedgerRow[], names: Map<string, string>, timeZone: string): string {
   const meaningful = rows.filter(
     (r) => !(r.type === "note" && (r.payload as { message?: string } | null)?.message === "Task created."),
   );
   const use = meaningful.length > 0 ? meaningful : rows;
   if (use.length === 0) return "updated this task";
 
-  const shown = use.slice(0, 2).map((r) => describeLedgerEntry(r, names));
+  const shown = use.slice(0, 2).map((r) => describeLedgerEntry(r, names, timeZone));
   const extra = use.length - shown.length;
   return extra > 0 ? `${shown.join(" · ")} (+${extra} more)` : shown.join(" · ");
 }

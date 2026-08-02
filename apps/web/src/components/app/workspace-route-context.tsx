@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-export type WorkspaceRouteValue = { workspaceId: string; workspaceSlug: string };
+export type WorkspaceRouteValue = { workspaceId: string; workspaceSlug: string; timeZone: string };
 
 export const WorkspaceRouteContext = createContext<WorkspaceRouteValue | null>(null);
 

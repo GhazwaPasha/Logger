@@ -6,6 +6,7 @@ import { apiJson } from "@/lib/api";
 import { applyTaskMutationToCache } from "@/lib/task-mutation-cache";
 import { useTaskAutoSync } from "@/hooks/useTaskAutoSync";
 import { getPendingCreation } from "@/lib/create-draft-task";
+import { zonedInputToDueAt } from "@/lib/date";
 import type { TaskMutationResult } from "@/lib/ledger-types";
 
 export type TaskFieldPatchBody = {
@@ -27,12 +28,14 @@ export function useTaskFieldsSync(options: {
   workspaceId: string;
   token: string | null;
   taskId: string;
+  /** Org timezone the `dueLocal` string in {@link dueFieldPatch} is expressed in. */
+  timeZone: string;
   ready: boolean;
   fingerprint: string;
   buildPatchPayload: () => TaskFieldPatchBody | null;
   debounceMs?: number;
 }) {
-  const { workspaceId, token, taskId, ready, fingerprint, buildPatchPayload, debounceMs = 400 } =
+  const { workspaceId, token, taskId, timeZone, ready, fingerprint, buildPatchPayload, debounceMs = 400 } =
     options;
 
   const queryClient = useQueryClient();
@@ -64,17 +67,21 @@ export function useTaskFieldsSync(options: {
     debounceMs,
   });
 
-  const dueFieldPatch = useCallback((dueLocal: string): { dueAt?: string | null } => {
-    const nextIso = dueLocal.trim() ? new Date(dueLocal).toISOString() : null;
-    const prevIso =
-      lastSavedDueAtRef.current === undefined
-        ? null
-        : lastSavedDueAtRef.current
-          ? new Date(lastSavedDueAtRef.current).toISOString()
-          : null;
-    if (prevIso === nextIso) return {};
-    return { dueAt: nextIso };
-  }, []);
+  const dueFieldPatch = useCallback(
+    (dueLocal: string): { dueAt?: string | null } => {
+      const nextInstant = dueLocal.trim() ? zonedInputToDueAt(dueLocal, timeZone) : null;
+      const nextIso = nextInstant ? nextInstant.toISOString() : null;
+      const prevIso =
+        lastSavedDueAtRef.current === undefined
+          ? null
+          : lastSavedDueAtRef.current
+            ? new Date(lastSavedDueAtRef.current).toISOString()
+            : null;
+      if (prevIso === nextIso) return {};
+      return { dueAt: nextIso };
+    },
+    [timeZone],
+  );
 
   const seedSavedDueAt = useCallback((iso: string | null | undefined) => {
     lastSavedDueAtRef.current = iso ?? null;

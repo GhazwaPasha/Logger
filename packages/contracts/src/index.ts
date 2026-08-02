@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { isValidTimeZone } from "./timezone.js";
+
+export * from "./timezone.js";
 
 export const orgRoleSchema = z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
@@ -42,9 +45,17 @@ export const createOrganizationSchema = z.object({
   name: z.string().min(1).max(256),
 });
 
-export const updateOrganizationSchema = z.object({
-  name: z.string().min(1).max(256),
-});
+export const updateOrganizationSchema = z
+  .object({
+    name: z.string().min(1).max(256).optional(),
+    timeZone: z
+      .string()
+      .min(1)
+      .max(64)
+      .refine(isValidTimeZone, { message: "Not a recognized IANA timezone" })
+      .optional(),
+  })
+  .refine((v) => v.name !== undefined || v.timeZone !== undefined, { message: "Nothing to update" });
 
 /** Invite or upsert membership by email (owner-only). */
 export const upsertOrganizationMemberSchema = z

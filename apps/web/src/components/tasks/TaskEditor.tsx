@@ -14,6 +14,7 @@ import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useDiscordChannels } from "@/hooks/useDiscordChannels";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { formatInTimeZone } from "@/lib/date";
 import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { DiscordChannelSearchField } from "@/components/tasks/DiscordChannelSearchField";
@@ -70,9 +71,9 @@ const REPEAT_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
-function formatDueDate(iso: string | null | undefined): string | null {
+function formatDueDate(iso: string | null | undefined, timeZone: string): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return formatInTimeZone(new Date(iso), timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -147,7 +148,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const router = useRouter();
   const { token, session } = useApiSession();
   const sessionUserId = session?.user?.id ?? null;
-  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
+  const { workspaceId, workspaceSlug, timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
   const { tasks, lists, members, depts } = useWorkspaceData();
   const titleRef = useRef<HTMLTextAreaElement>(null);
@@ -502,7 +503,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 </div>
               ) : (
                 (() => {
-                  const dueFormatted = formatDueDate(detail?.task.dueAt ?? null);
+                  const dueFormatted = formatDueDate(detail?.task.dueAt ?? null, timeZone);
                   const dueRepeat = parseTaskDueRepeat(detail?.task.dueRepeat);
                   const dueColorClass = detail ? dueIndicatorColorClass(detail.task) : "text-[var(--muted)]";
                   return dueFormatted ? (

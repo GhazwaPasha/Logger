@@ -122,7 +122,12 @@ export class OrganizationsService {
         createdAt: activityLedger.createdAt,
       })
       .from(activityLedger)
-      .where(inArray(activityLedger.taskId, taskIds))
+      .where(
+        and(
+          inArray(activityLedger.taskId, taskIds),
+          sql`${activityLedger.payload} ->> 'subtaskTitle' is null`,
+        ),
+      )
       .orderBy(desc(activityLedger.createdAt))
       .limit(limit);
 
@@ -156,12 +161,15 @@ export class OrganizationsService {
   async patch(userId: string, organizationId: string, body: unknown) {
     const membership = await this.authz.assertOrgMember(userId, organizationId);
     if (membership.role !== "owner") {
-      throw new ForbiddenException("Only owners can rename this workspace");
+      throw new ForbiddenException("Only owners can change workspace settings");
     }
     const parsed = updateOrganizationSchema.parse(body);
     const [row] = await this.db
       .update(organizations)
-      .set({ name: parsed.name })
+      .set({
+        ...(parsed.name !== undefined ? { name: parsed.name } : {}),
+        ...(parsed.timeZone !== undefined ? { timeZone: parsed.timeZone } : {}),
+      })
       .where(eq(organizations.id, organizationId))
       .returning();
     if (!row) throw new NotFoundException("Organization not found");

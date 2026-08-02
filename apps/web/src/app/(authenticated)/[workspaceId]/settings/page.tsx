@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
+import { formatInTimeZone } from "@/lib/date";
 import { authClient } from "@/lib/auth-client";
 import { apiJson, apiVoid } from "@/lib/api";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
@@ -30,7 +31,7 @@ type ApiKeyRow = {
 };
 
 export default function UserSettingsPage() {
-  const { workspaceId, workspaceSlug } = useWorkspaceRoute();
+  const { workspaceId, workspaceSlug, timeZone } = useWorkspaceRoute();
   const { data: session } = authClient.useSession();
   const { token } = useApiSession();
   const { theme, setTheme } = useAppPreferences();
@@ -348,8 +349,8 @@ export default function UserSettingsPage() {
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{k.name}</p>
                 <p className="font-mono-ledger text-xs text-[var(--muted)]">
-                  {k.keyPrefix}… · created {new Date(k.createdAt).toLocaleDateString()}
-                  {k.lastUsedAt ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}` : ""}
+                  {k.keyPrefix}… · created {formatInTimeZone(new Date(k.createdAt), timeZone, { month: "short", day: "numeric", year: "numeric" })}
+                  {k.lastUsedAt ? ` · last used ${formatInTimeZone(new Date(k.lastUsedAt), timeZone, { month: "short", day: "numeric", year: "numeric" })}` : ""}
                 </p>
               </div>
               <button

@@ -17,6 +17,7 @@ import {
   type ManualTaskStatus,
   type TaskPriority,
 } from "@/lib/task-board";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 const STATUS_BAR_ORDER: ManualTaskStatus[] = ["pending", "in_progress", "done", "cancelled"];
 
@@ -136,6 +137,7 @@ export function DashboardOverview({
   workspaceLoading: boolean;
   currentUserId: string | null;
 }) {
+  const { timeZone } = useWorkspaceRoute();
   const activeTasks = useMemo(() => tasks.filter((t) => !t.deletedAt), [tasks]);
 
   const stats = useMemo(() => {
@@ -175,7 +177,7 @@ export function DashboardOverview({
       else {
         pipeline++;
         if (taskShowsLateFooter(t)) lateStatus++;
-        if (taskMatchesDatePreset(t, "this_week")) dueThisWeek++;
+        if (taskMatchesDatePreset(t, "this_week", timeZone)) dueThisWeek++;
 
         const ids = t.assigneeUserIds ?? [];
         if (ids.length === 0) unassignedPipeline++;
@@ -227,7 +229,7 @@ export function DashboardOverview({
       subtasksTotal,
       subtasksDone,
     };
-  }, [activeTasks, depts, lists, currentUserId]);
+  }, [activeTasks, depts, lists, currentUserId, timeZone]);
 
   const loading = workspaceLoading;
 

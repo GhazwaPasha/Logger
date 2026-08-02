@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
+import { formatInTimeZone } from "@/lib/date";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { faPlug, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
 
@@ -29,7 +30,7 @@ type Delivery = {
 };
 
 export default function WebhooksPage() {
-  const { workspaceId } = useWorkspaceRoute();
+  const { workspaceId, timeZone } = useWorkspaceRoute();
   const { token } = useApiSession();
   const queryClient = useQueryClient();
 
@@ -284,7 +285,7 @@ export default function WebhooksPage() {
                       </span>
                       <code className="text-[var(--muted)]">{d.event}</code>
                       <span className="ml-auto text-[var(--muted)]">
-                        {new Date(d.createdAt).toLocaleString()}
+                        {formatInTimeZone(new Date(d.createdAt), timeZone, { dateStyle: "medium", timeStyle: "short" })}
                       </span>
                     </button>
                     {expandedDelivery === d.id && d.responseBody && (

@@ -1,9 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
+import { formatZonedDateKey } from "@work-ledger/contracts";
 import { activityLedger, departments, lists, organizationMembers, taskAssignees, tasks, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { getOrganizationTimeZone } from "../db/org-timezone.util";
 
 function escapeCsv(val: unknown): string {
   const s = val == null ? "" : String(val);
@@ -32,6 +34,7 @@ export class ReportsService {
     const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
     if (taskIds.length === 0) return "";
 
+    const timeZone = await getOrganizationTimeZone(this.db, organizationId);
     const conditions = [inArray(tasks.id, taskIds), isNull(tasks.deletedAt)];
     if (opts?.status) conditions.push(eq(tasks.status, opts.status as any));
     if (opts?.dateFrom) conditions.push(gte(tasks.createdAt, new Date(opts.dateFrom)));
@@ -94,8 +97,8 @@ export class ReportsService {
         dept?.name ?? "",
         list?.name ?? "",
         (assigneesByTask.get(r.id) ?? []).join("; "),
-        r.dueAt ? new Date(r.dueAt).toISOString().slice(0, 10) : "",
-        new Date(r.createdAt).toISOString().slice(0, 10),
+        r.dueAt ? formatZonedDateKey(new Date(r.dueAt), timeZone) : "",
+        formatZonedDateKey(new Date(r.createdAt), timeZone),
       ]);
     });
 

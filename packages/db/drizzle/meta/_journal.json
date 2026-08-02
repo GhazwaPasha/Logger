@@ -260,6 +260,20 @@
       "when": 1785700000000,
       "tag": "0036_backfill_recurring_task_data",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785800000000,
+      "tag": "0037_organization_timezone",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1785900000000,
+      "tag": "0038_task_completed_submitted_at",
+      "breakpoints": true
     }
   ]
 }

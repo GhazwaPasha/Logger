@@ -1,7 +1,23 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
+const timezone_js_1 = require("./timezone.js");
+__exportStar(require("./timezone.js"), exports);
 exports.orgRoleSchema = zod_1.z.enum(["owner", "manager", "member"]);
 /** Stages the client may set via create / PATCH / status endpoint. */
 exports.taskManualStatusSchema = zod_1.z.enum(["pending", "in_progress", "done", "cancelled"]);
@@ -37,9 +53,17 @@ exports.appendableLedgerTypeSchema = zod_1.z.enum(["ack", "note", "status_change
 exports.createOrganizationSchema = zod_1.z.object({
     name: zod_1.z.string().min(1).max(256),
 });
-exports.updateOrganizationSchema = zod_1.z.object({
-    name: zod_1.z.string().min(1).max(256),
-});
+exports.updateOrganizationSchema = zod_1.z
+    .object({
+    name: zod_1.z.string().min(1).max(256).optional(),
+    timeZone: zod_1.z
+        .string()
+        .min(1)
+        .max(64)
+        .refine(timezone_js_1.isValidTimeZone, { message: "Not a recognized IANA timezone" })
+        .optional(),
+})
+    .refine((v) => v.name !== undefined || v.timeZone !== undefined, { message: "Nothing to update" });
 /** Invite or upsert membership by email (owner-only). */
 exports.upsertOrganizationMemberSchema = zod_1.z
     .object({

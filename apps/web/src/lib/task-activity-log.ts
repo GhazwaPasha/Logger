@@ -1,22 +1,24 @@
 import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
+import { getZonedParts } from "@/lib/date";
 
-function format12hClock(d: Date): string {
+function format12hClock(p: ReturnType<typeof getZonedParts>): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  let h = d.getHours();
+  let h = p.hour;
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12;
   if (h === 0) h = 12;
-  return `${h}:${pad(d.getMinutes())} ${ampm}`;
+  return `${h}:${pad(p.minute)} ${ampm}`;
 }
 
-/** Compact local timestamp for terminal-style log lines (YY-MM-DD, 12h + AM/PM). */
-export function formatLogTimestamp(iso: string): string {
+/** Compact timestamp (in `timeZone`) for terminal-style log lines (YY-MM-DD, 12h + AM/PM). */
+export function formatLogTimestamp(iso: string, timeZone: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
     const pad = (n: number) => String(n).padStart(2, "0");
-    const yy = pad(d.getFullYear() % 100);
-    return `${yy}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${format12hClock(d)}`;
+    const p = getZonedParts(d, timeZone);
+    const yy = pad(p.year % 100);
+    return `${yy}-${pad(p.month)}-${pad(p.day)} ${format12hClock(p)}`;
   } catch {
     return iso;
   }

@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
 import { formatLogTimestamp, memberDisplayName, stripMentionMarkup } from "@/lib/task-activity-log";
 import { normalizeTaskStatus, statusLabelTextClasses, taskStatusDisplayLabel } from "@/lib/task-board";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 const USER_LOG_CLASS = "font-medium text-blue-600 dark:text-blue-400";
 
@@ -160,6 +161,7 @@ function StatusChangeLine({ actor, oldRaw, newRaw }: { actor: string; oldRaw: st
 
 /** Rich ledger line: blue person names, status labels use board pill colors. */
 export function LedgerLineDescription({ entry, members }: Props) {
+  const { timeZone } = useWorkspaceRoute();
   const actor = memberDisplayName(members, entry.actorId);
 
   switch (entry.type) {
@@ -199,8 +201,8 @@ export function LedgerLineDescription({ entry, members }: Props) {
     case "reschedule": {
       const oldDue = parseIso(entry.payload.oldDueAt);
       const newDue = parseIso(entry.payload.newDueAt);
-      const oldLabel = oldDue ? formatLogTimestamp(oldDue) : "none";
-      const newLabel = newDue ? formatLogTimestamp(newDue) : "none";
+      const oldLabel = oldDue ? formatLogTimestamp(oldDue, timeZone) : "none";
+      const newLabel = newDue ? formatLogTimestamp(newDue, timeZone) : "none";
       return (
         <>
           <UserName>{actor}</UserName> changed the due date ({oldLabel} → {newLabel})

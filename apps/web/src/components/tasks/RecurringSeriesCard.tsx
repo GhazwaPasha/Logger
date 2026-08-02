@@ -4,7 +4,10 @@ import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { MemberRow, TaskRow } from "@/lib/ledger-types";
 import { normalizeTaskStatus } from "@/lib/task-board";
+import { formatLogTimestamp } from "@/lib/task-activity-log";
+import { formatInTimeZone } from "@/lib/date";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
 type Props = {
   tasks: TaskRow[];
@@ -12,9 +15,9 @@ type Props = {
   onOpenTask: (taskId: string) => void;
 };
 
-function formatDate(iso: string | null | undefined): string {
+function formatDate(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return formatInTimeZone(new Date(iso), timeZone, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function memberName(members: MemberRow[], userId: string): string {
@@ -22,10 +25,29 @@ function memberName(members: MemberRow[], userId: string): string {
   return m?.name?.trim() || m?.email || "Unknown";
 }
 
+/** Late/on-time verdict for a completed occurrence; mirrors the label already sent to Discord on submission. */
+function completionTiming(t: TaskRow): { late: boolean } | null {
+  if (!t.completedAt || !t.dueAt) return null;
+  return { late: new Date(t.completedAt).getTime() > new Date(t.dueAt).getTime() };
+}
+
+function TimingBadge({ t }: { t: TaskRow }) {
+  const timing = completionTiming(t);
+  if (!timing) return null;
+  return (
+    <span
+      className={`ml-1 ${timing.late ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400"}`}
+    >
+      {timing.late ? "⏰ late" : "✅ on time"}
+    </span>
+  );
+}
+
 /** Groups recurring task chain into a single collapsible card (Done/Cancelled columns). */
 export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
   const [expanded, setExpanded] = useState(false);
   const prefersReduced = useReducedMotion();
+  const { timeZone } = useWorkspaceRoute();
 
   // Sort newest-first by createdAt
   const sorted = [...tasks].sort(
@@ -54,8 +76,20 @@ export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
               </svg>
               Recurring · {count} {count === 1 ? "completion" : "completions"}
             </span>
-            {lastDone?.dueAt && (
-              <span>Last: {formatDate(lastDone.dueAt)}</span>
+            {lastDone && (
+              <span>
+                {lastDone.completedAt ? (
+                  <>
+                    Completed {formatLogTimestamp(lastDone.completedAt, timeZone)}
+                    <TimingBadge t={lastDone} />
+                  </>
+                ) : (
+                  <>Last: {formatDate(lastDone.dueAt, timeZone)}</>
+                )}
+              </span>
+            )}
+            {lastDone?.lastSubmittedAt && (
+              <span>Submitted {formatLogTimestamp(lastDone.lastSubmittedAt, timeZone)}</span>
             )}
           </div>
         </div>
@@ -96,7 +130,14 @@ export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
             {sorted.map((t) => (
               <li key={t.id} className="flex items-center gap-2 px-3 py-2">
                 <span className="min-w-0 flex-1 font-mono-ledger text-[11px] text-[var(--muted)]">
-                  {formatDate(t.dueAt)}
+                  {t.completedAt ? (
+                    <>
+                      {formatLogTimestamp(t.completedAt, timeZone)}
+                      <TimingBadge t={t} />
+                    </>
+                  ) : (
+                    <>Due {formatDate(t.dueAt, timeZone)}</>
+                  )}
                   {t.assigneeUserIds?.length ? (
                     <span className="ml-1.5 text-[var(--fg)]/70">
                       {t.assigneeUserIds.map((id) => memberName(members, id)).join(", ")}

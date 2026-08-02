@@ -43,13 +43,14 @@ function ArchivedTaskRow({
   onRestore: () => void;
   onPurge: () => void;
 }) {
+  const { timeZone } = useWorkspaceRoute();
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-[var(--fg)]">{task.title}</p>
         {task.lastLedger && (
           <p className="mt-0.5 text-xs text-[var(--muted)]">
-            Archived {formatLogTimestamp(task.lastLedger.createdAt)}
+            Archived {formatLogTimestamp(task.lastLedger.createdAt, timeZone)}
           </p>
         )}
       </div>
@@ -74,7 +75,7 @@ function ArchivedTaskRow({
 }
 
 export default function ArchivedPage() {
-  const { workspaceId } = useWorkspaceRoute();
+  const { workspaceId, timeZone } = useWorkspaceRoute();
   const { token, session } = useApiSession();
   const { lists, members } = useWorkspaceData();
   const sessionUserId = session?.user?.id ?? null;
@@ -194,7 +195,7 @@ export default function ArchivedPage() {
                   {deletionLogName(entry)}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--muted)]">
-                  Deleted by {memberDisplayName(members, entry.actorId)} · {formatLogTimestamp(entry.createdAt)}
+                  Deleted by {memberDisplayName(members, entry.actorId)} · {formatLogTimestamp(entry.createdAt, timeZone)}
                 </p>
               </div>
             </div>

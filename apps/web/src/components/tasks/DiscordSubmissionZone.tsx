@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloudArrowUp } from "@fortawesome/free-solid-svg-icons";
+import { faCloudArrowUp, faCheck, faCircleNotch, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch } from "@/lib/api";
 
@@ -11,6 +11,18 @@ type DiscordSubmitResponse = {
   id: string;
   fileName: string;
   discord: { ok: true } | { ok: false; reason: string };
+};
+
+/** Files sent to Discord in one go; also Discord's own per-message attachment cap. */
+const MAX_FILES_PER_SUBMISSION = 5;
+
+type QueueStatus = "pending" | "uploading" | "success" | "error";
+
+type QueueItem = {
+  id: string;
+  file: File;
+  status: QueueStatus;
+  message?: string;
 };
 
 type Props = {
@@ -27,10 +39,17 @@ type Props = {
   embedded?: boolean;
 };
 
+function makeQueueId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+}
+
 /**
  * Separate upload control from the plain Attachments box — files sent here are also posted to the
  * task's Discord channel, synchronously, so success/failure is shown immediately rather than silently
  * failing in the background. The uploaded file still shows up in the shared Attachments list below.
+ *
+ * Submits up to `MAX_FILES_PER_SUBMISSION` files per batch, one at a time (each is its own Discord
+ * message and API call), so a slow or failed upload doesn't block or hide the ones after it.
  */
 export function DiscordSubmissionZone({
   taskId,
@@ -43,52 +62,67 @@ export function DiscordSubmissionZone({
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [overflowNotice, setOverflowNotice] = useState<string | null>(null);
 
-  const submitFile = useCallback(
-    async (file: File) => {
-      setResult(null);
-      setSubmitting(true);
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await apiFetch(`/tasks/${taskId}/attachments/discord-submit`, {
-          token,
-          method: "POST",
-          body: form,
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (res.status === 401 && typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("wl:auth-expired"));
+  const submitting = queue.some((item) => item.status === "pending" || item.status === "uploading");
+
+  const updateItem = useCallback((id: string, patch: Partial<QueueItem>) => {
+    setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }, []);
+
+  // Files can only be queued while nothing else is submitting (the dropzone disables input/drop/paste
+  // in that state), so a freshly built batch is always processed start-to-finish with no interleaving.
+  const processBatch = useCallback(
+    async (items: QueueItem[]) => {
+      for (const item of items) {
+        updateItem(item.id, { status: "uploading" });
+        try {
+          const form = new FormData();
+          form.append("file", item.file);
+          const res = await apiFetch(`/tasks/${taskId}/attachments/discord-submit`, {
+            token,
+            method: "POST",
+            body: form,
+            signal: AbortSignal.timeout(120_000),
+          });
+          if (res.status === 401 && typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("wl:auth-expired"));
+          }
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || res.statusText);
+          }
+          const body = (await res.json()) as DiscordSubmitResponse;
+          void queryClient.invalidateQueries({ queryKey: ["attachments", taskId] });
+          if (body.discord.ok) {
+            updateItem(item.id, { status: "success", message: "Sent to Discord" });
+          } else {
+            updateItem(item.id, { status: "error", message: `Attached, but Discord rejected it: ${body.discord.reason}` });
+          }
+        } catch (e) {
+          updateItem(item.id, { status: "error", message: e instanceof Error ? e.message : "Submission failed" });
         }
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || res.statusText);
-        }
-        const body = (await res.json()) as DiscordSubmitResponse;
-        void queryClient.invalidateQueries({ queryKey: ["attachments", taskId] });
-        if (body.discord.ok) {
-          setResult({ ok: true, message: `Sent "${body.fileName}" to Discord` });
-        } else {
-          setResult({ ok: false, message: `Attached, but Discord rejected it: ${body.discord.reason}` });
-        }
-      } catch (e) {
-        setResult({ ok: false, message: e instanceof Error ? e.message : "Submission failed" });
-      } finally {
-        setSubmitting(false);
       }
     },
-    [taskId, token, queryClient],
+    [taskId, token, queryClient, updateItem],
   );
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      void submitFile(files[0]!);
+      if (!files || files.length === 0 || submitting) return;
+      const picked = Array.from(files).slice(0, MAX_FILES_PER_SUBMISSION);
+      setOverflowNotice(
+        files.length > MAX_FILES_PER_SUBMISSION
+          ? `Only the first ${MAX_FILES_PER_SUBMISSION} files were queued (max ${MAX_FILES_PER_SUBMISSION} at a time).`
+          : null,
+      );
+      const items: QueueItem[] = picked.map((file) => ({ id: makeQueueId(), file, status: "pending" }));
+      setQueue(items);
+      void processBatch(items);
     },
-    [submitFile],
+    [submitting, processBatch],
   );
 
   const openBrowser = useCallback(() => {
@@ -157,6 +191,7 @@ export function DiscordSubmissionZone({
       <input
         ref={inputRef}
         type="file"
+        multiple
         className="hidden"
         accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
         disabled={submitting}
@@ -183,7 +218,7 @@ export function DiscordSubmissionZone({
           "Sending to Discord…"
         ) : (
           <>
-            Drag & drop or paste a file, or{" "}
+            Drag & drop or paste up to {MAX_FILES_PER_SUBMISSION} files, or{" "}
             <button
               type="button"
               onClick={openBrowser}
@@ -197,17 +232,52 @@ export function DiscordSubmissionZone({
     </div>
   );
 
-  const resultMessage = result && (
-    <p className={`text-xs ${result.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-      {result.message}
-    </p>
+  const queueList = queue.length > 0 && (
+    <ul className="space-y-1">
+      {queue.map((item) => (
+        <li key={item.id} className="flex items-center gap-2 text-xs">
+          {item.status === "uploading" || item.status === "pending" ? (
+            <FontAwesomeIcon
+              icon={faCircleNotch}
+              className="size-3 shrink-0 animate-spin text-[#5865F2] motion-reduce:animate-none"
+              aria-hidden
+            />
+          ) : item.status === "success" ? (
+            <FontAwesomeIcon icon={faCheck} className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          ) : (
+            <FontAwesomeIcon icon={faCircleExclamation} className="size-3 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg)]" title={item.file.name}>
+            {item.file.name}
+          </span>
+          <span
+            className={`shrink-0 ${
+              item.status === "error"
+                ? "text-red-600 dark:text-red-400"
+                : item.status === "success"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-[var(--muted)]"
+            }`}
+          >
+            {item.status === "pending"
+              ? "Queued…"
+              : item.status === "uploading"
+                ? "Sending…"
+                : item.message}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
+
+  const overflowMessage = overflowNotice && <p className="text-xs text-[var(--muted)]">{overflowNotice}</p>;
 
   if (embedded) {
     return (
       <div className="space-y-3">
         {dropzone}
-        {resultMessage}
+        {overflowMessage}
+        {queueList}
       </div>
     );
   }
@@ -240,7 +310,8 @@ export function DiscordSubmissionZone({
       </div>
 
       {dropzone}
-      {resultMessage}
+      {overflowMessage}
+      {queueList}
     </div>
   );
 }

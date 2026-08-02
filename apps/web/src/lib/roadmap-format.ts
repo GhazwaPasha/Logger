@@ -30,14 +30,16 @@ export const STATUS_PILL_CLASS: Record<RoadmapStatus, string> = {
   archived: "bg-neutral-500/15 text-[var(--muted)]",
 };
 
+// Goal/milestone dates are date-only (no time-of-day) and stored/positioned as UTC calendar days
+// (see roadmap-axis.ts) — format in UTC too, or a browser west of UTC would show the day before.
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
 export function formatRange(startIso: string, endIso: string): string {
   const start = new Date(startIso);
   const end = new Date(endIso);
-  const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+  const fmt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
   const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
   return `${start.toLocaleDateString(undefined, fmt)} – ${end.toLocaleDateString(undefined, sameYear ? fmt : { ...fmt, year: "numeric" })}`;
 }

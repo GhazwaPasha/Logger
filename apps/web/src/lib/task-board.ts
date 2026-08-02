@@ -1,4 +1,5 @@
 import type { TaskRow } from "@/lib/ledger-types";
+import { endOfDayInTz, endOfWeekInTz, startOfDayInTz, startOfWeekInTz } from "@/lib/date";
 
 /** Kanban columns + user-selectable stages (API PATCH). */
 export const TASK_FLOW_ORDER = ["pending", "in_progress", "done", "cancelled"] as const;
@@ -257,34 +258,7 @@ export function parseUrlStatusFilter(raw: string): UrlStatusFilter | null {
   return map[k] ?? null;
 }
 
-function startOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function endOfLocalDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
-
-function startOfWeekLocal(d: Date): Date {
-  const x = startOfLocalDay(d);
-  const day = x.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
-  return x;
-}
-
-function endOfWeekLocal(d: Date): Date {
-  const s = startOfWeekLocal(d);
-  const e = new Date(s);
-  e.setDate(e.getDate() + 6);
-  return endOfLocalDay(e);
-}
-
-export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolean {
+export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset, timeZone: string): boolean {
   const due = task.dueAt ? new Date(task.dueAt) : null;
   if (preset === "all") return true;
   if (preset === "no_due") return due === null;
@@ -294,7 +268,7 @@ export function taskMatchesDatePreset(task: TaskRow, preset: DatePreset): boolea
   if (preset === "this_week") {
     if (!due) return false;
     const now = new Date();
-    return due >= startOfWeekLocal(now) && due <= endOfWeekLocal(now);
+    return due >= startOfWeekInTz(now, timeZone) && due <= endOfWeekInTz(now, timeZone);
   }
   return true;
 }
@@ -321,16 +295,16 @@ export function taskMatchesDueWindow(task: TaskRow, window: DueWindow): boolean 
 }
 
 /** Custom range match for the "custom" due window; `fromYmd`/`toYmd` are `yyyy-mm-dd` date-input values, either may be blank. */
-export function taskMatchesDueRange(task: TaskRow, fromYmd: string, toYmd: string): boolean {
+export function taskMatchesDueRange(task: TaskRow, fromYmd: string, toYmd: string, timeZone: string): boolean {
   if (!fromYmd && !toYmd) return true;
   const due = task.dueAt ? new Date(task.dueAt) : null;
   if (!due) return false;
   if (fromYmd) {
-    const from = startOfLocalDay(new Date(`${fromYmd}T12:00:00`));
+    const from = startOfDayInTz(new Date(`${fromYmd}T12:00:00Z`), timeZone);
     if (due < from) return false;
   }
   if (toYmd) {
-    const to = endOfLocalDay(new Date(`${toYmd}T12:00:00`));
+    const to = endOfDayInTz(new Date(`${toYmd}T12:00:00Z`), timeZone);
     if (due > to) return false;
   }
   return true;

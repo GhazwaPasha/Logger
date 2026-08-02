@@ -109,12 +109,13 @@ export class PushNotificationsService implements OnModuleInit {
     if (subs.length === 0) return;
 
     const [orgRow] = await this.db
-      .select({ slug: organizations.slug })
+      .select({ slug: organizations.slug, timeZone: organizations.timeZone })
       .from(organizations)
       .where(eq(organizations.id, opts.organizationId))
       .limit(1);
 
     const slug = orgRow?.slug ?? opts.organizationId;
+    const timeZone = orgRow?.timeZone ?? "UTC";
     // Path-only so notificationclick opens on the subscriber's origin (prod, preview, custom domain).
     const url = `/${slug}/work?task=${encodeURIComponent(opts.taskId)}`;
 
@@ -126,7 +127,7 @@ export class PushNotificationsService implements OnModuleInit {
       .where(inArray(user.id, [...nameIds]));
     const names = new Map(nameRows.map((r) => [r.id, r.name]));
 
-    const summary = summarizeLedgerEntries(opts.ledgerDelta, names);
+    const summary = summarizeLedgerEntries(opts.ledgerDelta, names, timeZone);
     const title = names.get(opts.actorUserId) ?? "Someone";
     const body = `${truncate(opts.taskTitle, 80)} · ${summary}`;
     const payload = JSON.stringify({ title, body, url });
