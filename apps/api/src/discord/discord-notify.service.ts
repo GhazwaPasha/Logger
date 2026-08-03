@@ -5,13 +5,10 @@ import { formatInTimeZone } from "@work-ledger/contracts";
 import { discordIntegrations, organizations, user } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
-import { buildR2Client, getObjectBuffer } from "../attachments/attachments-storage.util";
 import { DiscordApiService } from "./discord-api.service";
 
 /** Discord's non-boosted-server upload ceiling; defense-in-depth (the app's own attachment cap is already 10MB). */
 const DISCORD_MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-export type DiscordAttachmentSource = { fileBuffer: Buffer } | { storageKey: string };
 
 export type NotifyAttachmentOpts = {
   organizationId: string;
@@ -24,10 +21,11 @@ export type NotifyAttachmentOpts = {
   dueAt: Date | null;
   /** When the submission was received (not when Discord delivery completes). */
   submittedAt: Date;
-  source: DiscordAttachmentSource;
+  fileBuffer: Buffer;
 };
 
-export type DiscordDeliveryResult = { ok: true } | { ok: false; reason: string };
+/** `messageUrl` is a permalink (`discord.com/channels/{guild}/{channel}/{message}`) — resolves only for members with access to that channel; no file bytes are kept on our side. */
+export type DiscordDeliveryResult = { ok: true; messageUrl: string } | { ok: false; reason: string };
 
 function formatDueDate(d: Date, timeZone: string): string {
   return formatInTimeZone(d, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -45,8 +43,6 @@ function timingLabel(dueAt: Date | null, submittedAt: Date, timeZone: string): s
 @Injectable()
 export class DiscordNotifyService {
   private readonly log = new Logger(DiscordNotifyService.name);
-  private readonly s3 = buildR2Client();
-  private readonly bucket = process.env.R2_BUCKET_NAME ?? "";
 
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
@@ -68,10 +64,7 @@ export class DiscordNotifyService {
       return { ok: false, reason: "This workspace hasn't connected a Discord server" };
     }
 
-    const fileBuffer = await this.resolveBytes(opts.source);
-    if (!fileBuffer) {
-      return { ok: false, reason: "Could not read the file to send to Discord" };
-    }
+    const fileBuffer = opts.fileBuffer;
     if (fileBuffer.length > DISCORD_MAX_UPLOAD_BYTES) {
       return { ok: false, reason: "File exceeds Discord's upload limit" };
     }
@@ -95,28 +88,18 @@ export class DiscordNotifyService {
     const content = `Submitted by ${uploaderName}${timingSuffix}${taskUrl}`;
 
     try {
-      await this.discordApi.postFileMessage(opts.discordChannelId, {
+      const { messageId } = await this.discordApi.postFileMessage(opts.discordChannelId, {
         content,
         fileBuffer,
         fileName: opts.fileName,
         mimeType: opts.mimeType,
       });
-      return { ok: true };
+      const messageUrl = `https://discord.com/channels/${integration.guildId}/${opts.discordChannelId}/${messageId}`;
+      return { ok: true, messageUrl };
     } catch (e) {
       const reason = e instanceof Error ? e.message : "Discord rejected the message";
       this.log.warn(`Discord delivery failed for task ${opts.taskId}: ${reason}`);
       return { ok: false, reason };
-    }
-  }
-
-  private async resolveBytes(source: DiscordAttachmentSource): Promise<Buffer | null> {
-    if ("fileBuffer" in source) return source.fileBuffer;
-    if (!this.s3 || !this.bucket) return null;
-    try {
-      return await getObjectBuffer(this.s3, this.bucket, source.storageKey);
-    } catch (e) {
-      this.log.warn(`Failed to fetch attachment bytes for Discord post: ${e instanceof Error ? e.message : String(e)}`);
-      return null;
     }
   }
 }

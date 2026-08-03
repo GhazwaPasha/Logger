@@ -7,11 +7,7 @@ import { faCloudArrowUp, faCheck, faCircleNotch, faCircleExclamation } from "@fo
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch } from "@/lib/api";
 
-type DiscordSubmitResponse = {
-  id: string;
-  fileName: string;
-  discord: { ok: true } | { ok: false; reason: string };
-};
+type DiscordSubmitResponse = { discord: { ok: true } | { ok: false; reason: string } };
 
 /** Files sent to Discord in one go; also Discord's own per-message attachment cap. */
 const MAX_FILES_PER_SUBMISSION = 5;

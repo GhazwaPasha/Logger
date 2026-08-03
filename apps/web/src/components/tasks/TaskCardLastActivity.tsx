@@ -9,6 +9,7 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 type Props = {
   entry: LedgerRow;
   members: MemberRow[];
+  taskDueAt?: string | null;
   /** Tighter line clamp for dense kanban columns */
   compact?: boolean;
   /**
@@ -21,7 +22,7 @@ type Props = {
 };
 
 /** Ledger preview for list (under title) or kanban (card footer). */
-export function TaskCardLastActivity({ entry, members, compact, variant = "footer", right }: Props) {
+export function TaskCardLastActivity({ entry, members, taskDueAt, compact, variant = "footer", right }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const lineClamp = compact ? "line-clamp-2" : variant === "inline" ? "line-clamp-2" : "line-clamp-3";
 
@@ -32,7 +33,7 @@ export function TaskCardLastActivity({ entry, members, compact, variant = "foote
           <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
           <span className="text-[var(--muted)]">: </span>
           <span className="text-[var(--fg)]/90">
-            <LedgerLineDescription entry={entry} members={members} />
+            <LedgerLineDescription entry={entry} members={members} taskDueAt={taskDueAt} />
           </span>
         </p>
       </div>

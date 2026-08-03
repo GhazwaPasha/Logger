@@ -5,9 +5,15 @@ import { getApiBaseUrl } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 
-type ExportType = "tasks" | "activity";
+type ExportType = "tasks" | "activity" | "performance";
 
-export function ExportButton() {
+const EXPORT_LABELS: Record<ExportType, string> = {
+  tasks: "Tasks report (CSV)",
+  activity: "Activity log (CSV)",
+  performance: "Performance report (CSV)",
+};
+
+export function ExportButton({ types = ["tasks", "activity"] }: { types?: ExportType[] }) {
   const { workspaceId } = useWorkspaceRoute();
   const { token } = useApiSession();
   const [open, setOpen] = useState(false);
@@ -46,20 +52,16 @@ export function ExportButton() {
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg shadow-black/10 dark:shadow-black/30">
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-            onClick={() => void download("tasks")}
-          >
-            Tasks report (CSV)
-          </button>
-          <button
-            type="button"
-            className="block w-full px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-            onClick={() => void download("activity")}
-          >
-            Activity log (CSV)
-          </button>
+          {types.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+              onClick={() => void download(type)}
+            >
+              {EXPORT_LABELS[type]}
+            </button>
+          ))}
         </div>
       )}
     </div>

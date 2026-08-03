@@ -173,8 +173,10 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
 
       const taskTitle = activityQuery.data?.tasksById[e.taskId]?.title ?? "Task";
       liveIsland.info(taskTitle, {
-        description: "New activity on a task you follow.",
+        description: "Tap to see what's new.",
         duration: 6500,
+        groupKey: "activity",
+        titleForCount: (n) => (n <= 1 ? taskTitle : `New activity on ${n} tasks you follow`),
         action: {
           label: "Open",
           onClick: () => setPanelOpen(true),
@@ -335,7 +337,11 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                             <p className="mt-1 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]">
                               <span className="text-[var(--muted)]">{formatLogTimestamp(e.createdAt, timeZone)}</span>
                               <span className="text-[var(--muted)]"> · </span>
-                              <LedgerLineDescription entry={e} members={members} />
+                              <LedgerLineDescription
+                                entry={e}
+                                members={members}
+                                taskDueAt={activityQuery.data?.tasksById[e.taskId]?.dueAt ?? null}
+                              />
                             </p>
                           </Link>
                         </li>

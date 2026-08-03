@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faBell } from "@fortawesome/free-solid-svg-icons";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { MemberRow, TaskRow } from "@/lib/ledger-types";
 import { normalizeTaskStatus } from "@/lib/task-board";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
@@ -25,20 +28,47 @@ function memberName(members: MemberRow[], userId: string): string {
   return m?.name?.trim() || m?.email || "Unknown";
 }
 
+function assigneeNames(members: MemberRow[], t: TaskRow): string {
+  return t.assigneeUserIds?.length ? t.assigneeUserIds.map((id) => memberName(members, id)).join(", ") : "Someone";
+}
+
 /** Late/on-time verdict for a completed occurrence; mirrors the label already sent to Discord on submission. */
 function completionTiming(t: TaskRow): { late: boolean } | null {
   if (!t.completedAt || !t.dueAt) return null;
   return { late: new Date(t.completedAt).getTime() > new Date(t.dueAt).getTime() };
 }
 
-function TimingBadge({ t }: { t: TaskRow }) {
+/** "{completedAt}, {assignee} completed this task [icon] in time/late". */
+function CompletionLine({ t, members, timeZone }: { t: TaskRow; members: MemberRow[]; timeZone: string }) {
+  if (!t.completedAt) return null;
   const timing = completionTiming(t);
-  if (!timing) return null;
   return (
-    <span
-      className={`ml-1 ${timing.late ? "text-orange-600 dark:text-orange-400" : "text-emerald-600 dark:text-emerald-400"}`}
-    >
-      {timing.late ? "⏰ late" : "✅ on time"}
+    <span>
+      {formatLogTimestamp(t.completedAt, timeZone)}, {assigneeNames(members, t)} completed this task
+      {timing && (
+        <>
+          {" "}
+          <FontAwesomeIcon
+            icon={timing.late ? faBell : faCheck}
+            className={`h-[0.7em] w-[0.7em] align-[1px] ${
+              timing.late ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+            }`}
+          />{" "}
+          {timing.late ? "late" : "in time"}
+        </>
+      )}
+    </span>
+  );
+}
+
+/** "Sent to [discord logo] Discord · {timestamp}", pill-chipped like the recurring badge. */
+function DiscordSubmissionLine({ t, timeZone }: { t: TaskRow; timeZone: string }) {
+  if (!t.lastSubmittedAt) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5">
+      Sent to <FontAwesomeIcon icon={faDiscord} className="h-[0.7em] w-[0.7em] text-[#5865F2]" /> Discord
+      <span className="text-[var(--muted)]/50">·</span>
+      {formatLogTimestamp(t.lastSubmittedAt, timeZone)}
     </span>
   );
 }
@@ -76,21 +106,14 @@ export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
               </svg>
               Recurring · {count} {count === 1 ? "completion" : "completions"}
             </span>
-            {lastDone && (
+            {lastDone?.completedAt ? (
               <span>
-                {lastDone.completedAt ? (
-                  <>
-                    Completed {formatLogTimestamp(lastDone.completedAt, timeZone)}
-                    <TimingBadge t={lastDone} />
-                  </>
-                ) : (
-                  <>Last: {formatDate(lastDone.dueAt, timeZone)}</>
-                )}
+                <CompletionLine t={lastDone} members={members} timeZone={timeZone} />
               </span>
-            )}
-            {lastDone?.lastSubmittedAt && (
-              <span>Submitted {formatLogTimestamp(lastDone.lastSubmittedAt, timeZone)}</span>
-            )}
+            ) : lastDone ? (
+              <span>Last: {formatDate(lastDone.dueAt, timeZone)}</span>
+            ) : null}
+            {lastDone?.lastSubmittedAt && <DiscordSubmissionLine t={lastDone} timeZone={timeZone} />}
           </div>
         </div>
 
@@ -132,17 +155,23 @@ export function RecurringSeriesCard({ tasks, members, onOpenTask }: Props) {
                 <span className="min-w-0 flex-1 font-mono-ledger text-[11px] text-[var(--muted)]">
                   {t.completedAt ? (
                     <>
-                      {formatLogTimestamp(t.completedAt, timeZone)}
-                      <TimingBadge t={t} />
+                      <CompletionLine t={t} members={members} timeZone={timeZone} />
+                      {t.lastSubmittedAt && (
+                        <span className="ml-1.5">
+                          <DiscordSubmissionLine t={t} timeZone={timeZone} />
+                        </span>
+                      )}
                     </>
                   ) : (
-                    <>Due {formatDate(t.dueAt, timeZone)}</>
+                    <>
+                      Due {formatDate(t.dueAt, timeZone)}
+                      {t.assigneeUserIds?.length ? (
+                        <span className="ml-1.5 text-[var(--fg)]/70">
+                          {t.assigneeUserIds.map((id) => memberName(members, id)).join(", ")}
+                        </span>
+                      ) : null}
+                    </>
                   )}
-                  {t.assigneeUserIds?.length ? (
-                    <span className="ml-1.5 text-[var(--fg)]/70">
-                      {t.assigneeUserIds.map((id) => memberName(members, id)).join(", ")}
-                    </span>
-                  ) : null}
                 </span>
                 <button
                   type="button"

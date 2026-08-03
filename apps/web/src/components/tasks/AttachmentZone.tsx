@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
@@ -18,7 +19,8 @@ type AttachmentRow = {
   fileName: string;
   fileSize: string;
   mimeType: string;
-  storageKey: string;
+  /** Null for Discord-only submissions — the file lives only in Discord, `url` is a message permalink. */
+  storageKey: string | null;
   url: string;
   discordDeliveredAt: string | null;
   createdAt: string;
@@ -152,17 +154,24 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                 transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
                 className="flex items-center gap-2 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2"
               >
-                <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
+                {a.storageKey ? (
+                  <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
+                ) : (
+                  <FontAwesomeIcon icon={faDiscord} className="size-4 shrink-0 text-[#5865F2]" aria-hidden />
+                )}
                 <div className="min-w-0 flex-1">
                   <a
                     href={a.url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    title={a.storageKey ? undefined : "Opens the message in Discord — only visible to members of that channel"}
                     className="block truncate text-sm font-medium text-[var(--fg)] hover:underline"
                   >
                     {a.fileName}
                   </a>
-                  <p className="font-mono-ledger text-[10px] text-[var(--muted)]">{formatBytes(a.fileSize)}</p>
+                  <p className="font-mono-ledger text-[10px] text-[var(--muted)]">
+                    {a.storageKey ? formatBytes(a.fileSize) : "View in Discord"}
+                  </p>
                 </div>
                 {a.discordDeliveredAt && (
                   <span

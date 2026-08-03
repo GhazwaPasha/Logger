@@ -167,11 +167,72 @@ export type MilestoneRow = {
 };
 
 /** `GET /organizations/:id/activity` — ledger rows for tasks visible to the user (newest first). */
-export type OrgActivityTaskMeta = { id: string; title: string; assignerId: string };
+export type OrgActivityTaskMeta = { id: string; title: string; assignerId: string; dueAt: string | null };
 export type OrgActivityLedgerRow = LedgerRow & { taskId: string };
 export type OrgActivityFeedResponse = {
   entries: OrgActivityLedgerRow[];
   tasksById: Record<string, OrgActivityTaskMeta>;
   /** Assignees for tasks referenced in `entries` (authoritative for notification eligibility). */
   assigneesByTaskId: Record<string, string[]>;
+};
+
+/** `GET /organizations/:id/performance/scorecards` — per-person rollup, owner/manager-gated. */
+export type PerformanceScorecardRow = {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: string;
+  completed: number;
+  onTime: number;
+  late: number;
+  onTimeRate: number;
+  pending: number;
+  inProgress: number;
+  openAssigned: number;
+  timeLoggedSeconds: number;
+  /** Discord submission required *and* a channel was actually configured. */
+  submissionsRequired: number;
+  submissionsFulfilled: number;
+  submissionRate: number;
+  /** Discord channel configured but submission not mandatory — never counted against compliance. */
+  submissionsOptional: number;
+  submissionsOptionalFulfilled: number;
+  attachmentsRequired: number;
+  attachmentsFulfilled: number;
+  attachmentRate: number;
+};
+export type PerformanceScorecardsResponse = {
+  members: PerformanceScorecardRow[];
+  totals: Omit<PerformanceScorecardRow, "userId" | "name" | "email" | "image" | "role">;
+  dateFrom: string;
+  dateTo: string;
+};
+
+/**
+ * `GET /organizations/:id/performance/scorecards/:userId/tasks` — one member's task drill-down.
+ * A completed recurring task with 2+ occurrences in range collapses into one "collection" row
+ * (`occurrenceCount` set) instead of listing each cycle separately.
+ */
+export type MemberTaskRow = {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  listId: string;
+  dueAt: string | null;
+  completedAt: string | null;
+  late: boolean;
+  discordChannelId: string | null;
+  discordSubmissionRequired: boolean;
+  lastSubmittedAt: string | null;
+  attachmentRequired: boolean;
+  hasAttachment: boolean;
+  timeLoggedSeconds: number;
+  occurrenceCount?: number;
+  lateCount?: number;
+  submissionsRequiredCount?: number;
+  submissionsFulfilledCount?: number;
+  attachmentsRequiredCount?: number;
+  attachmentsFulfilledCount?: number;
 };

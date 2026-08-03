@@ -36,4 +36,18 @@ export class ReportsController {
     res!.setHeader("Content-Disposition", 'attachment; filename="activity.csv"');
     res!.send(csv);
   }
+
+  @Get("performance.csv")
+  async performanceCsv(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Res() res?: Response,
+  ) {
+    const csv = await this.reports.exportPerformanceCsv(user.id, organizationId, { dateFrom, dateTo });
+    res!.setHeader("Content-Type", "text/csv");
+    res!.setHeader("Content-Disposition", 'attachment; filename="performance.csv"');
+    res!.send(csv);
+  }
 }

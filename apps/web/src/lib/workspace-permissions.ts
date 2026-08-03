@@ -6,6 +6,13 @@ export function isWorkspaceOwner(members: MemberRow[], userId: string | null | u
   return members.some((m) => m.userId === userId && m.role === "owner");
 }
 
+/** Performance/compliance data is owner- and manager-only — mirrors the API's `PerformanceService` gate. */
+export function canViewPerformance(members: MemberRow[], userId: string | null | undefined): boolean {
+  if (!userId) return false;
+  const me = members.find((m) => m.userId === userId);
+  return me?.role === "owner" || me?.role === "manager";
+}
+
 /** Level the viewer manages/created/owns for this task, or null if they have no special standing. */
 function taskStanding(
   task: TaskRow,

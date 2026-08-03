@@ -93,7 +93,7 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
                   <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
                   <span className="text-[var(--muted)]">: </span>
                   <span>
-                    <LedgerLineDescription entry={entry} members={members} />
+                    <LedgerLineDescription entry={entry} members={members} taskDueAt={task.dueAt} />
                   </span>
                 </p>
               ))}

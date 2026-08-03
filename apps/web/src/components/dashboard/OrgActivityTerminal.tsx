@@ -71,7 +71,7 @@ export function OrgActivityTerminal({
               </Link>
               <span className="text-[var(--muted)]"> · </span>
               <span>
-              <LedgerLineDescription entry={entry} members={members} />
+              <LedgerLineDescription entry={entry} members={members} taskDueAt={meta?.dueAt ?? null} />
             </span>
             </p>
           );

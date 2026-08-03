@@ -75,6 +75,21 @@ export function dueIndicatorColorClass(task: TaskRow, now: Date = new Date()): s
   return "text-blue-500 dark:text-blue-400";
 }
 
+/** Tinted-pill version of {@link dueIndicatorColorClass} (list/kanban due chip background). */
+export function dueChipPillClass(task: TaskRow, now: Date = new Date()): string {
+  if (taskShowsLateFooter(task, now)) {
+    return "border border-red-500/30 bg-red-500/12 text-red-600 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-400";
+  }
+  if (!task.dueAt) {
+    return "border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]";
+  }
+  const flowCol = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
+  if (flowCol === "in_progress") {
+    return "border border-green-500/30 bg-green-500/12 text-green-600 dark:border-green-500/25 dark:bg-green-500/10 dark:text-green-400";
+  }
+  return "border border-blue-500/30 bg-blue-500/12 text-blue-600 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-400";
+}
+
 /** Assignee control chrome (sky) when the task has at least one assignee. */
 export const TASK_ASSIGNED_CHROME_CLASS =
   "border-sky-500/35 bg-sky-500/14 text-sky-800 dark:border-sky-500/28 dark:bg-sky-500/10 dark:text-sky-200";

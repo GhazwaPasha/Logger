@@ -6,6 +6,7 @@ import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { getOrganizationTimeZone } from "../db/org-timezone.util";
+import { PerformanceService } from "../performance/performance.service";
 
 function escapeCsv(val: unknown): string {
   const s = val == null ? "" : String(val);
@@ -24,6 +25,7 @@ export class ReportsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly authz: AuthorizationService,
+    private readonly performance: PerformanceService,
   ) {}
 
   async exportTasksCsv(
@@ -141,6 +143,60 @@ export class ReportsService {
         r.actorName ?? r.actorEmail,
         r.type,
         new Date(r.createdAt).toISOString(),
+      ]),
+    );
+
+    return [header, ...dataRows].join("\n");
+  }
+
+  async exportPerformanceCsv(
+    userId: string,
+    organizationId: string,
+    opts?: { dateFrom?: string; dateTo?: string },
+  ): Promise<string> {
+    const { members } = await this.performance.scorecards(userId, organizationId, opts);
+    if (members.length === 0) return "";
+
+    const header = toCsvRow([
+      "Name",
+      "Email",
+      "Role",
+      "Completed",
+      "On Time",
+      "Late",
+      "On-Time Rate",
+      "Pending",
+      "In Progress",
+      "Time Logged (hrs)",
+      "Required Submissions",
+      "Required Submissions Fulfilled",
+      "Required Submission Rate",
+      "Optional Submissions",
+      "Optional Submissions Fulfilled",
+      "Attachments Required",
+      "Attachments Fulfilled",
+      "Attachment Rate",
+    ]);
+    const dataRows = members.map((m) =>
+      toCsvRow([
+        m.name ?? m.email,
+        m.email,
+        m.role,
+        m.completed,
+        m.onTime,
+        m.late,
+        `${Math.round(m.onTimeRate * 100)}%`,
+        m.pending,
+        m.inProgress,
+        (m.timeLoggedSeconds / 3600).toFixed(2),
+        m.submissionsRequired,
+        m.submissionsFulfilled,
+        `${Math.round(m.submissionRate * 100)}%`,
+        m.submissionsOptional,
+        m.submissionsOptionalFulfilled,
+        m.attachmentsRequired,
+        m.attachmentsFulfilled,
+        `${Math.round(m.attachmentRate * 100)}%`,
       ]),
     );
 

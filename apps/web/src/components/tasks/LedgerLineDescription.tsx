@@ -44,10 +44,33 @@ function parseIso(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : v;
 }
 
-type Props = { entry: LedgerRow; members: MemberRow[] };
+type Props = {
+  entry: LedgerRow;
+  members: MemberRow[];
+  /** Task's current due date — used only as a fallback for entries recorded before `late` was captured in the payload. */
+  taskDueAt?: string | null;
+};
+
+function LateBadge() {
+  return (
+    <span className="ml-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+      Late
+    </span>
+  );
+}
 
 /** Human-readable status transitions (ledger stores raw API enum strings). */
-function StatusChangeLine({ actor, oldRaw, newRaw }: { actor: string; oldRaw: string; newRaw: string }) {
+function StatusChangeLine({
+  actor,
+  oldRaw,
+  newRaw,
+  late,
+}: {
+  actor: string;
+  oldRaw: string;
+  newRaw: string;
+  late?: boolean;
+}) {
   const oldS = normalizeTaskStatus(oldRaw);
   const newS = normalizeTaskStatus(newRaw);
 
@@ -79,6 +102,7 @@ function StatusChangeLine({ actor, oldRaw, newRaw }: { actor: string; oldRaw: st
     return (
       <>
         <UserName>{actor}</UserName> marked this task complete
+        {late ? <LateBadge /> : null}
       </>
     );
   }
@@ -160,7 +184,7 @@ function StatusChangeLine({ actor, oldRaw, newRaw }: { actor: string; oldRaw: st
 }
 
 /** Rich ledger line: blue person names, status labels use board pill colors. */
-export function LedgerLineDescription({ entry, members }: Props) {
+export function LedgerLineDescription({ entry, members, taskDueAt }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const actor = memberDisplayName(members, entry.actorId);
 
@@ -175,7 +199,13 @@ export function LedgerLineDescription({ entry, members }: Props) {
           </>
         );
       }
-      return <StatusChangeLine actor={actor} oldRaw={oldS} newRaw={newS} />;
+      // Entries recorded before `late` was captured in the payload fall back to comparing this
+      // event's own timestamp against the task's current due date (best-effort for old data).
+      const late =
+        typeof entry.payload.late === "boolean"
+          ? entry.payload.late
+          : taskDueAt != null && new Date(entry.createdAt).getTime() > new Date(taskDueAt).getTime();
+      return <StatusChangeLine actor={actor} oldRaw={oldS} newRaw={newS} late={late} />;
     }
     case "assignee_change": {
       const prev = entry.payload.previousAssigneeUserIds;

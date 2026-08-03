@@ -25,3 +25,11 @@ export const discordKeys = {
   integration: (organizationId: string) => [...discordKeys.all, organizationId, "integration"] as const,
   channels: (organizationId: string) => [...discordKeys.all, organizationId, "channels"] as const,
 };
+
+export const performanceKeys = {
+  all: ["performance"] as const,
+  scorecards: (organizationId: string, dateFrom?: string, dateTo?: string) =>
+    [...performanceKeys.all, organizationId, "scorecards", dateFrom ?? "", dateTo ?? ""] as const,
+  memberTasks: (organizationId: string, userId: string, dateFrom?: string, dateTo?: string) =>
+    [...performanceKeys.all, organizationId, "member-tasks", userId, dateFrom ?? "", dateTo ?? ""] as const,
+};

@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
 import { getApiBaseUrl } from "@/lib/api";
-import { roadmapKeys, workspaceKeys } from "@/lib/query-keys";
+import { performanceKeys, roadmapKeys, workspaceKeys } from "@/lib/query-keys";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
@@ -53,6 +53,8 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
         });
         // Task completion/linking elsewhere should refresh roadmap rollups without a manual reload.
         void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(workspaceId) });
+        // Matches every date-range variant of the scorecards query (prefix match on performanceKeys.all).
+        void queryClient.invalidateQueries({ queryKey: [...performanceKeys.all, workspaceId] });
       }, WORKSPACE_INVALIDATE_DEBOUNCE_MS);
       // Task detail is updated by mutation handlers (PATCH / subtask APIs).
     };

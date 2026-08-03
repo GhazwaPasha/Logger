@@ -128,7 +128,7 @@ export class DiscordApiService implements OnModuleInit {
   async postFileMessage(
     channelId: string,
     opts: { content: string; fileBuffer: Buffer; fileName: string; mimeType: string },
-  ): Promise<void> {
+  ): Promise<{ messageId: string }> {
     const buildForm = () => {
       const form = new FormData();
       form.append("payload_json", JSON.stringify({ content: opts.content }));
@@ -150,5 +150,8 @@ export class DiscordApiService implements OnModuleInit {
       this.log.warn(`postFileMessage failed (${res.status}): ${detail.slice(0, 300)}`);
       throw new DiscordApiError(describeStatus(res.status), res.status);
     }
+
+    const body = (await res.json()) as { id: string };
+    return { messageId: body.id };
   }
 }

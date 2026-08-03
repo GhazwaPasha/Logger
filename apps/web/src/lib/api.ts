@@ -10,6 +10,20 @@ function apiBase(): string {
   return getApiBaseUrl();
 }
 
+/** Nest error bodies are `{ statusCode, message, error }`, with `message` sometimes an array
+ *  (ValidationPipe). Unwrap that instead of surfacing the raw JSON blob to the user. */
+function extractErrorMessage(text: string, fallback: string): string {
+  if (!text) return fallback;
+  try {
+    const parsed = JSON.parse(text) as { message?: string | string[] };
+    if (Array.isArray(parsed.message) && parsed.message.length > 0) return parsed.message.join(" ");
+    if (typeof parsed.message === "string" && parsed.message) return parsed.message;
+  } catch {
+    // Body wasn't JSON — fall through and use the raw text.
+  }
+  return text;
+}
+
 export async function apiFetch(
   path: string,
   options: RequestInit & { token?: string | null } = {},
@@ -38,7 +52,7 @@ export async function apiJson<T>(
   }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    throw new Error(extractErrorMessage(text, res.statusText));
   }
   return res.json() as Promise<T>;
 }
@@ -54,6 +68,6 @@ export async function apiVoid(
   }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    throw new Error(extractErrorMessage(text, res.statusText));
   }
 }

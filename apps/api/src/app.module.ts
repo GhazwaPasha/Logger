@@ -22,6 +22,7 @@ import { RoadmapModule } from "./roadmap/roadmap.module";
 import { DiscordModule } from "./discord/discord.module";
 import { McpModule } from "./mcp/mcp.module";
 import { WellKnownModule } from "./well-known/well-known.module";
+import { PerformanceModule } from "./performance/performance.module";
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { WellKnownModule } from "./well-known/well-known.module";
     CommentsModule,
     SearchModule,
     ReportsModule,
+    PerformanceModule,
     DependenciesModule,
     TimeModule,
     RealtimeModule,

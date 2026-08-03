@@ -18,6 +18,7 @@ import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/S
 import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { canViewPerformance } from "@/lib/workspace-permissions";
 import type { Dept, ListRow, TaskRow } from "@/lib/ledger-types";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { workspaceKeys } from "@/lib/query-keys";
@@ -169,6 +170,11 @@ export function WorkspaceSidebar({
     return members.some((m) => m.userId === uid && m.role === "owner");
   }, [session?.user?.id, members]);
 
+  const showPerformanceLink = useMemo(
+    () => canViewPerformance(members, session?.user?.id),
+    [session?.user?.id, members],
+  );
+
   const listsByLevel = useMemo(() => {
     const m = new Map<string, ListRow[]>();
     for (const d of depts) m.set(d.id, []);
@@ -296,6 +302,7 @@ export function WorkspaceSidebar({
   }, []);
 
   const activeDashboard = pathname === `${base}/dashboard`;
+  const activePerformance = pathname.startsWith(`${base}/performance`);
   const activeRoadmap = pathname.startsWith(`${base}/roadmap`);
   const activeCalendar = pathname.startsWith(`${base}/calendar`);
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
@@ -321,6 +328,7 @@ export function WorkspaceSidebar({
     const tail = pathname.replace(/^\/[^/]+/, "");
     const allowedTails = new Set([
       "/dashboard",
+      "/performance",
       "/roadmap",
       "/my-tasks",
       "/people",
@@ -670,6 +678,11 @@ export function WorkspaceSidebar({
             <Link href={`${base}/dashboard`} className={`${rowBase(activeDashboard)} pl-2`}>
               Dashboard
             </Link>
+            {showPerformanceLink && (
+              <Link href={`${base}/performance`} className={`${rowBase(activePerformance)} pl-2`}>
+                Performance
+              </Link>
+            )}
             <Link href={`${base}/roadmap`} className={`${rowBase(activeRoadmap)} pl-2`}>
               Roadmap
             </Link>

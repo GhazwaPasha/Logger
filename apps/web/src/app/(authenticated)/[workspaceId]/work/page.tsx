@@ -55,6 +55,7 @@ import { useRoadmap } from "@/hooks/useRoadmap";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
   type MemberRow,
@@ -100,7 +101,7 @@ import {
   statusLabelTextClasses,
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
-  dueIndicatorColorClass,
+  dueChipPillClass,
   taskMatchesDueRange,
   taskMatchesDueWindow,
   taskMatchesUrlStatusFilter,
@@ -1162,12 +1163,14 @@ function WorkItemsInner() {
               </button>
             )}
             <div className="flex-1" />
-            <TaskMilestoneIconBtn taskId={task.id} />
-            <AssigneeIconBtn task={task} />
-            <DueIconBtn task={task} />
-            <PriorityIconBtn task={task} />
-            <AttachIconBtn task={task} />
-            <DiscordIconBtn task={task} />
+            <div className="flex items-center gap-1">
+              <TaskMilestoneIconBtn taskId={task.id} />
+              <AssigneeIconBtn task={task} />
+              <DueIconBtn task={task} />
+              <PriorityIconBtn task={task} />
+              <AttachIconBtn task={task} />
+              <DiscordIconBtn task={task} />
+            </div>
           </div>
           {expanded && subtasksPreview.length > 0 && (
             <ul className="mt-1.5 space-y-1">
@@ -1203,7 +1206,7 @@ function WorkItemsInner() {
           )}
         </div>
 
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact right={<CommentIconBtn task={task} />} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={<CommentIconBtn task={task} />} /> : null}
       </div>
     );
   }
@@ -1250,34 +1253,41 @@ function WorkItemsInner() {
         : p === "low"
           ? "text-sky-500 dark:text-sky-400"
           : "text-[var(--muted)]";
+    const icon =
+      p === "high" ? (
+        <FontAwesomeIcon icon={faAnglesUp} className="size-4" aria-hidden />
+      ) : p === "low" ? (
+        <FontAwesomeIcon icon={faAnglesDown} className="size-4" aria-hidden />
+      ) : (
+        <FontAwesomeIcon icon={faArrowUp} className="size-4" aria-hidden />
+      );
+
+    if (!canEdit) {
+      return (
+        <div title={`Priority: ${PRIORITY_LABELS[p]}`} className={`flex size-5 shrink-0 items-center justify-center ${color}`}>
+          {icon}
+        </div>
+      );
+    }
+
     return (
-      <div
-        title={`Priority: ${PRIORITY_LABELS[p]}`}
-        className={`relative flex size-5 shrink-0 items-center justify-center ${color} ${canEdit ? "transition-opacity hover:opacity-75 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-1 focus-within:ring-offset-[var(--surface-elevated)]" : ""}`}
-      >
-        {canEdit && (
-          <select
-            className="absolute inset-0 z-[1] h-full w-full cursor-pointer opacity-0 appearance-none disabled:cursor-not-allowed"
-            value={p}
-            disabled={syncing}
-            onChange={(e) => void patchTask(task.id, { priority: e.target.value as TaskPriority })}
-            aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
-          >
-            {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => (
-              <option key={k} value={k}>{PRIORITY_LABELS[k]}</option>
-            ))}
-          </select>
-        )}
-        <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
-          {p === "high" ? (
-            <FontAwesomeIcon icon={faAnglesUp} className="size-4" aria-hidden />
-          ) : p === "low" ? (
-            <FontAwesomeIcon icon={faAnglesDown} className="size-4" aria-hidden />
-          ) : (
-            <FontAwesomeIcon icon={faArrowUp} className="size-4" aria-hidden />
-          )}
-        </span>
-      </div>
+      <SelectPopover
+        value={p}
+        onChange={(v) => void patchTask(task.id, { priority: v as TaskPriority })}
+        options={(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((k) => ({
+          value: k,
+          label: PRIORITY_LABELS[k],
+        }))}
+        disabled={syncing}
+        triggerClassName={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50 ${color}`}
+        triggerContent={
+          <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
+            {icon}
+          </span>
+        }
+        showChevron={false}
+        aria-label={`Priority: ${PRIORITY_LABELS[p]}`}
+      />
     );
   }
 
@@ -1288,22 +1298,25 @@ function WorkItemsInner() {
     const tooltip = dueSummary
       ? `Due ${dueSummary}${isLate ? " — Overdue" : ""}`
       : "No due date — click to set";
-    const color = dueIndicatorColorClass(task);
+    const color = dueChipPillClass(task);
     return (
       <button
         type="button"
         onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
-        className={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
+        className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
       >
         {isLate ? (
-          <FontAwesomeIcon icon={faBell} className="size-4" aria-hidden />
+          <FontAwesomeIcon icon={faBell} className="size-4 shrink-0" aria-hidden />
         ) : hasDue ? (
-          <FontAwesomeIcon icon={faStopwatch} className="size-4" aria-hidden />
+          <FontAwesomeIcon icon={faStopwatch} className="size-4 shrink-0" aria-hidden />
         ) : (
-          <FontAwesomeIcon icon={faCalendarPlus} className="size-4" aria-hidden />
+          <FontAwesomeIcon icon={faCalendarPlus} className="size-4 shrink-0" aria-hidden />
         )}
+        {dueSummary ? (
+          <span className="whitespace-nowrap text-xs font-medium leading-none tabular-nums">{dueSummary}</span>
+        ) : null}
       </button>
     );
   }
@@ -1318,15 +1331,15 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
-        className="flex size-6 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         {member ? (
           <Avatar
             name={member.name}
             email={member.email}
             image={member.image}
-            size="size-6"
-            className="bg-sky-500/20 text-[10px] font-bold leading-none tabular-nums text-[var(--fg)]"
+            size="size-5"
+            className="bg-sky-500/20 text-[9px] font-bold leading-none tabular-nums text-[var(--fg)]"
           />
         ) : (
           <FontAwesomeIcon icon={faUserPlus} className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
@@ -1493,12 +1506,14 @@ function WorkItemsInner() {
                 </button>
               )}
               <div className="flex-1" />
-              <TaskMilestoneIconBtn taskId={task.id} />
-              <AssigneeIconBtn task={task} />
-              <DueIconBtn task={task} />
-              <PriorityIconBtn task={task} />
-              <AttachIconBtn task={task} />
-              <DiscordIconBtn task={task} />
+              <div className="flex items-center gap-1">
+                <TaskMilestoneIconBtn taskId={task.id} />
+                <AssigneeIconBtn task={task} />
+                <DueIconBtn task={task} />
+                <PriorityIconBtn task={task} />
+                <AttachIconBtn task={task} />
+                <DiscordIconBtn task={task} />
+              </div>
             </div>
             {subtasksPreview.length > 0 && (
               <ul className="mt-1.5 space-y-1">
@@ -1551,7 +1566,7 @@ function WorkItemsInner() {
             )}
           </div>
         </div>
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} compact right={<CommentIconBtn task={task} />} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={<CommentIconBtn task={task} />} /> : null}
       </li>
     );
   }

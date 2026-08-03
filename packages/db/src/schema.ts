@@ -536,9 +536,8 @@ export const taskAttachments = pgTable(
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    blobId: uuid("blob_id")
-      .notNull()
-      .references(() => attachmentBlobs.id, { onDelete: "restrict" }),
+    /** Null for Discord-only submissions — those keep no copy in R2, only `discordMessageUrl`. */
+    blobId: uuid("blob_id").references(() => attachmentBlobs.id, { onDelete: "restrict" }),
     uploadedBy: text("uploaded_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -547,6 +546,8 @@ export const taskAttachments = pgTable(
     mimeType: text("mime_type").notNull(),
     /** Set when this file was uploaded via the "Discord submission" flow and successfully posted; null = not a Discord submission (or delivery failed). */
     discordDeliveredAt: timestamp("discord_delivered_at", { withTimezone: true }),
+    /** Discord message permalink for Discord-only submissions (no `blobId`); null otherwise. */
+    discordMessageUrl: text("discord_message_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("task_attachments_task_idx").on(t.taskId), index("task_attachments_blob_idx").on(t.blobId)],

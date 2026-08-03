@@ -139,7 +139,14 @@ export class AttachmentsService {
     userId: string,
     taskId: string,
     access: Awaited<ReturnType<AuthorizationService["getTaskAccess"]>>,
-    opts: { blobId: string; fileName: string; fileSize: number; mimeType: string },
+    opts: {
+      blobId: string | null;
+      fileName: string;
+      fileSize: number;
+      mimeType: string;
+      discordMessageUrl?: string;
+      discordDeliveredAt?: Date;
+    },
   ) {
     const [row] = await this.db
       .insert(taskAttachments)
@@ -150,6 +157,8 @@ export class AttachmentsService {
         fileName: opts.fileName,
         fileSize: String(opts.fileSize),
         mimeType: opts.mimeType,
+        discordMessageUrl: opts.discordMessageUrl,
+        discordDeliveredAt: opts.discordDeliveredAt,
       })
       .returning();
 
@@ -188,9 +197,9 @@ export class AttachmentsService {
   }
 
   /**
-   * "Discord submission" — a separate upload path from `upload()`. Stores the file exactly like a normal
-   * attachment, but also synchronously posts it to the task's Discord channel and waits for the result,
-   * so the caller gets immediate success/failure feedback instead of a silent background attempt.
+   * "Discord submission" — a separate upload path from `upload()`. Posts the file straight to the task's
+   * Discord channel from the in-memory buffer; nothing is written to R2/Neon unless delivery succeeds, and
+   * on success only a message permalink is kept (Discord is the sole copy of the file bytes).
    */
   async discordSubmit(userId: string, taskId: string, file: AttachmentUploadFile) {
     const submittedAt = new Date();
@@ -202,16 +211,6 @@ export class AttachmentsService {
       throw new BadRequestException("This task doesn't have a Discord channel assigned");
     }
 
-    const s3 = this.assertR2();
-    const stored = await storeBlobFromBuffer(this.db, s3, this.bucket, file.buffer, mimeType);
-
-    const row = await this.recordAttachment(userId, taskId, access, {
-      blobId: stored.blobId,
-      fileName,
-      fileSize: file.size,
-      mimeType,
-    });
-
     const delivery = await this.discordNotify.notifyAttachment({
       organizationId: access.task.organizationId,
       taskId,
@@ -221,29 +220,26 @@ export class AttachmentsService {
       mimeType,
       dueAt: access.task.dueAt,
       submittedAt,
-      source: { fileBuffer: file.buffer },
+      fileBuffer: file.buffer,
     });
 
-    let discordDeliveredAt: Date | null = null;
-    if (delivery.ok) {
-      discordDeliveredAt = new Date();
-      await this.db
-        .update(taskAttachments)
-        .set({ discordDeliveredAt })
-        .where(eq(taskAttachments.id, row.id));
-      await this.db
-        .update(tasks)
-        .set({ lastSubmittedAt: discordDeliveredAt })
-        .where(eq(tasks.id, taskId));
+    if (!delivery.ok) {
+      return { discord: delivery };
     }
 
-    return {
-      ...row,
+    const discordDeliveredAt = new Date();
+    const row = await this.recordAttachment(userId, taskId, access, {
+      blobId: null,
+      fileName,
+      fileSize: file.size,
+      mimeType,
+      discordMessageUrl: delivery.messageUrl,
       discordDeliveredAt,
-      storageKey: stored.storageKey,
-      deduplicated: stored.deduplicated,
-      discord: delivery,
-    };
+    });
+
+    await this.db.update(tasks).set({ lastSubmittedAt: discordDeliveredAt }).where(eq(tasks.id, taskId));
+
+    return { ...row, discord: delivery };
   }
 
   async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
@@ -297,16 +293,17 @@ export class AttachmentsService {
         fileSize: taskAttachments.fileSize,
         mimeType: taskAttachments.mimeType,
         discordDeliveredAt: taskAttachments.discordDeliveredAt,
+        discordMessageUrl: taskAttachments.discordMessageUrl,
         createdAt: taskAttachments.createdAt,
         storageKey: attachmentBlobs.storageKey,
       })
       .from(taskAttachments)
-      .innerJoin(attachmentBlobs, eq(taskAttachments.blobId, attachmentBlobs.id))
+      .leftJoin(attachmentBlobs, eq(taskAttachments.blobId, attachmentBlobs.id))
       .where(eq(taskAttachments.taskId, taskId));
 
     return rows.map((r) => ({
       ...r,
-      url: `${this.publicUrl}/${r.storageKey}`,
+      url: r.storageKey ? `${this.publicUrl}/${r.storageKey}` : (r.discordMessageUrl ?? ""),
     }));
   }
 
@@ -324,8 +321,10 @@ export class AttachmentsService {
 
     await this.db.delete(taskAttachments).where(eq(taskAttachments.id, attachmentId));
 
-    const s3 = this.assertR2();
-    await releaseBlobRef(this.db, s3, this.bucket, attachment.blobId);
+    if (attachment.blobId) {
+      const s3 = this.assertR2();
+      await releaseBlobRef(this.db, s3, this.bucket, attachment.blobId);
+    }
 
     const [entry] = await this.db
       .insert(activityLedger)
@@ -364,7 +363,7 @@ export class AttachmentsService {
     if (this.isR2Configured()) {
       const s3 = this.assertR2();
       for (const row of rows) {
-        await releaseBlobRef(this.db, s3, this.bucket, row.blobId);
+        if (row.blobId) await releaseBlobRef(this.db, s3, this.bucket, row.blobId);
       }
     }
     await this.db.delete(taskAttachments).where(

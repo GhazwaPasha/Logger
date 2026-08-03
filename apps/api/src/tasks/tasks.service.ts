@@ -31,6 +31,8 @@ import { PDFDocument, StandardFonts } from "pdf-lib";
 import { computeNextDue, isDueRepeat } from "./compute-next-due";
 import { coerceLegacyTaskStatus } from "./task-status-automation";
 
+const RECURRING_EARLY_COMPLETION_WINDOW_MS = 12 * 60 * 60 * 1000;
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -559,6 +561,21 @@ export class TasksService {
       throw new BadRequestException("Due date cannot be in the past");
     }
 
+    const now = new Date();
+    const orgTimeZone = await getOrganizationTimeZone(this.db, orgId);
+
+    // Recurring tasks may only be completed within 12 hours of their due date — otherwise a series
+    // can be raced through (complete → next spawns → complete again...), producing several
+    // "on time" completions in one sitting and pushing the schedule far into the future.
+    if (statusChanged && nextStatus === "done" && !dueCleared && task.dueAt && isDueRepeat(task.dueRepeat)) {
+      const earliestCompletable = new Date(task.dueAt.getTime() - RECURRING_EARLY_COMPLETION_WINDOW_MS);
+      if (now < earliestCompletable) {
+        throw new BadRequestException(
+          "Hold your horses, this task isn't due yet. Please try on the day it is actually due.",
+        );
+      }
+    }
+
     const nextDiscordChannelId =
       parsed.discordChannelId !== undefined ? parsed.discordChannelId : (task.discordChannelId ?? null);
     if (statusChanged && nextStatus === "done" && nextDiscordChannelId && nextDiscordSubmissionRequired) {
@@ -597,7 +614,6 @@ export class TasksService {
     }
 
     const ledgerDelta: (typeof activityLedger.$inferSelect)[] = [];
-    const now = new Date();
     const preDue = task.dueAt;
     const preRepeat = task.dueRepeat;
     let spawnedRecurringTaskId: string | undefined;
@@ -654,6 +670,9 @@ export class TasksService {
         }
 
         if (statusChanged) {
+          // Captured once, at completion time, so the ledger stays historically accurate even if
+          // the due date is edited later (activity feeds read this instead of recomputing live).
+          const completionDueIso = dueChanged ? nextDueIso : oldDueIso;
           const [row] = await tx
             .insert(activityLedger)
             .values({
@@ -663,6 +682,13 @@ export class TasksService {
               payload: {
                 oldStatus,
                 newStatus: parsed.status,
+                ...(nextStatus === "done"
+                  ? {
+                      dueAt: completionDueIso ?? null,
+                      completedAt: now.toISOString(),
+                      late: completionDueIso != null && now.getTime() > new Date(completionDueIso).getTime(),
+                    }
+                  : {}),
               },
             })
             .returning();
@@ -763,7 +789,6 @@ export class TasksService {
           .where(eq(tasks.spawnedFromTaskId, taskId))
           .limit(1);
         if (!existingChild) {
-          const orgTimeZone = await getOrganizationTimeZone(tx, orgId);
           const nextDue = computeNextDue(preDue, preRepeat, orgTimeZone);
           const seriesId = task.recurringSeriesId ?? task.id;
           if (!task.recurringSeriesId) {

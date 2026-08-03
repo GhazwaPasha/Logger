@@ -429,9 +429,8 @@ exports.taskAttachments = (0, pg_core_1.pgTable)("task_attachments", {
     taskId: (0, pg_core_1.uuid)("task_id")
         .notNull()
         .references(() => exports.tasks.id, { onDelete: "cascade" }),
-    blobId: (0, pg_core_1.uuid)("blob_id")
-        .notNull()
-        .references(() => exports.attachmentBlobs.id, { onDelete: "restrict" }),
+    /** Null for Discord-only submissions — those keep no copy in R2, only `discordMessageUrl`. */
+    blobId: (0, pg_core_1.uuid)("blob_id").references(() => exports.attachmentBlobs.id, { onDelete: "restrict" }),
     uploadedBy: (0, pg_core_1.text)("uploaded_by")
         .notNull()
         .references(() => exports.user.id, { onDelete: "restrict" }),
@@ -440,6 +439,8 @@ exports.taskAttachments = (0, pg_core_1.pgTable)("task_attachments", {
     mimeType: (0, pg_core_1.text)("mime_type").notNull(),
     /** Set when this file was uploaded via the "Discord submission" flow and successfully posted; null = not a Discord submission (or delivery failed). */
     discordDeliveredAt: (0, pg_core_1.timestamp)("discord_delivered_at", { withTimezone: true }),
+    /** Discord message permalink for Discord-only submissions (no `blobId`); null otherwise. */
+    discordMessageUrl: (0, pg_core_1.text)("discord_message_url"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("task_attachments_task_idx").on(t.taskId), (0, pg_core_1.index)("task_attachments_blob_idx").on(t.blobId)]);
 /** Task comments (threaded, soft-deletable). */
