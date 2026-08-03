@@ -84,7 +84,7 @@ export default function WorkspaceDashboardPage() {
           currentUserId={session?.user?.id ?? null}
         />
       ) : (
-        <section className="surface-elevated rounded-2xl border border-[var(--border-subtle)] p-3.5">
+        <section>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Workspace activity</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
             Ledger from tasks you can access, newest first (same format as task history).
@@ -97,6 +97,7 @@ export default function WorkspaceDashboardPage() {
               workHrefBase={base}
               isLoading={activityQuery.isPending}
               errorMessage={activityQuery.error ? (activityQuery.error as Error).message : null}
+              maxHeightClassName="max-h-[min(65vh,32rem)]"
             />
           </div>
         </section>

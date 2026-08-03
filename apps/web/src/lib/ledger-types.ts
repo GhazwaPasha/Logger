@@ -185,10 +185,14 @@ export type PerformanceScorecardRow = {
   role: string;
   completed: number;
   onTime: number;
+  /** Completed after their due date. */
   late: number;
   onTimeRate: number;
   pending: number;
   inProgress: number;
+  /** Still open (pending/in-progress) and past their due date. */
+  latePending: number;
+  lateInProgress: number;
   openAssigned: number;
   timeLoggedSeconds: number;
   /** Discord submission required *and* a channel was actually configured. */

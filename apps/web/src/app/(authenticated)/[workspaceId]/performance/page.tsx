@@ -6,7 +6,9 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { ExportButton } from "@/components/dashboard/ExportButton";
 import { PerformanceKpiRow } from "@/components/performance/PerformanceKpiRow";
-import { MemberScorecardList } from "@/components/performance/MemberScorecardList";
+import { TeamScorecardTable } from "@/components/performance/TeamScorecardTable";
+import { MemberChipRow } from "@/components/performance/MemberChipRow";
+import { MemberDetailPanel } from "@/components/performance/MemberDetailPanel";
 import { PerformanceActivityFeed } from "@/components/performance/PerformanceActivityFeed";
 import { DateRangePresets, presetToRange, type DateRangePreset } from "@/components/performance/DateRangePresets";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
@@ -22,6 +24,7 @@ export default function WorkspacePerformancePage() {
   const { token, session } = useApiSession();
   const { members, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [rangeDays, setRangeDays] = useState<DateRangePreset>(30);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -36,6 +39,10 @@ export default function WorkspacePerformancePage() {
 
   const scorecardsQuery = usePerformanceScorecards(token, workspaceId, allowed, range);
   const activityQuery = useOrgActivityFeed(token, workspaceId, allowed);
+
+  const scorecardMembers = scorecardsQuery.data?.members ?? [];
+  // Defaults to the top-ranked member so the detail panel isn't empty on first load.
+  const selectedMember = scorecardMembers.find((m) => m.userId === selectedUserId) ?? scorecardMembers[0] ?? null;
 
   if (!workspaceLoading && !allowed) {
     return (
@@ -83,12 +90,18 @@ export default function WorkspacePerformancePage() {
 
           <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team scorecard</h2>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Completion, workload, compliance, and time logged per person — click a row for their full breakdown and activity
-            </p>
-            <MemberScorecardList
-              members={scorecardsQuery.data?.members ?? []}
-              loading={loading}
+            <p className="mt-0.5 text-sm text-[var(--muted)]">Completion, on-time rate, workload, and time logged per person</p>
+            <TeamScorecardTable members={scorecardMembers} loading={loading} />
+          </div>
+
+          <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team members</h2>
+            <p className="mt-0.5 text-sm text-[var(--muted)]">Pick a person for their full breakdown and tasks</p>
+            <div className="mt-2">
+              <MemberChipRow members={scorecardMembers} selectedUserId={selectedMember?.userId ?? null} onSelect={setSelectedUserId} />
+            </div>
+            <MemberDetailPanel
+              member={selectedMember}
               token={token}
               organizationId={workspaceId}
               range={range}
@@ -96,7 +109,7 @@ export default function WorkspacePerformancePage() {
             />
           </div>
 
-          <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
+          <div>
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Activity</h2>
             <p className="mt-0.5 text-sm text-[var(--muted)]">Everyone&rsquo;s activity, newest first — filter down to one person</p>
             <div className="mt-2">

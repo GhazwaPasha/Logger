@@ -20,10 +20,14 @@ export type PerformanceScorecardRow = {
   role: string;
   completed: number;
   onTime: number;
+  /** Completed after their due date. */
   late: number;
   onTimeRate: number;
   pending: number;
   inProgress: number;
+  /** Still open (pending/in-progress) and past their due date. */
+  latePending: number;
+  lateInProgress: number;
   openAssigned: number;
   timeLoggedSeconds: number;
   /** Discord submission required *and* a channel was actually configured — the only tasks compliance can fairly judge. */
@@ -89,6 +93,8 @@ function emptyCounters() {
     late: 0,
     pending: 0,
     inProgress: 0,
+    latePending: 0,
+    lateInProgress: 0,
     openAssigned: 0,
     timeLoggedSeconds: 0,
     submissionsRequired: 0,
@@ -193,6 +199,8 @@ export class PerformanceService {
               openAssigned: sql<number>`count(*)::int`,
               pending: sql<number>`count(*) filter (where ${tasks.status} in ('pending','open','assigned'))::int`,
               inProgress: sql<number>`count(*) filter (where ${tasks.status} in ('in_progress','late'))::int`,
+              latePending: sql<number>`count(*) filter (where ${tasks.status} in ('pending','open','assigned') and ${tasks.dueAt} < now())::int`,
+              lateInProgress: sql<number>`count(*) filter (where ${tasks.status} in ('in_progress','late') and ${tasks.dueAt} < now())::int`,
             })
             .from(taskAssignees)
             .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
@@ -276,6 +284,8 @@ export class PerformanceService {
         row.openAssigned = r.openAssigned;
         row.pending = r.pending;
         row.inProgress = r.inProgress;
+        row.latePending = r.latePending;
+        row.lateInProgress = r.lateInProgress;
       }
       for (const r of complianceRows) {
         const row = get(r.userId);
@@ -314,6 +324,8 @@ export class PerformanceService {
       acc.late += m.late;
       acc.pending += m.pending;
       acc.inProgress += m.inProgress;
+      acc.latePending += m.latePending;
+      acc.lateInProgress += m.lateInProgress;
       acc.openAssigned += m.openAssigned;
       acc.timeLoggedSeconds += m.timeLoggedSeconds;
       acc.submissionsRequired += m.submissionsRequired;

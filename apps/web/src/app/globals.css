@@ -1323,3 +1323,166 @@ html[data-theme="dark"] .header-live-island__hit {
     transition-duration: 0.01ms;
   }
 }
+
+/* --- Activity terminal (dashboard + performance activity logs) --- */
+
+.activity-terminal {
+  /* Uses this app's own surface tokens (light or dark, whatever the current theme is)
+     instead of a hardcoded hacker-terminal palette, so it reads as a recessed panel
+     that belongs to the product rather than a skin dropped on top of it. */
+  --term-bg: var(--surface-elevated);
+  /* NOT surface-hover: in light theme surface-hover === surface-muted, which made the
+     header bar and body indistinguishable. surface-muted is reliably a shade off
+     surface-elevated in both themes. */
+  --term-bg-raised: var(--surface-muted);
+  --term-fg: var(--fg);
+  /* Derived from fg mixed toward the panel's own bg (not the flat app --muted token, which
+     is tuned for the page background and reads too low-contrast against this recessed panel
+     in light theme) so secondary text stays legible against --term-bg. */
+  --term-muted: color-mix(in srgb, var(--fg) 62%, var(--term-bg));
+  /* Real color (matches the app's own online-presence green) so the "live" glyph/cursor
+     stand apart from ordinary text instead of blending into it like a near-neutral accent would. */
+  --term-live: #22c55e;
+  --term-border: var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  border: 1px solid var(--term-border);
+  background: var(--term-bg);
+}
+
+.activity-terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  border-bottom: 1px solid var(--term-border);
+  background: var(--term-bg-raised);
+  padding: 0.5rem 0.75rem;
+}
+
+.activity-terminal__title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.4375rem;
+  overflow: hidden;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  color: var(--term-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.activity-terminal__body {
+  position: relative;
+  color: var(--term-fg);
+}
+
+.activity-terminal__scanlines {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.015) 0px,
+    rgba(255, 255, 255, 0.015) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+.activity-terminal-line {
+  position: relative;
+}
+
+.activity-terminal-line--enter {
+  animation: term-line-reveal 1050ms steps(26, end) both;
+}
+
+.activity-terminal-cursor {
+  display: inline-block;
+  width: 0.5em;
+  margin-left: 0.15em;
+  background: var(--term-live);
+  animation: term-cursor-blink 1s steps(1, jump-none) infinite;
+  vertical-align: -0.15em;
+}
+
+.activity-terminal-pulse-glyph {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--term-live);
+  animation:
+    term-glyph-spin 2.6s linear infinite,
+    term-glyph-pulse 1.3s ease-in-out infinite;
+}
+
+.activity-terminal-pulse-word {
+  display: inline-block;
+  animation: term-word-fade 320ms ease-out both;
+}
+
+@keyframes term-glyph-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes term-glyph-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes term-word-fade {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes term-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes term-line-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-terminal-cursor,
+  .activity-terminal-pulse-glyph,
+  .activity-terminal-pulse-word {
+    animation: none;
+  }
+
+  .activity-terminal-line--enter {
+    animation: none;
+  }
+}

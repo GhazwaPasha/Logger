@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
+import { SelectPopover } from "@/components/ui/SelectPopover";
 import { memberDisplayName } from "@/lib/task-activity-log";
 import type { MemberRow, OrgActivityFeedResponse } from "@/lib/ledger-types";
+
+const ACTOR_FILTER_TRIGGER_CLASS =
+  "flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]";
 
 /** Team activity, filterable down to one person at a time. */
 export function PerformanceActivityFeed({
@@ -27,9 +31,11 @@ export function PerformanceActivityFeed({
   const actorOptions = useMemo(() => {
     const ids = new Set(entries.map((e) => e.actorId));
     return [...ids]
-      .map((id) => ({ id, label: memberDisplayName(members, id) }))
+      .map((id) => ({ value: id, label: memberDisplayName(members, id) }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [entries, members]);
+
+  const selectOptions = useMemo(() => [{ value: "all", label: "Everyone" }, ...actorOptions], [actorOptions]);
 
   const filteredEntries = useMemo(
     () => (actorFilter === "all" ? entries : entries.filter((e) => e.actorId === actorFilter)),
@@ -39,20 +45,14 @@ export function PerformanceActivityFeed({
   return (
     <div>
       {actorOptions.length > 0 && (
-        <div className="mb-2 flex items-center justify-end">
-          <select
+        <div className="mb-2">
+          <SelectPopover
             value={actorFilter}
-            onChange={(e) => setActorFilter(e.target.value)}
-            className="input h-8 rounded-lg px-2 text-xs"
+            onChange={setActorFilter}
+            options={selectOptions}
+            triggerClassName={ACTOR_FILTER_TRIGGER_CLASS}
             aria-label="Filter activity by person"
-          >
-            <option value="all">Everyone</option>
-            {actorOptions.map((opt) => (
-              <option key={opt.id} value={opt.id}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       )}
       <OrgActivityTerminal
