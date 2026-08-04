@@ -1,21 +1,13 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { count, eq, inArray } from "drizzle-orm";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomUUID } from "node:crypto";
+import { S3Client } from "@aws-sdk/client-s3";
 import { activityLedger, attachmentBlobs, taskAssignees, taskAttachments, tasks } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { PushNotificationsService } from "../push/push-notifications.service";
 import { CollaborationService } from "../realtime/collaboration.service";
-import {
-  acquireLegacyBlob,
-  buildR2Client,
-  cleanupOrphanR2Objects,
-  releaseBlobRef,
-  storeBlobFromBuffer,
-} from "./attachments-storage.util";
+import { buildR2Client, cleanupOrphanR2Objects, releaseBlobRef } from "./attachments-storage.util";
 import { DiscordNotifyService } from "../discord/discord-notify.service";
 
 const MAX_FILES_PER_TASK = 10;
@@ -107,10 +99,6 @@ export class AttachmentsService {
     return this.s3;
   }
 
-  private newPresignStorageKey(taskId: string, fileName: string): string {
-    return `attachments/${taskId}/${randomUUID()}/${fileName}`;
-  }
-
   private async assertCanUpload(
     userId: string,
     taskId: string,
@@ -177,23 +165,12 @@ export class AttachmentsService {
     return row;
   }
 
-  /** Server-side upload with image compression and content-hash deduplication. Plain attachment — never touches Discord. */
-  async upload(userId: string, taskId: string, file: AttachmentUploadFile) {
-    const fileName = file.originalname.trim() || "upload";
-    const mimeType = resolveMime(fileName, file.mimetype);
-    const access = await this.assertCanUpload(userId, taskId, mimeType, file.size);
-
-    const s3 = this.assertR2();
-    const stored = await storeBlobFromBuffer(this.db, s3, this.bucket, file.buffer, mimeType);
-
-    const row = await this.recordAttachment(userId, taskId, access, {
-      blobId: stored.blobId,
-      fileName,
-      fileSize: file.size,
-      mimeType,
-    });
-
-    return { ...row, storageKey: stored.storageKey, deduplicated: stored.deduplicated };
+  /**
+   * Server-side upload with image compression and content-hash deduplication. Plain attachment — never touches Discord.
+   * Disabled: direct attachment uploads are turned off org-wide. Discord submission (`discordSubmit`) is unaffected.
+   */
+  async upload(_userId: string, _taskId: string, _file: AttachmentUploadFile): Promise<never> {
+    throw new BadRequestException("Attachments are currently disabled");
   }
 
   /**
@@ -242,43 +219,22 @@ export class AttachmentsService {
     return { ...row, discord: delivery };
   }
 
-  async presign(userId: string, taskId: string, opts: { fileName: string; mimeType: string; fileSize: number }) {
-    const mimeType = resolveMime(opts.fileName, opts.mimeType);
-    await this.assertCanUpload(userId, taskId, mimeType, opts.fileSize);
-
-    const s3 = this.assertR2();
-    const storageKey = this.newPresignStorageKey(taskId, opts.fileName);
-
-    const command = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: storageKey,
-      ContentType: mimeType,
-      ContentLength: opts.fileSize,
-    });
-    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
-    return { presignedUrl, storageKey };
+  /** Disabled: direct attachment uploads are turned off org-wide. Discord submission (`discordSubmit`) is unaffected. */
+  async presign(
+    _userId: string,
+    _taskId: string,
+    _opts: { fileName: string; mimeType: string; fileSize: number },
+  ): Promise<never> {
+    throw new BadRequestException("Attachments are currently disabled");
   }
 
-  async confirm(userId: string, taskId: string, opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string }) {
-    const mimeType = resolveMime(opts.fileName, opts.mimeType);
-    const access = await this.assertCanUpload(userId, taskId, mimeType, opts.fileSize);
-
-    if (!opts.storageKey.startsWith(`attachments/${taskId}/`)) {
-      throw new BadRequestException("Invalid storage key");
-    }
-
-    const blobId = await acquireLegacyBlob(this.db, {
-      storageKey: opts.storageKey,
-      mimeType,
-      byteSize: opts.fileSize,
-    });
-
-    return this.recordAttachment(userId, taskId, access, {
-      blobId,
-      fileName: opts.fileName,
-      fileSize: opts.fileSize,
-      mimeType,
-    });
+  /** Disabled: direct attachment uploads are turned off org-wide. Discord submission (`discordSubmit`) is unaffected. */
+  async confirm(
+    _userId: string,
+    _taskId: string,
+    _opts: { storageKey: string; fileName: string; fileSize: number; mimeType: string },
+  ): Promise<never> {
+    throw new BadRequestException("Attachments are currently disabled");
   }
 
   async listForTask(userId: string, taskId: string) {

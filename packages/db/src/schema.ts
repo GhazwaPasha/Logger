@@ -331,6 +331,9 @@ export const tasks = pgTable(
     index("tasks_list_idx").on(t.listId),
     index("tasks_assigner_idx").on(t.assignerId),
     index("tasks_recurring_series_idx").on(t.recurringSeriesId),
+    // Covers the list endpoint's hot path: filter by org + not-deleted, sort newest-first by
+    // (createdAt, id) — every status-column fetch on the board runs this exact shape.
+    index("tasks_org_active_created_idx").on(t.organizationId, t.deletedAt, t.createdAt, t.id),
     uniqueIndex("tasks_spawned_from_parent_uidx")
       .on(t.spawnedFromTaskId)
       .where(sql`${t.spawnedFromTaskId} is not null`),

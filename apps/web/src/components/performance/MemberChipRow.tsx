@@ -7,10 +7,13 @@ export function MemberChipRow({
   members,
   selectedUserId,
   onSelect,
+  onHover,
 }: {
   members: PerformanceScorecardRow[];
   selectedUserId: string | null;
   onSelect: (userId: string) => void;
+  /** Optional: warms that member's task-drill-down cache ahead of a click. */
+  onHover?: (userId: string) => void;
 }) {
   if (members.length === 0) {
     return <p className="text-sm text-[var(--muted)]">No one in scope for this range yet.</p>;
@@ -29,6 +32,7 @@ export function MemberChipRow({
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(m.userId)}
+            onMouseEnter={() => onHover?.(m.userId)}
             className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
               active
                 ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--fg)]"

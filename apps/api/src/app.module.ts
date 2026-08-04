@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ApiKeysModule } from "./api-keys/api-keys.module";
+import { CacheModule } from "./cache/cache.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthorizationModule } from "./authorization/authorization.module";
 import { DbModule } from "./db/db.module";
@@ -34,6 +35,7 @@ import { PerformanceModule } from "./performance/performance.module";
       ],
     }),
     ScheduleModule.forRoot(),
+    CacheModule,
     DbModule,
     AuthorizationModule,
     AuthModule,

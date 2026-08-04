@@ -495,6 +495,9 @@ export class TasksService {
       parsed.attachmentRequired !== undefined ? parsed.attachmentRequired : task.attachmentRequired;
     const attachmentRequiredChanged =
       parsed.attachmentRequired !== undefined && parsed.attachmentRequired !== task.attachmentRequired;
+    if (attachmentRequiredChanged && parsed.attachmentRequired === true) {
+      throw new BadRequestException("Attachments are currently disabled and can't be required");
+    }
 
     const nextTimeTrackingEnabled =
       parsed.timeTrackingEnabled !== undefined ? parsed.timeTrackingEnabled : task.timeTrackingEnabled;

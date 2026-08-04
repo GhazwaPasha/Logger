@@ -12,6 +12,8 @@ import {
   faAnglesDown,
   faAnglesUp,
   faCaretRight,
+  faChevronLeft,
+  faChevronRight,
   faComment,
   faCheck,
   faTableColumns,
@@ -37,7 +39,6 @@ import {
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { apiJson } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
@@ -52,6 +53,7 @@ import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
 import { StatusPillSelect, KANBAN_STATUS_SHELL_LAYOUT } from "@/components/tasks/StatusPillSelect";
 import { TaskMilestoneIconBtn } from "@/components/roadmap/TaskMilestoneIconBtn";
 import { useRoadmap } from "@/hooks/useRoadmap";
+import { usePrefetchTaskDetail } from "@/hooks/usePrefetchTaskDetail";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
@@ -382,6 +384,7 @@ function WorkItemsInner() {
   } = useWorkspaceData();
   const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
   const roadmap = useRoadmap(token, workspaceId);
+  const prefetchTaskDetail = usePrefetchTaskDetail(token);
   const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
@@ -731,7 +734,7 @@ function WorkItemsInner() {
   /**
    * Native HTML5 DnD gives no visual affordance on its own, so drag/dragover handlers normally
    * track state to highlight valid/invalid drop columns and dim the source card. That state must
-   * NOT live in React state here: TaskCard/KanbanBoard/VirtualColumnList are components defined
+   * NOT live in React state here: TaskCard/KanbanBoard/ColumnList are components defined
    * inside this render function, so any state update re-renders WorkItemsInner and recreates them
    * as new function identities, which makes React unmount+remount the dragged <li> mid-gesture —
    * the browser cancels native drag the instant its source node leaves the DOM, so the drop (and
@@ -1042,6 +1045,7 @@ function WorkItemsInner() {
             : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)]"
         }`}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
+        onMouseEnter={() => prefetchTaskDetail(task.id)}
       >
         {taskPatchSyncing ? (
           <div className="task-sync-ribbon-track" aria-hidden>
@@ -1429,6 +1433,7 @@ function WorkItemsInner() {
           clearDropHighlight();
         }}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
+        onMouseEnter={() => prefetchTaskDetail(task.id)}
         className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform,opacity] duration-200 ${
           taskPatchSyncing
             ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
@@ -1666,21 +1671,6 @@ function WorkItemsInner() {
             ))}
           </div>
         )}
-        <div className="pt-4">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-60"
-            onClick={() => openNewTask(listId || undefined)}
-            disabled={isOpeningNewTask}
-            aria-busy={isOpeningNewTask || undefined}
-          >
-            {isOpeningNewTask ? (
-              <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
-            ) : (
-              <span>+ Add task</span>
-            )}
-          </button>
-        </div>
       </div>
     );
   }
@@ -1702,101 +1692,140 @@ function WorkItemsInner() {
     );
   }
 
-  function VirtualColumnList({ items, col }: { items: ColumnItem[]; col: string }) {
-    const parentRef = useRef<HTMLDivElement>(null);
-    const virtualizer = useVirtualizer({
-      count: items.length,
-      getScrollElement: () => parentRef.current,
-      estimateSize: () => 90,
-      overscan: 5,
-      measureElement: (el) => el.getBoundingClientRect().height,
-    });
-    const virtualItems = virtualizer.getVirtualItems();
-
-    /**
-     * Auto-fetch the next page once the "load-more" sentinel scrolls into the virtualizer's
-     * rendered range (viewport + overscan) — mirrors infinite-scroll feeds instead of requiring
-     * a click. Tracks the last cursor it attempted so a failed fetch doesn't retry in a tight
-     * loop on every re-render; the loaded cursor only changes on success, which lifts the guard.
-     */
+  function ColumnList({ items, col }: { items: ColumnItem[]; col: string }) {
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    /** Same cursor-tracking guard as the list view: stops a failed fetch from retrying every intersection tick. */
     const attemptedCursorRef = useRef<string | null>(null);
+    const loadMoreItem = items.find((it) => it.kind === "load-more");
+
     useEffect(() => {
-      const loadMoreItem = items.find((it) => it.kind === "load-more");
-      if (!loadMoreItem || loadMoreItem.kind !== "load-more") return;
-      const sentinelVisible = virtualItems.some((v) => items[v.index]?.kind === "load-more");
-      if (!sentinelVisible || loadMoreItem.loading) return;
-      const meta = columnMeta[col];
-      if (!meta?.nextCursor || attemptedCursorRef.current === meta.nextCursor) return;
-      attemptedCursorRef.current = meta.nextCursor;
-      void loadMoreColumn(col);
-    }, [items, virtualItems, col]);
+      if (!loadMoreItem) return;
+      const el = sentinelRef.current;
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries[0]?.isIntersecting || loadMoreItem.loading) return;
+          const meta = columnMeta[col];
+          if (!meta?.nextCursor || attemptedCursorRef.current === meta.nextCursor) return;
+          attemptedCursorRef.current = meta.nextCursor;
+          void loadMoreColumn(col);
+        },
+        { rootMargin: "400px" },
+      );
+      observer.observe(el);
+      return () => observer.disconnect();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loadMoreItem, col]);
+
+    const stalled =
+      loadMoreItem != null &&
+      !loadMoreItem.loading &&
+      attemptedCursorRef.current !== null &&
+      attemptedCursorRef.current === columnMeta[col]?.nextCursor;
 
     return (
-      <div ref={parentRef} className="flex-1 overflow-y-auto min-h-24">
-        <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-          {virtualItems.map((vItem) => {
-            const item = items[vItem.index]!;
-            const stalled =
-              item.kind === "load-more" &&
-              !item.loading &&
-              attemptedCursorRef.current !== null &&
-              attemptedCursorRef.current === columnMeta[col]?.nextCursor;
+      <div className="flex flex-col gap-1">
+        {items.map((item) => {
+          if (item.kind === "task") {
             return (
-              <div
-                key={vItem.key}
-                data-index={vItem.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${vItem.start}px)`,
-                }}
-                className="pb-1"
-              >
-                {item.kind === "task" && <TaskCard task={item.task} />}
-                {item.kind === "series" && (
-                  <RecurringSeriesCard
-                    tasks={item.tasks}
-                    members={members}
-                    onOpenTask={openViewTask}
-                  />
-                )}
-                {item.kind === "load-more" &&
-                  (stalled ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        attemptedCursorRef.current = null;
-                        void loadMoreColumn(item.status);
-                      }}
-                      className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
-                    >
-                      Couldn&apos;t load more · retry ({item.loaded} of {item.total})
-                    </button>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      <TaskCardSkeleton />
-                      <TaskCardSkeleton />
-                    </div>
-                  ))}
+              <div key={item.task.id} className="pb-1">
+                <TaskCard task={item.task} />
               </div>
             );
-          })}
-        </div>
+          }
+          if (item.kind === "series") {
+            return (
+              <div key={item.seriesId} className="pb-1">
+                <RecurringSeriesCard tasks={item.tasks} members={members} onOpenTask={openViewTask} />
+              </div>
+            );
+          }
+          return (
+            <div key="load-more" ref={sentinelRef} className="pb-1">
+              {stalled ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    attemptedCursorRef.current = null;
+                    void loadMoreColumn(item.status);
+                  }}
+                  className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+                >
+                  Couldn&apos;t load more · retry ({item.loaded} of {item.total})
+                </button>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <TaskCardSkeleton />
+                  <TaskCardSkeleton />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   function KanbanBoard({ rows }: { rows: TaskRow[] }) {
     // columnMeta and loadMoreColumn are captured from the outer scope
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const updateScrollState = useCallback(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      setCanScrollLeft(el.scrollLeft > 4);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    }, []);
+
+    useEffect(() => {
+      updateScrollState();
+      const el = scrollRef.current;
+      if (!el) return;
+      el.addEventListener("scroll", updateScrollState, { passive: true });
+      const resizeObserver = new ResizeObserver(updateScrollState);
+      resizeObserver.observe(el);
+      return () => {
+        el.removeEventListener("scroll", updateScrollState);
+        resizeObserver.disconnect();
+      };
+    }, [updateScrollState, rows.length]);
+
+    const scrollByPage = (direction: -1 | 1) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+    };
+
     return (
-      <div className="overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] overscroll-x-contain">
+      <div className="sticky top-0 z-10 bg-[var(--surface-base)] pb-2">
+        <div className="relative">
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => scrollByPage(-1)}
+              aria-label="Scroll columns left"
+              className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+            >
+              <FontAwesomeIcon icon={faChevronLeft} className="size-3" aria-hidden />
+            </button>
+          )}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={() => scrollByPage(1)}
+              aria-label="Scroll columns right"
+              className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+            >
+              <FontAwesomeIcon icon={faChevronRight} className="size-3" aria-hidden />
+            </button>
+          )}
           <div
-            className="flex min-h-[min(72vh,38rem)] gap-2.5 md:min-h-[min(78vh,42rem)]"
-            style={{ minWidth: "min(100%, 92rem)" }}
+            ref={scrollRef}
+            className="scrollbar-hide overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain"
           >
+          <div className="flex gap-2.5">
             {TASK_FLOW_ORDER.map((col) => {
               const colTasks = rows.filter(
                 (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
@@ -1807,7 +1836,7 @@ function WorkItemsInner() {
                   key={col}
                   role="region"
                   aria-label={`${label}, ${colTasks.length} tasks`}
-                  className="flex min-h-0 min-w-[16rem] flex-1 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:min-w-[17rem]"
+                  className="flex w-[24rem] shrink-0 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:w-[28rem]"
                   onDragEnter={(e) => {
                     e.preventDefault();
                     const el = e.currentTarget;
@@ -1886,13 +1915,15 @@ function WorkItemsInner() {
                         loading: loadingMoreColumn === col,
                       });
                     }
-                    return <VirtualColumnList items={colItems} col={col} />;
+                    return <ColumnList items={colItems} col={col} />;
                   })()}
                 </div>
               );
             })}
           </div>
+          </div>
         </div>
+      </div>
     );
   }
 

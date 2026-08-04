@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { apiJson } from "@/lib/api";
+import { apiJson, apiJsonConditional } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 
@@ -41,9 +41,38 @@ type TaskPageResponse = {
   total: number;
 };
 
-async function fetchWorkspace(token: string, orgId: string): Promise<WorkspaceBundle> {
-  const [bootstrap, pending, inProgress, done, cancelled] = await Promise.all([
-    apiJson<BootstrapResponse>(`/organizations/${orgId}/workspace`, { token }),
+/**
+ * Fetches the bootstrap piece (departments/lists/members) with ETag revalidation — the server
+ * caches this per org and returns `304` when nothing's changed, so a repeat load costs a header
+ * comparison instead of three fresh queries. Falls back to a plain fetch if a `304` arrives with
+ * no matching cache entry to reuse (e.g. the query cache was cleared independently of this etag).
+ */
+async function fetchBootstrap(
+  token: string,
+  orgId: string,
+  etag: string | null,
+  cached: BootstrapResponse | undefined,
+): Promise<{ bootstrap: BootstrapResponse; etag: string | null }> {
+  const result = await apiJsonConditional<BootstrapResponse>(`/organizations/${orgId}/workspace`, {
+    token,
+    etag,
+  });
+  if (result.notModified) {
+    if (cached) return { bootstrap: cached, etag };
+    const fresh = await apiJson<BootstrapResponse>(`/organizations/${orgId}/workspace`, { token });
+    return { bootstrap: fresh, etag: null };
+  }
+  return { bootstrap: result.data!, etag: result.etag };
+}
+
+async function fetchWorkspace(
+  token: string,
+  orgId: string,
+  bootstrapEtag: string | null,
+  cachedBootstrap: BootstrapResponse | undefined,
+): Promise<{ bundle: WorkspaceBundle; bootstrapEtag: string | null }> {
+  const [{ bootstrap, etag }, pending, inProgress, done, cancelled] = await Promise.all([
+    fetchBootstrap(token, orgId, bootstrapEtag, cachedBootstrap),
     apiJson<TaskPageResponse>(
       `/organizations/${orgId}/tasks?status=pending&limit=50&includeSubtasks=true`,
       { token },
@@ -63,26 +92,46 @@ async function fetchWorkspace(token: string, orgId: string): Promise<WorkspaceBu
   ]);
 
   return {
-    depts: bootstrap.departments,
-    lists: bootstrap.lists,
-    members: bootstrap.members,
-    tasks: [...pending.tasks, ...inProgress.tasks, ...done.tasks, ...cancelled.tasks],
-    columnMeta: {
-      pending: { nextCursor: pending.nextCursor, total: pending.total },
-      in_progress: { nextCursor: inProgress.nextCursor, total: inProgress.total },
-      done: { nextCursor: done.nextCursor, total: done.total },
-      cancelled: { nextCursor: cancelled.nextCursor, total: cancelled.total },
+    bundle: {
+      depts: bootstrap.departments,
+      lists: bootstrap.lists,
+      members: bootstrap.members,
+      tasks: [...pending.tasks, ...inProgress.tasks, ...done.tasks, ...cancelled.tasks],
+      columnMeta: {
+        pending: { nextCursor: pending.nextCursor, total: pending.total },
+        in_progress: { nextCursor: inProgress.nextCursor, total: inProgress.total },
+        done: { nextCursor: done.nextCursor, total: done.total },
+        cancelled: { nextCursor: cancelled.nextCursor, total: cancelled.total },
+      },
     },
+    bootstrapEtag: etag,
   };
 }
 
 export function useOrgWorkspace(token: string | null, orgId: string | null) {
   const queryClient = useQueryClient();
   const [manualError, setManualError] = useState<string | null>(null);
+  /** Last-seen ETag for the workspace-bootstrap piece, per org — lets a repeat load skip re-sending departments/lists/members when unchanged. */
+  const bootstrapEtagRef = useRef<Map<string, string>>(new Map());
 
   const q = useQuery({
     queryKey: workspaceKeys.workspace(orgId ?? ""),
-    queryFn: () => fetchWorkspace(token!, orgId!),
+    queryFn: async () => {
+      const cacheKey = orgId!;
+      const existing = queryClient.getQueryData<WorkspaceBundle>(workspaceKeys.workspace(cacheKey));
+      const cachedBootstrap = existing
+        ? { departments: existing.depts, lists: existing.lists, members: existing.members }
+        : undefined;
+      const { bundle, bootstrapEtag } = await fetchWorkspace(
+        token!,
+        orgId!,
+        bootstrapEtagRef.current.get(cacheKey) ?? null,
+        cachedBootstrap,
+      );
+      if (bootstrapEtag) bootstrapEtagRef.current.set(cacheKey, bootstrapEtag);
+      else bootstrapEtagRef.current.delete(cacheKey);
+      return bundle;
+    },
     enabled: Boolean(token && orgId),
     staleTime: 60_000,
     refetchOnWindowFocus: true,

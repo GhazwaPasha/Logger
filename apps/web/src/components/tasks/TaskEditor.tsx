@@ -651,12 +651,21 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-2">
               {caps.canEditFields ? (
                 <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
-                  <span>Attach File (Required)</span>
-                  <Toggle
-                    checked={form.attachmentRequired}
-                    aria-label="Require at least one attachment before marking done"
-                    onChange={(next) => form.setAttachmentRequired(next)}
-                  />
+                  <span title="Attachments are disabled — this can only be turned off, not on">
+                    Attach File (Required)
+                  </span>
+                  <span title={form.attachmentRequired ? "Turn off attachment requirement" : "Attachments are disabled"}>
+                    <Toggle
+                      checked={form.attachmentRequired}
+                      disabled={!form.attachmentRequired}
+                      aria-label={
+                        form.attachmentRequired ? "Turn off attachment requirement" : "Attachments are disabled"
+                      }
+                      onChange={(next) => {
+                        if (!next) form.setAttachmentRequired(false);
+                      }}
+                    />
+                  </span>
                 </div>
               ) : (
                 form.attachmentRequired && (

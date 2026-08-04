@@ -15,6 +15,7 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { useApiSession } from "@/hooks/useApiSession";
 import { usePerformanceScorecards } from "@/hooks/usePerformanceScorecards";
+import { usePrefetchMemberTasks } from "@/hooks/usePrefetchMemberTasks";
 import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
 import { canViewPerformance } from "@/lib/workspace-permissions";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
@@ -39,6 +40,7 @@ export default function WorkspacePerformancePage() {
 
   const scorecardsQuery = usePerformanceScorecards(token, workspaceId, allowed, range);
   const activityQuery = useOrgActivityFeed(token, workspaceId, allowed);
+  const prefetchMemberTasks = usePrefetchMemberTasks(token, workspaceId, range);
 
   const scorecardMembers = scorecardsQuery.data?.members ?? [];
   // Defaults to the top-ranked member so the detail panel isn't empty on first load.
@@ -98,7 +100,12 @@ export default function WorkspacePerformancePage() {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team members</h2>
             <p className="mt-0.5 text-sm text-[var(--muted)]">Pick a person for their full breakdown and tasks</p>
             <div className="mt-2">
-              <MemberChipRow members={scorecardMembers} selectedUserId={selectedMember?.userId ?? null} onSelect={setSelectedUserId} />
+              <MemberChipRow
+                members={scorecardMembers}
+                selectedUserId={selectedMember?.userId ?? null}
+                onSelect={setSelectedUserId}
+                onHover={prefetchMemberTasks}
+              />
             </div>
             <MemberDetailPanel
               member={selectedMember}

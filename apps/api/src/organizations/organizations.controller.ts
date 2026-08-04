@@ -1,11 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Res } from "@nestjs/common";
+import type { Response } from "express";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
+import { MemoryCacheService } from "../cache/memory-cache.service";
 import { OrganizationsService } from "./organizations.service";
+
+/** Same result for every org member (no role gate) — safe to key by org only. */
+const WORKSPACE_BOOTSTRAP_TTL_SECONDS = 30;
 
 @Controller("organizations")
 export class OrganizationsController {
-  constructor(private readonly orgs: OrganizationsService) {}
+  constructor(
+    private readonly orgs: OrganizationsService,
+    private readonly cache: MemoryCacheService,
+  ) {}
 
   @Get()
   list(@CurrentUser() user: RequestUser) {
@@ -23,8 +31,28 @@ export class OrganizationsController {
   }
 
   @Get(":organizationId/workspace")
-  workspace(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
-    return this.orgs.workspaceBootstrap(user.id, organizationId);
+  async workspace(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Headers("if-none-match") ifNoneMatch?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const key = `workspace:${organizationId}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.etag === ifNoneMatch) {
+      res!.status(304).end();
+      return;
+    }
+    if (cached) {
+      res!.setHeader("ETag", cached.etag);
+      res!.setHeader("Cache-Control", "private, no-cache");
+      return cached.data;
+    }
+    const data = await this.orgs.workspaceBootstrap(user.id, organizationId);
+    const etag = this.cache.set(key, data, WORKSPACE_BOOTSTRAP_TTL_SECONDS);
+    res!.setHeader("ETag", etag);
+    res!.setHeader("Cache-Control", "private, no-cache");
+    return data;
   }
 
   @Get(":organizationId/activity")

@@ -269,6 +269,9 @@ exports.tasks = (0, pg_core_1.pgTable)("tasks", {
     (0, pg_core_1.index)("tasks_list_idx").on(t.listId),
     (0, pg_core_1.index)("tasks_assigner_idx").on(t.assignerId),
     (0, pg_core_1.index)("tasks_recurring_series_idx").on(t.recurringSeriesId),
+    // Covers the list endpoint's hot path: filter by org + not-deleted, sort newest-first by
+    // (createdAt, id) — every status-column fetch on the board runs this exact shape.
+    (0, pg_core_1.index)("tasks_org_active_created_idx").on(t.organizationId, t.deletedAt, t.createdAt, t.id),
     (0, pg_core_1.uniqueIndex)("tasks_spawned_from_parent_uidx")
         .on(t.spawnedFromTaskId)
         .where((0, drizzle_orm_1.sql) `${t.spawnedFromTaskId} is not null`),

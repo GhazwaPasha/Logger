@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiJson, apiVoid } from "@/lib/api";
+import { apiJson, apiJsonConditional, apiVoid } from "@/lib/api";
 import { roadmapKeys } from "@/lib/query-keys";
 import type { GoalRow, MilestoneRow, RoadmapStatus } from "@/lib/ledger-types";
 
@@ -80,10 +80,27 @@ export type UpdateMilestoneInput = Partial<{
 
 export function useRoadmap(token: string | null, orgId: string | null) {
   const queryClient = useQueryClient();
+  /** Last-seen ETag for the tree, per org — repeat loads skip re-sending the full tree when unchanged. */
+  const etagRef = useRef<Map<string, string>>(new Map());
 
   const q = useQuery({
     queryKey: roadmapKeys.tree(orgId ?? ""),
-    queryFn: () => apiJson<TreeResponse>(`/organizations/${orgId}/roadmap`, { token }),
+    queryFn: async () => {
+      const cacheKey = orgId!;
+      const result = await apiJsonConditional<TreeResponse>(`/organizations/${orgId}/roadmap`, {
+        token,
+        etag: etagRef.current.get(cacheKey) ?? null,
+      });
+      if (result.notModified) {
+        const existing = queryClient.getQueryData<TreeResponse>(roadmapKeys.tree(cacheKey));
+        if (existing) return existing;
+        etagRef.current.delete(cacheKey);
+        return apiJson<TreeResponse>(`/organizations/${orgId}/roadmap`, { token });
+      }
+      if (result.etag) etagRef.current.set(cacheKey, result.etag);
+      else etagRef.current.delete(cacheKey);
+      return result.data!;
+    },
     enabled: Boolean(token && orgId),
     staleTime: 30_000,
     refetchOnWindowFocus: true,

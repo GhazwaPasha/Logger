@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
@@ -50,10 +50,7 @@ type Props = {
 export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLInputElement>(null);
   const prefersReduced = useReducedMotion();
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<ConfirmDialogOptions | null>(null);
 
   const query = useQuery({
@@ -68,44 +65,6 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["attachments", taskId] }),
   });
 
-  const uploadFile = useCallback(
-    async (file: File) => {
-      setUploadError(null);
-      setUploading(true);
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        const res = await apiFetch(`/tasks/${taskId}/attachments/upload`, {
-          token,
-          method: "POST",
-          body: form,
-          signal: AbortSignal.timeout(120_000),
-        });
-        if (res.status === 401 && typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-        }
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || res.statusText);
-        }
-        void queryClient.invalidateQueries({ queryKey: ["attachments", taskId] });
-      } catch (e) {
-        setUploadError(e instanceof Error ? e.message : "Upload failed");
-      } finally {
-        setUploading(false);
-      }
-    },
-    [taskId, token, queryClient],
-  );
-
-  const handleFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      void uploadFile(files[0]!);
-    },
-    [uploadFile],
-  );
-
   if (viewOnly && (!query.data || query.data.length === 0)) return null;
 
   return (
@@ -116,29 +75,18 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
         {!viewOnly && (
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={uploading}
-            aria-label="Upload attachment"
-            title="Upload attachment"
-            className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+            disabled
+            aria-label="Attachments are disabled"
+            title="Attachments are disabled"
+            className="inline-flex size-6 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] opacity-50"
           >
-            <FontAwesomeIcon icon={faPlus} className="size-3.5" />
+            <FontAwesomeIcon icon={faLock} className="size-3" />
           </button>
         )}
       </div>
 
       {!viewOnly && (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept="image/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          {uploading && <p className="text-xs text-[var(--muted)]">Uploading…</p>}
-          {uploadError && <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>}
-        </>
+        <p className="text-xs text-[var(--muted)]">Attachments are disabled. Use Discord submission instead.</p>
       )}
 
       {query.data && query.data.length > 0 && (

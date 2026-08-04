@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Header,
+  Headers,
   Param,
   Patch,
   Post,
@@ -14,20 +15,43 @@ import type { Response } from "express";
 import { listTasksQuerySchema } from "@work-ledger/contracts";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
+import { MemoryCacheService } from "../cache/memory-cache.service";
 import { TasksService } from "./tasks.service";
+
+/** Task rows are the most frequently mutated data in the app — short TTL keeps cross-user staleness bounded. */
+const TASKS_LIST_TTL_SECONDS = 15;
 
 @Controller("organizations/:organizationId/tasks")
 export class TasksController {
-  constructor(private readonly tasks: TasksService) {}
+  constructor(
+    private readonly tasks: TasksService,
+    private readonly cache: MemoryCacheService,
+  ) {}
 
   @Get()
-  list(
+  async list(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query() rawQuery: Record<string, string>,
+    @Headers("if-none-match") ifNoneMatch: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const query = listTasksQuerySchema.parse(rawQuery);
-    return this.tasks.list(user.id, organizationId, {
+    // Results are role-scoped (owner sees the org, manager sees managed departments, member sees
+    // only assigned tasks) — must key by requester, never shared. Filters are baked in too, since
+    // each status/cursor/limit combination is effectively a different query.
+    const key = `tasks:${organizationId}:${user.id}:${JSON.stringify(query)}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.etag === ifNoneMatch) {
+      res.status(304).end();
+      return;
+    }
+    if (cached) {
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "private, no-cache");
+      return cached.data;
+    }
+    const data = await this.tasks.list(user.id, organizationId, {
       includeSubtasks: query.includeSubtasks,
       status: query.status,
       listId: query.listId,
@@ -39,6 +63,10 @@ export class TasksController {
       cursor: query.cursor,
       archivedOnly: query.archived,
     });
+    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, no-cache");
+    return data;
   }
 
   @Post()
