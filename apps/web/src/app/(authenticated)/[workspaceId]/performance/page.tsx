@@ -24,7 +24,7 @@ export default function WorkspacePerformancePage() {
   const { workspaceId, workspaceSlug } = useWorkspaceRoute();
   const { token, session } = useApiSession();
   const { members, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
-  const [rangeDays, setRangeDays] = useState<DateRangePreset>(30);
+  const [rangeDays, setRangeDays] = useState<DateRangePreset>(0);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
