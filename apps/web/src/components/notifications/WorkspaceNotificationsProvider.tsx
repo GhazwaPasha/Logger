@@ -67,11 +67,15 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   const [clearedBeforeTs, setClearedBeforeTs] = useState(0);
   const pushSyncInFlightRef = useRef(false);
 
+  // Real-time updates arrive via the `workspace_changed` socket event (see
+  // WorkspaceRealtimeSubscriber), which invalidates this same query key instantly on any
+  // change. This interval is only a fallback for missed/dropped socket events, so it can be
+  // long — tightening it further just multiplies Supabase egress for no freshness benefit.
   const activityQuery = useOrgActivityFeed(
     token,
     workspaceId,
     Boolean(token && workspaceId && userId),
-    45_000,
+    5 * 60_000,
   );
 
   const assigneesByTaskId = useMemo(() => {

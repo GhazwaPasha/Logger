@@ -67,7 +67,15 @@ export function QueryProvider({ children }: { children: ReactNode }) {
           // Never persist errors (e.g. "Failed to fetch") — they stick across reloads for maxAge and mask fixes.
           if (query.state.status !== "success") return false;
           const root = query.queryKey[0];
-          return root === "organizations" || root === "workspace";
+          if (root !== "organizations" && root !== "workspace") return false;
+          // Never persist the activity feed: WorkspaceNotificationsProvider seeds its toast-dedup
+          // baseline from the *first* data this query ever returns, silently. If that first data is a
+          // stale rehydrated snapshot (up to `maxAge` old) instead of a live fetch, the subsequent
+          // background refetch makes every entry created since then look "new" — firing one toast per
+          // entry, all at once, on load. Keeping this query un-persisted forces that first data to
+          // always come from a real fetch.
+          if (query.queryKey[2] === "activity") return false;
+          return true;
         },
       },
     }),
