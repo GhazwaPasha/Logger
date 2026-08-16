@@ -1602,6 +1602,8 @@ function WorkItemsInner() {
     // summary instead, wherever pagination happens to be.
     const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
       statuses: DONE_CANCELLED_STATUSES,
+      listId: selectedList,
+      departmentId: selectedList ? null : selectedLevel,
     });
     const sortedSeriesSummaries = useMemo(
       () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
@@ -1753,7 +1755,11 @@ function WorkItemsInner() {
     // Own fetch, own loading state — same reasoning as ListViewCards: a column's card headers
     // shouldn't depend on (or keep changing with) how much of that column has paginated in.
     const seriesStatuses = useMemo(() => (SERIES_GROUPED_COLUMNS.has(col) ? [col] : []), [col]);
-    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, { statuses: seriesStatuses });
+    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+      statuses: seriesStatuses,
+      listId: selectedList,
+      departmentId: selectedList ? null : selectedLevel,
+    });
     const seriesSummaryById = useMemo(
       () => new Map(seriesSummaries.map((s) => [s.seriesId, s] as const)),
       [seriesSummaries],
