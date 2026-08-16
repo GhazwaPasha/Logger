@@ -67,6 +67,7 @@ export class TasksController {
       limit: query.limit,
       cursor: query.cursor,
       archivedOnly: query.archived,
+      excludeRecurringSeries: query.excludeRecurringSeries,
     });
     const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
     res.setHeader("ETag", etag);

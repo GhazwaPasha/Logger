@@ -16,6 +16,16 @@ import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
  */
 const EAGERLY_LOADED_STATUSES = ["pending", "in_progress"] as const;
 
+/**
+ * Statuses where a recurring chain's completed occurrences are represented once each via the
+ * RecurringSeriesCard aggregate (see the work board's `useSeriesSummaries`), never as individual
+ * rows. `loadMoreColumn` is only ever called by the work board (nothing else pages past the
+ * initial bootstrap fetch below), so excluding them here is safe: paginating through every
+ * completion of a long-running recurring task just to discard it client-side doesn't scale with
+ * history, and this is the one path actually walking the full page-by-page cursor.
+ */
+const RECURRING_GROUPED_STATUSES = new Set(["done", "cancelled"]);
+
 export type ColumnMeta = {
   nextCursor: string | null;
   total: number;
@@ -182,8 +192,9 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
       if (!meta?.nextCursor) return;
       setLoadingMoreColumn(status);
       try {
+        const excludeRecurring = RECURRING_GROUPED_STATUSES.has(status) ? "&excludeRecurringSeries=true" : "";
         const result = await apiJson<TaskPageResponse>(
-          `/organizations/${orgId}/tasks?status=${status}&cursor=${meta.nextCursor}&limit=25&includeSubtasks=true`,
+          `/organizations/${orgId}/tasks?status=${status}&cursor=${meta.nextCursor}&limit=25&includeSubtasks=true${excludeRecurring}`,
           { token },
         );
         queryClient.setQueryData<WorkspaceBundle>(workspaceKeys.workspace(orgId), (old) => {

@@ -245,6 +245,16 @@ export const listTasksQuerySchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+  /**
+   * When "true", omits tasks that belong to a recurring chain (`recurringSeriesId` set). The work
+   * board's own infinite scroll uses this for done/cancelled: those occurrences are represented
+   * once each via the RecurringSeriesCard aggregate (see `/tasks/series-summary`), so paginating
+   * through every individual completion just to discard it client-side doesn't scale with history.
+   */
+  excludeRecurringSeries: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
 });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;

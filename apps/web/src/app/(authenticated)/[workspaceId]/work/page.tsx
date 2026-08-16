@@ -550,6 +550,7 @@ function ColumnList({
 function KanbanBoard({
   rows,
   columnMeta,
+  statusCounts,
   loadingMoreColumn,
   loadMoreColumn,
   lists,
@@ -569,6 +570,11 @@ function KanbanBoard({
 }: {
   rows: TaskRow[];
   columnMeta: Record<string, ColumnMeta>;
+  /** True per-status totals (pipeline card's own source) — the column header badge reads from
+   * here, not `columnMeta[col].total`, because once `loadMoreColumn` starts excluding recurring
+   * occurrences (see useOrgWorkspace) that field only reflects standalone-task pagination progress,
+   * not the true count. */
+  statusCounts: Record<ManualTaskStatus, number>;
   loadingMoreColumn: string | null;
   loadMoreColumn: (status: string) => void | Promise<void>;
   lists: ListRow[];
@@ -707,8 +713,8 @@ function KanbanBoard({
                     <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
                     <span className="tabular-nums text-[10px] font-medium opacity-80">
                       {columnMeta[col]?.nextCursor
-                        ? `${colTasks.length}/${columnMeta[col]!.total}`
-                        : (columnMeta[col]?.total ?? colTasks.length)}
+                        ? `${colTasks.length}/${statusCounts[col]}`
+                        : (statusCounts[col] ?? colTasks.length)}
                     </span>
                   </div>
                 </div>
@@ -2503,6 +2509,7 @@ function WorkItemsInner() {
           <KanbanBoard
             rows={sortedTasks}
             columnMeta={columnMeta}
+            statusCounts={boardStatusCounts}
             loadingMoreColumn={loadingMoreColumn}
             loadMoreColumn={loadMoreColumn}
             lists={lists}

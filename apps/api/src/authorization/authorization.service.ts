@@ -27,6 +27,8 @@ export interface ListTasksOpts {
   archivedOnly?: boolean;
   /** Restricts to one recurring chain — used for the on-demand occurrence list behind a RecurringSeriesCard. */
   recurringSeriesId?: string;
+  /** Omits tasks with a `recurringSeriesId` set — see `excludeRecurringSeries` on {@link listTasksQuerySchema}. */
+  excludeRecurringSeries?: boolean;
 }
 
 export type SeriesSummaryRow = {
@@ -360,6 +362,10 @@ export class AuthorizationService {
 
     if (opts?.recurringSeriesId) {
       filterConditions.push(eq(tasks.recurringSeriesId, opts.recurringSeriesId));
+    }
+
+    if (opts?.excludeRecurringSeries) {
+      filterConditions.push(isNull(tasks.recurringSeriesId));
     }
 
     const listScoped = await this.listScopedFilterConditions(organizationId, {
