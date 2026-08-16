@@ -530,15 +530,25 @@ function ColumnList({
                 Couldn&apos;t load more · retry ({item.loaded} of {item.total})
               </button>
             ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                className="flex flex-col gap-1"
-              >
-                <TaskCardSkeleton />
-                <TaskCardSkeleton />
-              </motion.div>
+              // Gated on item.loading, not just "more pages exist" — otherwise this sits here
+              // pulsing (styled as an active loading state) any time the sentinel hasn't crossed
+              // its 400px trigger margin yet, even though nothing is actually in flight. Same
+              // gating ListViewCards already uses via `anyLoading`.
+              <AnimatePresence initial={false}>
+                {item.loading && (
+                  <motion.div
+                    key="loading-skeletons"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                    className="flex flex-col gap-1"
+                  >
+                    <TaskCardSkeleton />
+                    <TaskCardSkeleton />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             )}
           </div>
         );
