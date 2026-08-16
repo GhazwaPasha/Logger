@@ -1662,14 +1662,33 @@ function WorkItemsInner() {
 
     return (
       <div>
-        <motion.div layout="position" className="columns-1 gap-3">
+        {/*
+         * Plain divs, not `motion.div layout` — with a large paginated list, a `layout` prop on
+         * every card makes framer-motion FLIP-animate the *entire* list on every append (it shares
+         * one layout group by default), which is exactly what read as "the whole screen jumping".
+         * A newly appended card just needs to fade in in place; it never needs to reposition its
+         * siblings, and normal block flow already leaves everything above it untouched.
+         */}
+        <div className="columns-1 gap-3">
           {items.map((item) =>
             item.kind === "task" ? (
-              <motion.div layout="position" key={item.task.id} className="mb-1 break-inside-avoid">
+              <motion.div
+                key={item.task.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="mb-1 break-inside-avoid"
+              >
                 <ListTaskCard task={item.task} />
               </motion.div>
             ) : (
-              <motion.div layout="position" key={item.seriesId} className="mb-1 break-inside-avoid">
+              <motion.div
+                key={item.seriesId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="mb-1 break-inside-avoid"
+              >
                 <RecurringSeriesCard
                   orgId={workspaceId}
                   seriesId={item.seriesId}
@@ -1681,7 +1700,7 @@ function WorkItemsInner() {
               </motion.div>
             )
           )}
-        </motion.div>
+        </div>
         {pendingStatuses.length > 0 && (
           <div className="flex flex-col gap-2 pt-2">
             {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
@@ -1691,7 +1710,6 @@ function WorkItemsInner() {
               {anyLoading && (
                 <motion.div
                   key="loading-skeletons"
-                  layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -1806,18 +1824,33 @@ function WorkItemsInner() {
       attemptedCursorRef.current === columnMeta[col]?.nextCursor;
 
     return (
+      // Plain divs, not `motion.div layout` — see ListViewCards for why: `layout` on every card
+      // in a large paginated column FLIP-animates the whole column on each append, which is what
+      // read as the screen jumping. A new card just fades in; it never needs to move its siblings.
       <div className="flex flex-col gap-1">
         {items.map((item) => {
           if (item.kind === "task") {
             return (
-              <motion.div layout="position" key={item.task.id} className="pb-1">
+              <motion.div
+                key={item.task.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="pb-1"
+              >
                 <TaskCard task={item.task} />
               </motion.div>
             );
           }
           if (item.kind === "series") {
             return (
-              <motion.div layout="position" key={item.seriesId} className="pb-1">
+              <motion.div
+                key={item.seriesId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="pb-1"
+              >
                 <RecurringSeriesCard
                   orgId={workspaceId}
                   seriesId={item.seriesId}
@@ -1847,7 +1880,6 @@ function WorkItemsInner() {
                 </button>
               ) : (
                 <motion.div
-                  layout
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: motionDuration(0.15, prefersReduced) }}
