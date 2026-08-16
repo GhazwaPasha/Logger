@@ -47,7 +47,7 @@ import { taskEditCaps } from "@/lib/workspace-permissions";
 import { formatInTimeZone, getZonedParts } from "@/lib/date";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
-import { useTaskCounts, useSeriesSummaries } from "@/hooks/useWorkTaskStats";
+import { useTaskCounts, useSeriesSummaries, type SeriesSummaryRow } from "@/hooks/useWorkTaskStats";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
@@ -1609,19 +1609,18 @@ function WorkItemsInner() {
       () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
       [seriesSummaries],
     );
-    const seriesSummaryById = useMemo(
-      () => new Map(seriesSummaries.map((s) => [s.seriesId, s] as const)),
-      [seriesSummaries],
-    );
 
-    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; seriesId: string }> = [];
+    // Carry the summary object itself, not just its id — a lookup-by-id done in a separate render
+    // pass is how a card could ever end up with no summary (and fall back to a skeleton); building
+    // the item straight from the same list that's being iterated here can't have that gap.
+    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; summary: SeriesSummaryRow }> = [];
     for (const task of rows) {
       const col = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
       if (task.recurringSeriesId && (col === "done" || col === "cancelled")) continue;
       items.push({ kind: "task", task });
     }
     for (const s of sortedSeriesSummaries) {
-      items.push({ kind: "series", seriesId: s.seriesId });
+      items.push({ kind: "series", summary: s });
     }
 
     // Statuses still missing pages. pending/in_progress get drained in the background by
@@ -1683,7 +1682,7 @@ function WorkItemsInner() {
               </motion.div>
             ) : (
               <motion.div
-                key={item.seriesId}
+                key={item.summary.seriesId}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: motionDuration(0.15, prefersReduced) }}
@@ -1691,8 +1690,7 @@ function WorkItemsInner() {
               >
                 <RecurringSeriesCard
                   orgId={workspaceId}
-                  seriesId={item.seriesId}
-                  summary={seriesSummaryById.get(item.seriesId)}
+                  summary={item.summary}
                   occurrenceStatuses={DONE_CANCELLED_STATUSES}
                   members={members}
                   onOpenTask={openViewTask}
@@ -1742,7 +1740,7 @@ function WorkItemsInner() {
 
   type ColumnItem =
     | { kind: "task"; task: TaskRow }
-    | { kind: "series"; seriesId: string }
+    | { kind: "series"; summary: SeriesSummaryRow }
     | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
 
   function TaskCardSkeleton() {
@@ -1778,11 +1776,6 @@ function WorkItemsInner() {
       listId: selectedList,
       departmentId: selectedList ? null : selectedLevel,
     });
-    const seriesSummaryById = useMemo(
-      () => new Map(seriesSummaries.map((s) => [s.seriesId, s] as const)),
-      [seriesSummaries],
-    );
-
     const items: ColumnItem[] = useMemo(() => {
       const out: ColumnItem[] = [];
       const grouped = SERIES_GROUPED_COLUMNS.has(col);
@@ -1790,8 +1783,11 @@ function WorkItemsInner() {
         if (grouped && task.recurringSeriesId) continue; // represented by its series card below
         out.push({ kind: "task", task });
       }
+      // Carry the summary object itself — a lookup-by-id done in a separate render pass is how a
+      // card could ever end up with no summary (and fall back to a skeleton); building the item
+      // straight from the same list that's being iterated here can't have that gap.
       for (const s of seriesSummaries) {
-        out.push({ kind: "series", seriesId: s.seriesId });
+        out.push({ kind: "series", summary: s });
       }
       if (loadMore) out.push({ kind: "load-more", ...loadMore });
       return out;
@@ -1845,7 +1841,7 @@ function WorkItemsInner() {
           if (item.kind === "series") {
             return (
               <motion.div
-                key={item.seriesId}
+                key={item.summary.seriesId}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: motionDuration(0.15, prefersReduced) }}
@@ -1853,8 +1849,7 @@ function WorkItemsInner() {
               >
                 <RecurringSeriesCard
                   orgId={workspaceId}
-                  seriesId={item.seriesId}
-                  summary={seriesSummaryById.get(item.seriesId)}
+                  summary={item.summary}
                   occurrenceStatuses={seriesStatuses}
                   members={members}
                   onOpenTask={openViewTask}
