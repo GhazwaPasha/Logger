@@ -26,7 +26,7 @@ import {
   faUserPlus,
 } from "@fortawesome/free-solid-svg-icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import {
   Suspense,
   useCallback,
@@ -61,13 +61,14 @@ import { Avatar } from "@/components/ui/Avatar";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
+  type ListRow,
   type MemberRow,
   type SubtaskRow,
   type TaskDetail,
   type TaskMutationResult,
   type TaskRow,
 } from "@/lib/ledger-types";
-import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
+import type { ColumnMeta, WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import {
   readWorkBoardScope,
@@ -355,6 +356,567 @@ function WorkBoardStatsCard({
         </div>
       </div>
     </aside>
+  );
+}
+
+const DROP_VALID_CLASSES = ["border-[var(--accent)]", "bg-[var(--accent-glow-soft)]"];
+const DROP_INVALID_CLASSES = ["border-red-400/50", "bg-red-500/[0.04]"];
+
+type ColumnItem =
+  | { kind: "task"; task: TaskRow }
+  | { kind: "series"; summary: SeriesSummaryRow }
+  | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
+
+function TaskCardSkeleton() {
+  return (
+    <div
+      className="animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-2.5"
+      aria-hidden
+    >
+      <div className="h-3 w-3/4 rounded bg-[var(--surface-hover)]" />
+      <div className="mt-2.5 h-2.5 w-1/2 rounded bg-[var(--surface-hover)]" />
+    </div>
+  );
+}
+
+/**
+ * IMPORTANT: `ListViewCards`, `KanbanBoard`, and `ColumnList` live at module scope on purpose —
+ * NOT nested inside `WorkItemsInner` like most of this file's render helpers. A function defined
+ * inside a component body is a *new component type* on every render of that component, and React
+ * unmounts + remounts the old instance whenever an element's `type` changes. Nested here, that
+ * meant every WorkItemsInner re-render (which pagination — the exact `loadMoreColumn` calls below
+ * — triggers a lot of, via `columnMeta`/`loadingMoreColumn` changing) tore down and rebuilt the
+ * entire card tree: every RecurringSeriesCard lost its `expanded` state and its data (even
+ * collapsed ones, even ones nowhere near the sentinel), and the resulting DOM teardown/rebuild is
+ * what actually read as "the whole screen jumping" — not any one skeleton. Keeping these three at
+ * module scope gives them a stable identity, so a re-render updates props in place instead.
+ */
+function ColumnList({
+  tasks: colTasks,
+  col,
+  loadMore,
+  nextCursor,
+  loadMoreColumn,
+  token,
+  workspaceId,
+  selectedList,
+  selectedLevel,
+  prefersReduced,
+  members,
+  openViewTask,
+  renderTaskCard,
+}: {
+  tasks: TaskRow[];
+  col: string;
+  loadMore: { status: string; loaded: number; total: number; loading: boolean } | null;
+  nextCursor: string | null;
+  loadMoreColumn: (status: string) => void | Promise<void>;
+  token: string | null;
+  workspaceId: string;
+  selectedList: string | null;
+  selectedLevel: string | null;
+  prefersReduced: boolean | null;
+  members: MemberRow[];
+  openViewTask: (taskId: string) => void;
+  renderTaskCard: (task: TaskRow) => ReactNode;
+}) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  /** Same cursor-tracking guard as the list view: stops a failed fetch from retrying every intersection tick. State, not a ref — the retry/skeleton branch below reads it while rendering. */
+  const [attemptedCursor, setAttemptedCursor] = useState<string | null>(null);
+
+  // Own fetch, own loading state — same reasoning as ListViewCards: a column's card headers
+  // shouldn't depend on (or keep changing with) how much of that column has paginated in.
+  const seriesStatuses = useMemo(() => (SERIES_GROUPED_COLUMNS.has(col) ? [col] : []), [col]);
+  const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+    statuses: seriesStatuses,
+    listId: selectedList,
+    departmentId: selectedList ? null : selectedLevel,
+  });
+
+  const items: ColumnItem[] = useMemo(() => {
+    const out: ColumnItem[] = [];
+    const grouped = SERIES_GROUPED_COLUMNS.has(col);
+    for (const task of colTasks) {
+      if (grouped && task.recurringSeriesId) continue; // represented by its series card below
+      out.push({ kind: "task", task });
+    }
+    // Carry the summary object itself — a lookup-by-id done in a separate render pass is how a
+    // card could ever end up with no summary (and fall back to a skeleton); building the item
+    // straight from the same list that's being iterated here can't have that gap.
+    for (const s of seriesSummaries) {
+      out.push({ kind: "series", summary: s });
+    }
+    if (loadMore) out.push({ kind: "load-more", ...loadMore });
+    return out;
+  }, [colTasks, col, seriesSummaries, loadMore]);
+
+  const loadMoreItem = items.find((it) => it.kind === "load-more");
+
+  useEffect(() => {
+    if (!loadMoreItem) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || loadMoreItem.loading) return;
+        if (!nextCursor || attemptedCursor === nextCursor) return;
+        setAttemptedCursor(nextCursor);
+        void loadMoreColumn(col);
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMoreItem, col, nextCursor, loadMoreColumn, attemptedCursor]);
+
+  const stalled =
+    loadMoreItem != null &&
+    !loadMoreItem.loading &&
+    attemptedCursor !== null &&
+    attemptedCursor === nextCursor;
+
+  return (
+    // Plain divs, not `motion.div layout` — see ListViewCards for why: `layout` on every card
+    // in a large paginated column FLIP-animates the whole column on each append, which is what
+    // read as the screen jumping. A new card just fades in; it never needs to move its siblings.
+    <div className="flex flex-col gap-1">
+      {items.map((item) => {
+        if (item.kind === "task") {
+          return (
+            <motion.div
+              key={item.task.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: motionDuration(0.15, prefersReduced) }}
+              className="pb-1"
+            >
+              {renderTaskCard(item.task)}
+            </motion.div>
+          );
+        }
+        if (item.kind === "series") {
+          return (
+            <motion.div
+              key={item.summary.seriesId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: motionDuration(0.15, prefersReduced) }}
+              className="pb-1"
+            >
+              <RecurringSeriesCard
+                orgId={workspaceId}
+                summary={item.summary}
+                occurrenceStatuses={seriesStatuses}
+                members={members}
+                onOpenTask={openViewTask}
+              />
+            </motion.div>
+          );
+        }
+        return (
+          <div key="load-more" className="pb-1">
+            {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
+                mount/resize never retriggers the observer — only actual scroll position does. */}
+            <div ref={sentinelRef} aria-hidden className="h-px" />
+            {stalled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAttemptedCursor(null);
+                  void loadMoreColumn(item.status);
+                }}
+                className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+              >
+                Couldn&apos;t load more · retry ({item.loaded} of {item.total})
+              </button>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="flex flex-col gap-1"
+              >
+                <TaskCardSkeleton />
+                <TaskCardSkeleton />
+              </motion.div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KanbanBoard({
+  rows,
+  columnMeta,
+  loadingMoreColumn,
+  loadMoreColumn,
+  lists,
+  sessionUserId,
+  members,
+  setError,
+  patchTask,
+  dragOverElRef,
+  dragStateRef,
+  token,
+  workspaceId,
+  selectedList,
+  selectedLevel,
+  prefersReduced,
+  openViewTask,
+  renderTaskCard,
+}: {
+  rows: TaskRow[];
+  columnMeta: Record<string, ColumnMeta>;
+  loadingMoreColumn: string | null;
+  loadMoreColumn: (status: string) => void | Promise<void>;
+  lists: ListRow[];
+  sessionUserId: string | null;
+  members: MemberRow[];
+  setError: (msg: string | null) => void;
+  patchTask: (taskId: string, patch: { status?: ManualTaskStatus; priority?: TaskPriority }) => void;
+  dragOverElRef: RefObject<HTMLDivElement | null>;
+  dragStateRef: RefObject<{ taskId: string; status: BoardTaskStatus } | null>;
+  token: string | null;
+  workspaceId: string;
+  selectedList: string | null;
+  selectedLevel: string | null;
+  prefersReduced: boolean | null;
+  openViewTask: (taskId: string) => void;
+  renderTaskCard: (task: TaskRow) => ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      resizeObserver.disconnect();
+    };
+  }, [updateScrollState, rows.length]);
+
+  const scrollByPage = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+  };
+
+  return (
+    <div className="sticky top-0 z-10 bg-[var(--surface-base)] pb-2">
+      <div className="relative">
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scrollByPage(-1)}
+            aria-label="Scroll columns left"
+            className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <FontAwesomeIcon icon={faChevronLeft} className="size-3" aria-hidden />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scrollByPage(1)}
+            aria-label="Scroll columns right"
+            className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <FontAwesomeIcon icon={faChevronRight} className="size-3" aria-hidden />
+          </button>
+        )}
+        <div
+          ref={scrollRef}
+          className="scrollbar-hide overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain"
+        >
+        <div className="flex gap-2.5">
+          {TASK_FLOW_ORDER.map((col) => {
+            const colTasks = rows.filter(
+              (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
+            );
+            const label = FLOW_COLUMN_LABELS[col];
+            return (
+              <div
+                key={col}
+                role="region"
+                aria-label={`${label}, ${colTasks.length} tasks`}
+                className="flex w-[24rem] shrink-0 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:w-[28rem]"
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  const el = e.currentTarget;
+                  if (dragOverElRef.current && dragOverElRef.current !== el) {
+                    dragOverElRef.current.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                  }
+                  dragOverElRef.current = el;
+                  const draggedTask = dragStateRef.current
+                    ? rows.find((t) => t.id === dragStateRef.current!.taskId)
+                    : undefined;
+                  const draggedCanCancel = draggedTask
+                    ? taskEditCaps(draggedTask, lists, sessionUserId, members).canEditFields
+                    : true;
+                  const allowed =
+                    dragStateRef.current != null &&
+                    kanbanTransitionAllowedFromStored(dragStateRef.current.status, col, draggedCanCancel);
+                  el.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                  el.classList.add(...(allowed ? DROP_VALID_CLASSES : DROP_INVALID_CLASSES));
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                  e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                  if (dragOverElRef.current === e.currentTarget) dragOverElRef.current = null;
+                }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
+                dragOverElRef.current = null;
+                const id = e.dataTransfer.getData("taskId");
+                if (!id) return;
+                const task = rows.find((t) => t.id === id);
+                if (!task) return;
+                const from = normalizeTaskStatus(task.status);
+                const canCancel = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
+                if (!kanbanTransitionAllowedFromStored(from, col, canCancel)) {
+                  setError("You can only move to the next stage or Cancelled (or reopen cancelled tasks to Pending).");
+                  return;
+                }
+                void patchTask(id, { status: col });
+              }}
+              >
+                <div
+                  className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 shadow-sm ${statusPillPaletteClasses(col)}`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
+                    <span className="tabular-nums text-[10px] font-medium opacity-80">
+                      {columnMeta[col]?.nextCursor
+                        ? `${colTasks.length}/${columnMeta[col]!.total}`
+                        : (columnMeta[col]?.total ?? colTasks.length)}
+                    </span>
+                  </div>
+                </div>
+                <ColumnList
+                  tasks={colTasks}
+                  col={col}
+                  loadMore={
+                    columnMeta[col]?.nextCursor
+                      ? {
+                          status: col,
+                          loaded: colTasks.length,
+                          total: columnMeta[col]!.total,
+                          loading: loadingMoreColumn === col,
+                        }
+                      : null
+                  }
+                  nextCursor={columnMeta[col]?.nextCursor ?? null}
+                  loadMoreColumn={loadMoreColumn}
+                  token={token}
+                  workspaceId={workspaceId}
+                  selectedList={selectedList}
+                  selectedLevel={selectedLevel}
+                  prefersReduced={prefersReduced}
+                  members={members}
+                  openViewTask={openViewTask}
+                  renderTaskCard={renderTaskCard}
+                />
+              </div>
+            );
+          })}
+        </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ListViewCards({
+  rows,
+  token,
+  workspaceId,
+  selectedList,
+  selectedLevel,
+  columnMeta,
+  loadingMoreColumn,
+  loadMoreColumn,
+  prefersReduced,
+  members,
+  openViewTask,
+  renderTaskCard,
+}: {
+  rows: TaskRow[];
+  token: string | null;
+  workspaceId: string;
+  selectedList: string | null;
+  selectedLevel: string | null;
+  columnMeta: Record<string, ColumnMeta>;
+  loadingMoreColumn: string | null;
+  loadMoreColumn: (status: string) => void | Promise<void>;
+  prefersReduced: boolean | null;
+  members: MemberRow[];
+  openViewTask: (taskId: string) => void;
+  renderTaskCard: (task: TaskRow) => ReactNode;
+}) {
+  // Series header stats (count/latest/last completion) come from their own lightweight fetch —
+  // never from how far pagination has gotten — so a chain with a long completion history no
+  // longer forces the board to load it all just to show one card. Per-occurrence rows for a
+  // known series are dropped from the flat list below; the series card is pushed once per
+  // summary instead, wherever pagination happens to be.
+  const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+    statuses: DONE_CANCELLED_STATUSES,
+    listId: selectedList,
+    departmentId: selectedList ? null : selectedLevel,
+  });
+  const sortedSeriesSummaries = useMemo(
+    () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
+    [seriesSummaries],
+  );
+
+  // Carry the summary object itself, not just its id — a lookup-by-id done in a separate render
+  // pass is how a card could ever end up with no summary (and fall back to a skeleton); building
+  // the item straight from the same list that's being iterated here can't have that gap.
+  const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; summary: SeriesSummaryRow }> = [];
+  for (const task of rows) {
+    const col = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
+    if (task.recurringSeriesId && (col === "done" || col === "cancelled")) continue;
+    items.push({ kind: "task", task });
+  }
+  for (const s of sortedSeriesSummaries) {
+    items.push({ kind: "series", summary: s });
+  }
+
+  // Statuses still missing pages. pending/in_progress get drained in the background by
+  // useOrgWorkspace, so in practice this is almost always just done/cancelled — but it stays
+  // generic so it's correct at any point mid-load too.
+  const pendingStatuses = TASK_FLOW_ORDER.filter((s) => columnMeta[s]?.nextCursor);
+  const pendingKey = pendingStatuses.join(",");
+  const anyLoading = pendingStatuses.some((s) => loadingMoreColumn === s);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  /** Same cursor-tracking guard as the kanban view: stops a failed fetch from retrying every intersection tick. State, not a ref — the retry-button branch below reads it while rendering. */
+  const [attemptedCursors, setAttemptedCursors] = useState<Record<string, string | null>>({});
+  const stalledStatuses = pendingStatuses.filter(
+    (s) => loadingMoreColumn !== s && attemptedCursors[s] === columnMeta[s]?.nextCursor,
+  );
+
+  useEffect(() => {
+    if (pendingStatuses.length === 0) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        const updates: Record<string, string | null> = {};
+        for (const status of pendingStatuses) {
+          if (loadingMoreColumn === status) continue;
+          const cursor = columnMeta[status]?.nextCursor;
+          if (!cursor || attemptedCursors[status] === cursor) continue;
+          updates[status] = cursor;
+          void loadMoreColumn(status);
+        }
+        if (Object.keys(updates).length > 0) {
+          setAttemptedCursors((prev) => ({ ...prev, ...updates }));
+        }
+      },
+      { rootMargin: "400px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingKey, loadingMoreColumn, attemptedCursors]);
+
+  return (
+    <div>
+      {/*
+       * Plain divs, not `motion.div layout` — with a large paginated list, a `layout` prop on
+       * every card makes framer-motion FLIP-animate the *entire* list on every append (it shares
+       * one layout group by default), which is exactly what read as "the whole screen jumping".
+       * A newly appended card just needs to fade in in place; it never needs to reposition its
+       * siblings, and normal block flow already leaves everything above it untouched.
+       */}
+      <div className="columns-1 gap-3">
+        {items.map((item) =>
+          item.kind === "task" ? (
+            <motion.div
+              key={item.task.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: motionDuration(0.15, prefersReduced) }}
+              className="mb-1 break-inside-avoid"
+            >
+              {renderTaskCard(item.task)}
+            </motion.div>
+          ) : (
+            <motion.div
+              key={item.summary.seriesId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: motionDuration(0.15, prefersReduced) }}
+              className="mb-1 break-inside-avoid"
+            >
+              <RecurringSeriesCard
+                orgId={workspaceId}
+                summary={item.summary}
+                occurrenceStatuses={DONE_CANCELLED_STATUSES}
+                members={members}
+                onOpenTask={openViewTask}
+              />
+            </motion.div>
+          )
+        )}
+      </div>
+      {pendingStatuses.length > 0 && (
+        <div className="flex flex-col gap-2 pt-2">
+          {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
+              mount/resize never retriggers the observer — only actual scroll position does. */}
+          <div ref={sentinelRef} aria-hidden className="h-px" />
+          <AnimatePresence initial={false}>
+            {anyLoading && (
+              <motion.div
+                key="loading-skeletons"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                className="flex flex-col gap-2"
+              >
+                <TaskCardSkeleton />
+                <TaskCardSkeleton />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {stalledStatuses.map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => {
+                setAttemptedCursors((prev) => ({ ...prev, [status]: null }));
+                void loadMoreColumn(status);
+              }}
+              className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+            >
+              Couldn&apos;t load more {FLOW_COLUMN_LABELS[status]} tasks · retry
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -749,8 +1311,6 @@ function WorkItemsInner() {
    */
   const dragStateRef = useRef<{ taskId: string; status: BoardTaskStatus } | null>(null);
   const dragOverElRef = useRef<HTMLDivElement | null>(null);
-  const DROP_VALID_CLASSES = ["border-[var(--accent)]", "bg-[var(--accent-glow-soft)]"];
-  const DROP_INVALID_CLASSES = ["border-red-400/50", "bg-red-500/[0.04]"];
   function clearDropHighlight() {
     dragOverElRef.current?.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
     dragOverElRef.current = null;
@@ -1594,455 +2154,6 @@ function WorkItemsInner() {
     );
   }
 
-  function ListViewCards({ rows }: { rows: TaskRow[] }) {
-    // Series header stats (count/latest/last completion) come from their own lightweight fetch —
-    // never from how far pagination has gotten — so a chain with a long completion history no
-    // longer forces the board to load it all just to show one card. Per-occurrence rows for a
-    // known series are dropped from the flat list below; the series card is pushed once per
-    // summary instead, wherever pagination happens to be.
-    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
-      statuses: DONE_CANCELLED_STATUSES,
-      listId: selectedList,
-      departmentId: selectedList ? null : selectedLevel,
-    });
-    const sortedSeriesSummaries = useMemo(
-      () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
-      [seriesSummaries],
-    );
-
-    // Carry the summary object itself, not just its id — a lookup-by-id done in a separate render
-    // pass is how a card could ever end up with no summary (and fall back to a skeleton); building
-    // the item straight from the same list that's being iterated here can't have that gap.
-    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; summary: SeriesSummaryRow }> = [];
-    for (const task of rows) {
-      const col = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
-      if (task.recurringSeriesId && (col === "done" || col === "cancelled")) continue;
-      items.push({ kind: "task", task });
-    }
-    for (const s of sortedSeriesSummaries) {
-      items.push({ kind: "series", summary: s });
-    }
-
-    // Statuses still missing pages. pending/in_progress get drained in the background by
-    // useOrgWorkspace, so in practice this is almost always just done/cancelled — but it stays
-    // generic so it's correct at any point mid-load too.
-    const pendingStatuses = TASK_FLOW_ORDER.filter((s) => columnMeta[s]?.nextCursor);
-    const pendingKey = pendingStatuses.join(",");
-    const anyLoading = pendingStatuses.some((s) => loadingMoreColumn === s);
-
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
-    /** Same cursor-tracking guard as the kanban view: stops a failed fetch from retrying every intersection tick. */
-    const attemptedCursorRef = useRef<Record<string, string | null>>({});
-    const stalledStatuses = pendingStatuses.filter(
-      (s) => loadingMoreColumn !== s && attemptedCursorRef.current[s] === columnMeta[s]?.nextCursor,
-    );
-
-    useEffect(() => {
-      if (pendingStatuses.length === 0) return;
-      const el = sentinelRef.current;
-      if (!el) return;
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (!entries[0]?.isIntersecting) return;
-          for (const status of pendingStatuses) {
-            if (loadingMoreColumn === status) continue;
-            const cursor = columnMeta[status]?.nextCursor;
-            if (!cursor || attemptedCursorRef.current[status] === cursor) continue;
-            attemptedCursorRef.current[status] = cursor;
-            void loadMoreColumn(status);
-          }
-        },
-        { rootMargin: "400px" },
-      );
-      observer.observe(el);
-      return () => observer.disconnect();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingKey, loadingMoreColumn]);
-
-    return (
-      <div>
-        {/*
-         * Plain divs, not `motion.div layout` — with a large paginated list, a `layout` prop on
-         * every card makes framer-motion FLIP-animate the *entire* list on every append (it shares
-         * one layout group by default), which is exactly what read as "the whole screen jumping".
-         * A newly appended card just needs to fade in in place; it never needs to reposition its
-         * siblings, and normal block flow already leaves everything above it untouched.
-         */}
-        <div className="columns-1 gap-3">
-          {items.map((item) =>
-            item.kind === "task" ? (
-              <motion.div
-                key={item.task.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                className="mb-1 break-inside-avoid"
-              >
-                <ListTaskCard task={item.task} />
-              </motion.div>
-            ) : (
-              <motion.div
-                key={item.summary.seriesId}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                className="mb-1 break-inside-avoid"
-              >
-                <RecurringSeriesCard
-                  orgId={workspaceId}
-                  summary={item.summary}
-                  occurrenceStatuses={DONE_CANCELLED_STATUSES}
-                  members={members}
-                  onOpenTask={openViewTask}
-                />
-              </motion.div>
-            )
-          )}
-        </div>
-        {pendingStatuses.length > 0 && (
-          <div className="flex flex-col gap-2 pt-2">
-            {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
-                mount/resize never retriggers the observer — only actual scroll position does. */}
-            <div ref={sentinelRef} aria-hidden className="h-px" />
-            <AnimatePresence initial={false}>
-              {anyLoading && (
-                <motion.div
-                  key="loading-skeletons"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                  className="flex flex-col gap-2"
-                >
-                  <TaskCardSkeleton />
-                  <TaskCardSkeleton />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            {stalledStatuses.map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => {
-                  attemptedCursorRef.current[status] = null;
-                  void loadMoreColumn(status);
-                }}
-                className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
-              >
-                Couldn&apos;t load more {FLOW_COLUMN_LABELS[status]} tasks · retry
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  type ColumnItem =
-    | { kind: "task"; task: TaskRow }
-    | { kind: "series"; summary: SeriesSummaryRow }
-    | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
-
-  function TaskCardSkeleton() {
-    return (
-      <div
-        className="animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-2.5"
-        aria-hidden
-      >
-        <div className="h-3 w-3/4 rounded bg-[var(--surface-hover)]" />
-        <div className="mt-2.5 h-2.5 w-1/2 rounded bg-[var(--surface-hover)]" />
-      </div>
-    );
-  }
-
-  function ColumnList({
-    tasks: colTasks,
-    col,
-    loadMore,
-  }: {
-    tasks: TaskRow[];
-    col: string;
-    loadMore: { status: string; loaded: number; total: number; loading: boolean } | null;
-  }) {
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
-    /** Same cursor-tracking guard as the list view: stops a failed fetch from retrying every intersection tick. */
-    const attemptedCursorRef = useRef<string | null>(null);
-
-    // Own fetch, own loading state — same reasoning as ListViewCards: a column's card headers
-    // shouldn't depend on (or keep changing with) how much of that column has paginated in.
-    const seriesStatuses = useMemo(() => (SERIES_GROUPED_COLUMNS.has(col) ? [col] : []), [col]);
-    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
-      statuses: seriesStatuses,
-      listId: selectedList,
-      departmentId: selectedList ? null : selectedLevel,
-    });
-    const items: ColumnItem[] = useMemo(() => {
-      const out: ColumnItem[] = [];
-      const grouped = SERIES_GROUPED_COLUMNS.has(col);
-      for (const task of colTasks) {
-        if (grouped && task.recurringSeriesId) continue; // represented by its series card below
-        out.push({ kind: "task", task });
-      }
-      // Carry the summary object itself — a lookup-by-id done in a separate render pass is how a
-      // card could ever end up with no summary (and fall back to a skeleton); building the item
-      // straight from the same list that's being iterated here can't have that gap.
-      for (const s of seriesSummaries) {
-        out.push({ kind: "series", summary: s });
-      }
-      if (loadMore) out.push({ kind: "load-more", ...loadMore });
-      return out;
-    }, [colTasks, col, seriesSummaries, loadMore]);
-
-    const loadMoreItem = items.find((it) => it.kind === "load-more");
-
-    useEffect(() => {
-      if (!loadMoreItem) return;
-      const el = sentinelRef.current;
-      if (!el) return;
-      const observer = new IntersectionObserver(
-        (entries) => {
-          if (!entries[0]?.isIntersecting || loadMoreItem.loading) return;
-          const meta = columnMeta[col];
-          if (!meta?.nextCursor || attemptedCursorRef.current === meta.nextCursor) return;
-          attemptedCursorRef.current = meta.nextCursor;
-          void loadMoreColumn(col);
-        },
-        { rootMargin: "400px" },
-      );
-      observer.observe(el);
-      return () => observer.disconnect();
-    }, [loadMoreItem, col]);
-
-    const stalled =
-      loadMoreItem != null &&
-      !loadMoreItem.loading &&
-      attemptedCursorRef.current !== null &&
-      attemptedCursorRef.current === columnMeta[col]?.nextCursor;
-
-    return (
-      // Plain divs, not `motion.div layout` — see ListViewCards for why: `layout` on every card
-      // in a large paginated column FLIP-animates the whole column on each append, which is what
-      // read as the screen jumping. A new card just fades in; it never needs to move its siblings.
-      <div className="flex flex-col gap-1">
-        {items.map((item) => {
-          if (item.kind === "task") {
-            return (
-              <motion.div
-                key={item.task.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                className="pb-1"
-              >
-                <TaskCard task={item.task} />
-              </motion.div>
-            );
-          }
-          if (item.kind === "series") {
-            return (
-              <motion.div
-                key={item.summary.seriesId}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                className="pb-1"
-              >
-                <RecurringSeriesCard
-                  orgId={workspaceId}
-                  summary={item.summary}
-                  occurrenceStatuses={seriesStatuses}
-                  members={members}
-                  onOpenTask={openViewTask}
-                />
-              </motion.div>
-            );
-          }
-          return (
-            <div key="load-more" className="pb-1">
-              {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
-                  mount/resize never retriggers the observer — only actual scroll position does. */}
-              <div ref={sentinelRef} aria-hidden className="h-px" />
-              {stalled ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    attemptedCursorRef.current = null;
-                    void loadMoreColumn(item.status);
-                  }}
-                  className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
-                >
-                  Couldn&apos;t load more · retry ({item.loaded} of {item.total})
-                </button>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: motionDuration(0.15, prefersReduced) }}
-                  className="flex flex-col gap-1"
-                >
-                  <TaskCardSkeleton />
-                  <TaskCardSkeleton />
-                </motion.div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  function KanbanBoard({ rows }: { rows: TaskRow[] }) {
-    // columnMeta and loadMoreColumn are captured from the outer scope
-    const scrollRef = useRef<HTMLDivElement | null>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
-
-    const updateScrollState = useCallback(() => {
-      const el = scrollRef.current;
-      if (!el) return;
-      setCanScrollLeft(el.scrollLeft > 4);
-      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-    }, []);
-
-    useEffect(() => {
-      updateScrollState();
-      const el = scrollRef.current;
-      if (!el) return;
-      el.addEventListener("scroll", updateScrollState, { passive: true });
-      const resizeObserver = new ResizeObserver(updateScrollState);
-      resizeObserver.observe(el);
-      return () => {
-        el.removeEventListener("scroll", updateScrollState);
-        resizeObserver.disconnect();
-      };
-    }, [updateScrollState, rows.length]);
-
-    const scrollByPage = (direction: -1 | 1) => {
-      const el = scrollRef.current;
-      if (!el) return;
-      el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
-    };
-
-    return (
-      <div className="sticky top-0 z-10 bg-[var(--surface-base)] pb-2">
-        <div className="relative">
-          {canScrollLeft && (
-            <button
-              type="button"
-              onClick={() => scrollByPage(-1)}
-              aria-label="Scroll columns left"
-              className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
-            >
-              <FontAwesomeIcon icon={faChevronLeft} className="size-3" aria-hidden />
-            </button>
-          )}
-          {canScrollRight && (
-            <button
-              type="button"
-              onClick={() => scrollByPage(1)}
-              aria-label="Scroll columns right"
-              className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
-            >
-              <FontAwesomeIcon icon={faChevronRight} className="size-3" aria-hidden />
-            </button>
-          )}
-          <div
-            ref={scrollRef}
-            className="scrollbar-hide overflow-x-auto [-webkit-overflow-scrolling:touch] overscroll-x-contain"
-          >
-          <div className="flex gap-2.5">
-            {TASK_FLOW_ORDER.map((col) => {
-              const colTasks = rows.filter(
-                (t) => storedStatusToFlowColumn(normalizeTaskStatus(t.status)) === col,
-              );
-              const label = FLOW_COLUMN_LABELS[col];
-              return (
-                <div
-                  key={col}
-                  role="region"
-                  aria-label={`${label}, ${colTasks.length} tasks`}
-                  className="flex w-[24rem] shrink-0 flex-col gap-2 rounded-xl border-2 border-transparent transition-colors duration-150 sm:w-[28rem]"
-                  onDragEnter={(e) => {
-                    e.preventDefault();
-                    const el = e.currentTarget;
-                    if (dragOverElRef.current && dragOverElRef.current !== el) {
-                      dragOverElRef.current.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
-                    }
-                    dragOverElRef.current = el;
-                    const draggedTask = dragStateRef.current
-                      ? rows.find((t) => t.id === dragStateRef.current!.taskId)
-                      : undefined;
-                    const draggedCanCancel = draggedTask
-                      ? taskEditCaps(draggedTask, lists, sessionUserId, members).canEditFields
-                      : true;
-                    const allowed =
-                      dragStateRef.current != null &&
-                      kanbanTransitionAllowedFromStored(dragStateRef.current.status, col, draggedCanCancel);
-                    el.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
-                    el.classList.add(...(allowed ? DROP_VALID_CLASSES : DROP_INVALID_CLASSES));
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                  }}
-                  onDragLeave={(e) => {
-                    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                    e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
-                    if (dragOverElRef.current === e.currentTarget) dragOverElRef.current = null;
-                  }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
-                  dragOverElRef.current = null;
-                  const id = e.dataTransfer.getData("taskId");
-                  if (!id) return;
-                  const task = rows.find((t) => t.id === id);
-                  if (!task) return;
-                  const from = normalizeTaskStatus(task.status);
-                  const canCancel = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
-                  if (!kanbanTransitionAllowedFromStored(from, col, canCancel)) {
-                    setError("You can only move to the next stage or Cancelled (or reopen cancelled tasks to Pending).");
-                    return;
-                  }
-                  void patchTask(id, { status: col });
-                }}
-                >
-                  <div
-                    className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 shadow-sm ${statusPillPaletteClasses(col)}`}
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
-                      <span className="tabular-nums text-[10px] font-medium opacity-80">
-                        {columnMeta[col]?.nextCursor
-                          ? `${colTasks.length}/${columnMeta[col]!.total}`
-                          : (columnMeta[col]?.total ?? colTasks.length)}
-                      </span>
-                    </div>
-                  </div>
-                  <ColumnList
-                    tasks={colTasks}
-                    col={col}
-                    loadMore={
-                      columnMeta[col]?.nextCursor
-                        ? {
-                            status: col,
-                            loaded: colTasks.length,
-                            total: columnMeta[col]!.total,
-                            loading: loadingMoreColumn === col,
-                          }
-                        : null
-                    }
-                  />
-                </div>
-              );
-            })}
-          </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const drilldownActive =
     Boolean(searchParams.get("status")) ||
     searchParams.get("mine") === "1" ||
@@ -2374,9 +2485,41 @@ function WorkItemsInner() {
               : "No tasks match the current filters."}
           </p>
         ) : viewMode === "list" ? (
-          <ListViewCards rows={sortedTasks} />
+          <ListViewCards
+            rows={sortedTasks}
+            token={token}
+            workspaceId={workspaceId}
+            selectedList={selectedList}
+            selectedLevel={selectedLevel}
+            columnMeta={columnMeta}
+            loadingMoreColumn={loadingMoreColumn}
+            loadMoreColumn={loadMoreColumn}
+            prefersReduced={prefersReduced}
+            members={members}
+            openViewTask={openViewTask}
+            renderTaskCard={(task) => <ListTaskCard task={task} />}
+          />
         ) : (
-          <KanbanBoard rows={sortedTasks} />
+          <KanbanBoard
+            rows={sortedTasks}
+            columnMeta={columnMeta}
+            loadingMoreColumn={loadingMoreColumn}
+            loadMoreColumn={loadMoreColumn}
+            lists={lists}
+            sessionUserId={sessionUserId}
+            members={members}
+            setError={setError}
+            patchTask={patchTask}
+            dragOverElRef={dragOverElRef}
+            dragStateRef={dragStateRef}
+            token={token}
+            workspaceId={workspaceId}
+            selectedList={selectedList}
+            selectedLevel={selectedLevel}
+            prefersReduced={prefersReduced}
+            openViewTask={openViewTask}
+            renderTaskCard={(task) => <TaskCard task={task} />}
+          />
         )}
       </section>
 
