@@ -47,6 +47,7 @@ import { taskEditCaps } from "@/lib/workspace-permissions";
 import { formatInTimeZone, getZonedParts } from "@/lib/date";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
+import { useTaskCounts, useSeriesSummaries } from "@/hooks/useWorkTaskStats";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
@@ -273,6 +274,11 @@ const BOARD_STATS_SEGMENTS: { status: ManualTaskStatus; label: string; title: st
   { status: "in_progress", label: "In progress", title: FLOW_COLUMN_LABELS.in_progress },
   { status: "done", label: "Done", title: FLOW_COLUMN_LABELS.done },
 ];
+
+/** Statuses grouped into one RecurringSeriesCard in list view (kanban groups per-column instead). */
+const DONE_CANCELLED_STATUSES = ["done", "cancelled"] as const;
+/** done/cancelled columns group same-chain occurrences into one card; other columns show every task individually. */
+const SERIES_GROUPED_COLUMNS = new Set<string>(DONE_CANCELLED_STATUSES);
 
 const PIPELINE_BADGE_FRAME =
   "inline-flex min-w-[1.75rem] items-center justify-center rounded-sm border border-[var(--border-subtle)] px-2 py-0.5 text-xs font-semibold tabular-nums leading-none";
@@ -895,18 +901,28 @@ function WorkItemsInner() {
     return activeTasks;
   }, [activeTasks, selectedList, selectedLevel, levelLists]);
 
-  const boardStatusCounts = useMemo(() => {
-    const counts: Record<ManualTaskStatus, number> = {
-      pending: 0,
-      in_progress: 0,
-      done: 0,
-      cancelled: 0,
+  /**
+   * Pipeline card counts: a dedicated grouped-COUNT query, not a tally over `visibleTasks`. Done/
+   * cancelled totals used to be counted off whatever the board had paginated in so far, so the
+   * card kept changing (and visibly reflowing) as more completed tasks streamed in behind the
+   * scenes — this stays correct and stable from the first paint, with its own loading state.
+   */
+  const { counts: rawTaskCounts, isLoading: taskCountsLoading } = useTaskCounts(token, workspaceId, {
+    listId: selectedList,
+    departmentId: selectedList ? null : selectedLevel,
+  });
+  const boardStatusCounts = useMemo((): Record<ManualTaskStatus, number> => {
+    return {
+      pending: rawTaskCounts?.pending ?? 0,
+      in_progress: rawTaskCounts?.in_progress ?? 0,
+      done: rawTaskCounts?.done ?? 0,
+      cancelled: rawTaskCounts?.cancelled ?? 0,
     };
-    for (const t of visibleTasks) {
-      counts[storedStatusToFlowColumn(normalizeTaskStatus(t.status))]++;
-    }
-    return counts;
-  }, [visibleTasks]);
+  }, [rawTaskCounts]);
+  const boardTotalCount = useMemo(
+    () => boardStatusCounts.pending + boardStatusCounts.in_progress + boardStatusCounts.done + boardStatusCounts.cancelled,
+    [boardStatusCounts],
+  );
 
   /** Badges on cards: all tasks → list + level; level filter only → list; single list filter → none */
 
@@ -1219,7 +1235,8 @@ function WorkItemsInner() {
   function ListRowStatusPill({ task }: { task: TaskRow }) {
     const stored = normalizeTaskStatus(task.status);
     const manual = manualStatusFromStored(stored);
-    const menuOptions = stageControlDropdownOptions(stored);
+    const canCancel = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
+    const menuOptions = stageControlDropdownOptions(stored, canCancel);
     return (
       <StatusPillSelect
         aria-label={`Task stage: ${FLOW_COLUMN_LABELS[manual]}`}
@@ -1234,7 +1251,8 @@ function WorkItemsInner() {
   function KanbanStatusPill({ task }: { task: TaskRow }) {
     const stored = normalizeTaskStatus(task.status);
     const manual = manualStatusFromStored(stored);
-    const menuOptions = stageControlDropdownOptions(stored);
+    const canCancel = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
+    const menuOptions = stageControlDropdownOptions(stored, canCancel);
     return (
       <StatusPillSelect
         aria-label={`Task stage: ${FLOW_COLUMN_LABELS[manual]}`}
@@ -1577,20 +1595,31 @@ function WorkItemsInner() {
   }
 
   function ListViewCards({ rows }: { rows: TaskRow[] }) {
-    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; seriesId: string; tasks: TaskRow[] }> = [];
-    const seriesGroups = new Map<string, TaskRow[]>();
+    // Series header stats (count/latest/last completion) come from their own lightweight fetch —
+    // never from how far pagination has gotten — so a chain with a long completion history no
+    // longer forces the board to load it all just to show one card. Per-occurrence rows for a
+    // known series are dropped from the flat list below; the series card is pushed once per
+    // summary instead, wherever pagination happens to be.
+    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+      statuses: DONE_CANCELLED_STATUSES,
+    });
+    const sortedSeriesSummaries = useMemo(
+      () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
+      [seriesSummaries],
+    );
+    const seriesSummaryById = useMemo(
+      () => new Map(seriesSummaries.map((s) => [s.seriesId, s] as const)),
+      [seriesSummaries],
+    );
+
+    const items: Array<{ kind: "task"; task: TaskRow } | { kind: "series"; seriesId: string }> = [];
     for (const task of rows) {
       const col = storedStatusToFlowColumn(normalizeTaskStatus(task.status));
-      if (task.recurringSeriesId && (col === "done" || col === "cancelled")) {
-        const g = seriesGroups.get(task.recurringSeriesId) ?? [];
-        g.push(task);
-        seriesGroups.set(task.recurringSeriesId, g);
-      } else {
-        items.push({ kind: "task", task });
-      }
+      if (task.recurringSeriesId && (col === "done" || col === "cancelled")) continue;
+      items.push({ kind: "task", task });
     }
-    for (const [seriesId, tasks] of seriesGroups) {
-      items.push({ kind: "series", seriesId, tasks });
+    for (const s of sortedSeriesSummaries) {
+      items.push({ kind: "series", seriesId: s.seriesId });
     }
 
     // Statuses still missing pages. pending/in_progress get drained in the background by
@@ -1631,31 +1660,47 @@ function WorkItemsInner() {
 
     return (
       <div>
-        <div className="columns-1 gap-3">
+        <motion.div layout="position" className="columns-1 gap-3">
           {items.map((item) =>
             item.kind === "task" ? (
-              <div key={item.task.id} className="mb-1 break-inside-avoid">
+              <motion.div layout="position" key={item.task.id} className="mb-1 break-inside-avoid">
                 <ListTaskCard task={item.task} />
-              </div>
+              </motion.div>
             ) : (
-              <div key={item.seriesId} className="mb-1 break-inside-avoid">
+              <motion.div layout="position" key={item.seriesId} className="mb-1 break-inside-avoid">
                 <RecurringSeriesCard
-                  tasks={item.tasks}
+                  orgId={workspaceId}
+                  seriesId={item.seriesId}
+                  summary={seriesSummaryById.get(item.seriesId)}
+                  occurrenceStatuses={DONE_CANCELLED_STATUSES}
                   members={members}
                   onOpenTask={openViewTask}
                 />
-              </div>
+              </motion.div>
             )
           )}
-        </div>
+        </motion.div>
         {pendingStatuses.length > 0 && (
-          <div ref={sentinelRef} className="flex flex-col gap-2 pt-2">
-            {anyLoading && (
-              <>
-                <TaskCardSkeleton />
-                <TaskCardSkeleton />
-              </>
-            )}
+          <div className="flex flex-col gap-2 pt-2">
+            {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
+                mount/resize never retriggers the observer — only actual scroll position does. */}
+            <div ref={sentinelRef} aria-hidden className="h-px" />
+            <AnimatePresence initial={false}>
+              {anyLoading && (
+                <motion.div
+                  key="loading-skeletons"
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                  className="flex flex-col gap-2"
+                >
+                  <TaskCardSkeleton />
+                  <TaskCardSkeleton />
+                </motion.div>
+              )}
+            </AnimatePresence>
             {stalledStatuses.map((status) => (
               <button
                 key={status}
@@ -1677,7 +1722,7 @@ function WorkItemsInner() {
 
   type ColumnItem =
     | { kind: "task"; task: TaskRow }
-    | { kind: "series"; seriesId: string; tasks: TaskRow[] }
+    | { kind: "series"; seriesId: string }
     | { kind: "load-more"; status: string; loaded: number; total: number; loading: boolean };
 
   function TaskCardSkeleton() {
@@ -1692,10 +1737,42 @@ function WorkItemsInner() {
     );
   }
 
-  function ColumnList({ items, col }: { items: ColumnItem[]; col: string }) {
+  function ColumnList({
+    tasks: colTasks,
+    col,
+    loadMore,
+  }: {
+    tasks: TaskRow[];
+    col: string;
+    loadMore: { status: string; loaded: number; total: number; loading: boolean } | null;
+  }) {
     const sentinelRef = useRef<HTMLDivElement | null>(null);
     /** Same cursor-tracking guard as the list view: stops a failed fetch from retrying every intersection tick. */
     const attemptedCursorRef = useRef<string | null>(null);
+
+    // Own fetch, own loading state — same reasoning as ListViewCards: a column's card headers
+    // shouldn't depend on (or keep changing with) how much of that column has paginated in.
+    const seriesStatuses = useMemo(() => (SERIES_GROUPED_COLUMNS.has(col) ? [col] : []), [col]);
+    const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, { statuses: seriesStatuses });
+    const seriesSummaryById = useMemo(
+      () => new Map(seriesSummaries.map((s) => [s.seriesId, s] as const)),
+      [seriesSummaries],
+    );
+
+    const items: ColumnItem[] = useMemo(() => {
+      const out: ColumnItem[] = [];
+      const grouped = SERIES_GROUPED_COLUMNS.has(col);
+      for (const task of colTasks) {
+        if (grouped && task.recurringSeriesId) continue; // represented by its series card below
+        out.push({ kind: "task", task });
+      }
+      for (const s of seriesSummaries) {
+        out.push({ kind: "series", seriesId: s.seriesId });
+      }
+      if (loadMore) out.push({ kind: "load-more", ...loadMore });
+      return out;
+    }, [colTasks, col, seriesSummaries, loadMore]);
+
     const loadMoreItem = items.find((it) => it.kind === "load-more");
 
     useEffect(() => {
@@ -1714,7 +1791,6 @@ function WorkItemsInner() {
       );
       observer.observe(el);
       return () => observer.disconnect();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loadMoreItem, col]);
 
     const stalled =
@@ -1728,20 +1804,30 @@ function WorkItemsInner() {
         {items.map((item) => {
           if (item.kind === "task") {
             return (
-              <div key={item.task.id} className="pb-1">
+              <motion.div layout="position" key={item.task.id} className="pb-1">
                 <TaskCard task={item.task} />
-              </div>
+              </motion.div>
             );
           }
           if (item.kind === "series") {
             return (
-              <div key={item.seriesId} className="pb-1">
-                <RecurringSeriesCard tasks={item.tasks} members={members} onOpenTask={openViewTask} />
-              </div>
+              <motion.div layout="position" key={item.seriesId} className="pb-1">
+                <RecurringSeriesCard
+                  orgId={workspaceId}
+                  seriesId={item.seriesId}
+                  summary={seriesSummaryById.get(item.seriesId)}
+                  occurrenceStatuses={seriesStatuses}
+                  members={members}
+                  onOpenTask={openViewTask}
+                />
+              </motion.div>
             );
           }
           return (
-            <div key="load-more" ref={sentinelRef} className="pb-1">
+            <div key="load-more" className="pb-1">
+              {/* Fixed-size marker, kept separate from the skeleton/retry UI below so its own
+                  mount/resize never retriggers the observer — only actual scroll position does. */}
+              <div ref={sentinelRef} aria-hidden className="h-px" />
               {stalled ? (
                 <button
                   type="button"
@@ -1754,10 +1840,16 @@ function WorkItemsInner() {
                   Couldn&apos;t load more · retry ({item.loaded} of {item.total})
                 </button>
               ) : (
-                <div className="flex flex-col gap-1">
+                <motion.div
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                  className="flex flex-col gap-1"
+                >
                   <TaskCardSkeleton />
                   <TaskCardSkeleton />
-                </div>
+                </motion.div>
               )}
             </div>
           );
@@ -1844,9 +1936,15 @@ function WorkItemsInner() {
                       dragOverElRef.current.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
                     }
                     dragOverElRef.current = el;
+                    const draggedTask = dragStateRef.current
+                      ? rows.find((t) => t.id === dragStateRef.current!.taskId)
+                      : undefined;
+                    const draggedCanCancel = draggedTask
+                      ? taskEditCaps(draggedTask, lists, sessionUserId, members).canEditFields
+                      : true;
                     const allowed =
                       dragStateRef.current != null &&
-                      kanbanTransitionAllowedFromStored(dragStateRef.current.status, col);
+                      kanbanTransitionAllowedFromStored(dragStateRef.current.status, col, draggedCanCancel);
                     el.classList.remove(...DROP_VALID_CLASSES, ...DROP_INVALID_CLASSES);
                     el.classList.add(...(allowed ? DROP_VALID_CLASSES : DROP_INVALID_CLASSES));
                   }}
@@ -1868,7 +1966,8 @@ function WorkItemsInner() {
                   const task = rows.find((t) => t.id === id);
                   if (!task) return;
                   const from = normalizeTaskStatus(task.status);
-                  if (!kanbanTransitionAllowedFromStored(from, col)) {
+                  const canCancel = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
+                  if (!kanbanTransitionAllowedFromStored(from, col, canCancel)) {
                     setError("You can only move to the next stage or Cancelled (or reopen cancelled tasks to Pending).");
                     return;
                   }
@@ -1887,36 +1986,20 @@ function WorkItemsInner() {
                       </span>
                     </div>
                   </div>
-                  {(() => {
-                    const colItems: ColumnItem[] = [];
-                    if (col === "done" || col === "cancelled") {
-                      const seriesGroups = new Map<string, TaskRow[]>();
-                      for (const task of colTasks) {
-                        if (task.recurringSeriesId) {
-                          const g = seriesGroups.get(task.recurringSeriesId) ?? [];
-                          g.push(task);
-                          seriesGroups.set(task.recurringSeriesId, g);
-                        } else {
-                          colItems.push({ kind: "task", task });
-                        }
-                      }
-                      for (const [seriesId, tasks] of seriesGroups) {
-                        colItems.push({ kind: "series", seriesId, tasks });
-                      }
-                    } else {
-                      for (const task of colTasks) colItems.push({ kind: "task", task });
+                  <ColumnList
+                    tasks={colTasks}
+                    col={col}
+                    loadMore={
+                      columnMeta[col]?.nextCursor
+                        ? {
+                            status: col,
+                            loaded: colTasks.length,
+                            total: columnMeta[col]!.total,
+                            loading: loadingMoreColumn === col,
+                          }
+                        : null
                     }
-                    if (columnMeta[col]?.nextCursor) {
-                      colItems.push({
-                        kind: "load-more",
-                        status: col,
-                        loaded: colTasks.length,
-                        total: columnMeta[col]!.total,
-                        loading: loadingMoreColumn === col,
-                      });
-                    }
-                    return <ColumnList items={colItems} col={col} />;
-                  })()}
+                  />
                 </div>
               );
             })}
@@ -2192,8 +2275,8 @@ function WorkItemsInner() {
           </div>
           <WorkBoardStatsCard
             counts={boardStatusCounts}
-            total={visibleTasks.length}
-            loading={workspaceLoading}
+            total={boardTotalCount}
+            loading={taskCountsLoading}
           />
         </div>
       </header>

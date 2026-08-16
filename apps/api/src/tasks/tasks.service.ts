@@ -50,6 +50,37 @@ export class TasksService {
     return { tasks: synced, nextCursor: result.nextCursor, total: result.total };
   }
 
+  /** Per-status counts for the pipeline summary card — see {@link AuthorizationService.countTasksByStatus}. */
+  async counts(userId: string, organizationId: string, opts?: { listId?: string; departmentId?: string }) {
+    return this.authz.countTasksByStatus(userId, organizationId, opts);
+  }
+
+  /** Collapsed-card stats for every recurring chain in the given statuses — see {@link AuthorizationService.listRecurringSeriesSummaries}. */
+  async seriesSummaries(
+    userId: string,
+    organizationId: string,
+    opts: { statuses: string[]; listId?: string; departmentId?: string },
+  ) {
+    return this.authz.listRecurringSeriesSummaries(userId, organizationId, opts);
+  }
+
+  /** Full occurrence list for one recurring chain — fetched only when its card is expanded. */
+  async seriesOccurrences(
+    userId: string,
+    organizationId: string,
+    seriesId: string,
+    opts?: { status?: string[] },
+  ) {
+    const result = await this.authz.listTasksForUser(userId, organizationId, {
+      recurringSeriesId: seriesId,
+      status: opts?.status,
+      limit: 100,
+      includeSubtasks: false,
+    });
+    const synced = await this.syncAutomatedStatuses(result.tasks);
+    return { tasks: synced };
+  }
+
   async create(userId: string, organizationId: string, body: unknown) {
     await this.authz.assertOrgMember(userId, organizationId);
     const parsed = createTaskSchema.parse(body);
@@ -555,6 +586,10 @@ export class TasksService {
       throw new ForbiddenException("Cannot edit subtasks");
     }
     if (!caps.canParticipate) throw new ForbiddenException("Cannot update task");
+
+    if (statusChanged && nextStatus === "cancelled" && !caps.canEditFields) {
+      throw new ForbiddenException("Only the assigner, department manager, or owner can cancel this task");
+    }
 
     if (discordChannelChanged && !access.isOwner) {
       throw new ForbiddenException("Only the workspace owner can change a task's Discord channel");

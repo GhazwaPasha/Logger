@@ -248,6 +248,30 @@ export const listTasksQuerySchema = z.object({
 });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+
+/** Pipeline card counts — no rows, so no `status`/`limit`/`cursor`. */
+export const taskCountsQuerySchema = z.object({
+  listId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().optional(),
+});
+export type TaskCountsQuery = z.infer<typeof taskCountsQuerySchema>;
+
+/** RecurringSeriesCard header stats, grouped by chain, for the given statuses. */
+export const seriesSummaryQuerySchema = z.object({
+  status: z.string().min(1).transform((s) => s.split(",").filter(Boolean)),
+  listId: z.string().uuid().optional(),
+  departmentId: z.string().uuid().optional(),
+});
+export type SeriesSummaryQuery = z.infer<typeof seriesSummaryQuerySchema>;
+
+/** Full occurrence list for one recurring chain, fetched only when its card is expanded. */
+export const seriesOccurrencesQuerySchema = z.object({
+  status: z
+    .string()
+    .optional()
+    .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+});
+export type SeriesOccurrencesQuery = z.infer<typeof seriesOccurrencesQuerySchema>;
 export type AppendLedgerInput = z.infer<typeof appendLedgerSchema>;
 export type RescheduleTaskInput = z.infer<typeof rescheduleTaskSchema>;
 

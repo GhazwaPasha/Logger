@@ -127,7 +127,7 @@ export function TaskViewPanel({
   const caps = taskEditCaps(task, lists, sessionUserId, members);
 
   const stored = normalizeTaskStatus(task.status);
-  const statusMenuOptions = stageControlDropdownOptions(stored);
+  const statusMenuOptions = stageControlDropdownOptions(stored, caps.canEditFields);
 
   const dueFormatted = formatDueDate(task.dueAt, timeZone);
   const dueRepeat = parseTaskDueRepeat(task.dueRepeat);

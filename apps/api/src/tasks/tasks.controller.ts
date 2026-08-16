@@ -12,7 +12,12 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { listTasksQuerySchema } from "@work-ledger/contracts";
+import {
+  listTasksQuerySchema,
+  seriesOccurrencesQuerySchema,
+  seriesSummaryQuerySchema,
+  taskCountsQuerySchema,
+} from "@work-ledger/contracts";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { MemoryCacheService } from "../cache/memory-cache.service";
@@ -76,6 +81,82 @@ export class TasksController {
     @Body() body: unknown,
   ) {
     return this.tasks.create(user.id, organizationId, body);
+  }
+
+  /**
+   * Pipeline card counts. Deliberately separate from `list()` — the card needs a total per status
+   * (however many done/cancelled tasks exist), not a page of rows, so it can show a real number
+   * before — and independent of whether — the board has paginated that far.
+   */
+  @Get("counts")
+  async counts(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query() rawQuery: Record<string, string>,
+    @Headers("if-none-match") ifNoneMatch: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const query = taskCountsQuerySchema.parse(rawQuery);
+    const key = `taskcounts:${organizationId}:${user.id}:${JSON.stringify(query)}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.etag === ifNoneMatch) {
+      res.status(304).end();
+      return;
+    }
+    if (cached) {
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "private, no-cache");
+      return cached.data;
+    }
+    const data = await this.tasks.counts(user.id, organizationId, query);
+    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, no-cache");
+    return data;
+  }
+
+  /** Collapsed-card stats (count + latest + last completion) per recurring chain — see {@link counts} for why this is separate from `list()`. */
+  @Get("series-summary")
+  async seriesSummary(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query() rawQuery: Record<string, string>,
+    @Headers("if-none-match") ifNoneMatch: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const query = seriesSummaryQuerySchema.parse(rawQuery);
+    const key = `seriessummary:${organizationId}:${user.id}:${JSON.stringify(query)}`;
+    const cached = this.cache.get(key);
+    if (cached && cached.etag === ifNoneMatch) {
+      res.status(304).end();
+      return;
+    }
+    if (cached) {
+      res.setHeader("ETag", cached.etag);
+      res.setHeader("Cache-Control", "private, no-cache");
+      return cached.data;
+    }
+    const data = await this.tasks.seriesSummaries(user.id, organizationId, {
+      statuses: query.status,
+      listId: query.listId,
+      departmentId: query.departmentId,
+    });
+    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
+    res.setHeader("ETag", etag);
+    res.setHeader("Cache-Control", "private, no-cache");
+    return data;
+  }
+
+  /** Full occurrence list for one recurring chain — only called once its RecurringSeriesCard is expanded. */
+  @Get("series/:seriesId")
+  seriesOccurrences(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Param("seriesId") seriesId: string,
+    @Query() rawQuery: Record<string, string>,
+  ) {
+    const query = seriesOccurrencesQuerySchema.parse(rawQuery);
+    return this.tasks.seriesOccurrences(user.id, organizationId, seriesId, { status: query.status });
   }
 }
 

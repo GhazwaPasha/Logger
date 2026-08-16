@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.seriesOccurrencesQuerySchema = exports.seriesSummaryQuerySchema = exports.taskCountsQuerySchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 const zod_1 = require("zod");
 const timezone_js_1 = require("./timezone.js");
 __exportStar(require("./timezone.js"), exports);
@@ -227,6 +227,24 @@ exports.listTasksQuerySchema = zod_1.z.object({
         .enum(["true", "false"])
         .optional()
         .transform((v) => v === "true"),
+});
+/** Pipeline card counts — no rows, so no `status`/`limit`/`cursor`. */
+exports.taskCountsQuerySchema = zod_1.z.object({
+    listId: zod_1.z.string().uuid().optional(),
+    departmentId: zod_1.z.string().uuid().optional(),
+});
+/** RecurringSeriesCard header stats, grouped by chain, for the given statuses. */
+exports.seriesSummaryQuerySchema = zod_1.z.object({
+    status: zod_1.z.string().min(1).transform((s) => s.split(",").filter(Boolean)),
+    listId: zod_1.z.string().uuid().optional(),
+    departmentId: zod_1.z.string().uuid().optional(),
+});
+/** Full occurrence list for one recurring chain, fetched only when its card is expanded. */
+exports.seriesOccurrencesQuerySchema = zod_1.z.object({
+    status: zod_1.z
+        .string()
+        .optional()
+        .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
 });
 exports.createCommentSchema = zod_1.z.object({
     body: zod_1.z.string().min(1).max(4000),

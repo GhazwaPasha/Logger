@@ -180,8 +180,11 @@ export function statusLabelTextClasses(st: BoardTaskStatus): string {
  * Stage targets for the **board/list status pill** menu: always includes the current stage,
  * the **next** stage along Pending → In progress → Done (when one exists), and **Cancelled**
  * whenever the task is not already cancelled. Cancelled tasks only offer reopen → **pending**.
+ *
+ * `canCancel` gates the **Cancelled** target — mirrors the API's `canEditFields` rule
+ * (owner/department manager/assigner only), so a plain assignee never sees it as an option.
  */
-export function stageControlDropdownOptions(stored: BoardTaskStatus): ManualTaskStatus[] {
+export function stageControlDropdownOptions(stored: BoardTaskStatus, canCancel = true): ManualTaskStatus[] {
   const manual = manualStatusFromStored(stored);
   if (manual === "cancelled") {
     return ["cancelled", "pending"];
@@ -189,7 +192,7 @@ export function stageControlDropdownOptions(stored: BoardTaskStatus): ManualTask
   const next = nextWorkflowManualStatus(stored);
   const out: ManualTaskStatus[] = [manual];
   if (next) out.push(next);
-  out.push("cancelled");
+  if (canCancel) out.push("cancelled");
   return out;
 }
 
@@ -198,19 +201,20 @@ export function stageControlDropdownOptions(stored: BoardTaskStatus): ManualTask
  * (list row + kanban stage menu): **next** workflow stage only (Pending → In progress → Done), plus **Cancelled**,
  * or **Pending** when reopening from cancelled (**Done** only moves to Cancelled, not backward via drag).
  */
-export function kanbanAllowedManualTransitions(current: ManualTaskStatus): ManualTaskStatus[] {
-  return stageControlDropdownOptions(current);
+export function kanbanAllowedManualTransitions(current: ManualTaskStatus, canCancel = true): ManualTaskStatus[] {
+  return stageControlDropdownOptions(current, canCancel);
 }
 
-export function kanbanAllowedTransitionsFromStored(stored: BoardTaskStatus): ManualTaskStatus[] {
-  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(stored));
+export function kanbanAllowedTransitionsFromStored(stored: BoardTaskStatus, canCancel = true): ManualTaskStatus[] {
+  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(stored), canCancel);
 }
 
 export function kanbanTransitionAllowedFromStored(
   fromStored: BoardTaskStatus,
   toFlowColumn: ManualTaskStatus,
+  canCancel = true,
 ): boolean {
-  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(fromStored)).includes(toFlowColumn);
+  return kanbanAllowedManualTransitions(storedStatusToFlowColumn(fromStored), canCancel).includes(toFlowColumn);
 }
 
 /** Next manual stage along Pending → In progress → Done (not cancel). For list checklist “advance one step”. */

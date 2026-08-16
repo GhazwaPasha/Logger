@@ -11,6 +11,7 @@ import {
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
+import { coerceLegacyTaskStatus } from "../tasks/task-status-automation";
 
 export interface ListTasksOpts {
   includeSubtasks?: boolean;
@@ -24,7 +25,22 @@ export interface ListTasksOpts {
   cursor?: string;
   /** When true, returns archived tasks (deletedAt set) instead of active ones — same role-based scoping either way. */
   archivedOnly?: boolean;
+  /** Restricts to one recurring chain — used for the on-demand occurrence list behind a RecurringSeriesCard. */
+  recurringSeriesId?: string;
 }
+
+export type SeriesSummaryRow = {
+  seriesId: string;
+  count: number;
+  latest: { id: string; title: string; createdAt: Date };
+  lastDone: {
+    id: string;
+    completedAt: Date | null;
+    dueAt: Date | null;
+    lastSubmittedAt: Date | null;
+    assigneeUserIds: string[];
+  } | null;
+};
 
 function encodeCursor(task: { createdAt: Date; id: string }): string {
   return Buffer.from(JSON.stringify({ createdAt: task.createdAt.toISOString(), id: task.id })).toString("base64url");
@@ -260,6 +276,67 @@ export class AuthorizationService {
     return assignedRows.map((r) => r.taskId);
   }
 
+  /**
+   * Role-scoped base WHERE conditions for the tasks table (owner: whole org; manager: managed
+   * lists; member/no membership: assigned-only). Shared by every task-visibility query so a new
+   * one can't accidentally skip scoping. Returns `null` when the caller has no visible rows at all
+   * (distinct from "org member with zero matches" — callers should short-circuit on `null`).
+   */
+  private async roleScopedTaskConditions(
+    userId: string,
+    organizationId: string,
+    opts: { archivedOnly?: boolean } = {},
+  ): Promise<SQL[] | null> {
+    const memberRow = await this.db
+      .select()
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
+      .limit(1);
+    const m = memberRow[0];
+    const deletedCondition = opts.archivedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt);
+
+    const conditions: (SQL | undefined)[] = [eq(tasks.organizationId, organizationId), deletedCondition];
+
+    if (m?.role === "manager") {
+      const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
+      if (managedDeptIds.length === 0) return null;
+      const managerLists = await this.db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
+      if (managerLists.length === 0) return null;
+      conditions.push(inArray(tasks.listId, managerLists.map((l) => l.id)));
+    } else if (!m || m.role === "member") {
+      const assignedIds = await this.db
+        .select({ taskId: taskAssignees.taskId })
+        .from(taskAssignees)
+        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), deletedCondition));
+      const ids = assignedIds.map((r) => r.taskId);
+      if (ids.length === 0) return null;
+      conditions.push(inArray(tasks.id, ids));
+    }
+
+    return conditions.filter((c): c is SQL => c !== undefined);
+  }
+
+  /** Shared by every task-visibility query: list/department scoping from the filter opts. Returns `null` when a department filter matches no lists. */
+  private async listScopedFilterConditions(
+    organizationId: string,
+    opts: { listId?: string; departmentId?: string },
+  ): Promise<SQL[] | null> {
+    if (opts.listId) return [eq(tasks.listId, opts.listId)];
+    if (opts.departmentId) {
+      const deptLists = await this.db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.organizationId, organizationId), eq(lists.departmentId, opts.departmentId)));
+      if (deptLists.length === 0) return null;
+      return [inArray(tasks.listId, deptLists.map((l) => l.id))];
+    }
+    return [];
+  }
+
   async listTasksForUser(userId: string, organizationId: string, opts?: ListTasksOpts) {
     const includeSubtasks = opts?.includeSubtasks !== false;
     const limit = Math.min(opts?.limit ?? 50, 100);
@@ -269,39 +346,10 @@ export class AuthorizationService {
       throw new ForbiddenException("No access to this organization");
     }
 
-    const memberRow = await this.db
-      .select()
-      .from(organizationMembers)
-      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
-      .limit(1);
-    const m = memberRow[0];
-    const deletedCondition = opts?.archivedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt);
-
-    // Role-scoped base conditions
-    const roleConditions: (SQL | undefined)[] = [
-      eq(tasks.organizationId, organizationId),
-      deletedCondition,
-    ];
-
-    if (m?.role === "manager") {
-      const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
-      if (managedDeptIds.length === 0) return { tasks: [], nextCursor: null, total: 0 };
-      const managerLists = await this.db
-        .select({ id: lists.id })
-        .from(lists)
-        .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
-      if (managerLists.length === 0) return { tasks: [], nextCursor: null, total: 0 };
-      roleConditions.push(inArray(tasks.listId, managerLists.map((l) => l.id)));
-    } else if (!m || m.role === "member") {
-      const assignedIds = await this.db
-        .select({ taskId: taskAssignees.taskId })
-        .from(taskAssignees)
-        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), deletedCondition));
-      const ids = assignedIds.map((r) => r.taskId);
-      if (ids.length === 0) return { tasks: [], nextCursor: null, total: 0 };
-      roleConditions.push(inArray(tasks.id, ids));
-    }
+    const roleConditions = await this.roleScopedTaskConditions(userId, organizationId, {
+      archivedOnly: opts?.archivedOnly,
+    });
+    if (roleConditions === null) return { tasks: [], nextCursor: null, total: 0 };
 
     // Filter conditions
     const filterConditions: (SQL | undefined)[] = [];
@@ -310,16 +358,16 @@ export class AuthorizationService {
       filterConditions.push(inArray(tasks.status, opts.status as (typeof tasks.$inferSelect)["status"][]));
     }
 
-    if (opts?.listId) {
-      filterConditions.push(eq(tasks.listId, opts.listId));
-    } else if (opts?.departmentId) {
-      const deptLists = await this.db
-        .select({ id: lists.id })
-        .from(lists)
-        .where(and(eq(lists.organizationId, organizationId), eq(lists.departmentId, opts.departmentId)));
-      if (deptLists.length === 0) return { tasks: [], nextCursor: null, total: 0 };
-      filterConditions.push(inArray(tasks.listId, deptLists.map((l) => l.id)));
+    if (opts?.recurringSeriesId) {
+      filterConditions.push(eq(tasks.recurringSeriesId, opts.recurringSeriesId));
     }
+
+    const listScoped = await this.listScopedFilterConditions(organizationId, {
+      listId: opts?.listId,
+      departmentId: opts?.departmentId,
+    });
+    if (listScoped === null) return { tasks: [], nextCursor: null, total: 0 };
+    filterConditions.push(...listScoped);
 
     if (opts?.assigneeUserId) {
       const assignedRows = await this.db
@@ -362,6 +410,127 @@ export class AuthorizationService {
 
     const finalized = await this.finalizeTaskList(slicedRows, includeSubtasks);
     return { tasks: finalized, nextCursor, total };
+  }
+
+  /**
+   * Per-status task counts (pending/in_progress/done/cancelled) for the pipeline summary card.
+   * A single grouped COUNT — no rows are fetched — so it stays cheap and accurate however many
+   * tasks (especially completed/cancelled ones) exist, independent of what the board has paginated in.
+   */
+  async countTasksByStatus(
+    userId: string,
+    organizationId: string,
+    opts: { listId?: string; departmentId?: string } = {},
+  ): Promise<Record<string, number>> {
+    const orgIds = await this.listOrganizationIdsForUser(userId);
+    if (!orgIds.includes(organizationId)) {
+      throw new ForbiddenException("No access to this organization");
+    }
+
+    const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
+    if (roleConditions === null) return {};
+
+    const listScoped = await this.listScopedFilterConditions(organizationId, opts);
+    if (listScoped === null) return {};
+
+    const rows = await this.db
+      .select({ status: tasks.status, value: count() })
+      .from(tasks)
+      .where(and(...roleConditions, ...listScoped))
+      .groupBy(tasks.status);
+
+    // Legacy rows (`open`/`assigned`/`late`) fold into the four workflow buckets the board
+    // actually renders — same mapping the flat list applies per-row via normalizeTaskStatus.
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      const normalized = coerceLegacyTaskStatus(r.status);
+      out[normalized] = (out[normalized] ?? 0) + Number(r.value);
+    }
+    return out;
+  }
+
+  /**
+   * One summary row per recurring chain (count + latest occurrence + last completion) for the
+   * statuses given — powers the collapsed RecurringSeriesCard header without ever fetching the
+   * chain's full occurrence list. That list is only pulled on demand, via `listTasksForUser` with
+   * `recurringSeriesId`, when the card is expanded.
+   */
+  async listRecurringSeriesSummaries(
+    userId: string,
+    organizationId: string,
+    opts: { statuses: string[]; listId?: string; departmentId?: string },
+  ): Promise<SeriesSummaryRow[]> {
+    const orgIds = await this.listOrganizationIdsForUser(userId);
+    if (!orgIds.includes(organizationId)) {
+      throw new ForbiddenException("No access to this organization");
+    }
+
+    const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
+    if (roleConditions === null) return [];
+
+    const listScoped = await this.listScopedFilterConditions(organizationId, opts);
+    if (listScoped === null) return [];
+
+    const conditions = [
+      ...roleConditions,
+      ...listScoped,
+      isNotNull(tasks.recurringSeriesId),
+      inArray(tasks.status, opts.statuses as (typeof tasks.$inferSelect)["status"][]),
+    ];
+
+    const [countRows, latestRows, lastDoneRows] = await Promise.all([
+      this.db
+        .select({ seriesId: tasks.recurringSeriesId, value: count() })
+        .from(tasks)
+        .where(and(...conditions))
+        .groupBy(tasks.recurringSeriesId),
+      this.db
+        .selectDistinctOn([tasks.recurringSeriesId])
+        .from(tasks)
+        .where(and(...conditions))
+        .orderBy(tasks.recurringSeriesId, desc(tasks.createdAt)),
+      this.db
+        .selectDistinctOn([tasks.recurringSeriesId])
+        .from(tasks)
+        .where(and(...conditions, eq(tasks.status, "done")))
+        .orderBy(tasks.recurringSeriesId, desc(tasks.completedAt), desc(tasks.createdAt)),
+    ]);
+
+    const lastDoneTaskIds = lastDoneRows.map((r) => r.id);
+    const assigneeRows = lastDoneTaskIds.length
+      ? await this.db
+          .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+          .from(taskAssignees)
+          .where(inArray(taskAssignees.taskId, lastDoneTaskIds))
+      : [];
+    const assigneesByTask = new Map<string, string[]>();
+    for (const r of assigneeRows) {
+      const arr = assigneesByTask.get(r.taskId);
+      if (arr) arr.push(r.userId);
+      else assigneesByTask.set(r.taskId, [r.userId]);
+    }
+
+    const lastDoneBySeriesId = new Map(lastDoneRows.map((r) => [r.recurringSeriesId!, r]));
+    const countBySeriesId = new Map(countRows.map((r) => [r.seriesId!, Number(r.value)]));
+
+    return latestRows.map((row): SeriesSummaryRow => {
+      const seriesId = row.recurringSeriesId!;
+      const lastDone = lastDoneBySeriesId.get(seriesId);
+      return {
+        seriesId,
+        count: countBySeriesId.get(seriesId) ?? 0,
+        latest: { id: row.id, title: row.title, createdAt: row.createdAt },
+        lastDone: lastDone
+          ? {
+              id: lastDone.id,
+              completedAt: lastDone.completedAt,
+              dueAt: lastDone.dueAt,
+              lastSubmittedAt: lastDone.lastSubmittedAt,
+              assigneeUserIds: assigneesByTask.get(lastDone.id) ?? [],
+            }
+          : null,
+      };
+    });
   }
 
   /** Assignees always attached; subtasks loaded only when needed (saves a batched subtask query). */
