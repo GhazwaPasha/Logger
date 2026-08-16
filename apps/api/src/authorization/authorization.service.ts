@@ -1,5 +1,21 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { type SQL, and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, max, or } from "drizzle-orm";
+import {
+  type SQL,
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  max,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
 import {
   activityLedger,
   lists,
@@ -29,7 +45,19 @@ export interface ListTasksOpts {
   recurringSeriesId?: string;
   /** Omits tasks with a `recurringSeriesId` set — see `excludeRecurringSeries` on {@link listTasksQuerySchema}. */
   excludeRecurringSeries?: boolean;
+  /** "Unassigned" scope — ignored when `assigneeUserId` is also set (specific assignee wins). */
+  unassigned?: boolean;
 }
+
+/** Filter scope shared by `countTasksByStatus` and `listRecurringSeriesSummaries` — see {@link AuthorizationService.boardFilterConditions}. */
+export type BoardFilterOpts = {
+  listId?: string;
+  departmentId?: string;
+  assigneeUserId?: string;
+  unassigned?: boolean;
+  dueDateFrom?: string;
+  dueDateTo?: string;
+};
 
 export type SeriesSummaryRow = {
   seriesId: string;
@@ -339,6 +367,53 @@ export class AuthorizationService {
     return [];
   }
 
+  /**
+   * The work board's "board filters" — list/level scope, assignee (specific or "unassigned"), and
+   * a due-date range — shared by `listTasksForUser` and the pipeline-counts / series-summary
+   * queries so all three stay in sync with what the board's task list is actually showing. Status/
+   * goal/milestone filters are deliberately NOT part of this: the pipeline card's job is the
+   * cross-status picture, and folding a status drilldown into it would make it a degenerate echo
+   * of the list instead of an overview. Returns `null` when a filter can't match anything (empty
+   * department, or an assignee with zero assigned tasks) — same short-circuit shape as
+   * {@link roleScopedTaskConditions}.
+   */
+  private async boardFilterConditions(
+    organizationId: string,
+    opts: {
+      listId?: string;
+      departmentId?: string;
+      assigneeUserId?: string;
+      unassigned?: boolean;
+      dueDateFrom?: string;
+      dueDateTo?: string;
+    },
+  ): Promise<SQL[] | null> {
+    const listScoped = await this.listScopedFilterConditions(organizationId, opts);
+    if (listScoped === null) return null;
+    const conditions: SQL[] = [...listScoped];
+
+    if (opts.assigneeUserId) {
+      const assignedRows = await this.db
+        .select({ taskId: taskAssignees.taskId })
+        .from(taskAssignees)
+        .where(eq(taskAssignees.userId, opts.assigneeUserId));
+      const assignedIds = assignedRows.map((r) => r.taskId);
+      if (assignedIds.length === 0) return null;
+      conditions.push(inArray(tasks.id, assignedIds));
+    } else if (opts.unassigned) {
+      conditions.push(
+        notExists(
+          this.db.select({ one: sql`1` }).from(taskAssignees).where(eq(taskAssignees.taskId, tasks.id)),
+        ),
+      );
+    }
+
+    if (opts.dueDateFrom) conditions.push(gte(tasks.dueAt, new Date(opts.dueDateFrom)));
+    if (opts.dueDateTo) conditions.push(lte(tasks.dueAt, new Date(opts.dueDateTo)));
+
+    return conditions;
+  }
+
   async listTasksForUser(userId: string, organizationId: string, opts?: ListTasksOpts) {
     const includeSubtasks = opts?.includeSubtasks !== false;
     const limit = Math.min(opts?.limit ?? 50, 100);
@@ -368,25 +443,16 @@ export class AuthorizationService {
       filterConditions.push(isNull(tasks.recurringSeriesId));
     }
 
-    const listScoped = await this.listScopedFilterConditions(organizationId, {
+    const boardFiltered = await this.boardFilterConditions(organizationId, {
       listId: opts?.listId,
       departmentId: opts?.departmentId,
+      assigneeUserId: opts?.assigneeUserId,
+      unassigned: opts?.unassigned,
+      dueDateFrom: opts?.dueDateFrom,
+      dueDateTo: opts?.dueDateTo,
     });
-    if (listScoped === null) return { tasks: [], nextCursor: null, total: 0 };
-    filterConditions.push(...listScoped);
-
-    if (opts?.assigneeUserId) {
-      const assignedRows = await this.db
-        .select({ taskId: taskAssignees.taskId })
-        .from(taskAssignees)
-        .where(eq(taskAssignees.userId, opts.assigneeUserId));
-      const assignedIds = assignedRows.map((r) => r.taskId);
-      if (assignedIds.length === 0) return { tasks: [], nextCursor: null, total: 0 };
-      filterConditions.push(inArray(tasks.id, assignedIds));
-    }
-
-    if (opts?.dueDateFrom) filterConditions.push(gte(tasks.dueAt, new Date(opts.dueDateFrom)));
-    if (opts?.dueDateTo) filterConditions.push(lte(tasks.dueAt, new Date(opts.dueDateTo)));
+    if (boardFiltered === null) return { tasks: [], nextCursor: null, total: 0 };
+    filterConditions.push(...boardFiltered);
 
     const baseConditions = [...roleConditions, ...filterConditions];
 
@@ -426,7 +492,7 @@ export class AuthorizationService {
   async countTasksByStatus(
     userId: string,
     organizationId: string,
-    opts: { listId?: string; departmentId?: string } = {},
+    opts: BoardFilterOpts = {},
   ): Promise<Record<string, number>> {
     const orgIds = await this.listOrganizationIdsForUser(userId);
     if (!orgIds.includes(organizationId)) {
@@ -436,13 +502,13 @@ export class AuthorizationService {
     const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
     if (roleConditions === null) return {};
 
-    const listScoped = await this.listScopedFilterConditions(organizationId, opts);
-    if (listScoped === null) return {};
+    const boardFiltered = await this.boardFilterConditions(organizationId, opts);
+    if (boardFiltered === null) return {};
 
     const rows = await this.db
       .select({ status: tasks.status, value: count() })
       .from(tasks)
-      .where(and(...roleConditions, ...listScoped))
+      .where(and(...roleConditions, ...boardFiltered))
       .groupBy(tasks.status);
 
     // Legacy rows (`open`/`assigned`/`late`) fold into the four workflow buckets the board
@@ -464,7 +530,7 @@ export class AuthorizationService {
   async listRecurringSeriesSummaries(
     userId: string,
     organizationId: string,
-    opts: { statuses: string[]; listId?: string; departmentId?: string },
+    opts: BoardFilterOpts & { statuses: string[] },
   ): Promise<SeriesSummaryRow[]> {
     const orgIds = await this.listOrganizationIdsForUser(userId);
     if (!orgIds.includes(organizationId)) {
@@ -474,12 +540,12 @@ export class AuthorizationService {
     const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
     if (roleConditions === null) return [];
 
-    const listScoped = await this.listScopedFilterConditions(organizationId, opts);
-    if (listScoped === null) return [];
+    const boardFiltered = await this.boardFilterConditions(organizationId, opts);
+    if (boardFiltered === null) return [];
 
     const conditions = [
       ...roleConditions,
-      ...listScoped,
+      ...boardFiltered,
       isNotNull(tasks.recurringSeriesId),
       inArray(tasks.status, opts.statuses as (typeof tasks.$inferSelect)["status"][]),
     ];

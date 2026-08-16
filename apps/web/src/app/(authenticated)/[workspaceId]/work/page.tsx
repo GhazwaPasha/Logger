@@ -47,7 +47,12 @@ import { taskEditCaps } from "@/lib/workspace-permissions";
 import { formatInTimeZone, getZonedParts } from "@/lib/date";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
-import { useTaskCounts, useSeriesSummaries, type SeriesSummaryRow } from "@/hooks/useWorkTaskStats";
+import {
+  useTaskCounts,
+  useSeriesSummaries,
+  type BoardFilterOpts,
+  type SeriesSummaryRow,
+} from "@/hooks/useWorkTaskStats";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
@@ -106,6 +111,7 @@ import {
   statusPillPaletteClasses,
   storedStatusToFlowColumn,
   dueChipPillClass,
+  dueWindowRange,
   taskMatchesDueRange,
   taskMatchesDueWindow,
   taskMatchesUrlStatusFilter,
@@ -399,8 +405,7 @@ function ColumnList({
   loadMoreColumn,
   token,
   workspaceId,
-  selectedList,
-  selectedLevel,
+  boardFilter,
   prefersReduced,
   members,
   openViewTask,
@@ -413,8 +418,7 @@ function ColumnList({
   loadMoreColumn: (status: string) => void | Promise<void>;
   token: string | null;
   workspaceId: string;
-  selectedList: string | null;
-  selectedLevel: string | null;
+  boardFilter: BoardFilterOpts;
   prefersReduced: boolean | null;
   members: MemberRow[];
   openViewTask: (taskId: string) => void;
@@ -428,9 +432,8 @@ function ColumnList({
   // shouldn't depend on (or keep changing with) how much of that column has paginated in.
   const seriesStatuses = useMemo(() => (SERIES_GROUPED_COLUMNS.has(col) ? [col] : []), [col]);
   const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+    ...boardFilter,
     statuses: seriesStatuses,
-    listId: selectedList,
-    departmentId: selectedList ? null : selectedLevel,
   });
 
   const items: ColumnItem[] = useMemo(() => {
@@ -572,8 +575,7 @@ function KanbanBoard({
   dragStateRef,
   token,
   workspaceId,
-  selectedList,
-  selectedLevel,
+  boardFilter,
   prefersReduced,
   openViewTask,
   renderTaskCard,
@@ -596,8 +598,7 @@ function KanbanBoard({
   dragStateRef: RefObject<{ taskId: string; status: BoardTaskStatus } | null>;
   token: string | null;
   workspaceId: string;
-  selectedList: string | null;
-  selectedLevel: string | null;
+  boardFilter: BoardFilterOpts;
   prefersReduced: boolean | null;
   openViewTask: (taskId: string) => void;
   renderTaskCard: (task: TaskRow) => ReactNode;
@@ -745,8 +746,7 @@ function KanbanBoard({
                   loadMoreColumn={loadMoreColumn}
                   token={token}
                   workspaceId={workspaceId}
-                  selectedList={selectedList}
-                  selectedLevel={selectedLevel}
+                  boardFilter={boardFilter}
                   prefersReduced={prefersReduced}
                   members={members}
                   openViewTask={openViewTask}
@@ -766,8 +766,7 @@ function ListViewCards({
   rows,
   token,
   workspaceId,
-  selectedList,
-  selectedLevel,
+  boardFilter,
   columnMeta,
   loadingMoreColumn,
   loadMoreColumn,
@@ -779,8 +778,7 @@ function ListViewCards({
   rows: TaskRow[];
   token: string | null;
   workspaceId: string;
-  selectedList: string | null;
-  selectedLevel: string | null;
+  boardFilter: BoardFilterOpts;
   columnMeta: Record<string, ColumnMeta>;
   loadingMoreColumn: string | null;
   loadMoreColumn: (status: string) => void | Promise<void>;
@@ -795,9 +793,8 @@ function ListViewCards({
   // known series are dropped from the flat list below; the series card is pushed once per
   // summary instead, wherever pagination happens to be.
   const { summaries: seriesSummaries } = useSeriesSummaries(token, workspaceId, {
+    ...boardFilter,
     statuses: DONE_CANCELLED_STATUSES,
-    listId: selectedList,
-    departmentId: selectedList ? null : selectedLevel,
   });
   const sortedSeriesSummaries = useMemo(
     () => [...seriesSummaries].sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime()),
@@ -1478,15 +1475,35 @@ function WorkItemsInner() {
   }, [activeTasks, selectedList, selectedLevel, levelLists]);
 
   /**
+   * The board filters the Pipeline card and RecurringSeriesCards track, beyond list/level scope:
+   * due-date range and assignee. Deliberately excludes urlStatusFilter/goal/milestone — see the
+   * doc comment on the backend's `boardFilterConditions` for why. `urlAssigneeUserId` (a specific
+   * assignee, e.g. from a People-page drilldown) wins over the mine/unassigned toggle on the rare
+   * chance both are active at once; the toggle is the far more common path.
+   */
+  const dueRange = useMemo(
+    () => dueWindowRange(dueWindow, dueFrom, dueTo, timeZone),
+    [dueWindow, dueFrom, dueTo, timeZone],
+  );
+  const boardFilter: BoardFilterOpts = useMemo(
+    () => ({
+      listId: selectedList,
+      departmentId: selectedList ? null : selectedLevel,
+      dueDateFrom: dueRange.from,
+      dueDateTo: dueRange.to,
+      assigneeUserId: urlAssigneeUserId ?? (urlAssigneeScope === "mine" ? sessionUserId : null),
+      unassigned: !urlAssigneeUserId && urlAssigneeScope === "unassigned",
+    }),
+    [selectedList, selectedLevel, dueRange, urlAssigneeUserId, urlAssigneeScope, sessionUserId],
+  );
+
+  /**
    * Pipeline card counts: a dedicated grouped-COUNT query, not a tally over `visibleTasks`. Done/
    * cancelled totals used to be counted off whatever the board had paginated in so far, so the
    * card kept changing (and visibly reflowing) as more completed tasks streamed in behind the
    * scenes — this stays correct and stable from the first paint, with its own loading state.
    */
-  const { counts: rawTaskCounts, isLoading: taskCountsLoading } = useTaskCounts(token, workspaceId, {
-    listId: selectedList,
-    departmentId: selectedList ? null : selectedLevel,
-  });
+  const { counts: rawTaskCounts, isLoading: taskCountsLoading } = useTaskCounts(token, workspaceId, boardFilter);
   const boardStatusCounts = useMemo((): Record<ManualTaskStatus, number> => {
     return {
       pending: rawTaskCounts?.pending ?? 0,
@@ -2505,8 +2522,7 @@ function WorkItemsInner() {
             rows={sortedTasks}
             token={token}
             workspaceId={workspaceId}
-            selectedList={selectedList}
-            selectedLevel={selectedLevel}
+            boardFilter={boardFilter}
             columnMeta={columnMeta}
             loadingMoreColumn={loadingMoreColumn}
             loadMoreColumn={loadMoreColumn}
@@ -2531,8 +2547,7 @@ function WorkItemsInner() {
             dragStateRef={dragStateRef}
             token={token}
             workspaceId={workspaceId}
-            selectedList={selectedList}
-            selectedLevel={selectedLevel}
+            boardFilter={boardFilter}
             prefersReduced={prefersReduced}
             openViewTask={openViewTask}
             renderTaskCard={(task) => <TaskCard task={task} />}

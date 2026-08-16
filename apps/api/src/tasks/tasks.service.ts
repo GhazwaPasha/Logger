@@ -21,7 +21,11 @@ import {
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { AttachmentsService } from "../attachments/attachments.service";
-import { AuthorizationService, type ListTasksOpts } from "../authorization/authorization.service";
+import {
+  AuthorizationService,
+  type BoardFilterOpts,
+  type ListTasksOpts,
+} from "../authorization/authorization.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { getOrganizationTimeZone } from "../db/org-timezone.util";
 import { ListsService } from "../lists/lists.service";
@@ -51,16 +55,12 @@ export class TasksService {
   }
 
   /** Per-status counts for the pipeline summary card — see {@link AuthorizationService.countTasksByStatus}. */
-  async counts(userId: string, organizationId: string, opts?: { listId?: string; departmentId?: string }) {
+  async counts(userId: string, organizationId: string, opts?: BoardFilterOpts) {
     return this.authz.countTasksByStatus(userId, organizationId, opts);
   }
 
   /** Collapsed-card stats for every recurring chain in the given statuses — see {@link AuthorizationService.listRecurringSeriesSummaries}. */
-  async seriesSummaries(
-    userId: string,
-    organizationId: string,
-    opts: { statuses: string[]; listId?: string; departmentId?: string },
-  ) {
+  async seriesSummaries(userId: string, organizationId: string, opts: BoardFilterOpts & { statuses: string[] }) {
     return this.authz.listRecurringSeriesSummaries(userId, organizationId, opts);
   }
 

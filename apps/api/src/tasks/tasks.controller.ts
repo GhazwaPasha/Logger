@@ -141,6 +141,10 @@ export class TasksController {
       statuses: query.status,
       listId: query.listId,
       departmentId: query.departmentId,
+      assigneeUserId: query.assigneeUserId,
+      unassigned: query.unassigned,
+      dueDateFrom: query.dueDateFrom,
+      dueDateTo: query.dueDateTo,
     });
     const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
     res.setHeader("ETag", etag);

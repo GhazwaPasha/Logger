@@ -9,15 +9,11 @@ export const workspaceKeys = {
   archivedTasks: (organizationId: string) => [...workspaceKeys.all, organizationId, "archived-tasks"] as const,
   deletionLog: (organizationId: string) => [...workspaceKeys.all, organizationId, "deletion-log"] as const,
   /** Pipeline card counts — deliberately its own query, not derived from `workspace()`'s paginated tasks. */
-  taskCounts: (organizationId: string, listId?: string | null, departmentId?: string | null) =>
-    [...workspaceKeys.all, organizationId, "task-counts", listId ?? "", departmentId ?? ""] as const,
+  taskCounts: (organizationId: string, filterKey: string) =>
+    [...workspaceKeys.all, organizationId, "task-counts", filterKey] as const,
   /** RecurringSeriesCard header stats, grouped by chain. */
-  seriesSummary: (
-    organizationId: string,
-    statuses: readonly string[],
-    listId?: string | null,
-    departmentId?: string | null,
-  ) => [...workspaceKeys.all, organizationId, "series-summary", statuses.join(","), listId ?? "", departmentId ?? ""] as const,
+  seriesSummary: (organizationId: string, statuses: readonly string[], filterKey: string) =>
+    [...workspaceKeys.all, organizationId, "series-summary", statuses.join(","), filterKey] as const,
   /** Full occurrence list for one recurring chain — only fetched once its card is expanded. */
   seriesOccurrences: (organizationId: string, seriesId: string) =>
     [...workspaceKeys.all, organizationId, "series-occurrences", seriesId] as const,

@@ -329,6 +329,35 @@ export function taskMatchesDueRange(task: TaskRow, fromYmd: string, toYmd: strin
   return true;
 }
 
+/**
+ * Concrete ISO due-date bounds for the active due-window state — `{ from: null, to: null }` for
+ * "all" (no filter). The board's pipeline/series-summary requests send these to the server so
+ * those cards apply the same due-date lens as the (client-filtered) task list below them, instead
+ * of always showing the unfiltered total. Keep this in step with {@link taskMatchesDueWindow} /
+ * {@link taskMatchesDueRange} by hand — it duplicates their date math rather than sharing it,
+ * since those two are called per-row in hot filter loops and take a plain `TaskRow`, not a window
+ * state, so folding them together would mean computing the same bounds on every row instead of once.
+ */
+export function dueWindowRange(
+  window: DueWindow,
+  customFromYmd: string,
+  customToYmd: string,
+  timeZone: string,
+): { from: string | null; to: string | null } {
+  if (window === "all") return { from: null, to: null };
+  if (window === "custom") {
+    const from = customFromYmd ? startOfDayInTz(new Date(`${customFromYmd}T12:00:00Z`), timeZone) : null;
+    const to = customToYmd ? endOfDayInTz(new Date(`${customToYmd}T12:00:00Z`), timeZone) : null;
+    return { from: from ? from.toISOString() : null, to: to ? to.toISOString() : null };
+  }
+  const now = new Date();
+  const end = new Date(now);
+  if (window === "1w") end.setDate(end.getDate() + 7);
+  else if (window === "1m") end.setMonth(end.getMonth() + 1);
+  else end.setDate(end.getDate() + Number(window[0]));
+  return { from: now.toISOString(), to: end.toISOString() };
+}
+
 export type SortMode = "priority_desc" | "priority_asc" | "due_asc" | "due_desc";
 
 export function sortTasks(rows: TaskRow[], mode: SortMode): TaskRow[] {

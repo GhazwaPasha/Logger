@@ -238,16 +238,31 @@ exports.listTasksQuerySchema = zod_1.z.object({
         .optional()
         .transform((v) => v === "true"),
 });
-/** Pipeline card counts — no rows, so no `status`/`limit`/`cursor`. */
-exports.taskCountsQuerySchema = zod_1.z.object({
+/**
+ * Shared by the pipeline-counts and series-summary queries: the subset of the work board's active
+ * filters that should narrow those cards too (list/level scope, due-date range, assignee). Status/
+ * goal/milestone filters are deliberately NOT here — the pipeline card's job is the cross-status
+ * picture, and goal/milestone are narrow enough not to be worth the two cards drifting from "what
+ * you're currently looking at" any further than this.
+ */
+const boardFilterQueryFields = {
     listId: zod_1.z.string().uuid().optional(),
     departmentId: zod_1.z.string().uuid().optional(),
-});
+    dueDateFrom: zod_1.z.string().datetime().optional(),
+    dueDateTo: zod_1.z.string().datetime().optional(),
+    assigneeUserId: zod_1.z.string().min(1).optional(),
+    /** "Unassigned" scope — mutually exclusive with `assigneeUserId` in practice (specific assignee wins if both are sent). */
+    unassigned: zod_1.z
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v === "true"),
+};
+/** Pipeline card counts — no rows, so no `status`/`limit`/`cursor`. */
+exports.taskCountsQuerySchema = zod_1.z.object(boardFilterQueryFields);
 /** RecurringSeriesCard header stats, grouped by chain, for the given statuses. */
 exports.seriesSummaryQuerySchema = zod_1.z.object({
     status: zod_1.z.string().min(1).transform((s) => s.split(",").filter(Boolean)),
-    listId: zod_1.z.string().uuid().optional(),
-    departmentId: zod_1.z.string().uuid().optional(),
+    ...boardFilterQueryFields,
 });
 /** Full occurrence list for one recurring chain, fetched only when its card is expanded. */
 exports.seriesOccurrencesQuerySchema = zod_1.z.object({
