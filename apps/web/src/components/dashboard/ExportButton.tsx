@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getApiBaseUrl } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { PerformanceExportModal, type ExportRange } from "@/components/performance/PerformanceExportModal";
 
 type ExportType = "tasks" | "activity" | "performance";
 
@@ -18,13 +19,20 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
   const { token } = useApiSession();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [rangeModalType, setRangeModalType] = useState<ExportType | null>(null);
 
-  const download = async (type: ExportType) => {
+  const download = async (type: ExportType, range?: ExportRange) => {
     if (!token || !workspaceId) return;
     setBusy(true);
     setOpen(false);
     try {
-      const url = `${getApiBaseUrl()}/organizations/${workspaceId}/reports/${type}.csv`;
+      const params = new URLSearchParams();
+      if (range) {
+        params.set("dateFrom", range.dateFrom);
+        params.set("dateTo", range.dateTo);
+      }
+      const query = params.toString();
+      const url = `${getApiBaseUrl()}/organizations/${workspaceId}/reports/${type}.csv${query ? `?${query}` : ""}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const blob = await res.blob();
       const a = document.createElement("a");
@@ -34,7 +42,18 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
       URL.revokeObjectURL(a.href);
     } finally {
       setBusy(false);
+      setRangeModalType(null);
     }
+  };
+
+  const handlePick = (type: ExportType) => {
+    if (type === "performance") {
+      // Performance reports can span very different time ranges, so ask before downloading.
+      setOpen(false);
+      setRangeModalType(type);
+      return;
+    }
+    void download(type);
   };
 
   return (
@@ -57,13 +76,19 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
               key={type}
               type="button"
               className="block w-full px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-              onClick={() => void download(type)}
+              onClick={() => handlePick(type)}
             >
               {EXPORT_LABELS[type]}
             </button>
           ))}
         </div>
       )}
+      <PerformanceExportModal
+        open={rangeModalType === "performance"}
+        busy={busy}
+        onClose={() => setRangeModalType(null)}
+        onExport={(range) => void download("performance", range)}
+      />
     </div>
   );
 }
