@@ -290,12 +290,18 @@ export const seriesSummaryQuerySchema = z.object({
 });
 export type SeriesSummaryQuery = z.infer<typeof seriesSummaryQuerySchema>;
 
-/** Full occurrence list for one recurring chain, fetched only when its card is expanded. */
+/**
+ * Occurrence list for one recurring chain, fetched only when its card is expanded. Paginated like
+ * the main task list (cursor/limit) — a chain's history is unbounded, so this must never be an
+ * unpaginated "fetch everything" query.
+ */
 export const seriesOccurrencesQuerySchema = z.object({
   status: z
     .string()
     .optional()
     .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(25),
 });
 export type SeriesOccurrencesQuery = z.infer<typeof seriesOccurrencesQuerySchema>;
 export type AppendLedgerInput = z.infer<typeof appendLedgerSchema>;

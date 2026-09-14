@@ -69,16 +69,19 @@ export class TasksService {
     userId: string,
     organizationId: string,
     seriesId: string,
-    opts?: { status?: string[] },
+    opts?: { status?: string[]; cursor?: string; limit?: number },
   ) {
     const result = await this.authz.listTasksForUser(userId, organizationId, {
       recurringSeriesId: seriesId,
       status: opts?.status,
-      limit: 100,
+      cursor: opts?.cursor,
+      limit: opts?.limit ?? 25,
       includeSubtasks: false,
     });
     const synced = await this.syncAutomatedStatuses(result.tasks);
-    return { tasks: synced };
+    // A chain's history is unbounded (that's the whole point of "recurring") — nextCursor must
+    // always come back so the card can page through it instead of silently truncating.
+    return { tasks: synced, nextCursor: result.nextCursor };
   }
 
   async create(userId: string, organizationId: string, body: unknown) {

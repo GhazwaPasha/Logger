@@ -391,7 +391,7 @@ function TaskCardSkeleton() {
  * inside a component body is a *new component type* on every render of that component, and React
  * unmounts + remounts the old instance whenever an element's `type` changes. Nested here, that
  * meant every WorkItemsInner re-render (which pagination — the exact `loadMoreColumn` calls below
- * — triggers a lot of, via `columnMeta`/`loadingMoreColumn` changing) tore down and rebuilt the
+ * — triggers a lot of, via `columnMeta`/`loadingMoreColumns` changing) tore down and rebuilt the
  * entire card tree: every RecurringSeriesCard lost its `expanded` state and its data (even
  * collapsed ones, even ones nowhere near the sentinel), and the resulting DOM teardown/rebuild is
  * what actually read as "the whole screen jumping" — not any one skeleton. Keeping these three at
@@ -564,7 +564,7 @@ function KanbanBoard({
   rows,
   columnMeta,
   statusCounts,
-  loadingMoreColumn,
+  loadingMoreColumns,
   loadMoreColumn,
   lists,
   sessionUserId,
@@ -587,7 +587,7 @@ function KanbanBoard({
    * occurrences (see useOrgWorkspace) that field only reflects standalone-task pagination progress,
    * not the true count. */
   statusCounts: Record<ManualTaskStatus, number>;
-  loadingMoreColumn: string | null;
+  loadingMoreColumns: Record<string, boolean>;
   loadMoreColumn: (status: string) => void | Promise<void>;
   lists: ListRow[];
   sessionUserId: string | null;
@@ -738,7 +738,7 @@ function KanbanBoard({
                           status: col,
                           loaded: colTasks.length,
                           total: columnMeta[col]!.total,
-                          loading: loadingMoreColumn === col,
+                          loading: Boolean(loadingMoreColumns[col]),
                         }
                       : null
                   }
@@ -768,7 +768,7 @@ function ListViewCards({
   workspaceId,
   boardFilter,
   columnMeta,
-  loadingMoreColumn,
+  loadingMoreColumns,
   loadMoreColumn,
   prefersReduced,
   members,
@@ -780,7 +780,7 @@ function ListViewCards({
   workspaceId: string;
   boardFilter: BoardFilterOpts;
   columnMeta: Record<string, ColumnMeta>;
-  loadingMoreColumn: string | null;
+  loadingMoreColumns: Record<string, boolean>;
   loadMoreColumn: (status: string) => void | Promise<void>;
   prefersReduced: boolean | null;
   members: MemberRow[];
@@ -819,13 +819,13 @@ function ListViewCards({
   // generic so it's correct at any point mid-load too.
   const pendingStatuses = TASK_FLOW_ORDER.filter((s) => columnMeta[s]?.nextCursor);
   const pendingKey = pendingStatuses.join(",");
-  const anyLoading = pendingStatuses.some((s) => loadingMoreColumn === s);
+  const anyLoading = pendingStatuses.some((s) => loadingMoreColumns[s]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   /** Same cursor-tracking guard as the kanban view: stops a failed fetch from retrying every intersection tick. State, not a ref — the retry-button branch below reads it while rendering. */
   const [attemptedCursors, setAttemptedCursors] = useState<Record<string, string | null>>({});
   const stalledStatuses = pendingStatuses.filter(
-    (s) => loadingMoreColumn !== s && attemptedCursors[s] === columnMeta[s]?.nextCursor,
+    (s) => !loadingMoreColumns[s] && attemptedCursors[s] === columnMeta[s]?.nextCursor,
   );
 
   useEffect(() => {
@@ -837,7 +837,7 @@ function ListViewCards({
         if (!entries[0]?.isIntersecting) return;
         const updates: Record<string, string | null> = {};
         for (const status of pendingStatuses) {
-          if (loadingMoreColumn === status) continue;
+          if (loadingMoreColumns[status]) continue;
           const cursor = columnMeta[status]?.nextCursor;
           if (!cursor || attemptedCursors[status] === cursor) continue;
           updates[status] = cursor;
@@ -852,7 +852,7 @@ function ListViewCards({
     observer.observe(el);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingKey, loadingMoreColumn, attemptedCursors]);
+  }, [pendingKey, loadingMoreColumns, attemptedCursors]);
 
   return (
     <div>
@@ -961,7 +961,7 @@ function WorkItemsInner() {
     setError,
     isLoading: workspaceLoading,
     loadMoreColumn,
-    loadingMoreColumn,
+    loadingMoreColumns,
   } = useWorkspaceData();
   const { openNewTask, isOpening: isOpeningNewTask } = useOpenNewTask();
   const roadmap = useRoadmap(token, workspaceId);
@@ -2524,7 +2524,7 @@ function WorkItemsInner() {
             workspaceId={workspaceId}
             boardFilter={boardFilter}
             columnMeta={columnMeta}
-            loadingMoreColumn={loadingMoreColumn}
+            loadingMoreColumns={loadingMoreColumns}
             loadMoreColumn={loadMoreColumn}
             prefersReduced={prefersReduced}
             members={members}
@@ -2536,7 +2536,7 @@ function WorkItemsInner() {
             rows={sortedTasks}
             columnMeta={columnMeta}
             statusCounts={boardStatusCounts}
-            loadingMoreColumn={loadingMoreColumn}
+            loadingMoreColumns={loadingMoreColumns}
             loadMoreColumn={loadMoreColumn}
             lists={lists}
             sessionUserId={sessionUserId}

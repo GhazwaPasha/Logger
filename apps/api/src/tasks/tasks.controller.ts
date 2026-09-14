@@ -161,7 +161,11 @@ export class TasksController {
     @Query() rawQuery: Record<string, string>,
   ) {
     const query = seriesOccurrencesQuerySchema.parse(rawQuery);
-    return this.tasks.seriesOccurrences(user.id, organizationId, seriesId, { status: query.status });
+    return this.tasks.seriesOccurrences(user.id, organizationId, seriesId, {
+      status: query.status,
+      cursor: query.cursor,
+      limit: query.limit,
+    });
   }
 }
 

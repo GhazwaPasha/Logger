@@ -264,12 +264,18 @@ exports.seriesSummaryQuerySchema = zod_1.z.object({
     status: zod_1.z.string().min(1).transform((s) => s.split(",").filter(Boolean)),
     ...boardFilterQueryFields,
 });
-/** Full occurrence list for one recurring chain, fetched only when its card is expanded. */
+/**
+ * Occurrence list for one recurring chain, fetched only when its card is expanded. Paginated like
+ * the main task list (cursor/limit) — a chain's history is unbounded, so this must never be an
+ * unpaginated "fetch everything" query.
+ */
 exports.seriesOccurrencesQuerySchema = zod_1.z.object({
     status: zod_1.z
         .string()
         .optional()
         .transform((s) => (s ? s.split(",").filter(Boolean) : undefined)),
+    cursor: zod_1.z.string().min(1).optional(),
+    limit: zod_1.z.coerce.number().int().min(1).max(100).optional().default(25),
 });
 exports.createCommentSchema = zod_1.z.object({
     body: zod_1.z.string().min(1).max(4000),

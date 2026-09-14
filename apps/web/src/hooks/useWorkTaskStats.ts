@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
 import type { TaskRow } from "@/lib/ledger-types";
@@ -86,20 +87,71 @@ export function useSeriesSummaries(
   return { summaries: q.data ?? [], isLoading: q.isPending && Boolean(token && orgId) };
 }
 
-/** Full occurrence list for one recurring chain — only fetched once its card is expanded. */
+type SeriesOccurrencesPage = { tasks: TaskRow[]; nextCursor: string | null };
+
+/**
+ * Occurrence list for one recurring chain — only fetched once its card is expanded, and paginated
+ * in pages of 25 like the main board. A chain's history is unbounded (that's the whole point of
+ * "recurring"), so this must never try to load it all in one request: the first page comes back
+ * from `useQuery` as usual, and `loadMore` appends subsequent pages by cursor, mirroring the
+ * `loadMoreColumn` pattern in useOrgWorkspace. `loadMoreError` is a real, directly-observed
+ * try/catch failure — not inferred from cursor/loading-state comparisons — so it can't produce a
+ * false-positive retry prompt the way that inference did on the main board.
+ */
 export function useSeriesOccurrences(
   token: string | null,
   orgId: string | null,
   seriesId: string | null,
   opts: { statuses?: readonly string[]; enabled: boolean },
 ) {
-  const statusParam = opts.statuses?.length ? `?status=${opts.statuses.join(",")}` : "";
+  const queryClient = useQueryClient();
+  const statusParam = opts.statuses?.length ? `&status=${opts.statuses.join(",")}` : "";
+  const queryKey = workspaceKeys.seriesOccurrences(orgId ?? "", seriesId ?? "");
+
   const q = useQuery({
-    queryKey: workspaceKeys.seriesOccurrences(orgId ?? "", seriesId ?? ""),
+    queryKey,
     queryFn: () =>
-      apiJson<{ tasks: TaskRow[] }>(`/organizations/${orgId}/tasks/series/${seriesId}${statusParam}`, { token }),
+      apiJson<SeriesOccurrencesPage>(`/organizations/${orgId}/tasks/series/${seriesId}?limit=25${statusParam}`, {
+        token,
+      }),
     enabled: Boolean(token && orgId && seriesId && opts.enabled),
     staleTime: 15_000,
   });
-  return { tasks: q.data?.tasks ?? [], isLoading: q.isFetching };
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const nextCursor = q.data?.nextCursor ?? null;
+
+  const loadMore = useCallback(async () => {
+    if (!token || !orgId || !seriesId || !nextCursor) return;
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const page = await apiJson<SeriesOccurrencesPage>(
+        `/organizations/${orgId}/tasks/series/${seriesId}?limit=25&cursor=${nextCursor}${statusParam}`,
+        { token },
+      );
+      queryClient.setQueryData<SeriesOccurrencesPage>(queryKey, (old) => {
+        if (!old) return page;
+        const existingIds = new Set(old.tasks.map((t) => t.id));
+        return {
+          tasks: [...old.tasks, ...page.tasks.filter((t) => !existingIds.has(t.id))],
+          nextCursor: page.nextCursor,
+        };
+      });
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [token, orgId, seriesId, nextCursor, statusParam, queryClient, queryKey]);
+
+  return {
+    tasks: q.data?.tasks ?? [],
+    isLoading: q.isFetching && !q.data,
+    nextCursor,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  };
 }

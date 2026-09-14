@@ -109,7 +109,14 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
   const { timeZone } = useWorkspaceRoute();
   const { token } = useApiSession();
 
-  const { tasks: occurrences, isLoading: occurrencesLoading } = useSeriesOccurrences(token, orgId, summary.seriesId, {
+  const {
+    tasks: occurrences,
+    isLoading: occurrencesLoading,
+    nextCursor,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  } = useSeriesOccurrences(token, orgId, summary.seriesId, {
     statuses: occurrenceStatuses,
     enabled: expanded,
   });
@@ -216,6 +223,24 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                   </li>
                 ))}
               </ul>
+            )}
+            {/* A chain's history is unbounded — this list is never fully loaded up front, so
+                more may remain even after the first page renders. */}
+            {!occurrencesLoading && nextCursor && (
+              <div className="px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className={`w-full rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                    loadMoreError
+                      ? "border-red-400/40 text-red-400 hover:bg-red-500/[0.06]"
+                      : "border-[var(--border-subtle)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] disabled:opacity-60"
+                  }`}
+                >
+                  {loadMoreError ? "Couldn't load more · retry" : loadingMore ? "Loading…" : "Load older occurrences"}
+                </button>
+              </div>
             )}
           </motion.div>
         )}

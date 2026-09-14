@@ -91,12 +91,16 @@ async function fetchWorkspace(
       `/organizations/${orgId}/tasks?status=in_progress&limit=50&includeSubtasks=true`,
       { token },
     ),
+    // excludeRecurringSeries here too — must match what loadMoreColumn sends for these statuses
+    // (RECURRING_GROUPED_STATUSES below), or the first page's `total`/rows include every
+    // recurring completion (inflating the count, e.g. "9 of 1271") until a later page silently
+    // corrects it.
     apiJson<TaskPageResponse>(
-      `/organizations/${orgId}/tasks?status=done&limit=25&includeSubtasks=true`,
+      `/organizations/${orgId}/tasks?status=done&limit=25&includeSubtasks=true&excludeRecurringSeries=true`,
       { token },
     ),
     apiJson<TaskPageResponse>(
-      `/organizations/${orgId}/tasks?status=cancelled&limit=25&includeSubtasks=true`,
+      `/organizations/${orgId}/tasks?status=cancelled&limit=25&includeSubtasks=true&excludeRecurringSeries=true`,
       { token },
     ),
   ]);
@@ -183,14 +187,24 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
 
   const data = q.data ?? empty;
 
-  const [loadingMoreColumn, setLoadingMoreColumn] = useState<string | null>(null);
+  /**
+   * Per-status, not a single shared value — pending/in_progress can (and often do) load
+   * concurrently, once via this hook's own background drain below and once via a column the user
+   * is scrolling. A single `string | null` can only name one "currently loading" column at a
+   * time, so the moment two loads overlap, whichever one didn't win that slot reads as "not
+   * loading" the instant the other one starts — which the board's stalled/retry check (loading
+   * false + cursor unchanged) can't tell apart from a real failure. That's what produced the
+   * false-positive "Couldn't load more" banners: a column still genuinely in flight, misread as
+   * stalled because another column's load happened to be occupying the one shared flag.
+   */
+  const [loadingMoreColumns, setLoadingMoreColumns] = useState<Record<string, boolean>>({});
 
   const loadMoreColumn = useCallback(
     async (status: string) => {
       if (!token || !orgId) return;
       const meta = data.columnMeta[status];
       if (!meta?.nextCursor) return;
-      setLoadingMoreColumn(status);
+      setLoadingMoreColumns((prev) => ({ ...prev, [status]: true }));
       try {
         const excludeRecurring = RECURRING_GROUPED_STATUSES.has(status) ? "&excludeRecurringSeries=true" : "";
         const result = await apiJson<TaskPageResponse>(
@@ -213,7 +227,12 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
       } catch {
         // non-critical — caller can retry
       } finally {
-        setLoadingMoreColumn(null);
+        setLoadingMoreColumns((prev) => {
+          if (!prev[status]) return prev;
+          const next = { ...prev };
+          delete next[status];
+          return next;
+        });
       }
     },
     [token, orgId, data.columnMeta, queryClient],
@@ -230,12 +249,12 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     for (const status of EAGERLY_LOADED_STATUSES) {
       const meta = data.columnMeta[status];
       if (!meta?.nextCursor) continue;
-      if (loadingMoreColumn === status) continue;
+      if (loadingMoreColumns[status]) continue;
       if (attemptedCursorRef.current[status] === meta.nextCursor) continue;
       attemptedCursorRef.current[status] = meta.nextCursor;
       void loadMoreColumn(status);
     }
-  }, [data.columnMeta, loadingMoreColumn, loadMoreColumn]);
+  }, [data.columnMeta, loadingMoreColumns, loadMoreColumn]);
 
   return {
     depts: data.depts,
@@ -248,6 +267,6 @@ export function useOrgWorkspace(token: string | null, orgId: string | null) {
     reload,
     isLoading: q.isPending && Boolean(token && orgId),
     loadMoreColumn,
-    loadingMoreColumn,
+    loadingMoreColumns,
   };
 }
