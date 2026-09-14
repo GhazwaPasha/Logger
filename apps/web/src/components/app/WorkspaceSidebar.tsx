@@ -675,23 +675,31 @@ export function WorkspaceSidebar({
             </div>
           )}
           <div className="mt-2 space-y-0.5 px-1">
-            <Link href={`${base}/dashboard`} className={`${rowBase(activeDashboard)} pl-2`}>
-              Dashboard
-            </Link>
-            {showPerformanceLink && (
-              <Link href={`${base}/performance`} className={`${rowBase(activePerformance)} pl-2`}>
-                Performance
+            {[
+              { href: `${base}/dashboard`, active: activeDashboard, label: "Dashboard" },
+              ...(showPerformanceLink
+                ? [{ href: `${base}/performance`, active: activePerformance, label: "Performance" }]
+                : []),
+              { href: `${base}/roadmap`, active: activeRoadmap, label: "Roadmap" },
+              { href: `${base}/calendar`, active: activeCalendar, label: "Calendar" },
+              { href: `${base}/my-tasks`, active: activeMyTasks, label: "My tasks" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={item.active ? "page" : undefined}
+                className="relative flex min-w-0 items-center gap-1 rounded-md py-1.5 pl-2 pr-2 text-left text-sm font-semibold text-[var(--fg)] transition-transform duration-200 ease-out motion-safe:active:scale-[0.99] hover:bg-[var(--surface-hover)]"
+              >
+                {item.active && (
+                  <motion.span
+                    layoutId="sidebar-primary-nav-pill"
+                    className="absolute inset-0 rounded-md bg-[var(--accent-muted)]"
+                    transition={{ duration: motionDuration(0.28, prefersReduced), ease: POP_EASE }}
+                  />
+                )}
+                <span className="relative truncate">{item.label}</span>
               </Link>
-            )}
-            <Link href={`${base}/roadmap`} className={`${rowBase(activeRoadmap)} pl-2`}>
-              Roadmap
-            </Link>
-            <Link href={`${base}/calendar`} className={`${rowBase(activeCalendar)} pl-2`}>
-              Calendar
-            </Link>
-            <Link href={`${base}/my-tasks`} className={`${rowBase(activeMyTasks)} pl-2`}>
-              My tasks
-            </Link>
+            ))}
           </div>
         </div>
 

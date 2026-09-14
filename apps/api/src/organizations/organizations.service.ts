@@ -294,10 +294,51 @@ export class OrganizationsService {
       .limit(1);
     const member = rows[0];
     if (!member) throw new NotFoundException("Member not found");
+
+    // Tasks in this org where the departing member is an assignee. Their assignment rows survive
+    // the membership delete below (task_assignees.user_id only cascades off the user account, not
+    // org membership), so left alone they'd dangle: the assignee id would no longer resolve against
+    // this org's member list and every display would fall back to showing "Unknown" forever instead
+    // of the task going back to unassigned.
+    const affected = await this.db
+      .select({ taskId: taskAssignees.taskId })
+      .from(taskAssignees)
+      .innerJoin(tasks, eq(tasks.id, taskAssignees.taskId))
+      .where(and(eq(tasks.organizationId, organizationId), eq(taskAssignees.userId, targetUserId)));
+
     await this.db
       .delete(organizationMemberManagedDepartments)
       .where(eq(organizationMemberManagedDepartments.organizationMemberId, member.id));
     await this.db.delete(organizationMembers).where(eq(organizationMembers.id, member.id));
+
+    if (affected.length > 0) {
+      const taskIds = [...new Set(affected.map((r) => r.taskId))];
+
+      const remainingRows = await this.db
+        .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(inArray(taskAssignees.taskId, taskIds));
+      const remainingByTask = new Map<string, string[]>();
+      for (const r of remainingRows) {
+        remainingByTask.set(r.taskId, [...(remainingByTask.get(r.taskId) ?? []), r.userId]);
+      }
+
+      await this.db
+        .delete(taskAssignees)
+        .where(and(inArray(taskAssignees.taskId, taskIds), eq(taskAssignees.userId, targetUserId)));
+
+      for (const taskId of taskIds) {
+        const previousAssigneeUserIds = [...(remainingByTask.get(taskId) ?? [])].sort();
+        const assigneeUserIds = previousAssigneeUserIds.filter((id) => id !== targetUserId);
+        await this.db.insert(activityLedger).values({
+          taskId,
+          actorId: requesterId,
+          type: "assignee_change",
+          payload: { previousAssigneeUserIds, assigneeUserIds },
+        });
+      }
+    }
+
     this.collaboration.notifyOrgChanged(organizationId, null);
   }
 

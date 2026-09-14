@@ -288,6 +288,13 @@
       "when": 1785900002000,
       "tag": "0040_tasks_org_active_created_index",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1785900003000,
+      "tag": "0041_backfill_orphaned_task_assignees",
+      "breakpoints": true
     }
   ]
 }
