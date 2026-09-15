@@ -57,12 +57,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Static SSR fallback for the instant before the inline script below runs. Deliberately a
-  // single value (not a `media`-keyed array): some Android/PWA standalone renderers don't
-  // evaluate the `media` attribute on this tag and just latch onto whichever one appears first,
-  // so more than one `meta[name=theme-color]` in the document causes it to get stuck on one
-  // color. There must only ever be exactly one such tag, which the script mutates in place.
-  themeColor: THEME_COLOR_LIGHT,
+  // Deliberately NOT declaring `themeColor` here: Next's metadata system re-renders/reconciles
+  // this tag from this static value on every client-side navigation (it doesn't know about our
+  // runtime updates), which was stomping the resolved theme's color right back to whatever
+  // constant this said — the status bar would revert to one fixed color no matter what the user
+  // picked. The inline script below creates and fully owns a plain, Next-invisible meta tag
+  // instead, and `useThemePreference` keeps mutating that same element afterwards.
   viewportFit: "cover",
 };
 
@@ -74,9 +74,9 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="system" suppressHydrationWarning>
       <head>
-        {/* Apply stored theme before first paint to avoid a flash, and resolve the actual
-            status-bar color (mutating the single meta tag from `viewport.themeColor` above in
-            place — never adding a second one, see the comment there). */}
+        {/* Apply stored theme before first paint to avoid a flash, and create the one and only
+            theme-color meta tag ourselves (see the comment on `viewport` above for why Next
+            must not render its own). */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('theme-pref');var theme=(t==='light'||t==='dark'||t==='system')?t:'system';document.documentElement.setAttribute('data-theme',theme);var isDark=theme==='dark'||(theme==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',isDark?'${THEME_COLOR_DARK}':'${THEME_COLOR_LIGHT}');}catch(e){}})();`,
