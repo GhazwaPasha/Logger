@@ -70,7 +70,7 @@ const profileShell =
   "flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[8px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
 
 const iconBtn =
-  "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--fg)] transition-[background-color,border-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
 
 export function AppHeader({
   workspaceSlug,
@@ -130,17 +130,13 @@ export function AppHeader({
             <LogBaseMark variant="chrome" decorative />
             <span className="hidden text-lg leading-none sm:inline">LogBase</span>
           </Link>
+          {settingsHref && <OnlineMembersAvatars />}
         </div>
         <div className="pointer-events-none z-50 flex max-w-[min(100vw-7rem,32rem)] justify-center justify-self-center px-1 sm:max-w-[min(100vw-9rem,38rem)]">
           <HeaderLiveIsland />
         </div>
-        <div className="flex min-w-0 items-center justify-end gap-2 justify-self-end sm:gap-3">
-          {settingsHref && (
-            <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-              <OnlineMembersAvatars />
-              <GlobalSearch />
-            </div>
-          )}
+        <div className="flex min-w-0 items-center justify-end gap-0.5 justify-self-end sm:gap-1">
+          {settingsHref && <GlobalSearch />}
           {settingsHref && notifications && (
             <button
               type="button"
@@ -165,7 +161,7 @@ export function AppHeader({
             </Link>
           )}
           {user && (
-            <div className="relative" ref={accountMenuRef}>
+            <div className="relative ml-1.5" ref={accountMenuRef}>
               <div className="relative">
                 <button
                   type="button"

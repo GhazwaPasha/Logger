@@ -134,17 +134,16 @@ export function GlobalSearch() {
       <button
         type="button"
         aria-label="Search tasks (Ctrl+K)"
+        title="Search (Ctrl+K)"
         onClick={() => {
           setOpen(true);
           setTimeout(() => inputRef.current?.focus(), 50);
         }}
-        className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] ${open ? "hidden" : ""}`}
+        className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)] ${open ? "hidden" : ""}`}
       >
-        <svg aria-hidden viewBox="0 0 20 20" fill="currentColor" className="size-4 shrink-0">
+        <svg aria-hidden viewBox="0 0 20 20" fill="currentColor" className="size-[1.125rem] shrink-0">
           <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9z" clipRule="evenodd" />
         </svg>
-        <span className="hidden text-xs sm:inline">Search</span>
-        <kbd className="hidden rounded border border-[var(--border)] px-1 py-0.5 text-[10px] font-medium leading-none sm:inline">⌘K</kbd>
       </button>
 
       {open && (
