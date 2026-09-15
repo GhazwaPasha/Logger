@@ -18,7 +18,6 @@ import {
   faCheck,
   faTableColumns,
   faEllipsisVertical,
-  faListCheck,
   faPaperclip,
   faPlus,
   faTableList,
@@ -1755,7 +1754,6 @@ function WorkItemsInner() {
                 aria-expanded={expanded}
                 className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
               >
-                <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                 Subtasks
                 {Array.isArray(subtasksState) ? (
                   <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
@@ -1770,7 +1768,6 @@ function WorkItemsInner() {
                 title="Add subtasks"
                 aria-label="Add subtasks"
               >
-                <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                 Subtasks
                 <FontAwesomeIcon icon={faPlus} className="size-4 opacity-60" aria-hidden />
               </button>
@@ -2100,7 +2097,6 @@ function WorkItemsInner() {
                   title="View subtasks"
                   aria-label="View subtasks"
                 >
-                  <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                   Subtasks
                   {Array.isArray(subtasksState) ? (
                     <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
@@ -2114,7 +2110,6 @@ function WorkItemsInner() {
                   title="Add subtasks"
                   aria-label="Add subtasks"
                 >
-                  <FontAwesomeIcon icon={faListCheck} className="size-4 opacity-70" aria-hidden />
                   Subtasks
                   <svg className="size-3.5 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M12 5v14M5 12h14" />
