@@ -18,6 +18,7 @@ import {
   faCheck,
   faTableColumns,
   faEllipsisVertical,
+  faLayerGroup,
   faPaperclip,
   faPlus,
   faTableList,
@@ -59,6 +60,7 @@ import { StatusPillSelect, KANBAN_STATUS_SHELL_LAYOUT } from "@/components/tasks
 import { TaskMilestoneIconBtn } from "@/components/roadmap/TaskMilestoneIconBtn";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { usePrefetchTaskDetail } from "@/hooks/usePrefetchTaskDetail";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
@@ -268,9 +270,10 @@ function formatCustomDueChip(ymd: string): string {
 function tasksToolbarIconButtonClasses(active: boolean) {
   return [
     "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors",
-    "hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]",
-    active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--muted)]",
+    active
+      ? "bg-[var(--fg)] text-[var(--surface-base)]"
+      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
   ].join(" ");
 }
 
@@ -886,6 +889,8 @@ function WorkItemsInner() {
   const isMobile = useIsMobile();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
+  /** Set when a `?task=` deep link arrives with no board scope yet; resolved by the scope-resolution effect below. */
+  const deepLinkResolutionRef = useRef<{ taskId: string; done: boolean; fetchStarted?: boolean } | null>(null);
   const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
     null,
   );
@@ -1049,6 +1054,8 @@ function WorkItemsInner() {
     const tid = params.get("task");
     if (tid) {
       setViewTaskId(tid);
+      // No board scope yet to land on this task's own category/channel (see the scope-resolution effect below).
+      deepLinkResolutionRef.current = { taskId: tid, done: false };
       params.delete("task");
       changed = true;
     }
@@ -1362,6 +1369,53 @@ function WorkItemsInner() {
     writeWorkBoardScope(workspaceId, { levelId: levelIdToSave, listId: listIdToSave });
   }, [workspaceId, lists, depts, selectedLevel, selectedList, levelLists]);
 
+  const sortedDepts = useMemo(
+    () => [...depts].sort((a, b) => a.orderIndex - b.orderIndex),
+    [depts],
+  );
+
+  /**
+   * A board with no valid scope (fresh session, or the selected category/channel was deleted)
+   * must never render every task in the org — resolve to a real default instead. A pending
+   * `?task=` deep link wins (land on that task's own category/channel); otherwise fall back to
+   * the first category. Runs after the sync-storage effect above so it isn't immediately
+   * overwritten by that effect re-persisting the still-stale `null` scope from this render.
+   */
+  useEffect(() => {
+    if (workspaceLoading) return;
+    if (sortedDepts.length === 0) return;
+    if (selectedLevel != null || selectedList != null) return;
+
+    const pending = deepLinkResolutionRef.current;
+    if (pending && !pending.done) {
+      const resolveTo = (deptId: string | null, listId: string | null) => {
+        pending.done = true;
+        const validDeptId = deptId && sortedDepts.some((d) => d.id === deptId) ? deptId : null;
+        writeWorkBoardScope(
+          workspaceId,
+          validDeptId ? { levelId: validDeptId, listId } : { levelId: sortedDepts[0]!.id, listId: null },
+        );
+      };
+
+      const row = tasks.find((t) => t.id === pending.taskId);
+      if (row) {
+        resolveTo(lists.find((l) => l.id === row.listId)?.departmentId ?? null, row.listId);
+        return;
+      }
+      if (!pending.fetchStarted && token) {
+        pending.fetchStarted = true;
+        apiJson<TaskDetail>(`/tasks/${pending.taskId}`, { token })
+          .then((detail) => {
+            resolveTo(lists.find((l) => l.id === detail.task.listId)?.departmentId ?? null, detail.task.listId);
+          })
+          .catch(() => resolveTo(null, null));
+      }
+      return;
+    }
+
+    writeWorkBoardScope(workspaceId, { levelId: sortedDepts[0]!.id, listId: null });
+  }, [workspaceLoading, sortedDepts, selectedLevel, selectedList, tasks, lists, token, workspaceId]);
+
   /** Header scope badges (same styles as task cards): level + list when applicable. */
   const filterScopeSegments = useMemo((): { kind: "level" | "list"; label: string }[] => {
     if (selectedListName && selectedLevelName) {
@@ -1388,7 +1442,8 @@ function WorkItemsInner() {
   const visibleTasks = useMemo(() => {
     if (selectedList) return activeTasks.filter((t) => t.listId === selectedList);
     if (selectedLevel) return activeTasks.filter((t) => levelLists.some((l) => l.id === t.listId));
-    return activeTasks;
+    // No valid scope yet (resolving, or zero categories) — never fall back to every org task.
+    return [];
   }, [activeTasks, selectedList, selectedLevel, levelLists]);
 
   /**
@@ -2183,29 +2238,42 @@ function WorkItemsInner() {
           </button>
         </div>
       ) : null}
-      <header className="pb-1">
+      <header className="border-b border-[var(--border-subtle)] pb-4">
         <div className="grid grid-cols-1 gap-3 lg:items-start lg:gap-y-3">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-2 lg:col-start-1 lg:row-start-1 lg:pt-0.5">
-            <span className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]">
+            <span
+              className={
+                filterScopeSegments.length === 0
+                  ? "inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]"
+                  : "text-sm font-medium text-[var(--muted)]"
+              }
+            >
               {NODE_LABELS.workItem}s
             </span>
-            {filterScopeSegments.map((seg, i) => (
-              <span key={`${seg.kind}-${i}`} className="flex items-center gap-x-2">
-                <span className="text-sm text-[var(--muted)] opacity-40" aria-hidden>›</span>
-                <span
-                  className={`inline-flex items-center border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)] ${
-                    i === 0 ? "rounded-xl" : "rounded-full"
-                  }`}
-                >
-                  {seg.label}
+            {filterScopeSegments.map((seg, i) => {
+              const isCurrent = i === filterScopeSegments.length - 1;
+              return (
+                <span key={`${seg.kind}-${i}`} className="flex items-center gap-x-2">
+                  <span className="text-xs text-[var(--muted)] opacity-60" aria-hidden>›</span>
+                  <span
+                    className={
+                      isCurrent
+                        ? "inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]"
+                        : "text-sm font-medium text-[var(--muted)]"
+                    }
+                  >
+                    {seg.label}
+                  </span>
                 </span>
-              </span>
-            ))}
+              );
+            })}
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
             <button
               type="button"
-              className="btn-primary inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
+              title="New task"
+              aria-label="New task"
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)] shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
               onClick={() => openNewTask(listId || undefined)}
               disabled={isOpeningNewTask}
               aria-busy={isOpeningNewTask || undefined}
@@ -2215,11 +2283,10 @@ function WorkItemsInner() {
               ) : (
                 <FontAwesomeIcon icon={faPlus} className="size-4" />
               )}
-              New task
             </button>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-header)] p-1.5">
               <div
-                className="inline-flex items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
+                className="inline-flex items-center gap-0.5 rounded-lg"
                 role="group"
                 aria-label="Board layout"
               >
@@ -2410,6 +2477,16 @@ function WorkItemsInner() {
 
       <section>
         {workspaceLoading ? (
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
+            Loading tasks…
+          </p>
+        ) : sortedDepts.length === 0 ? (
+          <EmptyState
+            icon={faLayerGroup}
+            title={`No ${NODE_LABELS.level.toLowerCase()}s yet`}
+            description={`Create a ${NODE_LABELS.level.toLowerCase()} from the sidebar to start organizing ${NODE_LABELS.workItem.toLowerCase()}s.`}
+          />
+        ) : selectedLevel == null && selectedList == null ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
             Loading tasks…
           </p>

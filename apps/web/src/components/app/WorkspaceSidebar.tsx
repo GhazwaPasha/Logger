@@ -296,9 +296,6 @@ export function WorkspaceSidebar({
   const activeArchived = pathname.startsWith(`${base}/archived`);
   const activeAddWorkspace = pathname.startsWith(`${base}/add-workspace`);
   const selectedOrg = orgs.find((o) => o.id === workspaceId) ?? null;
-  /** Work page scoped to whole workspace (level/list live in sessionStorage, not the URL). */
-  const activeAllWorkspaceTasks =
-    pathname === `${base}/work` && boardScope?.levelId == null && boardScope?.listId == null;
 
   const userLabel = session?.user?.name?.trim() || session?.user?.email || "Account";
   const orgLabel = selectedOrg?.name ?? "Workspace";
@@ -708,15 +705,18 @@ export function WorkspaceSidebar({
 
         <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
           <div className="group/alltasks mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
-            <Link
-              href={`${base}/work`}
-              className={`${rowBase(activeAllWorkspaceTasks)} flex min-w-0 flex-1 items-center pl-2`}
-              title={`All ${NODE_LABELS.workItem.toLowerCase()}s in this workspace`}
-              aria-current={activeAllWorkspaceTasks ? "page" : undefined}
-              onClick={() => writeWorkBoardScope(workspaceId, { levelId: null, listId: null })}
+            <button
+              type="button"
+              className={`${rowBase(false)} flex min-w-0 flex-1 items-center pl-2`}
+              title={
+                orgTreeOpen
+                  ? `Collapse ${NODE_LABELS.level.toLowerCase()}s and ${NODE_LABELS.list.toLowerCase()}s`
+                  : `Expand ${NODE_LABELS.level.toLowerCase()}s and ${NODE_LABELS.list.toLowerCase()}s`
+              }
+              onClick={() => setOrgTreeOpen((v) => !v)}
             >
-              <span className="truncate text-sm font-bold text-[var(--fg)]">All Tasks</span>
-            </Link>
+              <span className="truncate text-sm font-bold text-[var(--fg)]">{NODE_LABELS.workspace}</span>
+            </button>
             {canRenameOrgStructure && (
               <button
                 type="button"

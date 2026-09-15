@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
-import { ExportButton } from "@/components/dashboard/ExportButton";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -31,15 +30,8 @@ export default function WorkspaceDashboardPage() {
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-3">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Hey, {firstName}!</h1>
-          <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
-            Your base is logging, tracking tasks, monitoring deadlines.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <ExportButton />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-semibold tracking-tight">Hey, {firstName}!</h1>
         <div
           className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
           role="group"
@@ -69,7 +61,6 @@ export default function WorkspaceDashboardPage() {
           >
             Activity log
           </button>
-        </div>
         </div>
       </div>
 
