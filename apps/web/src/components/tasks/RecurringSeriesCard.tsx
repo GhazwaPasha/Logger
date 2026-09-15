@@ -113,6 +113,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
     tasks: occurrences,
     isLoading: occurrencesLoading,
     nextCursor,
+    hasMoreBeyondCap,
     loadingMore,
     loadMoreError,
     loadMore,
@@ -225,7 +226,9 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
               </ul>
             )}
             {/* A chain's history is unbounded — this list is never fully loaded up front, so
-                more may remain even after the first page renders. */}
+                more may remain even after the first page renders. Pagination stops at
+                OCCURRENCE_CAP (see useSeriesOccurrences) rather than letting a years-old
+                recurring chain page back indefinitely. */}
             {!occurrencesLoading && nextCursor && (
               <div className="px-3 py-2">
                 <button
@@ -240,6 +243,11 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                 >
                   {loadMoreError ? "Couldn't load more · retry" : loadingMore ? "Loading…" : "Load older occurrences"}
                 </button>
+              </div>
+            )}
+            {!occurrencesLoading && hasMoreBeyondCap && (
+              <div className="px-3 py-2 text-center text-[10px] text-[var(--muted)]">
+                Showing the {occurrences.length} most recent occurrences
               </div>
             )}
           </motion.div>

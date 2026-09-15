@@ -15,7 +15,7 @@ export type BoardTaskStatus = ManualTaskStatus | (typeof AUTOMATED_TASK_STATUSES
  * URL `status=` values only (composite buckets for dashboard KPIs / deep links).
  */
 export type PendingWorkUrlFilter = "pending_work";
-/** **In progress** column (overdue work shows **Late** in the card footer, not here). */
+/** **In progress** column (overdue work shows **Late** in the card footer, not here — pending overdue work shows it too). */
 export type ActiveWorkUrlFilter = "active_work";
 
 export type UrlStatusFilter = BoardTaskStatus | PendingWorkUrlFilter | ActiveWorkUrlFilter;
@@ -59,11 +59,11 @@ export function taskIsOverdue(task: Pick<TaskRow, "dueAt">, now: Date = new Date
   return !Number.isNaN(t) && t < now.getTime();
 }
 
-/** In progress with a due time in the past — surfaces **Late** badge + due styling (not a stored status). */
+/** Pending or in progress with a due time in the past — surfaces **Late** badge + due styling (not a stored status). */
 export function taskShowsLateFooter(task: TaskRow, now: Date = new Date()): boolean {
   const st = normalizeTaskStatus(task.status);
   const manual = manualStatusFromStored(st);
-  return manual === "in_progress" && taskIsOverdue(task, now);
+  return (manual === "pending" || manual === "in_progress") && taskIsOverdue(task, now);
 }
 
 /** Shared due-date indicator color (list/kanban clock icon, side panel, editor): red once late, green while actively worked on, blue for any other due date, muted when unset. */
@@ -94,7 +94,7 @@ export function dueChipPillClass(task: TaskRow, now: Date = new Date()): string 
 export const TASK_ASSIGNED_CHROME_CLASS =
   "border-sky-500/35 bg-sky-500/14 text-sky-800 dark:border-sky-500/28 dark:bg-sky-500/10 dark:text-sky-200";
 
-/** Due control chrome (orange) when the task is in progress and overdue. */
+/** Due control chrome (orange) when the task is pending or in progress and overdue. */
 export const TASK_LATE_DUE_CHROME_CLASS =
   "border-orange-500/45 bg-orange-500/16 text-orange-900 dark:border-orange-500/38 dark:bg-orange-500/12 dark:text-orange-100";
 

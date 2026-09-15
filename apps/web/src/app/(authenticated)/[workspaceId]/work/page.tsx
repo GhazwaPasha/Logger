@@ -83,6 +83,7 @@ import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useArchiveTask } from "@/hooks/useArchiveTask";
 import { useOpenNewTask } from "@/hooks/useOpenNewTask";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import {
   FLOW_COLUMN_LABELS,
   PRIORITY_LABELS,
@@ -275,94 +276,10 @@ function tasksToolbarIconButtonClasses(active: boolean) {
 
 const TASKS_TOOLBAR_ICON_CLASS = "size-4 pointer-events-none";
 
-const BOARD_STATS_SEGMENTS: { status: ManualTaskStatus; label: string; title: string }[] = [
-  { status: "pending", label: "Pending", title: FLOW_COLUMN_LABELS.pending },
-  { status: "in_progress", label: "In progress", title: FLOW_COLUMN_LABELS.in_progress },
-  { status: "done", label: "Done", title: FLOW_COLUMN_LABELS.done },
-];
-
 /** Statuses grouped into one RecurringSeriesCard in list view (kanban groups per-column instead). */
 const DONE_CANCELLED_STATUSES = ["done", "cancelled"] as const;
 /** done/cancelled columns group same-chain occurrences into one card; other columns show every task individually. */
 const SERIES_GROUPED_COLUMNS = new Set<string>(DONE_CANCELLED_STATUSES);
-
-const PIPELINE_BADGE_FRAME =
-  "inline-flex min-w-[1.75rem] items-center justify-center rounded-sm border border-[var(--border-subtle)] px-2 py-0.5 text-xs font-semibold tabular-nums leading-none";
-
-function WorkBoardStatsCard({
-  counts,
-  total,
-  loading = false,
-}: {
-  total: number;
-  counts: Record<ManualTaskStatus, number>;
-  loading?: boolean;
-}) {
-  const cancelled = counts.cancelled;
-  const n = (v: number) => (loading ? "…" : v);
-  return (
-    <aside
-      className="min-w-0 w-full shrink-0 lg:col-span-1 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:justify-self-stretch lg:self-start"
-      aria-live="polite"
-      aria-label="Task counts by workflow stage"
-    >
-      <div className="ui-elevated-panel relative overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--accent)_45%,transparent)] to-transparent opacity-90"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.4]"
-          style={{
-            background:
-              "radial-gradient(100% 140% at 100% -20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 48%)",
-          }}
-        />
-        <div className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Pipeline</span>
-              <span className="hidden text-[10px] text-[var(--muted)] sm:inline" aria-hidden>
-                ·
-              </span>
-              <span className="hidden truncate text-[10px] text-[var(--muted)]/90 sm:inline">Live · current scope</span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <span className="text-xs font-medium text-[var(--muted)]">Total</span>
-              <span
-                className={`${PIPELINE_BADGE_FRAME} min-w-[2rem] bg-[var(--surface-muted)] px-2.5 text-sm text-[var(--fg)]`}
-              >
-                {n(total)}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 px-2.5 pb-2 pt-0 sm:gap-x-2.5 sm:px-3 sm:pb-2 lg:justify-between">
-            {BOARD_STATS_SEGMENTS.map(({ status, label, title }) => (
-              <div
-                key={status}
-                className="group flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
-                role="group"
-                aria-label={`${title}: ${loading ? "loading" : counts[status]}`}
-              >
-                <span className="truncate text-xs font-medium text-[var(--fg)]">{label}</span>
-                <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPaletteClasses(status)}`}>{n(counts[status])}</span>
-              </div>
-            ))}
-            <div
-              className="group flex min-w-0 items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-[var(--surface-hover)]/60"
-              role="group"
-              aria-label={`${STATUS_LABELS.cancelled}: ${loading ? "loading" : cancelled}`}
-            >
-              <span className="truncate text-xs font-medium text-[var(--fg)]">{STATUS_LABELS.cancelled}</span>
-              <span className={`${PIPELINE_BADGE_FRAME} ${statusPillPaletteClasses("cancelled")}`}>{n(cancelled)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  );
-}
 
 const DROP_VALID_CLASSES = ["border-[var(--accent)]", "bg-[var(--accent-glow-soft)]"];
 const DROP_INVALID_CLASSES = ["border-red-400/50", "bg-red-500/[0.04]"];
@@ -966,6 +883,7 @@ function WorkItemsInner() {
   const roadmap = useRoadmap(token, workspaceId);
   const prefetchTaskDetail = usePrefetchTaskDetail(token);
   const { archiveTask, archiveError: taskArchiveError, clearArchiveError } = useArchiveTask();
+  const isMobile = useIsMobile();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
   const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
@@ -1474,7 +1392,7 @@ function WorkItemsInner() {
   }, [activeTasks, selectedList, selectedLevel, levelLists]);
 
   /**
-   * The board filters the Pipeline card and RecurringSeriesCards track, beyond list/level scope:
+   * The board filters the kanban column counts and RecurringSeriesCards track, beyond list/level scope:
    * due-date range and assignee. Deliberately excludes urlStatusFilter/goal/milestone — see the
    * doc comment on the backend's `boardFilterConditions` for why. `urlAssigneeUserId` (a specific
    * assignee, e.g. from a People-page drilldown) wins over the mine/unassigned toggle on the rare
@@ -1497,12 +1415,12 @@ function WorkItemsInner() {
   );
 
   /**
-   * Pipeline card counts: a dedicated grouped-COUNT query, not a tally over `visibleTasks`. Done/
-   * cancelled totals used to be counted off whatever the board had paginated in so far, so the
-   * card kept changing (and visibly reflowing) as more completed tasks streamed in behind the
-   * scenes — this stays correct and stable from the first paint, with its own loading state.
+   * Kanban column-header counts: a dedicated grouped-COUNT query, not a tally over `visibleTasks`.
+   * Done/cancelled totals used to be counted off whatever the board had paginated in so far, so
+   * columns kept changing (and visibly reflowing) as more completed tasks streamed in behind the
+   * scenes — this stays correct and stable from the first paint.
    */
-  const { counts: rawTaskCounts, isLoading: taskCountsLoading } = useTaskCounts(token, workspaceId, boardFilter);
+  const { counts: rawTaskCounts } = useTaskCounts(token, workspaceId, boardFilter);
   const boardStatusCounts = useMemo((): Record<ManualTaskStatus, number> => {
     return {
       pending: rawTaskCounts?.pending ?? 0,
@@ -1511,10 +1429,6 @@ function WorkItemsInner() {
       cancelled: rawTaskCounts?.cancelled ?? 0,
     };
   }, [rawTaskCounts]);
-  const boardTotalCount = useMemo(
-    () => boardStatusCounts.pending + boardStatusCounts.in_progress + boardStatusCounts.done + boardStatusCounts.cancelled,
-    [boardStatusCounts],
-  );
 
   /** Badges on cards: all tasks → list + level; level filter only → list; single list filter → none */
 
@@ -1634,7 +1548,9 @@ function WorkItemsInner() {
     const checklistDone = flowCol === "done";
     const checklistDisabled = flowCol === "cancelled";
     const advanceTo = nextWorkflowManualStatus(storedStatus);
-    const expanded = !listRowCollapsed.has(task.id);
+    // Desktop defaults subtasks open; mobile defaults them collapsed, so membership in the set
+    // means "collapsed" on desktop but "expanded" on mobile.
+    const expanded = isMobile ? listRowCollapsed.has(task.id) : !listRowCollapsed.has(task.id);
     const sid = subtasksByTaskId[task.id];
     const subtasksState =
       sid !== undefined ? sid : task.subtasks !== undefined ? task.subtasks : undefined;
@@ -2268,7 +2184,7 @@ function WorkItemsInner() {
         </div>
       ) : null}
       <header className="pb-1">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(26rem,min(52rem,58vw))] lg:items-start lg:gap-x-4 xl:gap-x-5 lg:gap-y-3">
+        <div className="grid grid-cols-1 gap-3 lg:items-start lg:gap-y-3">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-2 lg:col-start-1 lg:row-start-1 lg:pt-0.5">
             <span className="inline-flex items-center rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]">
               {NODE_LABELS.workItem}s
@@ -2445,11 +2361,6 @@ function WorkItemsInner() {
               </div>
             </div>
           </div>
-          <WorkBoardStatsCard
-            counts={boardStatusCounts}
-            total={boardTotalCount}
-            loading={taskCountsLoading}
-          />
         </div>
       </header>
 

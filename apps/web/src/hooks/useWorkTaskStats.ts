@@ -7,9 +7,10 @@ import { workspaceKeys } from "@/lib/query-keys";
 import type { TaskRow } from "@/lib/ledger-types";
 
 /**
- * Three lightweight, independently-loading queries that back the work board's summary UI (pipeline
- * card + RecurringSeriesCard headers) without ever depending on how far the board's own infinite
- * scroll has paginated. See useOrgWorkspace for the paginated task rows these deliberately avoid.
+ * Three lightweight, independently-loading queries that back the work board's summary UI (kanban
+ * column counts + RecurringSeriesCard headers) without ever depending on how far the board's own
+ * infinite scroll has paginated. See useOrgWorkspace for the paginated task rows these deliberately
+ * avoid.
  */
 
 export type SeriesSummaryRow = {
@@ -50,7 +51,7 @@ function filterParams(opts: BoardFilterOpts): URLSearchParams {
   return params;
 }
 
-/** Pipeline card counts — own query, own loading state; never derived from paginated task rows. */
+/** Kanban column-header counts — own query, own loading state; never derived from paginated task rows. */
 export function useTaskCounts(token: string | null, orgId: string | null, opts: BoardFilterOpts) {
   const params = filterParams(opts);
   const q = useQuery({
@@ -89,14 +90,19 @@ export function useSeriesSummaries(
 
 type SeriesOccurrencesPage = { tasks: TaskRow[]; nextCursor: string | null };
 
+/** Frontend-only cap on how far back a card's occurrence list will page — see RecurringSeriesCard. */
+const OCCURRENCE_CAP = 30;
+
 /**
  * Occurrence list for one recurring chain — only fetched once its card is expanded, and paginated
  * in pages of 25 like the main board. A chain's history is unbounded (that's the whole point of
- * "recurring"), so this must never try to load it all in one request: the first page comes back
- * from `useQuery` as usual, and `loadMore` appends subsequent pages by cursor, mirroring the
- * `loadMoreColumn` pattern in useOrgWorkspace. `loadMoreError` is a real, directly-observed
- * try/catch failure — not inferred from cursor/loading-state comparisons — so it can't produce a
- * false-positive retry prompt the way that inference did on the main board.
+ * "recurring"), so `loadMore` stops offering further pages once `OCCURRENCE_CAP` items are loaded
+ * — older occurrences are still on the server, just not worth fetching into a collapsible summary
+ * card. The first page comes back from `useQuery` as usual, and `loadMore` appends subsequent pages
+ * by cursor (capped to however many are left under the cap), mirroring the `loadMoreColumn` pattern
+ * in useOrgWorkspace. `loadMoreError` is a real, directly-observed try/catch failure — not inferred
+ * from cursor/loading-state comparisons — so it can't produce a false-positive retry prompt the way
+ * that inference did on the main board.
  */
 export function useSeriesOccurrences(
   token: string | null,
@@ -120,15 +126,21 @@ export function useSeriesOccurrences(
 
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState(false);
-  const nextCursor = q.data?.nextCursor ?? null;
+  const loadedCount = q.data?.tasks.length ?? 0;
+  const rawNextCursor = q.data?.nextCursor ?? null;
+  const capReached = loadedCount >= OCCURRENCE_CAP;
+  const nextCursor = capReached ? null : rawNextCursor;
+  /** More history exists on the server past what the cap let us load. */
+  const hasMoreBeyondCap = capReached && Boolean(rawNextCursor);
 
   const loadMore = useCallback(async () => {
-    if (!token || !orgId || !seriesId || !nextCursor) return;
+    if (!token || !orgId || !seriesId || !rawNextCursor || capReached) return;
+    const limit = Math.min(25, OCCURRENCE_CAP - loadedCount);
     setLoadingMore(true);
     setLoadMoreError(false);
     try {
       const page = await apiJson<SeriesOccurrencesPage>(
-        `/organizations/${orgId}/tasks/series/${seriesId}?limit=25&cursor=${nextCursor}${statusParam}`,
+        `/organizations/${orgId}/tasks/series/${seriesId}?limit=${limit}&cursor=${rawNextCursor}${statusParam}`,
         { token },
       );
       queryClient.setQueryData<SeriesOccurrencesPage>(queryKey, (old) => {
@@ -144,12 +156,13 @@ export function useSeriesOccurrences(
     } finally {
       setLoadingMore(false);
     }
-  }, [token, orgId, seriesId, nextCursor, statusParam, queryClient, queryKey]);
+  }, [token, orgId, seriesId, rawNextCursor, capReached, loadedCount, statusParam, queryClient, queryKey]);
 
   return {
     tasks: q.data?.tasks ?? [],
     isLoading: q.isFetching && !q.data,
     nextCursor,
+    hasMoreBeyondCap,
     loadingMore,
     loadMoreError,
     loadMore,

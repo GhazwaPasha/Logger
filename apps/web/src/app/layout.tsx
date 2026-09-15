@@ -3,6 +3,7 @@ import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { BootProvider } from "@/components/app/BootProvider";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme-color";
 import "@/lib/fontawesome-config";
 import "./globals.css";
 
@@ -49,12 +50,17 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "LogBase",
-    statusBarStyle: "default",
+    // Translucent status bar lets the header's own background (which already pads for the
+    // safe-area inset via `.safe-top`) show through, so it matches instead of iOS's opaque default.
+    statusBarStyle: "black-translucent",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#27272a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR_LIGHT },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR_DARK },
+  ],
   viewportFit: "cover",
 };
 
@@ -66,10 +72,13 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="system" suppressHydrationWarning>
       <head>
-        {/* Apply stored theme before first paint to avoid a flash */}
+        {/* Apply stored theme before first paint to avoid a flash. When the user has explicitly
+            picked light/dark (not "system"), also pin the status-bar color to match — otherwise
+            the prefers-color-scheme theme-color meta tags Next generates from the `viewport`
+            export below would follow the OS instead. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme-pref');if(t==='light'||t==='dark'||t==='system')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme-pref');if(t==='light'||t==='dark'||t==='system')document.documentElement.setAttribute('data-theme',t);if(t==='light'||t==='dark'){var m=document.createElement('meta');m.id='theme-color-override';m.setAttribute('name','theme-color');m.setAttribute('content',t==='dark'?'${THEME_COLOR_DARK}':'${THEME_COLOR_LIGHT}');document.head.appendChild(m);}}catch(e){}})();`,
           }}
         />
       </head>

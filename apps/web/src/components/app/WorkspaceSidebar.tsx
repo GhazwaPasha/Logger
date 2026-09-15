@@ -46,23 +46,6 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
-function PencilIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
-    </svg>
-  );
-}
-
 function PlusIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -566,6 +549,16 @@ export function WorkspaceSidebar({
       : structureMenu.kind === "level"
         ? [
             {
+              id: "rename-level",
+              label: `Rename ${NODE_LABELS.level}`,
+              onSelect: () => {
+                setRenamingListId(null);
+                setRenameListDraft("");
+                setRenamingLevelId(structureMenu.deptId);
+                setRenameLevelDraft(structureMenu.name);
+              },
+            },
+            {
               id: "delete-level",
               label: `Delete ${NODE_LABELS.level}`,
               destructive: true,
@@ -583,6 +576,16 @@ export function WorkspaceSidebar({
             },
           ]
         : [
+            {
+              id: "rename-list",
+              label: `Rename ${NODE_LABELS.list}`,
+              onSelect: () => {
+                setRenamingLevelId(null);
+                setRenameLevelDraft("");
+                setRenamingListId(structureMenu.listId);
+                setRenameListDraft(structureMenu.name);
+              },
+            },
             {
               id: "delete-list",
               label: `Delete ${NODE_LABELS.list}`,
@@ -925,24 +928,6 @@ export function WorkspaceSidebar({
                             >
                               <span className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</span>
                             </Link>
-                            {!reorderMode && canRenameOrgStructure && (
-                              <button
-                                type="button"
-                                className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
-                                aria-label={`Rename ${NODE_LABELS.level} ${d.name}`}
-                                title={`Rename ${NODE_LABELS.level}`}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setRenamingListId(null);
-                                  setRenameListDraft("");
-                                  setRenamingLevelId(d.id);
-                                  setRenameLevelDraft(d.name);
-                                }}
-                              >
-                                <PencilIcon className="h-3.5 w-3.5" />
-                              </button>
-                            )}
                             {!reorderMode && (
                               <button
                                 type="button"
@@ -1158,24 +1143,6 @@ export function WorkspaceSidebar({
                                             {l.name}
                                           </span>
                                         </Link>
-                                        {!reorderMode && canRenameOrgStructure && (
-                                          <button
-                                            type="button"
-                                            className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
-                                            aria-label={`Rename ${NODE_LABELS.list} ${l.name}`}
-                                            title={`Rename ${NODE_LABELS.list}`}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              setRenamingLevelId(null);
-                                              setRenameLevelDraft("");
-                                              setRenamingListId(l.id);
-                                              setRenameListDraft(l.name);
-                                            }}
-                                          >
-                                            <PencilIcon className="h-3.5 w-3.5" />
-                                          </button>
-                                        )}
                                         <Link
                                           href={`${base}/work`}
                                           tabIndex={-1}

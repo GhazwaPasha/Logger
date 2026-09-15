@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import { THEME_COLOR_LIGHT } from "@/lib/theme-color";
 
 export default function manifest(): MetadataRoute.Manifest {
   const origin = getPublicSiteOrigin();
@@ -12,8 +13,11 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    // Manifest colors can't vary by color scheme (only used for the splash screen before the
+    // page's own theme-color meta tags take over) — pair them with the light header so the splash
+    // matches background_color below rather than the arbitrary gray it used before.
     background_color: "#fafafa",
-    theme_color: "#27272a",
+    theme_color: THEME_COLOR_LIGHT,
     icons: [
       {
         src: `${origin}/icons/logbase-app-192.png`,

@@ -26,6 +26,11 @@ export function ApiSessionProvider({ children }: { children: ReactNode }) {
     const { data, error } = await authClient.token();
     if (error) {
       setToken(null);
+      // The JWT couldn't be refreshed. Re-check the underlying Better Auth session so a
+      // truly dead session (not just an expired JWT) updates useSession() and triggers
+      // AppAuthenticatedProviders' redirect-to-login effect, instead of leaving the user
+      // stuck on the page with a stale "invalid token" error banner.
+      void authClient.getSession();
       return;
     }
     setToken(data?.token ?? null);
@@ -50,8 +55,12 @@ export function ApiSessionProvider({ children }: { children: ReactNode }) {
       }
       const { data, error } = await authClient.token();
       if (cancelled) return;
-      if (error) setToken(null);
-      else setToken(data?.token ?? null);
+      if (error) {
+        setToken(null);
+        void authClient.getSession();
+      } else {
+        setToken(data?.token ?? null);
+      }
       setTokenResolved(true);
     })();
     return () => {
