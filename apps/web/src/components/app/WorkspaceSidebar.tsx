@@ -720,7 +720,7 @@ export function WorkspaceSidebar({
                 className={`shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-[color,background-color,opacity] duration-150 ${
                   reorderMode
                     ? "bg-[var(--accent)] text-[var(--on-accent)]"
-                    : "pointer-events-none text-[var(--muted)] opacity-0 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                    : "touch-reveal pointer-events-none text-[var(--muted)] opacity-0 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
                 }`}
                 aria-pressed={reorderMode}
                 aria-label={
@@ -739,7 +739,7 @@ export function WorkspaceSidebar({
             )}
             <button
               type="button"
-              className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+              className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
               aria-label={`Add ${NODE_LABELS.level}`}
               title={`Add ${NODE_LABELS.level}`}
               onClick={() => {
@@ -928,7 +928,7 @@ export function WorkspaceSidebar({
                             {!reorderMode && canRenameOrgStructure && (
                               <button
                                 type="button"
-                                className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
                                 aria-label={`Rename ${NODE_LABELS.level} ${d.name}`}
                                 title={`Rename ${NODE_LABELS.level}`}
                                 onClick={(e) => {
@@ -946,7 +946,7 @@ export function WorkspaceSidebar({
                             {!reorderMode && (
                               <button
                                 type="button"
-                                className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
                                 aria-label={`Add ${NODE_LABELS.list} to ${d.name}`}
                                 title={`Add ${NODE_LABELS.list}`}
                                 onClick={(e) => {
@@ -1161,7 +1161,7 @@ export function WorkspaceSidebar({
                                         {!reorderMode && canRenameOrgStructure && (
                                           <button
                                             type="button"
-                                            className="pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                                            className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/list:pointer-events-auto group-hover/list:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
                                             aria-label={`Rename ${NODE_LABELS.list} ${l.name}`}
                                             title={`Rename ${NODE_LABELS.list}`}
                                             onClick={(e) => {

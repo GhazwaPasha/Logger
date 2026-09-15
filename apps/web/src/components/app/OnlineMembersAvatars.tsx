@@ -26,12 +26,13 @@ export function OnlineMembersAvatars() {
   const overflow = onlineMembers.length - MAX_SHOWN;
 
   return (
-    <div className="flex items-center gap-1.5" role="list" aria-label={`${onlineMembers.length} teammate${onlineMembers.length === 1 ? "" : "s"} online`}>
-      {shown.map((m) => (
+    <div className="flex items-center" role="list" aria-label={`${onlineMembers.length} teammate${onlineMembers.length === 1 ? "" : "s"} online`}>
+      {shown.map((m, i) => (
           <div
             key={m.userId}
             role="listitem"
-            className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[10px] font-semibold uppercase tracking-tight text-[var(--fg)]"
+            className={`flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-header)] bg-[var(--accent-muted)] text-[9px] font-semibold uppercase tracking-tight text-[var(--fg)] ${i > 0 ? "-ml-2" : ""}`}
+            style={{ zIndex: shown.length - i }}
             title={m.name || m.email}
           >
             <Avatar name={m.name} email={m.email} image={m.image} size="size-full" />
@@ -39,7 +40,8 @@ export function OnlineMembersAvatars() {
       ))}
       {overflow > 0 && (
         <div
-          className="flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[10px] font-semibold text-[var(--muted)]"
+          className="-ml-2 flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-[var(--bg-header)] bg-[var(--surface-elevated)] text-[9px] font-semibold text-[var(--muted)]"
+          style={{ zIndex: 0 }}
           title={`${overflow} more online`}
         >
           +{overflow}

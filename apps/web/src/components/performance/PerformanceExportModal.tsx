@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { POP_EASE, backdropVariants, motionDuration, sheetCardVariants } from "@/components/ui/motion-presets";
 
 export type ExportRange = { dateFrom: string; dateTo: string };
 
@@ -76,8 +78,9 @@ export function PerformanceExportModal({
   const [preset, setPreset] = useState<PresetKey>("1w");
   const [customFrom, setCustomFrom] = useState(toDateInputValue(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)));
   const [customTo, setCustomTo] = useState(toDateInputValue(today));
+  const prefersReduced = useReducedMotion();
 
-  if (!open || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   const rangeForPreset = (key: PresetKey): ExportRange | null => {
     switch (key) {
@@ -112,103 +115,118 @@ export function PerformanceExportModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="presentation">
-      <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-        aria-hidden
-        onMouseDown={busy ? undefined : onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="relative z-[1] w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-xl shadow-black/20"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Export</p>
-            <h2 className="mt-0.5 text-lg font-semibold text-[var(--fg)]">Performance report</h2>
-          </div>
-          <button
-            type="button"
-            className="rounded-lg p-1.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] disabled:opacity-50"
-            onClick={onClose}
-            disabled={busy}
-            aria-label="Close"
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-[130]" role="presentation">
+          <motion.div
+            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+            aria-hidden
+            variants={backdropVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            transition={{ duration: motionDuration(0.18, prefersReduced) }}
+            onMouseDown={busy ? undefined : onClose}
+          />
+          {/* Pinned-bottom sheet below `md`, centered dialog at `md`+ — matches ConfirmDialog. */}
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-x-0 bottom-0 z-[1] w-full rounded-t-2xl border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl shadow-black/20 md:inset-0 md:m-auto md:h-fit md:max-w-sm md:rounded-2xl md:border md:pb-6"
+            variants={sheetCardVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
           >
-            <FontAwesomeIcon icon={faXmark} className="size-4" />
-          </button>
-        </div>
-
-        <p className="mt-3 text-sm text-[var(--muted)]">Choose the time range to include in the CSV.</p>
-
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
-          {PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={`rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-                preset === p.key
-                  ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                  : "bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-              }`}
-              onClick={() => setPreset(p.key)}
-              aria-pressed={preset === p.key}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        {preset === "custom" && (
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                From
-              </label>
-              <input
-                type="date"
-                className="input w-full rounded-lg px-3 py-2 text-sm"
-                value={customFrom}
-                max={customTo || undefined}
-                onChange={(e) => setCustomFrom(e.target.value)}
-              />
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Export</p>
+                <h2 className="mt-0.5 text-lg font-semibold text-[var(--fg)]">Performance report</h2>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg p-1.5 text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] disabled:opacity-50"
+                onClick={onClose}
+                disabled={busy}
+                aria-label="Close"
+              >
+                <FontAwesomeIcon icon={faXmark} className="size-4" />
+              </button>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                To
-              </label>
-              <input
-                type="date"
-                className="input w-full rounded-lg px-3 py-2 text-sm"
-                value={customTo}
-                min={customFrom || undefined}
-                onChange={(e) => setCustomTo(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-        {invalidCustom && <p className="mt-1.5 text-xs text-red-500">Pick a valid date range.</p>}
 
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            className="btn-secondary rounded-xl px-4 py-2 text-sm font-medium"
-            onClick={onClose}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
-            onClick={handleExport}
-            disabled={busy || invalidCustom}
-          >
-            {busy ? "Exporting…" : "Export CSV"}
-          </button>
+            <p className="mt-3 text-sm text-[var(--muted)]">Choose the time range to include in the CSV.</p>
+
+            <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className={`rounded-lg px-3 py-2.5 text-xs font-medium transition-colors sm:py-2 ${
+                    preset === p.key
+                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                      : "bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                  }`}
+                  onClick={() => setPreset(p.key)}
+                  aria-pressed={preset === p.key}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {preset === "custom" && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    From
+                  </label>
+                  <input
+                    type="date"
+                    className="input w-full rounded-lg px-3 py-2 text-sm"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    To
+                  </label>
+                  <input
+                    type="date"
+                    className="input w-full rounded-lg px-3 py-2 text-sm"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            {invalidCustom && <p className="mt-1.5 text-xs text-red-500">Pick a valid date range.</p>}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary rounded-xl px-4 py-2 text-sm font-medium"
+                onClick={onClose}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                onClick={handleExport}
+                disabled={busy || invalidCustom}
+              >
+                {busy ? "Exporting…" : "Export CSV"}
+              </button>
+            </div>
+          </motion.div>
         </div>
-      </div>
-    </div>,
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

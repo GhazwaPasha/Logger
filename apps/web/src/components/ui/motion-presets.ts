@@ -21,6 +21,13 @@ export const dialogCardVariants: Variants = {
   visible: { opacity: 1, scale: 1 },
 };
 
+/** Bottom sheet on narrow viewports (pinned to the bottom edge, slides up), falling back to a
+ * centered dialog at `md`+ via the wrapper's own responsive classes — same variants drive both. */
+export const sheetCardVariants: Variants = {
+  hidden: { opacity: 0, y: "100%" },
+  visible: { opacity: 1, y: 0 },
+};
+
 /** Collapses a duration to 0 under `prefers-reduced-motion`, matching the app's existing CSS reduced-motion behavior. */
 export function motionDuration(base: number, prefersReduced: boolean | null) {
   return prefersReduced ? 0 : base;

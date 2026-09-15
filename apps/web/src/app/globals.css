@@ -172,6 +172,28 @@ body {
   background: var(--surface-elevated);
 }
 
+/* Safe-area insets for notches/gesture bars — inert until `viewportFit: "cover"` is set on the
+   Viewport export in app/layout.tsx, which lets the page draw under those regions. */
+@supports (padding: max(0px)) {
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}
+
+/* Reveals hover-only controls (row actions gated by `group-hover:opacity-100`) on devices with
+   no hover capability — a touchscreen at `md`+ width still has no hover, so this checks hover
+   capability directly rather than gating on a width breakpoint. */
+@media (hover: none) {
+  .touch-reveal {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
 /* Dashboard overview KPI strip: pastel tiles + hill graphic — light appearance only */
 .dashboard-kpi-card {
   position: relative;

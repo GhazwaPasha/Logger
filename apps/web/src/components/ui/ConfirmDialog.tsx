@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
-import { POP_EASE, backdropVariants, dialogCardVariants, motionDuration } from "./motion-presets";
+import { POP_EASE, backdropVariants, motionDuration, sheetCardVariants } from "./motion-presets";
 
 export type ConfirmDialogOptions = {
   title: string;
@@ -70,7 +70,7 @@ export function ConfirmDialog({
     <AnimatePresence>
       {open && options && (
         <div
-          className="fixed inset-0 z-[140] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[140]"
           role="presentation"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) onClose();
@@ -85,13 +85,15 @@ export function ConfirmDialog({
             exit="hidden"
             transition={{ duration: motionDuration(0.18, prefersReduced) }}
           />
+          {/* Pinned-bottom sheet below `md`, centered dialog at `md`+ — same slide-up motion reads
+           * as a sheet on mobile and a subtle rise-in on desktop. */}
           <motion.div
             role="alertdialog"
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={descId}
-            className="relative z-[1] w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-xl shadow-black/20"
-            variants={dialogCardVariants}
+            className="fixed inset-x-0 bottom-0 z-[1] w-full rounded-t-2xl border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl shadow-black/20 md:inset-0 md:m-auto md:h-fit md:max-w-md md:rounded-2xl md:border md:pb-6"
+            variants={sheetCardVariants}
             initial="hidden"
             animate="visible"
             exit="hidden"
