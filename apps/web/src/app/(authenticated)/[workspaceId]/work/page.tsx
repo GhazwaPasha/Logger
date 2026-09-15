@@ -2238,7 +2238,7 @@ function WorkItemsInner() {
           </button>
         </div>
       ) : null}
-      <header className="border-b border-[var(--border-subtle)] pb-4">
+      <header>
         <div className="grid grid-cols-1 gap-3 lg:items-start lg:gap-y-3">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-2 lg:col-start-1 lg:row-start-1 lg:pt-0.5">
             <span
