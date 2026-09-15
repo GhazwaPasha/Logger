@@ -26,18 +26,6 @@ const nextConfig = {
       },
     ];
   },
-  async headers() {
-    // Opt in to the OS color-scheme Client Hint so the manifest.ts handler below can see it on
-    // the request that follows — the installed PWA's status bar is painted by Android from the
-    // web manifest's static theme_color (fetched out-of-band, outside any page session), not
-    // from the live in-app meta[name=theme-color] tag, so nothing client-side can reach it.
-    return [
-      {
-        source: "/:path*",
-        headers: [{ key: "Accept-CH", value: "Sec-CH-Prefers-Color-Scheme" }],
-      },
-    ];
-  },
   async rewrites() {
     // Proxy the MCP endpoint through this app's own origin, so the URL anyone connects an AI
     // agent to is the product's domain, not the API's separate Render hosting domain.

@@ -3,7 +3,6 @@ import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { BootProvider } from "@/components/app/BootProvider";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
-import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme-color";
 import "@/lib/fontawesome-config";
 import "./globals.css";
 
@@ -50,19 +49,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "LogBase",
-    // Translucent status bar lets the header's own background (which already pads for the
-    // safe-area inset via `.safe-top`) show through, so it matches instead of iOS's opaque default.
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
 };
 
 export const viewport: Viewport = {
-  // Deliberately NOT declaring `themeColor` here: Next's metadata system re-renders/reconciles
-  // this tag from this static value on every client-side navigation (it doesn't know about our
-  // runtime updates), which was stomping the resolved theme's color right back to whatever
-  // constant this said — the status bar would revert to one fixed color no matter what the user
-  // picked. The inline script below creates and fully owns a plain, Next-invisible meta tag
-  // instead, and `useThemePreference` keeps mutating that same element afterwards.
+  themeColor: "#27272a",
   viewportFit: "cover",
 };
 
@@ -74,12 +66,10 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="system" suppressHydrationWarning>
       <head>
-        {/* Apply stored theme before first paint to avoid a flash, and create the one and only
-            theme-color meta tag ourselves (see the comment on `viewport` above for why Next
-            must not render its own). */}
+        {/* Apply stored theme before first paint to avoid a flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme-pref');var theme=(t==='light'||t==='dark'||t==='system')?t:'system';document.documentElement.setAttribute('data-theme',theme);var isDark=theme==='dark'||(theme==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);var m=document.querySelector('meta[name="theme-color"]');if(!m){m=document.createElement('meta');m.setAttribute('name','theme-color');document.head.appendChild(m);}m.setAttribute('content',isDark?'${THEME_COLOR_DARK}':'${THEME_COLOR_LIGHT}');}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('theme-pref');if(t==='light'||t==='dark'||t==='system')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
           }}
         />
       </head>

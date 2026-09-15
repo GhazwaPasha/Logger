@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { useOptionalWorkspaceNotifications } from "@/components/notifications/WorkspaceNotificationsProvider";
-import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { Avatar } from "@/components/ui/Avatar";
 import { authClient } from "@/lib/auth-client";
 import { HeaderLiveIsland } from "./live-island";
@@ -130,7 +129,6 @@ export function AppHeader({
             <LogBaseMark variant="chrome" decorative />
             <span className="hidden text-lg leading-none sm:inline">LogBase</span>
           </Link>
-          {settingsHref && <GlobalSearch />}
         </div>
         <div className="pointer-events-none z-50 flex max-w-[min(100vw-7rem,32rem)] justify-center justify-self-center px-1 sm:max-w-[min(100vw-9rem,38rem)]">
           <HeaderLiveIsland />

@@ -129,7 +129,7 @@ export function GlobalSearch() {
   return (
     <div
       ref={containerRef}
-      className={`relative shrink-0 ${open ? "w-[22rem] sm:w-[28rem]" : ""}`}
+      className={`relative shrink-0 ${open ? "w-[16rem] sm:w-[20rem]" : ""}`}
     >
       <button
         type="button"
