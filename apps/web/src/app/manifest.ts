@@ -1,9 +1,19 @@
 import type { MetadataRoute } from "next";
+import { headers } from "next/headers";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
-import { THEME_COLOR_LIGHT } from "@/lib/theme-color";
+import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/theme-color";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const origin = getPublicSiteOrigin();
+  // The installed PWA's OS status bar/splash are painted by Android from THIS static field,
+  // fetched out-of-band by the OS rather than by the live page — no client-side script can reach
+  // it (see the `Accept-CH` comment in next.config.mjs). The `Sec-CH-Prefers-Color-Scheme`
+  // Client Hint is the only lever available to vary it, and it tracks the phone's OS-level
+  // light/dark setting specifically — not an in-app manual theme override, which this request
+  // has no way to know about since it isn't tied to any browser session/localStorage.
+  const hintHeaders = await headers();
+  const isDark = hintHeaders.get("sec-ch-prefers-color-scheme") === "dark";
+  const themeColor = isDark ? THEME_COLOR_DARK : THEME_COLOR_LIGHT;
   return {
     id: `${origin}/`,
     name: "LogBase",
@@ -13,11 +23,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
-    // Manifest colors can't vary by color scheme (only used for the splash screen before the
-    // page's own theme-color meta tags take over) — pair them with the light header so the splash
-    // matches background_color below rather than the arbitrary gray it used before.
-    background_color: "#fafafa",
-    theme_color: THEME_COLOR_LIGHT,
+    background_color: themeColor,
+    theme_color: themeColor,
     icons: [
       {
         src: `${origin}/icons/logbase-app-192.png`,
