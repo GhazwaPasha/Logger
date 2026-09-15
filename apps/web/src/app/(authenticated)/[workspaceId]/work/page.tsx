@@ -2241,20 +2241,13 @@ function WorkItemsInner() {
       <header>
         <div className="grid grid-cols-1 gap-3 lg:items-start lg:gap-y-3">
           <h1 className="flex min-w-0 flex-wrap items-center gap-x-2 lg:col-start-1 lg:row-start-1 lg:pt-0.5">
-            <span
-              className={
-                filterScopeSegments.length === 0
-                  ? "inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]"
-                  : "text-sm font-medium text-[var(--muted)]"
-              }
-            >
-              {NODE_LABELS.workItem}s
-            </span>
             {filterScopeSegments.map((seg, i) => {
               const isCurrent = i === filterScopeSegments.length - 1;
               return (
                 <span key={`${seg.kind}-${i}`} className="flex items-center gap-x-2">
-                  <span className="text-xs text-[var(--muted)] opacity-60" aria-hidden>›</span>
+                  {i > 0 && (
+                    <span className="text-xs text-[var(--muted)] opacity-60" aria-hidden>›</span>
+                  )}
                   <span
                     className={
                       isCurrent
@@ -2268,7 +2261,7 @@ function WorkItemsInner() {
               );
             })}
           </h1>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 max-sm:justify-between lg:col-start-1 lg:row-start-2 lg:justify-start">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 lg:col-start-1 lg:row-start-2 lg:justify-start">
             <button
               type="button"
               title="New task"
