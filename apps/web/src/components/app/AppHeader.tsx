@@ -65,8 +65,9 @@ function IconSettings({ className }: { className?: string }) {
   );
 }
 
+/* size-5 (20px) matches the online-teammate avatars in OnlineMembersAvatars. */
 const profileShell =
-  "flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-xs font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
+  "flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[8px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
 
 const iconBtn =
   "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--fg)] transition-[background-color,border-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
@@ -179,7 +180,7 @@ export function AppHeader({
                   <Avatar name={user.name} email={user.email} image={user.image} size="size-full" />
                 </button>
                 <span
-                  className="pointer-events-none absolute bottom-0.5 right-0.5 size-2.5 rounded-full bg-green-500 ring-2 ring-[var(--bg-header)]"
+                  className="pointer-events-none absolute bottom-0 right-0 size-2 rounded-full bg-green-500 ring-1 ring-[var(--bg-header)]"
                   aria-hidden
                 />
               </div>

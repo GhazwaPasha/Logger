@@ -31,7 +31,7 @@ export function OnlineMembersAvatars() {
           <div
             key={m.userId}
             role="listitem"
-            className={`flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-header)] bg-[var(--accent-muted)] text-[9px] font-semibold uppercase tracking-tight text-[var(--fg)] ${i > 0 ? "-ml-2" : ""}`}
+            className={`flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-header)] bg-[var(--accent-muted)] text-[8px] font-semibold uppercase tracking-tight text-[var(--fg)] ${i > 0 ? "-ml-1.5" : ""}`}
             style={{ zIndex: shown.length - i }}
             title={m.name || m.email}
           >
@@ -40,7 +40,7 @@ export function OnlineMembersAvatars() {
       ))}
       {overflow > 0 && (
         <div
-          className="-ml-2 flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-[var(--bg-header)] bg-[var(--surface-elevated)] text-[9px] font-semibold text-[var(--muted)]"
+          className="-ml-1.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 border-[var(--bg-header)] bg-[var(--surface-elevated)] text-[8px] font-semibold text-[var(--muted)]"
           style={{ zIndex: 0 }}
           title={`${overflow} more online`}
         >
