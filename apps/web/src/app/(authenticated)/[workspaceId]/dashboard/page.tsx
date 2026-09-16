@@ -30,7 +30,7 @@ export default function WorkspaceDashboardPage() {
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-3">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Hey, {firstName}!</h1>
         <div
           className="inline-flex shrink-0 items-center rounded-xl bg-[var(--surface-elevated)] p-0.5"
