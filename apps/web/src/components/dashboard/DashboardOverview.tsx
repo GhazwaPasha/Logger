@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { RoadmapDashboardPanel } from "@/components/dashboard/RoadmapDashboardPanel";
-import { DASHBOARD_KPI_TONES, DashboardKpiWave, SegmentedBar } from "@/components/dashboard/kpi-primitives";
+import { DASHBOARD_KPI_TONES, DashboardKpiWave, DonutChart } from "@/components/dashboard/kpi-primitives";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -29,7 +29,20 @@ const STATUS_SEGMENT_BG: Record<ManualTaskStatus, string> = {
   cancelled: "bg-neutral-500/45",
 };
 
+const STATUS_SEGMENT_STROKE: Record<ManualTaskStatus, string> = {
+  pending: "stroke-slate-500/55",
+  in_progress: "stroke-violet-500/55",
+  done: "stroke-emerald-500/55",
+  cancelled: "stroke-neutral-500/45",
+};
+
 const PRIORITY_ORDER: TaskPriority[] = ["high", "medium", "low"];
+
+const PRIORITY_STROKE: Record<TaskPriority, string> = {
+  high: "stroke-rose-500/55",
+  medium: "stroke-amber-500/50",
+  low: "stroke-slate-400/45",
+};
 
 const PRIORITY_BAR_BG: Record<TaskPriority, string> = {
   high: "bg-rose-500/55",
@@ -162,7 +175,7 @@ export function DashboardOverview({
   const statusSegments = STATUS_BAR_ORDER.map((st) => ({
     key: st,
     count: stats.workflowCounts[st],
-    className: STATUS_SEGMENT_BG[st],
+    strokeClassName: STATUS_SEGMENT_STROKE[st],
     title: FLOW_COLUMN_LABELS[st],
   }));
 
@@ -170,7 +183,7 @@ export function DashboardOverview({
     ...PRIORITY_ORDER.map((p) => ({
       key: p,
       count: stats.priorityCounts[p],
-      className: PRIORITY_BAR_BG[p],
+      strokeClassName: PRIORITY_STROKE[p],
       title: PRIORITY_LABELS[p],
     })),
     ...(stats.unsetPriority > 0
@@ -178,7 +191,7 @@ export function DashboardOverview({
           {
             key: "unset",
             count: stats.unsetPriority,
-            className: "bg-[var(--border-subtle)]",
+            strokeClassName: "stroke-[color:var(--border-subtle)]",
             title: "No priority",
           },
         ]
@@ -321,51 +334,51 @@ export function DashboardOverview({
               Open Work
             </Link>
           </div>
-          <div className="mt-2">
-            <SegmentedBar segments={statusSegments} emptyLabel="No tasks yet" />
+          <div className="mt-2 flex items-center gap-4">
+            <DonutChart segments={statusSegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
+            <ul className="min-w-0 flex-1 space-y-1">
+              {STATUS_BAR_ORDER.map((st) => (
+                <li key={st} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_SEGMENT_BG[st]}`} aria-hidden />
+                    <span className="truncate">{FLOW_COLUMN_LABELS[st]}</span>
+                  </span>
+                  <Link
+                    href={workHref(basePath, { status: st })}
+                    className="tabular-nums font-medium text-[var(--fg)] hover:text-[var(--accent)]"
+                  >
+                    {loading ? "…" : stats.workflowCounts[st]}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="mt-2 grid gap-x-2 gap-y-1 sm:grid-cols-2">
-            {STATUS_BAR_ORDER.map((st) => (
-              <li key={st} className="flex items-center justify-between gap-2 text-sm">
-                <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_SEGMENT_BG[st]}`} aria-hidden />
-                  <span className="truncate">{FLOW_COLUMN_LABELS[st]}</span>
-                </span>
-                <Link
-                  href={workHref(basePath, { status: st })}
-                  className="tabular-nums font-medium text-[var(--fg)] hover:text-[var(--accent)]"
-                >
-                  {loading ? "…" : stats.workflowCounts[st]}
-                </Link>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
-          <div className="mt-2">
-            <SegmentedBar
-              segments={prioritySegments}
-              emptyLabel="No tasks or priorities recorded"
-            />
-          </div>
-          <ul className="mt-2 space-y-1 text-sm">
-            {PRIORITY_ORDER.map((p) => (
-              <li key={p} className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-[var(--muted)]">
-                  <span className={`h-2 w-2 rounded-full ${PRIORITY_BAR_BG[p]}`} aria-hidden />
-                  {PRIORITY_LABELS[p]}
+          <div className="mt-2 flex items-center gap-4">
+            <DonutChart segments={prioritySegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
+            <ul className="min-w-0 flex-1 space-y-1 text-sm">
+              {PRIORITY_ORDER.map((p) => (
+                <li key={p} className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${PRIORITY_BAR_BG[p]}`} aria-hidden />
+                    <span className="truncate">{PRIORITY_LABELS[p]}</span>
+                  </span>
+                  <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.priorityCounts[p]}</span>
+                </li>
+              ))}
+              <li className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--border-subtle)]" aria-hidden />
+                  <span className="truncate">No priority set</span>
                 </span>
-                <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.priorityCounts[p]}</span>
+                <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.unsetPriority}</span>
               </li>
-            ))}
-            <li className="flex items-center justify-between gap-2">
-              <span className="text-[var(--muted)]">No priority set</span>
-              <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.unsetPriority}</span>
-            </li>
-          </ul>
+            </ul>
+          </div>
         </div>
       </div>
 
@@ -400,22 +413,22 @@ export function DashboardOverview({
                 const max = stats.levelRows[0]?.count ?? 1;
                 const w = max > 0 ? (count / max) * 100 : 0;
                 return (
-                  <li key={dept.id}>
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate font-medium text-[var(--fg)]">{dept.name}</span>
-                      <Link
-                        href={workHref(basePath, { level: dept.id })}
-                        className="shrink-0 tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
-                      >
-                        {loading ? "…" : count}
-                      </Link>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                  <li key={dept.id} className="flex items-center gap-2.5 text-sm">
+                    <span className="w-24 shrink-0 truncate font-medium text-[var(--fg)] sm:w-28" title={dept.name}>
+                      {dept.name}
+                    </span>
+                    <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                       <div
                         className="h-full rounded-full bg-[var(--accent)]/50"
                         style={{ width: `${w}%` }}
                       />
                     </div>
+                    <Link
+                      href={workHref(basePath, { level: dept.id })}
+                      className="w-6 shrink-0 text-right tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
+                    >
+                      {loading ? "…" : count}
+                    </Link>
                   </li>
                 );
               })}
@@ -436,19 +449,19 @@ export function DashboardOverview({
                 const max = stats.topAssignees[0]?.[1] ?? 1;
                 const w = max > 0 ? (count / max) * 100 : 0;
                 return (
-                  <li key={userId}>
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="min-w-0 truncate font-medium text-[var(--fg)]">{label}</span>
-                      <Link
-                        href={workHref(basePath, { assignee: userId })}
-                        className="shrink-0 tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
-                      >
-                        {loading ? "…" : count}
-                      </Link>
-                    </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
+                  <li key={userId} className="flex items-center gap-2.5 text-sm">
+                    <span className="w-24 shrink-0 truncate font-medium text-[var(--fg)] sm:w-28" title={label}>
+                      {label}
+                    </span>
+                    <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                       <div className="h-full rounded-full bg-violet-500/45" style={{ width: `${w}%` }} />
                     </div>
+                    <Link
+                      href={workHref(basePath, { assignee: userId })}
+                      className="w-6 shrink-0 text-right tabular-nums text-[var(--muted)] hover:text-[var(--accent)]"
+                    >
+                      {loading ? "…" : count}
+                    </Link>
                   </li>
                 );
               })}
