@@ -57,7 +57,7 @@ export function DonutChart({
   const gap = visible.length > 1 ? 0.8 : 0;
   let offset = 0;
   return (
-    <div className="relative h-28 w-28 shrink-0" role="img" aria-label={`${centerLabel}: ${total}`}>
+    <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`${centerLabel}: ${total}`}>
       <svg viewBox="0 0 42 42" className="h-full w-full -rotate-90">
         <circle
           cx="21"

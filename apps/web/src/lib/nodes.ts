@@ -12,7 +12,9 @@
 export const NODE_LABELS = {
   workspace: "Workspace",
   level: "Category",
+  levelPlural: "Categories",
   list: "Channel",
+  listPlural: "Channels",
   workItem: "Task",
 } as const;
 

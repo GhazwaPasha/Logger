@@ -254,28 +254,26 @@ export function DashboardOverview({
           className={`dashboard-kpi-card flex min-h-0 flex-col ${DASHBOARD_KPI_TONES[3].toneClass} rounded-2xl p-2 sm:p-2.5`}
         >
           <DashboardKpiWave back={DASHBOARD_KPI_TONES[3].waveBack} front={DASHBOARD_KPI_TONES[3].waveFront} />
-          <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+          <div className="relative z-[1]">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">Workspace</p>
-            <dl className="mt-2 flex flex-1 flex-col justify-center gap-2.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-[11px] text-[var(--muted)]">Members</dt>
-                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : members.length}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-[11px] text-[var(--muted)]">{NODE_LABELS.level}s</dt>
-                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : depts.length}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-[11px] text-[var(--muted)]">{NODE_LABELS.list}s</dt>
-                <dd className="text-xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : lists.length}</dd>
-              </div>
+            <dl className="mt-0.5 grid grid-cols-3 gap-2">
+              {[
+                { label: "Members", value: members.length },
+                { label: NODE_LABELS.levelPlural, value: depts.length },
+                { label: NODE_LABELS.listPlural, value: lists.length },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex min-w-0 flex-col-reverse">
+                  <dt className="mt-1 truncate text-[11px] leading-snug text-[var(--muted)]">{label}</dt>
+                  <dd className="text-4xl font-semibold tabular-nums leading-none tracking-tight">{loading ? "…" : value}</dd>
+                </div>
+              ))}
             </dl>
           </div>
         </div>
       </div>
 
       <div className="grid items-stretch gap-x-2.5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
+        <div className="surface-elevated ui-elevated-panel flex flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
@@ -285,9 +283,9 @@ export function DashboardOverview({
               Open Work
             </Link>
           </div>
-          <div className="mt-2 flex items-center gap-4">
+          <div className="mt-2 flex flex-1 items-center justify-center gap-6">
             <DonutChart segments={statusSegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
-            <ul className="min-w-0 flex-1 space-y-1">
+            <ul className="min-w-0 max-w-[14rem] flex-1 space-y-1.5">
               {STATUS_BAR_ORDER.map((st) => (
                 <li key={st} className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
@@ -306,12 +304,12 @@ export function DashboardOverview({
           </div>
         </div>
 
-        <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
+        <div className="surface-elevated ui-elevated-panel flex flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
-          <div className="mt-2 flex items-center gap-4">
+          <div className="mt-2 flex flex-1 items-center justify-center gap-6">
             <DonutChart segments={prioritySegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
-            <ul className="min-w-0 flex-1 space-y-1 text-sm">
+            <ul className="min-w-0 max-w-[14rem] flex-1 space-y-1.5 text-sm">
               {PRIORITY_ORDER.map((p) => (
                 <li key={p} className="flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
@@ -328,32 +326,44 @@ export function DashboardOverview({
         <aside className="surface-elevated ui-elevated-panel flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5 sm:col-span-2 lg:col-span-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
-          <div className="mt-1.5 flex flex-wrap gap-x-1.5 gap-y-1 lg:mt-2 lg:flex-1 lg:flex-col lg:gap-1.5 lg:pt-1">
+          <div className="mt-2 grid flex-1 grid-cols-2 gap-1.5">
             <Link
               href={workHref(basePath, { status: "late" })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
+              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
             >
-              <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-hidden />
-              Late ({loading ? "…" : stats.lateStatus})
+              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.lateStatus}</span>
+              <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-hidden />
+                Late
+              </span>
             </Link>
             <Link
               href={workHref(basePath, { due: "this_week" })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
+              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
             >
-              Due this week ({loading ? "…" : stats.dueThisWeek})
+              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.dueThisWeek}</span>
+              <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+                Due this week
+              </span>
             </Link>
             <Link
               href={workHref(basePath, { unassigned: "1" })}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:bg-[var(--surface-hover)] lg:w-full lg:justify-start lg:text-left"
+              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
             >
-              Unassigned ({loading ? "…" : stats.unassignedPipeline})
+              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.unassignedPipeline}</span>
+              <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+                Unassigned
+              </span>
             </Link>
             {currentUserId ? (
               <Link
                 href={workHref(basePath, { mine: "1" })}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--accent-muted)] px-2.5 py-2 text-center text-sm font-medium transition-colors hover:opacity-90 lg:w-full lg:justify-start lg:text-left"
+                className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--accent-muted)] hover:opacity-90"
               >
-                My tasks ({loading ? "…" : stats.minePipeline})
+                <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.minePipeline}</span>
+                <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+                  My tasks
+                </span>
               </Link>
             ) : null}
           </div>
