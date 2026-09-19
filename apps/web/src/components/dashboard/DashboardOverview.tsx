@@ -95,7 +95,6 @@ export function DashboardOverview({
       cancelled: 0,
     };
     const priorityCounts: Record<TaskPriority, number> = { high: 0, medium: 0, low: 0 };
-    let unsetPriority = 0;
 
     const levelPipeline: Record<string, number> = {};
     for (const d of depts) levelPipeline[d.id] = 0;
@@ -109,7 +108,6 @@ export function DashboardOverview({
 
       const pri = taskPriority(t);
       if (t.priority) priorityCounts[pri]++;
-      else unsetPriority++;
 
       if (col === "done") done++;
       else if (col === "cancelled") cancelled++;
@@ -162,7 +160,6 @@ export function DashboardOverview({
       minePipeline,
       workflowCounts,
       priorityCounts,
-      unsetPriority,
       levelRows,
       topAssignees,
       subtasksTotal,
@@ -179,24 +176,12 @@ export function DashboardOverview({
     title: FLOW_COLUMN_LABELS[st],
   }));
 
-  const prioritySegments = [
-    ...PRIORITY_ORDER.map((p) => ({
-      key: p,
-      count: stats.priorityCounts[p],
-      strokeClassName: PRIORITY_STROKE[p],
-      title: PRIORITY_LABELS[p],
-    })),
-    ...(stats.unsetPriority > 0
-      ? [
-          {
-            key: "unset",
-            count: stats.unsetPriority,
-            strokeClassName: "stroke-[color:var(--border-subtle)]",
-            title: "No priority",
-          },
-        ]
-      : []),
-  ];
+  const prioritySegments = PRIORITY_ORDER.map((p) => ({
+    key: p,
+    count: stats.priorityCounts[p],
+    strokeClassName: PRIORITY_STROKE[p],
+    title: PRIORITY_LABELS[p],
+  }));
 
   const subtaskPct =
     stats.subtasksTotal > 0 ? Math.round((stats.subtasksDone / stats.subtasksTotal) * 100) : 0;
@@ -370,13 +355,6 @@ export function DashboardOverview({
                   <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.priorityCounts[p]}</span>
                 </li>
               ))}
-              <li className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2 text-[var(--muted)]">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--border-subtle)]" aria-hidden />
-                  <span className="truncate">No priority set</span>
-                </span>
-                <span className="tabular-nums font-medium text-[var(--fg)]">{loading ? "…" : stats.unsetPriority}</span>
-              </li>
             </ul>
           </div>
         </div>

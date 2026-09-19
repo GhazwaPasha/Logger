@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useRoadmap } from "@/hooks/useRoadmap";
-import { RoadmapStatsRow } from "@/components/roadmap/RoadmapStatsRow";
 import { STATUS_DOT_CLASS, STATUS_LABELS } from "@/lib/roadmap-format";
 
 export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
   const { token } = useApiSession();
   const { workspaceId } = useWorkspaceRoute();
   const roadmap = useRoadmap(token, workspaceId);
+  const [expanded, setExpanded] = useState(false);
   const goalTitleById = useMemo(() => new Map(roadmap.goals.map((g) => [g.id, g.title] as const)), [roadmap.goals]);
 
   const activeMilestones = useMemo(() => {
@@ -28,20 +28,42 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
   if (!roadmap.isLoading && roadmap.goals.length === 0 && roadmap.milestones.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <RoadmapStatsRow goals={roadmap.goals} milestones={roadmap.milestones} loading={roadmap.isLoading} />
+    <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls="dashboard-roadmap-body"
+          className="-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+        >
+          <svg
+            viewBox="0 0 20 20"
+            className={`mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)] transition-transform motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M7 4l6 6-6 6" />
+          </svg>
+          <span className="min-w-0">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Roadmap</span>
+            <span className="mt-0.5 block text-sm text-[var(--muted)]">
+              {expanded || roadmap.isLoading
+                ? "Milestones active right now"
+                : `${activeMilestones.length} active milestone${activeMilestones.length === 1 ? "" : "s"}`}
+            </span>
+          </span>
+        </button>
+        <Link href={`${basePath}/roadmap`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
+          Open Roadmap
+        </Link>
+      </div>
 
-      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Roadmap</h2>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">Milestones active right now</p>
-          </div>
-          <Link href={`${basePath}/roadmap`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
-            Open Roadmap
-          </Link>
-        </div>
-
+      <div id="dashboard-roadmap-body" hidden={!expanded}>
         {roadmap.isLoading ? (
           <ul className="mt-2.5 space-y-2.5" aria-hidden aria-busy>
             {[0, 1, 2].map((i) => (
