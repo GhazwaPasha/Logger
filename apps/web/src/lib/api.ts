@@ -24,6 +24,39 @@ function extractErrorMessage(text: string, fallback: string): string {
   return text;
 }
 
+/** The request never got a response (offline, server down, DNS, timeout) — as opposed to an HTTP error status. */
+export class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NetworkError";
+  }
+}
+
+/** Fired after every API request with `{ reachable }`; `NetworkStatusBanner` listens to this. */
+export const NETWORK_STATUS_EVENT = "wl:network-status";
+
+function reportReachable(reachable: boolean) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(NETWORK_STATUS_EVENT, { detail: { reachable } }));
+}
+
+/** Turns the browser's raw "Failed to fetch" into something readable; anything else passes through untouched
+ *  (notably a caller's own AbortError, which React Query relies on for cancellation). */
+function toNetworkError(err: unknown): unknown {
+  if (err instanceof DOMException && err.name === "TimeoutError") {
+    return new NetworkError("The server took too long to respond. Please try again.");
+  }
+  if (err instanceof TypeError) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    return new NetworkError(
+      offline
+        ? "You're offline. Check your connection and try again."
+        : "Can't reach the server. Please try again in a moment.",
+    );
+  }
+  return err;
+}
+
 export async function apiFetch(
   path: string,
   options: RequestInit & { token?: string | null } = {},
@@ -34,12 +67,20 @@ export async function apiFetch(
   if (!headers.has("Content-Type") && rest.body && !(rest.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  return fetch(`${apiBase()}${path}`, {
-    ...rest,
-    headers,
-    cache: rest.cache ?? "no-store",
-    signal: rest.signal ?? AbortSignal.timeout(30_000),
-  });
+  try {
+    const res = await fetch(`${apiBase()}${path}`, {
+      ...rest,
+      headers,
+      cache: rest.cache ?? "no-store",
+      signal: rest.signal ?? AbortSignal.timeout(30_000),
+    });
+    reportReachable(true);
+    return res;
+  } catch (err) {
+    const mapped = toNetworkError(err);
+    if (mapped instanceof NetworkError) reportReachable(false);
+    throw mapped;
+  }
 }
 
 export async function apiJson<T>(

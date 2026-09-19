@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getApiBaseUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { PerformanceExportModal, type ExportRange } from "@/components/performance/PerformanceExportModal";
@@ -32,8 +32,8 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
         params.set("dateTo", range.dateTo);
       }
       const query = params.toString();
-      const url = `${getApiBaseUrl()}/organizations/${workspaceId}/reports/${type}.csv${query ? `?${query}` : ""}`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const url = `/organizations/${workspaceId}/reports/${type}.csv${query ? `?${query}` : ""}`;
+      const res = await apiFetch(url, { token });
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { getApiBaseUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
@@ -83,8 +83,8 @@ export function TimeTracker({
   const { data: entries = [] } = useQuery<TimeEntry[]>({
     queryKey: timeKey,
     queryFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/time`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await apiFetch(`/tasks/${taskId}/time`, {
+        token,
       });
       if (!res.ok) throw new Error("Failed to load time entries");
       return res.json() as Promise<TimeEntry[]>;
@@ -98,9 +98,9 @@ export function TimeTracker({
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/time/start`, {
+      const res = await apiFetch(`/tasks/${taskId}/time/start`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { message?: string };
@@ -112,9 +112,9 @@ export function TimeTracker({
 
   const stopMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/time/stop`, {
+      const res = await apiFetch(`/tasks/${taskId}/time/stop`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) throw new Error("Failed to stop timer");
     },
@@ -123,9 +123,9 @@ export function TimeTracker({
 
   const deleteMutation = useMutation({
     mutationFn: async (entryId: string) => {
-      const res = await fetch(`${getApiBaseUrl()}/time/${entryId}`, {
+      const res = await apiFetch(`/time/${entryId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) throw new Error("Failed to delete entry");
     },
@@ -141,9 +141,9 @@ export function TimeTracker({
 
   const logManualMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/time/log`, {
+      const res = await apiFetch(`/tasks/${taskId}/time/log`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        token,
         body: JSON.stringify({ startedAt: manualStart, stoppedAt: manualEnd, note: manualNote || undefined }),
       });
       if (!res.ok) {

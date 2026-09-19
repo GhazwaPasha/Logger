@@ -7,6 +7,7 @@ import { useThemePreference } from "@/hooks/useThemePreference";
 import { safeReturnPath } from "@/lib/safe-return-path";
 import { AppBootScreen } from "@/components/ui/LoadingFrame";
 import { AppPreferencesProvider } from "./AppPreferencesContext";
+import { NetworkStatusBanner } from "./NetworkStatusBanner";
 import { OrganizationsProvider } from "./OrganizationsProvider";
 import { QueryProvider } from "./QueryProvider";
 
@@ -39,6 +40,7 @@ export function AppAuthenticatedProviders({ children }: { children: React.ReactN
 
   return (
     <QueryProvider>
+      <NetworkStatusBanner />
       <AppPreferencesProvider theme={theme} setTheme={setTheme}>
         <OrganizationsProvider>{children}</OrganizationsProvider>
       </AppPreferencesProvider>

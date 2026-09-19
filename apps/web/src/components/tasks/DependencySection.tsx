@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { faLink } from "@fortawesome/free-solid-svg-icons";
-import { getApiBaseUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import type { TaskRow } from "@/lib/ledger-types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
@@ -12,16 +12,16 @@ import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/moti
 type DependencyTask = { id: string; title: string; status: string };
 
 async function fetchBlockers(token: string, taskId: string): Promise<DependencyTask[]> {
-  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/dependencies/blockers`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`/tasks/${taskId}/dependencies/blockers`, {
+    token,
   });
   if (!res.ok) throw new Error("Failed to load blockers");
   return res.json() as Promise<DependencyTask[]>;
 }
 
 async function fetchBlocking(token: string, taskId: string): Promise<DependencyTask[]> {
-  const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/dependencies/blocking`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`/tasks/${taskId}/dependencies/blocking`, {
+    token,
   });
   if (!res.ok) throw new Error("Failed to load blocking");
   return res.json() as Promise<DependencyTask[]>;
@@ -151,9 +151,9 @@ export function DependencySection({
 
   const addMutation = useMutation({
     mutationFn: async (dependsOnTaskId: string) => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/dependencies`, {
+      const res = await apiFetch(`/tasks/${taskId}/dependencies`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        token,
         body: JSON.stringify({ dependsOnTaskId }),
       });
       if (!res.ok) {
@@ -168,9 +168,9 @@ export function DependencySection({
 
   const removeMutation = useMutation({
     mutationFn: async (dependsOnTaskId: string) => {
-      const res = await fetch(`${getApiBaseUrl()}/tasks/${taskId}/dependencies/${dependsOnTaskId}`, {
+      const res = await apiFetch(`/tasks/${taskId}/dependencies/${dependsOnTaskId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) throw new Error("Failed to remove dependency");
     },

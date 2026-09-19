@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
-import { getApiBaseUrl } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { formatInTimeZone } from "@/lib/date";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { faPlug, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
@@ -39,8 +39,8 @@ export default function WebhooksPage() {
   const { data: endpoints = [], isLoading } = useQuery<Endpoint[]>({
     queryKey: endpointsKey,
     queryFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/organizations/${workspaceId}/webhooks`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await apiFetch(`/organizations/${workspaceId}/webhooks`, {
+        token,
       });
       if (!res.ok) throw new Error("Failed to load webhooks");
       return res.json() as Promise<Endpoint[]>;
@@ -58,9 +58,9 @@ export default function WebhooksPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`${getApiBaseUrl()}/organizations/${workspaceId}/webhooks`, {
+      const res = await apiFetch(`/organizations/${workspaceId}/webhooks`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        token,
         body: JSON.stringify({ url, events: selectedEvents }),
       });
       if (!res.ok) {
@@ -81,9 +81,9 @@ export default function WebhooksPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${getApiBaseUrl()}/organizations/${workspaceId}/webhooks/${id}`, {
+      const res = await apiFetch(`/organizations/${workspaceId}/webhooks/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) throw new Error("Failed to delete webhook");
     },
@@ -92,9 +92,9 @@ export default function WebhooksPage() {
 
   const testMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`${getApiBaseUrl()}/organizations/${workspaceId}/webhooks/${id}/test`, {
+      const res = await apiFetch(`/organizations/${workspaceId}/webhooks/${id}/test`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        token,
       });
       if (!res.ok) throw new Error("Test failed");
       return res.json() as Promise<{ status: number | null; body: string }>;
@@ -107,9 +107,8 @@ export default function WebhooksPage() {
   const { data: deliveries = [] } = useQuery<Delivery[]>({
     queryKey: ["webhooks", "deliveries", viewDeliveriesId],
     queryFn: async () => {
-      const res = await fetch(
-        `${getApiBaseUrl()}/organizations/${workspaceId}/webhooks/${viewDeliveriesId!}/deliveries`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const res = await apiFetch(`/organizations/${workspaceId}/webhooks/${viewDeliveriesId!}/deliveries`,
+        { token },
       );
       if (!res.ok) throw new Error("Failed to load deliveries");
       return res.json() as Promise<Delivery[]>;
