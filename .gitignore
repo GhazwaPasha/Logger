@@ -13,3 +13,20 @@ coverage
 
 # Cursor stop-hook audit (one line per agent completion)
 second-memory/Inbox/_session-log.txt
+
+# Android TWA (Bubblewrap): signing keys/passwords and generated Gradle project + build output
+android/node_modules
+android/*.keystore
+android/*.jks
+android/keystore-password.local.txt
+android/app/
+android/build/
+android/.gradle/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/*.apk
+android/*.aab
+android/*.idsig
+android/manifest-checksum.txt

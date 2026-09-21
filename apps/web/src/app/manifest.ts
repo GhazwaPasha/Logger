@@ -9,9 +9,12 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "LogBase",
     description:
       "Structure tasks and capture durable activity across your organization—export the trail when stakeholders need proof.",
+    lang: "en",
+    categories: ["productivity", "business"],
     start_url: "/",
     scope: "/",
     display: "standalone",
+    prefer_related_applications: false,
     background_color: "#000000",
     theme_color: "#27272a",
     icons: [

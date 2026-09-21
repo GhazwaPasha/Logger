@@ -1,0 +1,43 @@
+{
+  "packageId": "com.logbase.app",
+  "host": "log-base.vercel.app",
+  "name": "LogBase",
+  "launcherName": "LogBase",
+  "display": "standalone",
+  "themeColor": "#27272a",
+  "themeColorDark": "#27272a",
+  "navigationColor": "#27272a",
+  "navigationColorDark": "#27272a",
+  "navigationDividerColor": "#27272a",
+  "navigationDividerColorDark": "#27272a",
+  "backgroundColor": "#000000",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://log-base.vercel.app/icons/logbase-app-512.png",
+  "maskableIconUrl": "https://log-base.vercel.app/icons/logbase-app-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "logbase-upload"
+  },
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://log-base.vercel.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://log-base.vercel.app/",
+  "minSdkVersion": 23,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "displayOverride": []
+}
