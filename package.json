@@ -23,7 +23,16 @@
   "engines": {
     "node": ">=20"
   },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "@better-auth/core": "1.6.9"
+  },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@better-auth/core": "1.6.9",
+    "expo-router": "~57.0.22"
   }
 }

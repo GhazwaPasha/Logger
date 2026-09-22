@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description: "How LogBase collects, uses, and protects your data.",
 };
 
-const LAST_UPDATED = "July 24, 2026";
+const LAST_UPDATED = "September 22, 2026";
 const CONTACT_EMAIL = "ghazwairshad@gmail.com";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
@@ -131,10 +131,21 @@ export default function PrivacyPolicyPage() {
             <Section id="retention" title="4. Data retention">
               <p>
                 We retain account and workspace data for as long as your account or organization remains active,
-                because the activity ledger is designed to be a durable record. If you delete your account or an
-                organization deletes its workspace, associated data is removed or anonymized within a reasonable
-                period, except where we are required to retain it for legal, security, or legitimate business
-                reasons (for example, fraud prevention or dispute resolution).
+                because the activity ledger is designed to be a durable record. When you delete your account, we erase
+                your name, email address, profile picture, sign-in methods, API keys and push subscriptions
+                immediately, and remove you from your workspaces. The tasks, comments, history entries and time
+                entries you created remain in those workspaces so their records stay accurate, but they are
+                attributed to &ldquo;Deleted user&rdquo; and are no longer linked to your personal information. When
+                a workspace owner deletes a workspace, everything in it is permanently removed. We may retain limited
+                data where we are required to for legal, security, or legitimate business reasons (for example, fraud
+                prevention or dispute resolution).
+              </p>
+              <p>
+                See{" "}
+                <Link href="/delete-account" className="text-[var(--fg)] underline underline-offset-2">
+                  how to delete your account
+                </Link>
+                .
               </p>
             </Section>
 
@@ -148,8 +159,11 @@ export default function PrivacyPolicyPage() {
             <Section id="your-rights" title="6. Your choices &amp; rights">
               <p>
                 Depending on where you live, you may have rights to access, correct, export, or delete your personal
-                data, or to object to certain processing. You can update most account details from within the app,
-                or contact us at{" "}
+                data, or to object to certain processing. You can update most account details, and{" "}
+                <Link href="/delete-account" className="text-[var(--fg)] underline underline-offset-2">
+                  delete your account
+                </Link>
+                , from within the app, or contact us at{" "}
                 <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--fg)] underline underline-offset-2">
                   {CONTACT_EMAIL}
                 </a>{" "}

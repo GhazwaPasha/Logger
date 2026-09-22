@@ -135,6 +135,11 @@ export default async function Home() {
                         Terms of Service
                       </Link>
                     </li>
+                    <li>
+                      <Link href="/delete-account" className="text-[var(--fg)] underline-offset-4 hover:underline">
+                        Delete your account
+                      </Link>
+                    </li>
                   </ul>
                 </div>
               </div>

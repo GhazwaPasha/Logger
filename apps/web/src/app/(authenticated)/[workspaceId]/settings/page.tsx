@@ -8,7 +8,8 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { formatInTimeZone } from "@/lib/date";
 import { authClient } from "@/lib/auth-client";
 import { apiJson, apiVoid } from "@/lib/api";
-import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { clearLastWorkspaceId, setLastWorkspaceId } from "@/lib/workspace-storage";
+import { QUERY_STORAGE_KEY_PREFIX } from "@/lib/query-cache-version";
 import { useAppPreferences } from "@/components/app/AppPreferencesContext";
 import type { ThemePref } from "@/hooks/useThemePreference";
 import { SelectPopover } from "@/components/ui/SelectPopover";
@@ -17,7 +18,7 @@ import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
 import { SettingsCard, SettingsFieldRow, EditableField } from "@/components/ui/SettingsCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { faPalette, faUser, faKey, faPlug } from "@fortawesome/free-solid-svg-icons";
+import { faPalette, faUser, faKey, faPlug, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 
 const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
 
@@ -67,6 +68,37 @@ export default function UserSettingsPage() {
   const revokeKeyMutation = useMutation({
     mutationFn: (id: string) => apiVoid(`/api-keys/${id}`, { token, method: "DELETE" }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: apiKeysQueryKey }),
+  });
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteAccountMutation = useMutation({
+    mutationFn: () =>
+      apiJson<{ ok: true }>("/account/delete", {
+        token,
+        method: "POST",
+        body: JSON.stringify({ confirm: "DELETE" }),
+      }),
+    onSuccess: async () => {
+      // The account is gone server-side; drop everything cached for it on this device, then leave.
+      try {
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith(QUERY_STORAGE_KEY_PREFIX)) localStorage.removeItem(key);
+        }
+        clearLastWorkspaceId();
+      } catch {
+        /* storage unavailable */
+      }
+      queryClient.clear();
+      try {
+        await authClient.signOut();
+      } catch {
+        /* the session row was already deleted with the account */
+      }
+      window.location.replace("/login");
+    },
+    onError: (e) => setDeleteError(e instanceof Error ? e.message : "Could not delete your account"),
   });
 
   // Same origin as the app itself — /mcp is proxied through to the API (see next.config.mjs
@@ -419,6 +451,94 @@ export default function UserSettingsPage() {
             </pre>
           </div>
         </div>
+      </SettingsCard>
+      <SettingsCard
+        icon={faTriangleExclamation}
+        title="Delete account"
+        description="Permanently remove your personal data from LogBase."
+      >
+        {!deleteOpen ? (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-[var(--muted)]">
+              Your name, email, sign-in methods and API keys are erased and you&rsquo;re removed from every workspace.
+              This can&rsquo;t be undone.
+            </p>
+            <button
+              type="button"
+              className="shrink-0 rounded-xl border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteConfirmText("");
+                setDeleteOpen(true);
+              }}
+            >
+              Delete account…
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {deleteError && <ErrorBanner message={deleteError} onDismiss={() => setDeleteError(null)} />}
+            <div className="space-y-2 text-sm text-[var(--fg)]">
+              <p className="font-medium">What happens when you delete your account</p>
+              <ul className="list-disc space-y-1 pl-5 text-[var(--muted)]">
+                <li>Your name, email address, profile picture and linked Discord/Google sign-ins are permanently erased.</li>
+                <li>You&rsquo;re signed out everywhere, and your API keys, connected apps and push notifications stop working.</li>
+                <li>You&rsquo;re removed from all workspaces, and tasks assigned to you become unassigned.</li>
+                <li>
+                  Your past activity &mdash; tasks, comments, history entries and logged time &mdash; stays in your
+                  workspaces so their records remain accurate, but it&rsquo;s shown as{" "}
+                  <span className="font-medium text-[var(--fg)]">&ldquo;Deleted user&rdquo;</span> and can no longer be
+                  linked back to you.
+                </li>
+                <li>
+                  If you&rsquo;re the only owner of a workspace, you&rsquo;ll need to make someone else an owner or
+                  delete that workspace first.
+                </li>
+              </ul>
+            </div>
+            <SettingsFieldRow label='Type "DELETE"' htmlFor="settings-delete-confirm-input">
+              <input
+                id="settings-delete-confirm-input"
+                className="input rounded-xl"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="DELETE"
+                value={deleteConfirmText}
+                disabled={deleteAccountMutation.isPending}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+              />
+            </SettingsFieldRow>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="btn-secondary rounded-xl px-4 py-2 text-sm font-medium"
+                disabled={deleteAccountMutation.isPending}
+                onClick={() => {
+                  setDeleteOpen(false);
+                  setDeleteError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 dark:hover:bg-red-500"
+                disabled={deleteConfirmText !== "DELETE" || deleteAccountMutation.isPending || !token}
+                aria-busy={deleteAccountMutation.isPending || undefined}
+                onClick={() => {
+                  setDeleteError(null);
+                  deleteAccountMutation.mutate();
+                }}
+              >
+                {deleteAccountMutation.isPending ? (
+                  <InlineSpinner className="size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+                ) : null}
+                <span>{deleteAccountMutation.isPending ? "Deleting" : "Permanently delete my account"}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </SettingsCard>
     </div>
   );

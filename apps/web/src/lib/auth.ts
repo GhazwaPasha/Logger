@@ -1,3 +1,4 @@
+import { expo } from "@better-auth/expo";
 import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -93,6 +94,15 @@ function resolveTrustedOriginsStatic(): string[] {
   if (origins.size === 0) addUrl("http://localhost:3000");
   // Host wildcard — matches any *.vercel.app deployment (previews + production hostname mismatches).
   if (process.env.VERCEL) origins.add("*.vercel.app");
+  // Native app deep links (see apps/mobile app.json `scheme`). Expo Go serves `exp://` in development only.
+  origins.add("logbase://");
+  origins.add("logbase://*");
+  if (process.env.NODE_ENV !== "production") {
+    origins.add("exp://");
+    origins.add("exp://**");
+    origins.add("exp://192.168.*.*:*/**");
+    origins.add("exp://10.*.*.*:*/**");
+  }
   return [...origins];
 }
 
@@ -183,6 +193,7 @@ export const auth = betterAuth({
     useSecureCookies: resolveUseSecureCookies(),
   },
   plugins: [
+    expo(),
     jwt({
       jwks: {
         // Default encrypts JWKS private keys with BETTER_AUTH_SECRET; changing the secret without DB cleanup

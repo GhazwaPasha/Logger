@@ -2,6 +2,7 @@ import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { AccountModule } from "./account/account.module";
 import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { CacheModule } from "./cache/cache.module";
 import { AuthModule } from "./auth/auth.module";
@@ -40,6 +41,7 @@ import { PerformanceModule } from "./performance/performance.module";
     AuthorizationModule,
     AuthModule,
     ApiKeysModule,
+    AccountModule,
     OrganizationsModule,
     DepartmentsModule,
     ListsModule,
