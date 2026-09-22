@@ -57,6 +57,7 @@ export type TaskRow = {
   updatedAt?: string;
   deletedAt: string | null;
   completedAt?: string | null;
+  lastSubmittedAt?: string | null;
   assigneeUserIds?: string[];
   subtasks?: SubtaskRow[];
   lastLedger?: LedgerRow | null;

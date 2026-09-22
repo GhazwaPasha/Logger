@@ -1,11 +1,12 @@
-import { faLayerGroup, faListUl, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faLayerGroup, faListUl } from '@fortawesome/free-solid-svg-icons';
+import * as SecureStore from 'expo-secure-store';
 import { router, usePathname, type Href } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/icon';
+import { ActionMenu, type ActionMenuItem } from '@/components/action-menu';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { RotatingChevron } from '@/components/motion/rotating-chevron';
 import { useShell } from '@/components/shell/shell-context';
@@ -17,18 +18,31 @@ import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
 import { NODE_LABELS } from '@/lib/labels';
 import { isWorkspaceOwner } from '@/lib/permissions';
-import { useActiveTasks, useCreateDepartment, useCreateList } from '@/lib/queries';
+import {
+  useActiveTasks,
+  useCreateDepartment,
+  useCreateList,
+  useDeleteDepartment,
+  useDeleteList,
+  useRenameDepartment,
+  useRenameList,
+} from '@/lib/queries';
 import { useWorkspace } from '@/lib/workspace';
+
+/** Per-workspace blob of `{ listId: lastSeenEpochMs }`, mirroring the web's per-list `localStorage` keys. */
+const listLastSeenKey = (orgId: string) => `logbase.listLastSeen.${orgId}`;
 
 /** A pressable sidebar row (`rowBase` in `WorkspaceSidebar.tsx`): 4px radius, accent-muted when active. */
 function Row({
   active,
   onPress,
+  onLongPress,
   children,
   style,
 }: {
   active?: boolean;
   onPress?: () => void;
+  onLongPress?: () => void;
   children: React.ReactNode;
   style?: object;
 }) {
@@ -37,6 +51,7 @@ function Row({
     <PressableScale
       accessibilityRole="button"
       onPress={onPress}
+      onLongPress={onLongPress}
       scaleTo={0.99}
       style={({ pressed }) => [
         styles.row,
@@ -118,50 +133,39 @@ function PrimaryNav({
   );
 }
 
-/** The small "+" beside a tree row (`PlusIcon` button on the web). */
-function PlusButton({ label, onPress }: { label: string; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={6}
-      onPress={onPress}
-      scaleTo={0.9}
-      haptic="tap"
-      style={({ pressed }) => [styles.plus, { backgroundColor: pressed ? theme.accentMuted : 'transparent' }, stateTransition]}>
-      <Icon icon={faPlus} size={13} color="muted" />
-    </PressableScale>
-  );
-}
-
 /**
- * Inline "name your category / channel" field. Enter creates; leaving it with text creates too; leaving it
- * empty cancels — the same flow as the web sidebar.
+ * Inline "name your category / channel" field — used both to create one (empty start) and to rename
+ * one (`initialValue` pre-filled). Enter submits; leaving it with (changed) text submits too; leaving
+ * it empty, or unchanged, cancels — the same flow as the web sidebar.
  */
 function InlineNameInput({
   placeholder,
+  initialValue = '',
   busy,
   onSubmit,
   onCancel,
 }: {
   placeholder: string;
+  initialValue?: string;
   busy: boolean;
   onSubmit: (name: string) => void;
   onCancel: () => void;
 }) {
   const theme = useTheme();
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
   const submitted = useRef(false);
 
-  // After a failed create the field stays mounted; let the user retry.
+  // After a failed create/rename the field stays mounted; let the user retry.
   useEffect(() => {
     if (!busy) submitted.current = false;
   }, [busy]);
 
   const submit = () => {
     const name = value.trim();
-    if (!name || busy || submitted.current) return;
+    if (!name || name === initialValue || busy || submitted.current) {
+      if (!name || name === initialValue) onCancel();
+      return;
+    }
     submitted.current = true;
     onSubmit(name);
   };
@@ -170,6 +174,7 @@ function InlineNameInput({
     <Animated.View entering={revealIn} exiting={revealOut} style={styles.inlineWrap}>
       <TextInput
         autoFocus
+        selectTextOnFocus={!!initialValue}
         editable={!busy}
         value={value}
         onChangeText={setValue}
@@ -212,8 +217,12 @@ export function Sidebar() {
   const active = useActiveTasks(org?.id);
   const createDept = useCreateDepartment(org?.id);
   const createList = useCreateList(org?.id);
+  const renameDept = useRenameDepartment(org?.id);
+  const deleteDept = useDeleteDepartment(org?.id);
+  const renameList = useRenameList(org?.id);
+  const deleteList = useDeleteList(org?.id);
 
-  /** Only workspace owners may create categories / channels (mirrors the API). */
+  /** Only workspace owners may create/rename/delete categories / channels (mirrors the API). */
   const canEditStructure = isWorkspaceOwner(members, userId);
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -221,13 +230,65 @@ export function Sidebar() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [addingLevel, setAddingLevel] = useState(false);
   const [addListFor, setAddListFor] = useState<string | null>(null);
+  const [renamingLevelId, setRenamingLevelId] = useState<string | null>(null);
+  const [renamingListId, setRenamingListId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const countByList = useMemo(() => {
+  /** Long-press target for the structure action sheet — mirrors the web's right-click `structureMenu`. */
+  const [structureMenu, setStructureMenu] = useState<
+    | null
+    | { kind: 'workspace' }
+    | { kind: 'level'; deptId: string; name: string }
+    | { kind: 'list'; listId: string; deptId: string; name: string }
+  >(null);
+
+  /** Newest task activity per list — drives the Discord-style unread pill (mirrors `WorkspaceSidebar.tsx`). */
+  const latestActivityByListId = useMemo(() => {
     const m = new Map<string, number>();
-    for (const t of active.data ?? []) m.set(t.listId, (m.get(t.listId) ?? 0) + 1);
+    for (const t of active.data ?? []) {
+      const iso = t.lastLedger?.createdAt ?? t.updatedAt ?? t.createdAt;
+      if (!iso) continue;
+      const ts = new Date(iso).getTime();
+      if (Number.isNaN(ts)) continue;
+      if (ts > (m.get(t.listId) ?? 0)) m.set(t.listId, ts);
+    }
     return m;
   }, [active.data]);
+
+  const [listLastSeen, setListLastSeen] = useState<Record<string, number>>({});
+
+  /** Hydrate this workspace's last-seen timestamps once its id is known. */
+  useEffect(() => {
+    const orgId = org?.id;
+    if (!orgId) return;
+    let live = true;
+    SecureStore.getItemAsync(listLastSeenKey(orgId))
+      .then((raw) => {
+        if (!live) return;
+        try {
+          setListLastSeen(raw ? (JSON.parse(raw) as Record<string, number>) : {});
+        } catch {
+          setListLastSeen({});
+        }
+      })
+      .catch(() => live && setListLastSeen({}));
+    return () => {
+      live = false;
+    };
+  }, [org?.id]);
+
+  const markListSeen = useCallback(
+    (listId: string) => {
+      const orgId = org?.id;
+      if (!orgId) return;
+      setListLastSeen((prev) => {
+        const next = { ...prev, [listId]: Date.now() };
+        SecureStore.setItemAsync(listLastSeenKey(orgId), JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    },
+    [org?.id],
+  );
 
   const listsByDept = useMemo(() => {
     const m = new Map<string, typeof lists>();
@@ -243,6 +304,17 @@ export function Sidebar() {
   };
   const is = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
   const onBoard = pathname === '/work';
+
+  // Keep the currently open list marked as seen while new activity arrives on it — otherwise
+  // navigating away would immediately show it as unread despite having just watched it happen.
+  useEffect(() => {
+    if (!onBoard || !scope.listId) return;
+    const latest = latestActivityByListId.get(scope.listId) ?? 0;
+    if (latest > (listLastSeen[scope.listId] ?? 0)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      markListSeen(scope.listId);
+    }
+  }, [onBoard, scope.listId, latestActivityByListId, listLastSeen, markListSeen]);
 
   const toggle = (deptId: string) =>
     setExpanded((prev) => {
@@ -270,6 +342,118 @@ export function Sidebar() {
     );
   }
 
+  function renameLevel(deptId: string, name: string) {
+    setError(null);
+    renameDept.mutate(
+      { deptId, name },
+      {
+        onSuccess: () => setRenamingLevelId(null),
+        onError: (e) => setError(e.message || `Could not rename ${NODE_LABELS.level.toLowerCase()}`),
+      },
+    );
+  }
+
+  function renameChannel(listId: string, name: string) {
+    setError(null);
+    renameList.mutate(
+      { listId, name },
+      {
+        onSuccess: () => setRenamingListId(null),
+        onError: (e) => setError(e.message || `Could not rename ${NODE_LABELS.list.toLowerCase()}`),
+      },
+    );
+  }
+
+  function confirmDeleteLevel(deptId: string, name: string) {
+    Alert.alert(`Delete this ${NODE_LABELS.level.toLowerCase()}?`, `“${name}” and every ${NODE_LABELS.list.toLowerCase()} and task under it will be permanently removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: `Delete ${NODE_LABELS.level}`,
+        style: 'destructive',
+        onPress: () => {
+          setError(null);
+          deleteDept.mutate(deptId, {
+            onError: (e) => setError(e.message || `Could not delete ${NODE_LABELS.level.toLowerCase()}`),
+          });
+        },
+      },
+    ]);
+  }
+
+  function confirmDeleteChannel(listId: string, name: string) {
+    Alert.alert(`Delete this ${NODE_LABELS.list.toLowerCase()}?`, `“${name}” and every task in it will be permanently removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: `Delete ${NODE_LABELS.list}`,
+        style: 'destructive',
+        onPress: () => {
+          setError(null);
+          deleteList.mutate(listId, {
+            onError: (e) => setError(e.message || `Could not delete ${NODE_LABELS.list.toLowerCase()}`),
+          });
+        },
+      },
+    ]);
+  }
+
+  /** Structure action sheet items — the touch counterpart of the web's `structureMenuItems`. */
+  const structureMenuItems: ActionMenuItem[] =
+    !structureMenu || !canEditStructure
+      ? []
+      : structureMenu.kind === 'workspace'
+        ? [
+            {
+              id: 'add-level',
+              label: `Add ${NODE_LABELS.level}`,
+              onSelect: () => {
+                setTreeOpen(true);
+                setAddingLevel(true);
+              },
+            },
+          ]
+        : structureMenu.kind === 'level'
+          ? [
+              {
+                id: 'add-list',
+                label: `Add ${NODE_LABELS.list}`,
+                onSelect: () => {
+                  const deptId = structureMenu.deptId;
+                  setExpanded((prev) => new Set(prev).add(deptId));
+                  setAddListFor(deptId);
+                },
+              },
+              {
+                id: 'rename-level',
+                label: `Rename ${NODE_LABELS.level}`,
+                onSelect: () => {
+                  setRenamingListId(null);
+                  setRenamingLevelId(structureMenu.deptId);
+                },
+              },
+              {
+                id: 'delete-level',
+                label: `Delete ${NODE_LABELS.level}`,
+                destructive: true,
+                onSelect: () => confirmDeleteLevel(structureMenu.deptId, structureMenu.name),
+              },
+            ]
+          : [
+              {
+                id: 'rename-list',
+                label: `Rename ${NODE_LABELS.list}`,
+                onSelect: () => {
+                  setRenamingLevelId(null);
+                  setRenamingListId(structureMenu.listId);
+                },
+              },
+              {
+                id: 'delete-list',
+                label: `Delete ${NODE_LABELS.list}`,
+                destructive: true,
+                onSelect: () => confirmDeleteChannel(structureMenu.listId, structureMenu.name),
+              },
+            ];
+
   const userLabel = session?.user.name?.trim() || session?.user.email || '';
 
   const primary: { href: Href; label: string; active: boolean }[] = [
@@ -291,6 +475,12 @@ export function Sidebar() {
         styles.fill,
         { backgroundColor: theme.surfaceNav, paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}>
+      <ActionMenu
+        visible={structureMenu != null && structureMenuItems.length > 0}
+        items={structureMenuItems}
+        onClose={() => setStructureMenu(null)}
+      />
+
       {/* Workspace switcher + primary navigation */}
       <View style={[styles.head, { borderBottomColor: theme.borderSubtle }]}>
         <Pressable
@@ -346,20 +536,14 @@ export function Sidebar() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         <View style={styles.treeHead}>
-          <Row onPress={() => setTreeOpen((v) => !v)} style={{ flex: 1 }}>
+          <Row
+            onPress={() => setTreeOpen((v) => !v)}
+            onLongPress={canEditStructure ? () => setStructureMenu({ kind: 'workspace' }) : undefined}
+            style={{ flex: 1 }}>
             <Text font="outfit" weight="bold" style={{ flex: 1 }}>
               {NODE_LABELS.workspace}
             </Text>
           </Row>
-          {canEditStructure ? (
-            <PlusButton
-              label={`Add ${NODE_LABELS.level}`}
-              onPress={() => {
-                setTreeOpen(true);
-                setAddingLevel(true);
-              }}
-            />
-          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={treeOpen ? `Collapse ${NODE_LABELS.levelPlural}` : `Expand ${NODE_LABELS.levelPlural}`}
@@ -389,33 +573,34 @@ export function Sidebar() {
                 <Animated.View key={d.id} layout={listLayout}>
                   {/* A category only groups channels: it expands and collapses, it isn't a destination. */}
                   <View style={styles.levelRow}>
-                    <PressableScale
-                      accessibilityRole="button"
-                      accessibilityLabel={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
-                      accessibilityState={{ expanded: open }}
-                      scaleTo={0.99}
-                      style={({ pressed }) => [
-                        styles.levelMain,
-                        { backgroundColor: pressed ? theme.surfaceHover : 'transparent' },
-                        stateTransition,
-                      ]}
-                      onPress={() => toggle(d.id)}>
-                      <Text font="outfit" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
-                        {d.name}
-                      </Text>
-                    </PressableScale>
-                    {canEditStructure ? (
-                      <PlusButton
-                        label={`Add ${NODE_LABELS.list} to ${d.name}`}
-                        onPress={() => {
-                          setExpanded((prev) => new Set(prev).add(d.id));
-                          setAddListFor(d.id);
-                        }}
+                    {renamingLevelId === d.id ? (
+                      <InlineNameInput
+                        placeholder={`Name your ${NODE_LABELS.level.toLowerCase()}`}
+                        initialValue={d.name}
+                        busy={renameDept.isPending}
+                        onSubmit={(name) => renameLevel(d.id, name)}
+                        onCancel={() => setRenamingLevelId(null)}
                       />
-                    ) : null}
-                    <Text font="outfit" weight="semibold" color="muted" tabular style={styles.count}>
-                      {levelLists.length}
-                    </Text>
+                    ) : (
+                      <PressableScale
+                        accessibilityRole="button"
+                        accessibilityLabel={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
+                        accessibilityState={{ expanded: open }}
+                        scaleTo={0.99}
+                        style={({ pressed }) => [
+                          styles.levelMain,
+                          { backgroundColor: pressed ? theme.surfaceHover : 'transparent' },
+                          stateTransition,
+                        ]}
+                        onPress={() => toggle(d.id)}
+                        onLongPress={
+                          canEditStructure ? () => setStructureMenu({ kind: 'level', deptId: d.id, name: d.name }) : undefined
+                        }>
+                        <Text font="outfit" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+                          {d.name}
+                        </Text>
+                      </PressableScale>
+                    )}
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
@@ -427,35 +612,53 @@ export function Sidebar() {
                   </View>
 
                   {open ? (
-                    <Animated.View entering={revealIn} exiting={revealOut} style={[styles.lists, { borderLeftColor: theme.borderSubtle }]}>
+                    <Animated.View entering={revealIn} exiting={revealOut} style={styles.lists}>
                       {levelLists.length === 0 && addListFor !== d.id ? (
                         <EmptyState compact icon={faListUl} title={`No ${NODE_LABELS.listPlural.toLowerCase()} yet`} />
                       ) : (
                         levelLists.map((l) => {
                           const listActive = onBoard && scope.listId === l.id;
+                          const hasUnread = !listActive && (latestActivityByListId.get(l.id) ?? 0) > (listLastSeen[l.id] ?? 0);
+                          if (renamingListId === l.id) {
+                            return (
+                              <InlineNameInput
+                                key={l.id}
+                                placeholder={`Name your ${NODE_LABELS.list.toLowerCase()}`}
+                                initialValue={l.name}
+                                busy={renameList.isPending}
+                                onSubmit={(name) => renameChannel(l.id, name)}
+                                onCancel={() => setRenamingListId(null)}
+                              />
+                            );
+                          }
                           return (
-                            <Row
-                              key={l.id}
-                              active={listActive}
-                              onPress={() => {
-                                setList(l.id);
-                                go('/work');
-                              }}>
-                              <Text font="outfit" weight="medium" color="muted">
-                                #{' '}
-                              </Text>
-                              <Text
-                                font="outfit"
-                                weight={listActive ? 'semibold' : 'medium'}
-                                color={listActive ? 'fg' : 'muted'}
-                                numberOfLines={1}
-                                style={{ flex: 1 }}>
-                                {l.name}
-                              </Text>
-                              <Text font="outfit" weight="semibold" color="muted" tabular>
-                                {countByList.get(l.id) ?? 0}
-                              </Text>
-                            </Row>
+                            <View key={l.id} style={styles.listRowWrap}>
+                              {hasUnread ? <View pointerEvents="none" style={[styles.unreadPill, { backgroundColor: theme.fg }]} /> : null}
+                              <Row
+                                active={listActive}
+                                onPress={() => {
+                                  setList(l.id);
+                                  markListSeen(l.id);
+                                  go('/work');
+                                }}
+                                onLongPress={
+                                  canEditStructure
+                                    ? () => setStructureMenu({ kind: 'list', listId: l.id, deptId: d.id, name: l.name })
+                                    : undefined
+                                }>
+                                <Text font="outfit" weight="medium" color="muted">
+                                  #{' '}
+                                </Text>
+                                <Text
+                                  font="outfit"
+                                  weight={hasUnread ? 'bold' : listActive ? 'semibold' : 'medium'}
+                                  color={hasUnread || listActive ? 'fg' : 'muted'}
+                                  numberOfLines={1}
+                                  style={{ flex: 1 }}>
+                                  {l.name}
+                                </Text>
+                              </Row>
+                            </View>
                           );
                         })
                       )}
@@ -510,10 +713,20 @@ const styles = StyleSheet.create({
   treeHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   levelRow: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.md },
   levelMain: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, borderRadius: Radius.md },
-  plus: { width: 28, height: 28, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
-  count: { paddingHorizontal: 6 },
   chevron: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  lists: { marginLeft: 12, paddingLeft: 4, borderLeftWidth: StyleSheet.hairlineWidth * 2, marginBottom: 2 },
+  lists: { marginBottom: 2 },
+  listRowWrap: { position: 'relative' },
+  /** Discord-style unread indicator: a half-pill sitting just outside the row's left edge. */
+  unreadPill: {
+    position: 'absolute',
+    left: -8,
+    top: '50%',
+    marginTop: -4,
+    width: 4,
+    height: 8,
+    borderTopRightRadius: Radius.full,
+    borderBottomRightRadius: Radius.full,
+  },
   inlineWrap: { paddingVertical: 4, paddingHorizontal: 4 },
   inline: { height: 36, borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 10, paddingRight: 34, fontSize: 14 },
   inlineSpinner: { position: 'absolute', right: 14, top: 0, bottom: 0 },

@@ -4,17 +4,16 @@ import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
+import { ActivityTerminal } from '@/components/activity/activity-terminal';
 import { Donut } from '@/components/donut';
-import { BlinkingCursor } from '@/components/motion/blinking-cursor';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Page, PageTitle, Panel, SectionLabel, Segmented } from '@/components/page';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
-import { lineReveal, sequenceEnter } from '@/constants/motion';
+import { sequenceEnter } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
-import { describeLedger, formatLogTimestamp } from '@/lib/format';
 import { NODE_LABELS } from '@/lib/labels';
 import { useActiveTasks, useBoardCounts, useOrgActivity } from '@/lib/queries';
 import { FLOW_COLUMN_LABELS, PRIORITY_LABELS, taskIsOverdue, taskPriority, TASK_FLOW_ORDER, type TaskPriority } from '@/lib/task-board';
@@ -48,27 +47,31 @@ function KpiCard({ tone, children, onPress }: { tone: 0 | 1 | 2 | 3; children: R
   const dark = useIsDark();
   const t = KPI_TONES[tone];
   return (
-    <PressableScale
-      disabled={!onPress}
-      onPress={onPress}
-      scaleTo={0.98}
-      entering={sequenceEnter(tone)}
-      style={[
-        styles.kpi,
-        dark
-          ? { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }
-          : { backgroundColor: t.bg, borderColor: t.border },
-      ]}>
-      {!dark ? (
-        <View style={styles.wave} pointerEvents="none">
-          <Svg width="112%" height={76} viewBox="0 0 400 72" preserveAspectRatio="none" style={{ marginLeft: '-6%' }}>
-            <Path fill={t.back} d="M0 40 C48 24 96 48 152 34 C208 20 256 44 304 32 C336 24 368 36 400 38 L400 72 L0 72 Z" />
-            <Path fill={t.front} d="M0 52 C60 42 110 62 170 50 C230 38 290 58 350 47 C375 42 390 46 400 48 L400 72 L0 72 Z" />
-          </Svg>
-        </View>
-      ) : null}
-      <View style={{ zIndex: 1 }}>{children}</View>
-    </PressableScale>
+    // The entrance keyframe and the press-scale transform can't share one node (Reanimated warns about
+    // "transform" being fought over), so the flex sizing + entrance live on this outer wrapper and the
+    // press animation stays on the inner Pressable.
+    <Animated.View entering={sequenceEnter(tone)} style={styles.kpiOuter}>
+      <PressableScale
+        disabled={!onPress}
+        onPress={onPress}
+        scaleTo={0.98}
+        style={[
+          styles.kpi,
+          dark
+            ? { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }
+            : { backgroundColor: t.bg, borderColor: t.border },
+        ]}>
+        {!dark ? (
+          <View style={styles.wave} pointerEvents="none">
+            <Svg width="112%" height={76} viewBox="0 0 400 72" preserveAspectRatio="none" style={{ marginLeft: '-6%' }}>
+              <Path fill={t.back} d="M0 40 C48 24 96 48 152 34 C208 20 256 44 304 32 C336 24 368 36 400 38 L400 72 L0 72 Z" />
+              <Path fill={t.front} d="M0 52 C60 42 110 62 170 50 C230 38 290 58 350 47 C375 42 390 46 400 48 L400 72 L0 72 Z" />
+            </Svg>
+          </View>
+        ) : null}
+        <View style={{ zIndex: 1 }}>{children}</View>
+      </PressableScale>
+    </Animated.View>
   );
 }
 
@@ -348,29 +351,17 @@ export default function DashboardScreen() {
           <Text size="sm" color="muted">
             Ledger from tasks you can access, newest first.
           </Text>
-          <Panel style={{ gap: 8, marginTop: 6 }}>
-            {(activity.data?.entries ?? []).length === 0 ? (
-              <Text size="sm" color="muted">
-                {activity.isLoading ? 'Loading…' : 'No activity yet.'}
-              </Text>
-            ) : (
-              <>
-                {(activity.data?.entries ?? []).slice(0, 60).map((e, i) => (
-                <Animated.View key={e.id} entering={lineReveal(i)}>
-                <Text font="mono" size="11" lh={16} color="muted">
-                  {formatLogTimestamp(e.createdAt, org?.timeZone ?? 'UTC')}
-                  {': '}
-                  <Text font="mono" size="11" lh={16} color={alpha(theme.fg, 0.9)}>
-                    {names.get(e.actorId) ?? 'Someone'} {describeLedger(e, names, org?.timeZone ?? 'UTC')}
-                    {activity.data?.tasksById[e.taskId] ? ` — ${activity.data.tasksById[e.taskId]!.title}` : ''}
-                  </Text>
-                </Text>
-                </Animated.View>
-              ))}
-                <BlinkingCursor />
-              </>
-            )}
-          </Panel>
+          <View style={{ marginTop: 6 }}>
+            <ActivityTerminal
+              entries={activity.data?.entries ?? []}
+              tasksById={activity.data?.tasksById ?? {}}
+              names={names}
+              timeZone={org?.timeZone ?? 'UTC'}
+              isLoading={activity.isLoading}
+              errorMessage={activity.error ? (activity.error as Error).message : null}
+              onOpenTask={(taskId) => router.push({ pathname: '/task/[id]', params: { id: taskId } })}
+            />
+          </View>
         </View>
       )}
     </Page>
@@ -380,9 +371,9 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   titleRow: { gap: 8 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  kpiOuter: { flexGrow: 1, flexBasis: '46%' },
   kpi: {
-    flexGrow: 1,
-    flexBasis: '46%',
+    flex: 1,
     minHeight: 104,
     borderRadius: Radius.xxxl - 3,
     borderWidth: 1,

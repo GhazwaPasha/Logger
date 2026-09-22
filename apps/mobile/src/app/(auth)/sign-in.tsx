@@ -82,49 +82,52 @@ export default function SignIn() {
                   {(Object.keys(PROVIDERS) as Provider[]).map((p, i) => {
                     const meta = PROVIDERS[p];
                     return (
-                      <PressableScale
-                        key={p}
-                        accessibilityRole="button"
-                        scaleTo={0.98}
-                        entering={sequenceEnter(i + 1, 12)}
-                        disabled={busy !== null}
-                        onPress={() => signInSocial(p)}
-                        style={({ pressed }) => [
-                          styles.hubButton,
-                          {
-                            borderColor: alpha(meta.color, 0.3),
-                            backgroundColor: alpha(meta.color, pressed ? 0.14 : 0.08),
-                            opacity: busy !== null && busy !== p ? 0.6 : 1,
-                          },
-                        ]}>
-                        <Icon icon={meta.icon} size={20} color={meta.color} />
-                        <Text size="base" weight="medium">
-                          {busy === p ? 'Connecting…' : `Continue with ${meta.label}`}
-                        </Text>
-                      </PressableScale>
+                      // Entrance and press-scale can't share one node (see the KPI cards comment in
+                      // dashboard.tsx), so the keyframe lives on this wrapper.
+                      <Animated.View key={p} entering={sequenceEnter(i + 1, 12)}>
+                        <PressableScale
+                          accessibilityRole="button"
+                          scaleTo={0.98}
+                          disabled={busy !== null}
+                          onPress={() => signInSocial(p)}
+                          style={({ pressed }) => [
+                            styles.hubButton,
+                            {
+                              borderColor: alpha(meta.color, 0.3),
+                              backgroundColor: alpha(meta.color, pressed ? 0.14 : 0.08),
+                              opacity: busy !== null && busy !== p ? 0.6 : 1,
+                            },
+                          ]}>
+                          <Icon icon={meta.icon} size={20} color={meta.color} />
+                          <Text size="base" weight="medium">
+                            {busy === p ? 'Connecting…' : `Continue with ${meta.label}`}
+                          </Text>
+                        </PressableScale>
+                      </Animated.View>
                     );
                   })}
-                  <PressableScale
-                    accessibilityRole="button"
-                    scaleTo={0.98}
-                    entering={sequenceEnter(3, 12)}
-                    disabled={busy !== null}
-                    onPress={() => {
-                      setError(null);
-                      setStep('email');
-                    }}
-                    style={({ pressed }) => [
-                      styles.hubButton,
-                      {
-                        borderColor: theme.borderSubtle,
-                        backgroundColor: pressed ? theme.surfaceHover : theme.surfaceBase,
-                      },
-                    ]}>
-                    <Icon icon={faEnvelope} size={20} color={theme.accent} />
-                    <Text size="base" weight="medium">
-                      Continue with Email
-                    </Text>
-                  </PressableScale>
+                  <Animated.View entering={sequenceEnter(3, 12)}>
+                    <PressableScale
+                      accessibilityRole="button"
+                      scaleTo={0.98}
+                      disabled={busy !== null}
+                      onPress={() => {
+                        setError(null);
+                        setStep('email');
+                      }}
+                      style={({ pressed }) => [
+                        styles.hubButton,
+                        {
+                          borderColor: theme.borderSubtle,
+                          backgroundColor: pressed ? theme.surfaceHover : theme.surfaceBase,
+                        },
+                      ]}>
+                      <Icon icon={faEnvelope} size={20} color={theme.accent} />
+                      <Text size="base" weight="medium">
+                        Continue with Email
+                      </Text>
+                    </PressableScale>
+                  </Animated.View>
                 </View>
                 {error ? (
                   <View style={{ width: '100%', maxWidth: 384 }}>

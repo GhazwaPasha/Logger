@@ -28,6 +28,10 @@ export const FLOW_COLUMN_LABELS: Record<ManualTaskStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+/** Statuses whose recurring occurrences collapse into a single `RecurringSeriesCard` (matches the web board). */
+export const DONE_CANCELLED_STATUSES = ['done', 'cancelled'] as const;
+export const SERIES_GROUPED_COLUMNS = new Set<ManualTaskStatus>(DONE_CANCELLED_STATUSES);
+
 export type TaskPriority = 'high' | 'medium' | 'low';
 export const PRIORITY_LABELS: Record<TaskPriority, string> = { high: 'High', medium: 'Medium', low: 'Low' };
 export const PRIORITIES = ['high', 'medium', 'low'] as const;
@@ -112,6 +116,24 @@ export function statusPillColors(st: BoardTaskStatus, dark: boolean, theme: Pale
       return { bg: alpha(Tone.emerald500, a), fg: theme.fg };
     default:
       return { bg: alpha(Tone.neutral500, 0.15), fg: theme.muted };
+  }
+}
+
+/** Semantic text color for an inline status label in the activity log (web's `statusLabelTextClasses`). */
+export function statusLabelColor(st: BoardTaskStatus, dark: boolean): string {
+  switch (st) {
+    case 'pending':
+      return dark ? Tone.slate400 : Tone.slate600;
+    case 'assigned':
+      return dark ? Tone.sky400 : Tone.sky600;
+    case 'in_progress':
+      return dark ? Tone.violet400 : Tone.violet600;
+    case 'late':
+      return dark ? Tone.orange400 : Tone.orange600;
+    case 'done':
+      return dark ? Tone.emerald400 : Tone.emerald600;
+    default:
+      return dark ? Tone.neutral400 : Tone.neutral600;
   }
 }
 

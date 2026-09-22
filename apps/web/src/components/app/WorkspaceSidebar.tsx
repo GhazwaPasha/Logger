@@ -19,7 +19,7 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { NODE_LABELS } from "@/lib/nodes";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 import { canViewPerformance } from "@/lib/workspace-permissions";
-import type { Dept, ListRow, TaskRow } from "@/lib/ledger-types";
+import type { Dept, ListRow } from "@/lib/ledger-types";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 import { workspaceKeys } from "@/lib/query-keys";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -42,23 +42,6 @@ function Chevron({ open }: { open: boolean }) {
       strokeLinejoin="round"
     >
       <path d="M9 6l6 6-6 6" />
-    </svg>
-  );
-}
-
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 5v14M5 12h14" />
     </svg>
   );
 }
@@ -134,6 +117,7 @@ export function WorkspaceSidebar({
   const [renamingListBusy, setRenamingListBusy] = useState(false);
   const [structureMenu, setStructureMenu] = useState<
     | null
+    | { x: number; y: number; kind: "workspace" }
     | { x: number; y: number; kind: "level"; deptId: string; name: string }
     | { x: number; y: number; kind: "list"; listId: string; deptId: string; name: string }
   >(null);
@@ -181,22 +165,6 @@ export function WorkspaceSidebar({
     setDragOverDeptId(null);
     setDragOverListId(null);
   }, [reorderMode]);
-
-  const tasksByList = useMemo(() => {
-    const m = new Map<string, TaskRow[]>();
-    for (const l of lists) m.set(l.id, []);
-    for (const t of tasks) {
-      if (t.deletedAt) continue;
-      // Sidebar badge tracks open work — finished tasks (esp. piled-up recurring completions) shouldn't inflate it.
-      if (t.status === "done" || t.status === "cancelled") continue;
-      const list = m.get(t.listId);
-      if (list) list.push(t);
-    }
-    for (const list of m.values()) {
-      list.sort((a, b) => a.title.localeCompare(b.title));
-    }
-    return m;
-  }, [tasks, lists]);
 
   useEffect(() => {
     setExpanded((prev) => {
@@ -543,8 +511,35 @@ export function WorkspaceSidebar({
   const structureMenuItems: SimpleContextMenuItem[] =
     !structureMenu || !canRenameOrgStructure
       ? []
-      : structureMenu.kind === "level"
+      : structureMenu.kind === "workspace"
         ? [
+            {
+              id: "add-level",
+              label: `Add ${NODE_LABELS.level}`,
+              onSelect: () => {
+                setOrgTreeOpen(true);
+                setShowAddLevelInput(true);
+                setNewLevelName("");
+              },
+            },
+          ]
+        : structureMenu.kind === "level"
+        ? [
+            {
+              id: "add-list",
+              label: `Add ${NODE_LABELS.list}`,
+              onSelect: () => {
+                const deptId = structureMenu.deptId;
+                setExpanded((prev) => {
+                  if (prev.has(deptId)) return prev;
+                  const n = new Set(prev);
+                  n.add(deptId);
+                  return n;
+                });
+                setShowAddListForLevel(deptId);
+                setNewListName("");
+              },
+            },
             {
               id: "rename-level",
               label: `Rename ${NODE_LABELS.level}`,
@@ -704,7 +699,14 @@ export function WorkspaceSidebar({
         </div>
 
         <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-          <div className="group/alltasks mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]">
+          <div
+            className="group/alltasks mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]"
+            onContextMenu={(e) => {
+              if (!canRenameOrgStructure) return;
+              e.preventDefault();
+              setStructureMenu({ x: e.clientX, y: e.clientY, kind: "workspace" });
+            }}
+          >
             <button
               type="button"
               className={`${rowBase(false)} flex min-w-0 flex-1 items-center pl-2`}
@@ -740,19 +742,6 @@ export function WorkspaceSidebar({
                 {reorderMode ? "Done" : "Edit"}
               </button>
             )}
-            <button
-              type="button"
-              className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/alltasks:pointer-events-auto group-hover/alltasks:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
-              aria-label={`Add ${NODE_LABELS.level}`}
-              title={`Add ${NODE_LABELS.level}`}
-              onClick={() => {
-                setOrgTreeOpen(true);
-                setShowAddLevelInput(true);
-                setNewLevelName("");
-              }}
-            >
-              <PlusIcon className="h-3.5 w-3.5" />
-            </button>
             <button
               type="button"
               className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
@@ -890,9 +879,6 @@ export function WorkspaceSidebar({
                                 </span>
                               ) : null}
                             </div>
-                            <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
-                              {levelLists.length}
-                            </span>
                           </div>
                         ) : (
                           <div
@@ -928,44 +914,6 @@ export function WorkspaceSidebar({
                             >
                               <span className="truncate text-sm font-semibold text-[var(--fg)]">{d.name}</span>
                             </Link>
-                            {!reorderMode && (
-                              <button
-                                type="button"
-                                className="touch-reveal pointer-events-none shrink-0 rounded p-1 text-[var(--muted)] opacity-0 transition-opacity duration-150 group-hover/level:pointer-events-auto group-hover/level:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
-                                aria-label={`Add ${NODE_LABELS.list} to ${d.name}`}
-                                title={`Add ${NODE_LABELS.list}`}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setExpanded((prev) => {
-                                    if (prev.has(d.id)) return prev;
-                                    const n = new Set(prev);
-                                    n.add(d.id);
-                                    return n;
-                                  });
-                                  setShowAddListForLevel(d.id);
-                                  setNewListName("");
-                                }}
-                              >
-                                <PlusIcon className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                            <Link
-                              href={`${base}/work`}
-                              tabIndex={-1}
-                              aria-hidden
-                              className="shrink-0 px-2 py-1.5 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
-                              title={`Open ${d.name}`}
-                              onClick={(e) => {
-                                if (reorderMode) {
-                                  e.preventDefault();
-                                  return;
-                                }
-                                writeWorkBoardScope(workspaceId, { levelId: d.id, listId: null });
-                              }}
-                            >
-                              {levelLists.length}
-                            </Link>
                           </div>
                         )}
                         <button
@@ -994,7 +942,6 @@ export function WorkspaceSidebar({
                             </li>
                           ) : (
                             levelLists.map((l) => {
-                              const listTaskCount = (tasksByList.get(l.id) ?? []).length;
                               const isActiveList = boardScope?.listId === l.id;
                               const hasUnread =
                                 !isActiveList &&
@@ -1099,9 +1046,6 @@ export function WorkspaceSidebar({
                                             </span>
                                           ) : null}
                                         </div>
-                                        <span className="shrink-0 text-sm font-semibold text-[var(--muted)] tabular-nums">
-                                          {listTaskCount}
-                                        </span>
                                       </div>
                                     ) : (
                                       <div
@@ -1142,23 +1086,6 @@ export function WorkspaceSidebar({
                                           >
                                             {l.name}
                                           </span>
-                                        </Link>
-                                        <Link
-                                          href={`${base}/work`}
-                                          tabIndex={-1}
-                                          aria-hidden
-                                          className="shrink-0 py-1.5 pr-2 pl-1 text-sm font-semibold text-[var(--muted)] tabular-nums hover:text-[var(--fg)]"
-                                          title={l.name}
-                                          onClick={(e) => {
-                                            if (reorderMode) {
-                                              e.preventDefault();
-                                              return;
-                                            }
-                                            writeWorkBoardScope(workspaceId, { levelId: d.id, listId: l.id });
-                                            markListSeen(l.id);
-                                          }}
-                                        >
-                                          {listTaskCount}
                                         </Link>
                                       </div>
                                     )}

@@ -7,6 +7,7 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 
 import { api } from '@/lib/api';
 import type { ManualTaskStatus, TaskPriority } from '@/lib/task-board';
@@ -36,6 +37,9 @@ export const qk = {
   tasksRoot: ['tasks'] as const,
   column: (orgId: string, filter: BoardFilter, status: string) => ['tasks', orgId, 'column', filter, status] as const,
   counts: (orgId: string, filter: BoardFilter) => ['tasks', orgId, 'counts', filter] as const,
+  seriesSummary: (orgId: string, filter: BoardFilter, statuses: readonly string[]) =>
+    ['tasks', orgId, 'series-summary', filter, statuses] as const,
+  seriesOccurrences: (orgId: string, seriesId: string) => ['tasks', orgId, 'series', seriesId] as const,
   active: (orgId: string) => ['tasks', orgId, 'active'] as const,
   archived: (orgId: string) => ['tasks', orgId, 'archived'] as const,
   task: (taskId: string) => ['task', taskId] as const,
@@ -89,6 +93,108 @@ export function useBoardCounts(orgId: string | undefined, filter: BoardFilter) {
     enabled: !!orgId,
     queryFn: () => api<Record<string, number>>(`/organizations/${orgId}/tasks/counts`, { params: filterParams(filter) }),
   });
+}
+
+/** Collapsed-card stats for a recurring chain — mirrors the web's `SeriesSummaryRow` (`useWorkTaskStats.ts`). */
+export type SeriesSummaryRow = {
+  seriesId: string;
+  count: number;
+  latest: { id: string; title: string; createdAt: string };
+  lastDone: {
+    id: string;
+    completedAt: string | null;
+    dueAt: string | null;
+    lastSubmittedAt: string | null;
+    assigneeUserIds: string[];
+  } | null;
+};
+
+/** RecurringSeriesCard header stats (count + latest + last completion), grouped by chain. */
+export function useSeriesSummaries(
+  orgId: string | undefined,
+  filter: BoardFilter,
+  statuses: readonly string[],
+  enabled = true,
+) {
+  const q = useQuery({
+    queryKey: qk.seriesSummary(orgId ?? '', filter, statuses),
+    queryFn: () =>
+      api<SeriesSummaryRow[]>(`/organizations/${orgId}/tasks/series-summary`, {
+        params: { ...filterParams(filter), status: statuses.join(',') },
+      }),
+    enabled: !!orgId && enabled && statuses.length > 0,
+    staleTime: 30_000,
+  });
+  return { summaries: q.data ?? [], isLoading: q.isPending && !!orgId };
+}
+
+type SeriesOccurrencesPage = { tasks: TaskRow[]; nextCursor: string | null };
+
+/** Frontend-only cap on how far back a card's occurrence list will page — see the web's `RecurringSeriesCard`. */
+const OCCURRENCE_CAP = 30;
+
+/** Occurrence list for one recurring chain — only fetched once its card is expanded, paginated by cursor. */
+export function useSeriesOccurrences(
+  orgId: string | undefined,
+  seriesId: string | undefined,
+  opts: { statuses?: readonly string[]; enabled: boolean },
+) {
+  const qc = useQueryClient();
+  const statusParam = opts.statuses?.length ? opts.statuses.join(',') : undefined;
+  const queryKey = qk.seriesOccurrences(orgId ?? '', seriesId ?? '');
+
+  const q = useQuery({
+    queryKey,
+    queryFn: () =>
+      api<SeriesOccurrencesPage>(`/organizations/${orgId}/tasks/series/${seriesId}`, {
+        params: { limit: 25, status: statusParam },
+      }),
+    enabled: !!orgId && !!seriesId && opts.enabled,
+    staleTime: 15_000,
+  });
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const loadedCount = q.data?.tasks.length ?? 0;
+  const rawNextCursor = q.data?.nextCursor ?? null;
+  const capReached = loadedCount >= OCCURRENCE_CAP;
+  const nextCursor = capReached ? null : rawNextCursor;
+  /** More history exists on the server past what the cap let us load. */
+  const hasMoreBeyondCap = capReached && Boolean(rawNextCursor);
+
+  const loadMore = useCallback(async () => {
+    if (!orgId || !seriesId || !rawNextCursor || capReached) return;
+    const limit = Math.min(25, OCCURRENCE_CAP - loadedCount);
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const page = await api<SeriesOccurrencesPage>(`/organizations/${orgId}/tasks/series/${seriesId}`, {
+        params: { limit, cursor: rawNextCursor, status: statusParam },
+      });
+      qc.setQueryData<SeriesOccurrencesPage>(queryKey, (old) => {
+        if (!old) return page;
+        const existingIds = new Set(old.tasks.map((t) => t.id));
+        return {
+          tasks: [...old.tasks, ...page.tasks.filter((t) => !existingIds.has(t.id))],
+          nextCursor: page.nextCursor,
+        };
+      });
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [orgId, seriesId, rawNextCursor, capReached, loadedCount, statusParam, qc, queryKey]);
+
+  return {
+    tasks: q.data?.tasks ?? [],
+    isLoading: q.isFetching && !q.data,
+    nextCursor,
+    hasMoreBeyondCap,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+  };
 }
 
 /** Every pending / in-progress task in the workspace (paged internally) — sidebar counts and dashboard stats. */
@@ -403,5 +509,63 @@ export function useCreateList(orgId: string | undefined) {
       appendToBootstrap(qc, orgId, (old) =>
         old.lists.some((l) => l.id === created.id) ? old : { ...old, lists: [...old.lists, created] },
       ),
+  });
+}
+
+export function useRenameDepartment(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { deptId: string; name: string }) =>
+      api<Dept>(`/organizations/${orgId}/departments/${v.deptId}`, { method: 'PATCH', body: { name: v.name } }),
+    onSuccess: (updated) =>
+      orgId &&
+      appendToBootstrap(qc, orgId, (old) => ({
+        ...old,
+        departments: old.departments.map((d) => (d.id === updated.id ? updated : d)),
+      })),
+  });
+}
+
+/** Deleting a category takes every channel (and task) under it with it — same as the web sidebar. */
+export function useDeleteDepartment(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deptId: string) => api(`/organizations/${orgId}/departments/${deptId}`, { method: 'DELETE' }),
+    onSuccess: (_result, deptId) => {
+      if (!orgId) return;
+      appendToBootstrap(qc, orgId, (old) => ({
+        ...old,
+        departments: old.departments.filter((d) => d.id !== deptId),
+        lists: old.lists.filter((l) => l.departmentId !== deptId),
+      }));
+      // The board scope self-heals to another channel once the deleted one is gone from `lists` (see useWorkspace's resolveScope).
+      void invalidateTasks(qc);
+    },
+  });
+}
+
+export function useRenameList(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { listId: string; name: string }) =>
+      api<ListRow>(`/organizations/${orgId}/lists/${v.listId}`, { method: 'PATCH', body: { name: v.name } }),
+    onSuccess: (updated) =>
+      orgId &&
+      appendToBootstrap(qc, orgId, (old) => ({
+        ...old,
+        lists: old.lists.map((l) => (l.id === updated.id ? updated : l)),
+      })),
+  });
+}
+
+export function useDeleteList(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (listId: string) => api(`/organizations/${orgId}/lists/${listId}`, { method: 'DELETE' }),
+    onSuccess: (_result, listId) => {
+      if (!orgId) return;
+      appendToBootstrap(qc, orgId, (old) => ({ ...old, lists: old.lists.filter((l) => l.id !== listId) }));
+      void invalidateTasks(qc);
+    },
   });
 }

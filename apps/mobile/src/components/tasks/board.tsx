@@ -24,6 +24,7 @@ import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
 import { BoardActionsContext, type BoardActions } from '@/components/tasks/board-context';
+import { RecurringSeriesCard } from '@/components/tasks/recurring-series-card';
 import { ColumnHeader } from '@/components/tasks/status-pill';
 import { TaskCard, TaskCardSkeleton } from '@/components/tasks/task-card';
 import { Text } from '@/components/text';
@@ -38,11 +39,15 @@ import {
   usePendingTaskIds,
   useBoardColumn,
   useBoardCounts,
+  useSeriesSummaries,
   useSetSubtaskDone,
   type BoardFilter,
+  type SeriesSummaryRow,
 } from '@/lib/queries';
 import {
+  DONE_CANCELLED_STATUSES,
   DUE_WINDOW_OPTIONS,
+  SERIES_GROUPED_COLUMNS,
   SORT_OPTIONS,
   sortTasks,
   TASK_FLOW_ORDER,
@@ -53,6 +58,9 @@ import {
 } from '@/lib/task-board';
 import type { TaskRow } from '@/lib/types';
 import { useWorkspace } from '@/lib/workspace';
+
+/** A list-view row: either a plain task card, or a recurring chain collapsed into one series card. */
+type ListRow = { kind: 'task'; task: TaskRow } | { kind: 'series'; summary: SeriesSummaryRow };
 
 type ViewMode = 'list' | 'kanban';
 
@@ -90,6 +98,13 @@ export function Board({ mine = false }: { mine?: boolean }) {
   );
   const counts = useBoardCounts(orgId, ready ? filter : { listId: '__none__' });
 
+  // Recurring chains in Done/Cancelled collapse into a RecurringSeriesCard (matches the web board):
+  // per-column in kanban, combined in list view. Own fetch, own loading state — never derived from
+  // how far a column has paginated.
+  const doneSeries = useSeriesSummaries(orgId, filter, ['done'], ready && viewMode === 'kanban');
+  const cancelledSeries = useSeriesSummaries(orgId, filter, ['cancelled'], ready && viewMode === 'kanban');
+  const combinedSeries = useSeriesSummaries(orgId, filter, DONE_CANCELLED_STATUSES, ready && viewMode === 'list');
+
   const patch = usePatchTask();
   const subtaskDone = useSetSubtaskDone();
   const syncingIds = usePendingTaskIds();
@@ -113,7 +128,21 @@ export function Board({ mine = false }: { mine?: boolean }) {
     [columns, dueWindow, sortMode],
   );
 
-  const listRows = useMemo(() => TASK_FLOW_ORDER.flatMap((s) => rowsFor(s)), [rowsFor]);
+  const listRows = useMemo<ListRow[]>(() => {
+    const items: ListRow[] = [];
+    for (const status of TASK_FLOW_ORDER) {
+      const grouped = SERIES_GROUPED_COLUMNS.has(status);
+      for (const task of rowsFor(status)) {
+        if (grouped && task.recurringSeriesId) continue; // represented by its series card below
+        items.push({ kind: 'task', task });
+      }
+    }
+    const sortedSeries = [...combinedSeries.summaries].sort(
+      (a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime(),
+    );
+    for (const summary of sortedSeries) items.push({ kind: 'series', summary });
+    return items;
+  }, [rowsFor, combinedSeries.summaries]);
   const firstLoad = ready && TASK_FLOW_ORDER.every((s) => columns[s].isLoading);
   const isOwner = me?.role === 'owner';
   const anyError = TASK_FLOW_ORDER.map((s) => columns[s].error).find(Boolean) as Error | undefined;
@@ -246,9 +275,19 @@ export function Board({ mine = false }: { mine?: boolean }) {
     body = (
       <Animated.FlatList
         data={listRows}
-        keyExtractor={(t) => t.id}
+        keyExtractor={(item) => (item.kind === 'task' ? item.task.id : `series-${item.summary.seriesId}`)}
         // Only the first screenful staggers in; appended pages and recycled rows shouldn't re-animate.
-        renderItem={({ item, index }) => <TaskCard task={item} variant="list" enterIndex={index < 10 ? index : undefined} />}
+        renderItem={({ item, index }) =>
+          item.kind === 'task' ? (
+            <TaskCard task={item.task} variant="list" enterIndex={index < 10 ? index : undefined} />
+          ) : (
+            <RecurringSeriesCard
+              summary={item.summary}
+              occurrenceStatuses={DONE_CANCELLED_STATUSES}
+              enterIndex={index < 10 ? index : undefined}
+            />
+          )
+        }
         itemLayoutAnimation={listLayout}
         ItemSeparatorComponent={Gap}
         contentContainerStyle={styles.listContent}
@@ -273,7 +312,10 @@ export function Board({ mine = false }: { mine?: boolean }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.kanbanScroll}>
           {TASK_FLOW_ORDER.map((status) => {
-            const rows = rowsFor(status);
+            const grouped = SERIES_GROUPED_COLUMNS.has(status);
+            const rawRows = rowsFor(status);
+            const rows = grouped ? rawRows.filter((t) => !t.recurringSeriesId) : rawRows;
+            const seriesForCol = status === 'done' ? doneSeries.summaries : status === 'cancelled' ? cancelledSeries.summaries : [];
             const q = columns[status];
             const total = counts.data?.[status];
             return (
@@ -294,8 +336,16 @@ export function Board({ mine = false }: { mine?: boolean }) {
                   {rows.map((t, i) => (
                     <TaskCard key={t.id} task={t} variant="kanban" enterIndex={i < 8 ? i : undefined} />
                   ))}
+                  {seriesForCol.map((s, i) => (
+                    <RecurringSeriesCard
+                      key={s.seriesId}
+                      summary={s}
+                      occurrenceStatuses={[status]}
+                      enterIndex={rows.length + i < 8 ? rows.length + i : undefined}
+                    />
+                  ))}
                   {q.isFetchingNextPage ? <ActivityIndicator style={{ padding: 12 }} color={theme.muted} /> : null}
-                  {rows.length === 0 && !q.isFetching ? (
+                  {rows.length === 0 && seriesForCol.length === 0 && !q.isFetching ? (
                     <EmptyState compact icon={faListUl} title="No tasks" />
                   ) : null}
                 </ScrollView>
