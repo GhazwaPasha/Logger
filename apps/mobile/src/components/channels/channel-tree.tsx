@@ -33,8 +33,9 @@ type StructureTarget =
   | { kind: 'list'; listId: string; deptId: string; name: string };
 
 /**
- * The Channels tab: categories as collapsible sections, channels as full-width rows with the Discord-style
- * unread pill and their open-task count. Owners long-press a category or channel to add / rename / delete,
+ * The Channels tab, laid out open like Slack / Discord: collapsible category headers (chevron on the left),
+ * then a plain list of `# channel` rows — no cards or dividers. Unread channels are bold with the Discord-style
+ * pill on the screen edge; the open-task count sits quietly on the right. Owners long-press a category or channel to add / rename / delete,
  * as in the web sidebar.
  */
 export function ChannelTree() {
@@ -207,9 +208,16 @@ export function ChannelTree() {
   if (isLoading && depts.length === 0) {
     body = (
       <View style={styles.skeletons}>
-        {[0, 1, 2, 3].map((i) => (
-          <Pulse key={i} style={[styles.skeleton, { backgroundColor: theme.surfaceElevated }]}>
-            <View style={{ height: 12, width: `${60 - i * 8}%`, borderRadius: 3, backgroundColor: theme.surfaceHover }} />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <Pulse key={i} style={styles.skeleton}>
+            <View
+              style={{
+                height: i % 3 === 0 ? 10 : 14,
+                width: i % 3 === 0 ? '35%' : `${62 - i * 5}%`,
+                borderRadius: 4,
+                backgroundColor: theme.surfaceHover,
+              }}
+            />
           </Pulse>
         ))}
       </View>
@@ -253,28 +261,24 @@ export function ChannelTree() {
                 { backgroundColor: pressed ? theme.surfaceHover : 'transparent' },
                 stateTransition,
               ]}>
+              <RotatingChevron open={open} size={10} />
               <Text size="xs" weight="semibold" color="muted" uppercase tracking={0.6} numberOfLines={1} style={{ flex: 1 }}>
                 {d.name}
               </Text>
-              <RotatingChevron open={open} />
             </PressableScale>
           )}
 
           {open ? (
-            <Animated.View
-              entering={revealIn}
-              exiting={revealOut}
-              style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+            <Animated.View entering={revealIn} exiting={revealOut}>
               {levelLists.length === 0 && addListFor !== d.id ? (
                 <EmptyState compact icon={faListUl} title={`No ${NODE_LABELS.listPlural.toLowerCase()} yet`} />
               ) : (
-                levelLists.map((l, i) => {
+                levelLists.map((l) => {
                   const hasUnread = unread.hasUnread(l.id);
                   const count = unread.openCount(l.id);
-                  const divider = i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth * 2, borderTopColor: theme.borderSubtle } : null;
                   if (renamingListId === l.id) {
                     return (
-                      <View key={l.id} style={divider}>
+                      <View key={l.id}>
                         <InlineNameInput
                           placeholder={`Name your ${NODE_LABELS.list.toLowerCase()}`}
                           initialValue={l.name}
@@ -286,7 +290,7 @@ export function ChannelTree() {
                     );
                   }
                   return (
-                    <View key={l.id} style={divider}>
+                    <View key={l.id}>
                       {hasUnread ? <View pointerEvents="none" style={[styles.unreadPill, { backgroundColor: theme.fg }]} /> : null}
                       <Pressable
                         accessibilityRole="button"
@@ -298,24 +302,22 @@ export function ChannelTree() {
                             : undefined
                         }
                         style={({ pressed }) => [styles.channelRow, pressed && { backgroundColor: theme.surfaceHover }]}>
-                        <Text font="outfit" size="base" weight="medium" color="muted">
+                        <Text font="outfit" size="sm" weight="medium" color={hasUnread ? 'fg' : 'muted'} style={styles.hash}>
                           #
                         </Text>
                         <Text
                           font="outfit"
-                          size="base"
+                          size="sm"
                           weight={hasUnread ? 'bold' : 'medium'}
-                          color={hasUnread ? 'fg' : alpha(theme.fg, 0.8)}
+                          color={hasUnread ? 'fg' : alpha(theme.fg, 0.72)}
                           numberOfLines={1}
                           style={{ flex: 1 }}>
                           {l.name}
                         </Text>
                         {count > 0 ? (
-                          <View style={[styles.count, { backgroundColor: theme.surfaceMuted }]}>
-                            <Text size="xs" weight="semibold" color="muted" tabular>
-                              {count}
-                            </Text>
-                          </View>
+                          <Text size="xs" weight="medium" color="muted" tabular>
+                            {count}
+                          </Text>
                         ) : null}
                       </Pressable>
                     </View>
@@ -371,11 +373,8 @@ export function ChannelTree() {
             accessibilityRole="button"
             scaleTo={0.98}
             onPress={() => setAddingLevel(true)}
-            style={({ pressed }) => [
-              styles.addLevel,
-              { borderColor: theme.border, backgroundColor: pressed ? theme.surfaceHover : 'transparent' },
-            ]}>
-            <Icon icon={faPlus} size={13} color="muted" />
+            style={({ pressed }) => [styles.addLevel, { backgroundColor: pressed ? theme.surfaceHover : 'transparent' }]}>
+            <Icon icon={faPlus} size={12} color="muted" />
             <Text size="sm" weight="medium" color="muted">
               Add {NODE_LABELS.level.toLowerCase()}
             </Text>
@@ -467,42 +466,48 @@ function InlineNameInput({
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 16, paddingTop: 4, gap: 16 },
-  section: { gap: 6 },
+  content: { paddingHorizontal: 8, paddingTop: 0, gap: 4 },
+  section: { gap: 0 },
+  // Category header: chevron first, like the Slack / Discord sidebars.
   levelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    minHeight: 36,
-    paddingHorizontal: 4,
-    borderRadius: Radius.md,
+    minHeight: 30,
+    paddingHorizontal: 10,
+    borderRadius: 10,
   },
-  group: { borderRadius: Radius.xxxl + 4, borderWidth: 1, overflow: 'hidden' },
-  channelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52, paddingHorizontal: 16 },
-  /** Discord-style unread indicator: a half-pill on the row's left edge. */
+  channelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 32,
+    paddingLeft: 12,
+    paddingRight: 14,
+    borderRadius: 10,
+  },
+  hash: { width: 14, textAlign: 'center' },
+  /** Discord-style unread indicator: a half-pill on the screen's left edge, beside the row. */
   unreadPill: {
     position: 'absolute',
-    left: 0,
+    left: -8,
     top: '50%',
-    marginTop: -5,
+    marginTop: -4,
     width: 4,
-    height: 10,
+    height: 8,
     zIndex: 1,
     borderTopRightRadius: Radius.full,
     borderBottomRightRadius: Radius.full,
   },
-  count: { minWidth: 26, height: 22, paddingHorizontal: 7, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  skeletons: { gap: 10 },
-  skeleton: { height: 52, borderRadius: Radius.xxxl, justifyContent: 'center', paddingHorizontal: 16, opacity: 0.7 },
+  skeletons: { gap: 0, paddingTop: 4 },
+  skeleton: { height: 32, justifyContent: 'center', paddingHorizontal: 12, opacity: 0.7 },
   addLevel: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: Radius.xxxl,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+    gap: 10,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 10,
   },
   inlineWrap: { padding: 8 },
   inline: { height: 40, borderRadius: Radius.lg, borderWidth: 1, paddingHorizontal: 12, paddingRight: 36, fontSize: 15 },

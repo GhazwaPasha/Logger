@@ -8,13 +8,12 @@ import { ActivityTerminal } from '@/components/activity/activity-terminal';
 import { Donut } from '@/components/donut';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Page, Panel, SectionLabel, Segmented } from '@/components/page';
-import { TabHeader } from '@/components/shell/screen-header';
+import { TabHeader, WorkspaceSwitcher } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
 import { sequenceEnter } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
-import { authClient } from '@/lib/auth-client';
 import { NODE_LABELS } from '@/lib/labels';
 import { useActiveTasks, useBoardCounts, useOrgActivity } from '@/lib/queries';
 import { FLOW_COLUMN_LABELS, PRIORITY_LABELS, taskIsOverdue, taskPriority, TASK_FLOW_ORDER, type TaskPriority } from '@/lib/task-board';
@@ -108,7 +107,6 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
 
 export default function DashboardScreen() {
   const theme = useTheme();
-  const { data: session } = authClient.useSession();
   const { org, depts, lists, members, userId, scope } = useWorkspace();
   const active = useActiveTasks(org?.id);
   /** The work links open the last channel's board (or the channel list when there is none yet). */
@@ -120,7 +118,6 @@ export default function DashboardScreen() {
   const [view, setView] = useState<View_>('overview');
   const activity = useOrgActivity(org?.id, view === 'activity');
 
-  const firstName = session?.user.name?.trim().split(' ')[0] || session?.user.email || 'there';
   const loading = active.isLoading || counts.isLoading;
   const tasks = useMemo(() => active.data ?? [], [active.data]);
 
@@ -159,7 +156,11 @@ export default function DashboardScreen() {
 
   return (
     <Page
-      header={<TabHeader title={`Hey, ${firstName}!`} />}
+      header={
+        <TabHeader>
+          <WorkspaceSwitcher />
+        </TabHeader>
+      }
       onRefresh={() => {
         void active.refetch();
         void counts.refetch();

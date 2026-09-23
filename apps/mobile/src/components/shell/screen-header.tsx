@@ -2,7 +2,7 @@ import {
   faBell,
   faBoxArchive,
   faBuilding,
-  faCheck,
+  faChevronDown,
   faChevronLeft,
   faGear,
   faRightFromBracket,
@@ -16,27 +16,31 @@ import Animated, { useAnimatedStyle, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
 import { useNotifications } from '@/components/shell/notifications';
+import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
 import { Duration, POP_EASE } from '@/constants/motion';
-import { Radius, Tone } from '@/constants/theme';
+import { alpha, Radius, Tone } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { queryClient } from '@/lib/query-client';
 import { useWorkspace } from '@/lib/workspace';
 
-const HEADER_HEIGHT = 52;
+const HEADER_HEIGHT = 56;
+/** Height of the header's floating controls (workspace switcher, bell + avatar pill). */
+const CONTROL_H = 44;
 
 /**
- * Header of a tab's root screen: the screen title, the notifications bell and the account menu. The bar has
- * no fill or border — only its controls are drawn, directly on the page background.
+ * Header of a tab's root screen: the screen title (or, on Home, the workspace switcher) and a floating pill
+ * holding the notifications bell and the account menu. The pills use the bottom bar's surface — Liquid Glass
+ * on iOS 26, an opaque elevated surface elsewhere — so the top and bottom chrome read as one set.
  */
 export function TabHeader({ title, children }: { title?: string; children?: ReactNode }) {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { openPanel, unreadCount } = useNotifications();
 
@@ -52,20 +56,23 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
           {children}
         </View>
 
-        <View style={styles.actions}>
+        <View style={styles.controlPill}>
+          <BarSurface radius={CONTROL_H / 2} />
           <View>
             <IconButton
               icon={faBell}
               label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
               onPress={openPanel}
-              size={40}
-              iconSize={18}
+              size={36}
+              iconSize={17}
+              tone="fg"
+              style={styles.round}
             />
             {unreadCount > 0 ? (
               <Animated.View
                 entering={ZoomIn.duration(Duration.pop).easing(POP_EASE)}
                 pointerEvents="none"
-                style={[styles.unread, { borderColor: theme.surfaceBase }]}
+                style={styles.unread}
               />
             ) : null}
           </View>
@@ -111,6 +118,52 @@ export function StackHeader({
   );
 }
 
+/**
+ * Workspace switcher for the Home header's far left: a floating pill (same surface and height as the bell +
+ * avatar pill) with the workspace's initial, name and a chevron; tapping it opens a sheet of your workspaces.
+ */
+export function WorkspaceSwitcher() {
+  const theme = useTheme();
+  const { orgs, org, setOrgId } = useWorkspace();
+  const [open, setOpen] = useState(false);
+  if (!org) return null;
+  const initial = org.name.trim().charAt(0).toUpperCase() || '?';
+
+  return (
+    <>
+      <View style={styles.switcher}>
+        <BarSurface radius={CONTROL_H / 2} />
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`Workspace: ${org.name}. Switch workspace`}
+          scaleTo={0.97}
+          haptic="select"
+          onPress={() => setOpen(true)}
+          style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
+          <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
+            <Text size="xs" weight="bold" color={theme.onAccent}>
+              {initial}
+            </Text>
+          </View>
+          <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {org.name}
+          </Text>
+          <Icon icon={faChevronDown} size={11} color="muted" />
+        </PressableScale>
+      </View>
+
+      <MenuSheet<string>
+        visible={open}
+        title="Workspace"
+        value={org.id}
+        options={orgs.map((o) => ({ value: o.id, label: o.name }))}
+        onSelect={(id) => id !== org.id && setOrgId(id)}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
+}
+
 type MenuLink = { href: Href; label: string; icon: IconDefinition };
 
 const LINKS: MenuLink[] = [
@@ -120,12 +173,11 @@ const LINKS: MenuLink[] = [
   { href: '/organization-settings', label: 'Organization settings', icon: faBuilding },
 ];
 
-/** Avatar + account menu: workspace switcher, the secondary destinations, and sign out. */
+/** Avatar + account menu: the secondary destinations and sign out. */
 function AccountButton() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
-  const { orgs, org, setOrgId } = useWorkspace();
   const user = session?.user;
   const [open, setOpen] = useState(false);
   const { mounted, progress } = usePresence(open, { openMs: Duration.pop, closeMs: Duration.micro });
@@ -159,9 +211,9 @@ function AccountButton() {
         style={styles.avatarButton}
         hitSlop={8}>
         <View style={[styles.avatarRing, { borderColor: theme.borderSubtle }]}>
-          <Avatar name={user.name} email={user.email} image={user.image} size={24} />
+          <Avatar name={user.name} email={user.email} image={user.image} size={26} />
         </View>
-        <View style={[styles.presence, { borderColor: theme.surfaceBase }]} />
+        <View style={styles.presence} />
       </PressableScale>
 
       <Modal visible={mounted} transparent animationType="none" onRequestClose={() => setOpen(false)}>
@@ -189,29 +241,6 @@ function AccountButton() {
                   {user.email}
                 </Text>
               </View>
-
-              {orgs.length > 0 ? (
-                <View style={[styles.section, { borderTopColor: theme.borderSubtle }]}>
-                  <Text size="10" weight="semibold" color="muted" uppercase tracking={0.6} style={styles.sectionLabel}>
-                    Workspace
-                  </Text>
-                  {orgs.map((o) => {
-                    const active = o.id === org?.id;
-                    return (
-                      <MenuRow
-                        key={o.id}
-                        label={o.name}
-                        selected={active}
-                        right={active ? <Icon icon={faCheck} size={13} color="fg" /> : null}
-                        onPress={() => {
-                          setOpen(false);
-                          if (!active) setOrgId(o.id);
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-              ) : null}
 
               <View style={[styles.section, { borderTopColor: theme.borderSubtle }]}>
                 {LINKS.map((l) => (
@@ -267,27 +296,44 @@ const styles = StyleSheet.create({
   stackRow: { paddingHorizontal: 8, gap: 4 },
   back: { marginRight: 2 },
   titleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginRight: -6 },
-  avatarButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  controlPill: {
+    height: CONTROL_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 4,
+    borderRadius: CONTROL_H / 2,
+  },
+  round: { borderRadius: 18 },
+  avatarButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  switcher: { height: CONTROL_H, maxWidth: 240, borderRadius: CONTROL_H / 2 },
+  switcherInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 6,
+    paddingRight: 14,
+    borderRadius: CONTROL_H / 2,
+  },
+  switcherMark: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   avatarRing: { borderRadius: 13, borderWidth: 1, overflow: 'hidden' },
   unread: {
     position: 'absolute',
-    right: 7,
-    top: 7,
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    borderWidth: 2,
+    right: 8,
+    top: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: Tone.red600,
   },
   presence: {
     position: 'absolute',
-    right: 7,
-    bottom: 7,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    borderWidth: 1.5,
+    right: 4,
+    bottom: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: Tone.green500,
   },
   menu: {
@@ -305,7 +351,6 @@ const styles = StyleSheet.create({
   },
   menuHead: { paddingHorizontal: 14, paddingVertical: 12, gap: 2 },
   section: { paddingVertical: 4, paddingHorizontal: 4, borderTopWidth: StyleSheet.hairlineWidth * 2 },
-  sectionLabel: { paddingHorizontal: 10, paddingTop: 6, paddingBottom: 2 },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
