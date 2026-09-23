@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { PageEnter, PageTitle } from '@/components/page';
+import { PageEnter } from '@/components/page';
+import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Button, CenteredSpinner, EmptyState, ErrorBanner } from '@/components/ui';
 import { Radius } from '@/constants/theme';
@@ -14,10 +15,14 @@ import { useWorkspace } from '@/lib/workspace';
 
 /** Archived tasks (soft-deleted) with restore. */
 export default function ArchivedScreenRoute() {
+  const theme = useTheme();
   return (
-    <PageEnter>
-      <ArchivedScreen />
-    </PageEnter>
+    <View style={{ flex: 1, backgroundColor: theme.surfaceBase }}>
+      <StackHeader title="Archived" />
+      <PageEnter>
+        <ArchivedScreen />
+      </PageEnter>
+    </View>
   );
 }
 
@@ -36,7 +41,6 @@ function ArchivedScreen() {
       keyExtractor={(t) => t.id}
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
-          <PageTitle>Archived</PageTitle>
           {q.error ? <ErrorBanner message={q.error.message} onRetry={() => void q.refetch()} /> : null}
           {restore.error ? <ErrorBanner message={restore.error.message} /> : null}
         </View>

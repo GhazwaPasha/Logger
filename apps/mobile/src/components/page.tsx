@@ -1,38 +1,51 @@
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { RefreshControl, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { useCollapseOnScroll, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { Text } from '@/components/text';
 import { pageEnter, sequenceEnter, stateTransition } from '@/constants/motion';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** Scrollable page body: the web's `<main>` padding (`px-3 pt-3 pb-6`) on the base surface. */
+/**
+ * Scrollable page body: the web's `<main>` padding (`px-3 pt-3 pb-6`) on the base surface. `header` stays
+ * fixed above the scroll area. Under the tabs, the body clears the floating bar and collapses it on scroll.
+ */
 export function Page({
   children,
+  header,
   onRefresh,
   refreshing,
   gap = 12,
 }: {
   children: ReactNode;
+  header?: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
   gap?: number;
 }) {
   const theme = useTheme();
+  const bottomInset = useTabBarInset();
+  const onScroll = useCollapseOnScroll();
   return (
-    <PageEnter>
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.surfaceBase }}
-      contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 32, gap }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={theme.muted} /> : undefined
-      }>
-      {children}
-    </ScrollView>
-    </PageEnter>
+    <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
+      {header}
+      <PageEnter>
+        <Animated.ScrollView
+          style={styles.fill}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 32 + bottomInset, gap }}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          refreshControl={
+            onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={theme.muted} /> : undefined
+          }>
+          {children}
+        </Animated.ScrollView>
+      </PageEnter>
+    </View>
   );
 }
 

@@ -1,7 +1,8 @@
 import { faRoute } from '@fortawesome/free-solid-svg-icons';
 import { StyleSheet, View } from 'react-native';
 
-import { Page, PageTitle, Panel } from '@/components/page';
+import { Page, Panel } from '@/components/page';
+import { TabHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { CenteredSpinner, EmptyState, ErrorBanner } from '@/components/ui';
 import { alpha, Radius, Tone } from '@/constants/theme';
@@ -47,8 +48,7 @@ export default function RoadmapScreen() {
   const goals = (q.data?.goals ?? []).filter((g) => g.status !== 'archived');
 
   return (
-    <Page gap={12} onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
-      <PageTitle>Roadmap</PageTitle>
+    <Page header={<TabHeader title="Roadmap" />} gap={12} onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
       {q.error ? <ErrorBanner message={q.error.message} onRetry={() => void q.refetch()} /> : null}
       {q.isLoading ? <CenteredSpinner /> : null}
       {!q.isLoading && goals.length === 0 && !q.error ? (

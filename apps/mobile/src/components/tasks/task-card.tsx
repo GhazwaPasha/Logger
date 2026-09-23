@@ -7,14 +7,13 @@ import {
   faCalendarPlus,
   faCheck,
   faChevronDown,
-  faComment,
   faEllipsisVertical,
   faPaperclip,
   faPlus,
   faStopwatch,
   faUserPlus,
 } from '@fortawesome/free-solid-svg-icons';
-import { memo, useMemo, useState } from 'react';
+import { memo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 
@@ -31,7 +30,7 @@ import { Avatar } from '@/components/ui';
 import { Duration, itemEnter, listLayout, POP_EASE, revealIn, revealOut, stateTransition } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
-import { describeLedger, formatDueForListPill, formatLogTimestamp } from '@/lib/format';
+import { formatDueForListPill } from '@/lib/format';
 import { taskEditCaps } from '@/lib/permissions';
 import {
   dueChipColors,
@@ -175,7 +174,6 @@ function TaskCardImpl({
   const late = taskShowsLateFooter(task);
   const due = dueChipColors(task, dark, theme);
 
-  const names = useMemo(() => new Map(members.map((m) => [m.userId, m.name || m.email])), [members]);
   const assignee = members.find((m) => m.userId === task.assigneeUserIds?.[0]);
   const subtasks = task.subtasks ?? [];
   const subtaskShown = kanban ? subtasks.slice(0, KANBAN_SUBTASK_PREVIEW) : expanded ? subtasks : [];
@@ -191,7 +189,6 @@ function TaskCardImpl({
   const PriorityIcon = priority === 'high' ? faAnglesUp : priority === 'low' ? faAnglesDown : faArrowUp;
   const pColor = priorityColor(priority, dark, theme);
   const dueLabel = task.dueAt ? formatDueForListPill(task.dueAt, timeZone) : null;
-  const last = task.lastLedger;
 
   return (
     <Animated.View
@@ -355,22 +352,6 @@ function TaskCardImpl({
         </View>
       </View>
 
-      {/* Last activity footer (`TaskCardLastActivity`, compact) */}
-      {last ? (
-        <View style={[styles.footer, { borderTopColor: alpha(theme.borderSubtle, 0.5) }]}>
-          <Text font="mono" size="11" lh={15} color="muted" numberOfLines={2} style={{ flex: 1 }}>
-            {formatLogTimestamp(last.createdAt, timeZone)}
-            {': '}
-            <Text font="mono" size="11" lh={15} color={alpha(theme.fg, 0.9)}>
-              {names.get(last.actorId) ?? 'Someone'} {describeLedger(last, names, timeZone)}
-            </Text>
-          </Text>
-          <PressableScale scaleTo={0.92} accessibilityLabel="Comments" hitSlop={6} onPress={() => openTask(task.id)} style={styles.iconSlot}>
-            <Icon icon={faComment} size={16} color="muted" />
-          </PressableScale>
-        </View>
-      ) : null}
-
       <MenuSheet<TaskPriority>
         visible={priorityOpen}
         title="Priority"
@@ -428,13 +409,4 @@ const styles = StyleSheet.create({
   },
   subtasks: { marginTop: 6, gap: 4 },
   subtaskRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderTopWidth: StyleSheet.hairlineWidth * 2,
-    paddingHorizontal: 10,
-    paddingTop: 6,
-    paddingBottom: 8,
-  },
 });

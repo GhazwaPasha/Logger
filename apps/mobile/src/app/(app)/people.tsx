@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Page, PageTitle, Panel } from '@/components/page';
+import { Page, Panel } from '@/components/page';
+import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { alpha, Radius, Tone } from '@/constants/theme';
@@ -17,8 +18,7 @@ export default function PeopleScreen() {
   const deptName = (id: string | null) => depts.find((d) => d.id === id)?.name;
 
   return (
-    <Page gap={12}>
-      <PageTitle>Team</PageTitle>
+    <Page header={<StackHeader title="Team" />} gap={12}>
       <Panel style={{ padding: 0 }}>
         {members.map((m, i) => {
           const tone = ROLE_TONE[m.role as keyof typeof ROLE_TONE] ?? Tone.slate500;

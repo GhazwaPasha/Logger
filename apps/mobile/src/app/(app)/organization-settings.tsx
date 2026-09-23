@@ -3,7 +3,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { MenuSheet } from '@/components/menu-sheet';
-import { Page, PageTitle, Panel, SectionLabel } from '@/components/page';
+import { Page, Panel, SectionLabel } from '@/components/page';
+import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Button, ErrorBanner, Input } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,8 +50,7 @@ export default function OrganizationSettingsScreen() {
   const dirty = !!org && name.trim() !== org.name && name.trim().length > 0;
 
   return (
-    <Page gap={16}>
-      <PageTitle>Organization settings</PageTitle>
+    <Page header={<StackHeader title="Organization settings" />} gap={16}>
       {!isOwner ? (
         <Text size="sm" color="muted">
           Only workspace owners can change these settings.

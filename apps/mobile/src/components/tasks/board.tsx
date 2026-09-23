@@ -1,7 +1,6 @@
 import {
   faArrowsUpDown,
   faCalendarDays,
-  faLayerGroup,
   faListUl,
   faPlus,
   faTableColumns,
@@ -23,6 +22,7 @@ import { Icon } from '@/components/icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
+import { useCollapseOnScroll, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { BoardActionsContext, type BoardActions } from '@/components/tasks/board-context';
 import { RecurringSeriesCard } from '@/components/tasks/recurring-series-card';
 import { ColumnHeader } from '@/components/tasks/status-pill';
@@ -30,7 +30,6 @@ import { TaskCard, TaskCardSkeleton } from '@/components/tasks/task-card';
 import { Text } from '@/components/text';
 import { EmptyState, ErrorBanner, IconButton } from '@/components/ui';
 import { listLayout } from '@/constants/motion';
-import { NODE_LABELS } from '@/lib/labels';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -65,14 +64,28 @@ type ListRow = { kind: 'task'; task: TaskRow } | { kind: 'series'; summary: Seri
 type ViewMode = 'list' | 'kanban';
 
 /**
- * The work board — list and kanban views of a category / channel (or of "my tasks"), matching
- * `work/page.tsx` on the web: breadcrumb pill, toolbar, per-status paginated columns, same cards.
+ * The work board — list and kanban views of one channel, or of everyone's tasks assigned to one person,
+ * matching `work/page.tsx` on the web: toolbar, per-status paginated columns, same cards. The screen's
+ * header names what the board shows.
  */
-export function Board({ mine = false }: { mine?: boolean }) {
+export function Board({
+  listId,
+  assigneeUserId,
+  emptyTitle = 'No tasks here yet',
+}: {
+  /** Show one channel… */
+  listId?: string;
+  /** …or the tasks assigned to one person (My tasks, a person from search). */
+  assigneeUserId?: string | null;
+  emptyTitle?: string;
+}) {
   const theme = useTheme();
   const { width } = useWindowDimensions();
-  const { org, scope, level, list, userId, me, isLoading: workspaceLoading } = useWorkspace();
+  const bottomInset = useTabBarInset();
+  const onScroll = useCollapseOnScroll();
+  const { org } = useWorkspace();
   const orgId = org?.id;
+  const byChannel = !!listId;
 
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [sortMode, setSortMode] = useState<SortMode>('priority_desc');
@@ -80,13 +93,11 @@ export function Board({ mine = false }: { mine?: boolean }) {
   const [sortOpen, setSortOpen] = useState(false);
   const [dueOpen, setDueOpen] = useState(false);
 
-  // "Mine" is a personal cross-channel view; the regular board always shows exactly one channel.
   const filter = useMemo<BoardFilter>(
-    () => (mine ? { assigneeUserId: userId } : { listId: scope.listId }),
-    [mine, userId, scope.listId],
+    () => (byChannel ? { listId } : { assigneeUserId: assigneeUserId ?? null }),
+    [byChannel, listId, assigneeUserId],
   );
-  const ready = !!orgId && (mine ? !!userId : !!scope.listId);
-  const noChannel = !mine && !!orgId && !workspaceLoading && !scope.listId;
+  const ready = !!orgId && (byChannel || !!assigneeUserId);
 
   const pending = useBoardColumn(orgId, filter, 'pending', ready);
   const inProgress = useBoardColumn(orgId, filter, 'in_progress', ready);
@@ -143,8 +154,9 @@ export function Board({ mine = false }: { mine?: boolean }) {
     for (const summary of sortedSeries) items.push({ kind: 'series', summary });
     return items;
   }, [rowsFor, combinedSeries.summaries]);
-  const firstLoad = ready && TASK_FLOW_ORDER.every((s) => columns[s].isLoading);
-  const isOwner = me?.role === 'owner';
+  // Keep the skeletons until there is something to show: the columns resolve independently, and the
+  // (often empty) done/cancelled ones usually land first — `every` would flash the empty state.
+  const firstLoad = ready && listRows.length === 0 && TASK_FLOW_ORDER.some((s) => columns[s].isLoading);
   const anyError = TASK_FLOW_ORDER.map((s) => columns[s].error).find(Boolean) as Error | undefined;
   const refreshing = TASK_FLOW_ORDER.some((s) => columns[s].isRefetching && !columns[s].isFetchingNextPage);
 
@@ -158,39 +170,8 @@ export function Board({ mine = false }: { mine?: boolean }) {
   };
   const loadingMore = TASK_FLOW_ORDER.some((s) => columns[s].isFetchingNextPage);
 
-  // Breadcrumb (`filterScopeSegments`): category › channel, current segment as a pill.
-  const segments = mine
-    ? [{ label: 'My tasks' }]
-    : ([level && list ? { label: level.name } : null, list ? { label: list.name } : null].filter(Boolean) as { label: string }[]);
-
   const header = (
     <View style={styles.headerWrap}>
-      <View style={styles.crumbs}>
-        {segments.map((seg, i) => {
-          const current = i === segments.length - 1;
-          return (
-            <View key={`${seg.label}-${i}`} style={styles.crumb}>
-              {i > 0 ? (
-                <Text size="xs" color="muted" style={{ opacity: 0.6 }}>
-                  ›
-                </Text>
-              ) : null}
-              {current ? (
-                <View style={[styles.crumbPill, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceElevated }]}>
-                  <Text size="sm" weight="medium" lh={14} numberOfLines={1}>
-                    {seg.label}
-                  </Text>
-                </View>
-              ) : (
-                <Text size="sm" weight="medium" color="muted" numberOfLines={1}>
-                  {seg.label}
-                </Text>
-              )}
-            </View>
-          );
-        })}
-      </View>
-
       <View style={styles.toolbarRow}>
         <PressableScale
           accessibilityRole="button"
@@ -198,7 +179,7 @@ export function Board({ mine = false }: { mine?: boolean }) {
           scaleTo={0.94}
           haptic="tap"
           onPress={() =>
-            router.push({ pathname: '/task/new', params: !mine && scope.listId ? { listId: scope.listId } : {} })
+            router.push({ pathname: '/task/new', params: listId ? { listId } : {} })
           }
           style={({ pressed }) => [
             styles.newTask,
@@ -243,27 +224,13 @@ export function Board({ mine = false }: { mine?: boolean }) {
   const empty = (
     <EmptyState
       icon={faListUl}
-      title={mine ? 'Nothing assigned to you' : `No tasks in this ${NODE_LABELS.list.toLowerCase()} yet`}
+      title={emptyTitle}
       description={dueWindow !== 'all' ? 'Try a wider due-date window.' : 'Tap + to add one.'}
     />
   );
 
   let body: React.ReactNode;
-  if (noChannel) {
-    body = (
-      <View style={styles.noChannel}>
-        <EmptyState
-          icon={faLayerGroup}
-          title={`No ${NODE_LABELS.listPlural.toLowerCase()} yet`}
-          description={
-            isOwner
-              ? `Add a ${NODE_LABELS.list.toLowerCase()} from the sidebar to start a board.`
-              : `Ask a workspace owner to add a ${NODE_LABELS.list.toLowerCase()}.`
-          }
-        />
-      </View>
-    );
-  } else if (!ready || firstLoad) {
+  if (!ready || firstLoad) {
     body = (
       <View style={styles.skeletons}>
         <TaskCardSkeleton />
@@ -290,7 +257,9 @@ export function Board({ mine = false }: { mine?: boolean }) {
         }
         itemLayoutAnimation={listLayout}
         ItemSeparatorComponent={Gap}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 24 + bottomInset }]}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={theme.muted} /> : null}
@@ -327,7 +296,7 @@ export function Board({ mine = false }: { mine?: boolean }) {
                 <ScrollView
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.columnList}
+                  contentContainerStyle={[styles.columnList, { paddingBottom: 24 + bottomInset }]}
                   onScroll={({ nativeEvent: e }) => {
                     const nearEnd = e.contentOffset.y + e.layoutMeasurement.height > e.contentSize.height - 240;
                     if (nearEnd && q.hasNextPage && !q.isFetchingNextPage) void q.fetchNextPage();
@@ -392,9 +361,6 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 12, paddingTop: 4, paddingBottom: 24, flexGrow: 1 },
   headerWrap: { gap: 12, paddingBottom: 12 },
   kanbanHead: { paddingHorizontal: 12, paddingTop: 4 },
-  crumbs: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  crumb: { flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '100%' },
-  crumbPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   newTask: {
     width: 40,
@@ -431,7 +397,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   skeletons: { paddingHorizontal: 12, paddingTop: 4, paddingBottom: 12, gap: 8 },
-  noChannel: { flex: 1, justifyContent: 'center' },
   kanbanScroll: { paddingHorizontal: 12, paddingBottom: 12, flexGrow: 1 },
   columnList: { paddingTop: 8, gap: 8, paddingBottom: 24 },
 });

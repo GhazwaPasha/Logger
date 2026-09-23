@@ -233,6 +233,28 @@ export function useArchivedTasks(orgId: string | undefined) {
   });
 }
 
+/** A task title match from `GET /organizations/:id/search` (`SearchTaskResult` in the API). */
+export type SearchTaskResult = {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  dueAt: string | null;
+  listId: string;
+};
+
+/** Task title search (the API needs at least 2 characters and returns up to 20 matches). */
+export function useSearchTasks(orgId: string | undefined, query: string) {
+  const q = query.trim();
+  return useQuery({
+    queryKey: ['search', orgId ?? '', q] as const,
+    enabled: !!orgId && q.length >= 2,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+    queryFn: () => api<SearchTaskResult[]>(`/organizations/${orgId}/search`, { params: { q } }),
+  });
+}
+
 export function useTaskDetail(taskId: string | undefined) {
   return useQuery({
     queryKey: qk.task(taskId ?? ''),

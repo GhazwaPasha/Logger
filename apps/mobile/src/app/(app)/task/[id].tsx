@@ -3,12 +3,13 @@ import {
   faAnglesUp,
   faArrowUp,
   faBoxArchive,
-  faXmark,
+  faChevronLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AttachmentsCard } from '@/components/tasks/detail/attachments-card';
 import { CommentThreadCard } from '@/components/tasks/detail/comment-thread';
@@ -77,6 +78,7 @@ export default function TaskScreenRoute() {
 function TaskScreen() {
   const theme = useTheme();
   const dark = useIsDark();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { org, members, lists, depts, userId } = useWorkspace();
   const timeZone = org?.timeZone ?? 'UTC';
@@ -117,16 +119,16 @@ function TaskScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/work'));
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/dashboard'));
 
   const topBar = (
-    <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle }]}>
+    <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, paddingTop: insets.top + 6 }]}>
+      <PressableScale scaleTo={0.94} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={close} style={styles.close}>
+        <Icon icon={faChevronLeft} size={18} color="fg" />
+      </PressableScale>
       <Text size="sm" weight="semibold" style={{ flex: 1 }} numberOfLines={1}>
         Task details
       </Text>
-      <PressableScale scaleTo={0.97} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} onPress={close} style={styles.close}>
-        <Icon icon={faXmark} size={16} color="muted" />
-      </PressableScale>
     </View>
   );
 
@@ -323,7 +325,7 @@ function TaskScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
-  close: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 12, gap: 12, paddingBottom: 48 },
   titleInput: { fontSize: 17, fontWeight: '600', lineHeight: 23, padding: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },

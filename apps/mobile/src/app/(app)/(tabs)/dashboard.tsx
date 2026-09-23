@@ -7,7 +7,8 @@ import Svg, { Path } from 'react-native-svg';
 import { ActivityTerminal } from '@/components/activity/activity-terminal';
 import { Donut } from '@/components/donut';
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { Page, PageTitle, Panel, SectionLabel, Segmented } from '@/components/page';
+import { Page, Panel, SectionLabel, Segmented } from '@/components/page';
+import { TabHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
 import { sequenceEnter } from '@/constants/motion';
@@ -108,8 +109,13 @@ function Bar({ label, value, max, color }: { label: string; value: number; max: 
 export default function DashboardScreen() {
   const theme = useTheme();
   const { data: session } = authClient.useSession();
-  const { org, depts, lists, members, userId } = useWorkspace();
+  const { org, depts, lists, members, userId, scope } = useWorkspace();
   const active = useActiveTasks(org?.id);
+  /** The work links open the last channel's board (or the channel list when there is none yet). */
+  const openBoard = () =>
+    scope.listId
+      ? router.navigate({ pathname: '/channels/[listId]', params: { listId: scope.listId } })
+      : router.navigate('/channels');
   const counts = useBoardCounts(org?.id, {});
   const [view, setView] = useState<View_>('overview');
   const activity = useOrgActivity(org?.id, view === 'activity');
@@ -153,6 +159,7 @@ export default function DashboardScreen() {
 
   return (
     <Page
+      header={<TabHeader title={`Hey, ${firstName}!`} />}
       onRefresh={() => {
         void active.refetch();
         void counts.refetch();
@@ -161,7 +168,6 @@ export default function DashboardScreen() {
       refreshing={active.isRefetching || counts.isRefetching}
       gap={10}>
       <View style={styles.titleRow}>
-        <PageTitle>{`Hey, ${firstName}!`}</PageTitle>
         <Segmented
           value={view}
           onChange={setView}
@@ -179,14 +185,14 @@ export default function DashboardScreen() {
       {view === 'overview' ? (
         <>
           <View style={styles.kpiGrid}>
-            <KpiCard tone={0} onPress={() => router.navigate('/work')}>
+            <KpiCard tone={0} onPress={() => openBoard()}>
               <KpiLabel>Pending work</KpiLabel>
               <KpiValue>{value(workflow.pending)}</KpiValue>
               <Text size="11" color="muted" style={{ marginTop: 4 }}>
                 {FLOW_COLUMN_LABELS.pending} queue
               </Text>
             </KpiCard>
-            <KpiCard tone={1} onPress={() => router.navigate('/work')}>
+            <KpiCard tone={1} onPress={() => openBoard()}>
               <KpiLabel>Active work</KpiLabel>
               <KpiValue>{value(workflow.in_progress)}</KpiValue>
               <Text size="11" color="muted" style={{ marginTop: 4 }}>
@@ -229,7 +235,7 @@ export default function DashboardScreen() {
                   All active tasks (not deleted)
                 </Text>
               </View>
-              <Text size="xs" weight="medium" color="accent" onPress={() => router.navigate('/work')}>
+              <Text size="xs" weight="medium" color="accent" onPress={() => openBoard()}>
                 Open Work
               </Text>
             </View>
@@ -293,8 +299,8 @@ export default function DashboardScreen() {
             </Text>
             <View style={styles.tiles}>
               {[
-                { label: 'Overdue', n: stats.overdue, tone: Tone.red500, go: () => router.navigate('/work') },
-                { label: 'Unassigned', n: stats.unassigned, tone: Tone.amber500, go: () => router.navigate('/work') },
+                { label: 'Overdue', n: stats.overdue, tone: Tone.red500, go: () => openBoard() },
+                { label: 'Unassigned', n: stats.unassigned, tone: Tone.amber500, go: () => openBoard() },
                 { label: 'Assigned to me', n: stats.mine, tone: Tone.blue500, go: () => router.navigate('/my-tasks') },
               ].map((x) => (
                 <PressableScale

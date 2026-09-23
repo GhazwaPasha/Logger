@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
 import { StyleSheet, View } from 'react-native';
 
-import { Page, PageTitle, Panel, SectionLabel, Segmented } from '@/components/page';
+import { Page, Panel, SectionLabel, Segmented } from '@/components/page';
+import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { useThemePreference, useTheme, type ThemePreference } from '@/hooks/use-theme';
@@ -39,8 +40,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <Page gap={16}>
-      <PageTitle>Your settings</PageTitle>
+    <Page header={<StackHeader title="Your settings" />} gap={16}>
 
       <Panel style={{ gap: 12 }}>
         <SectionLabel>Profile</SectionLabel>

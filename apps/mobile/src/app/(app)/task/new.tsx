@@ -2,6 +2,7 @@ import { faAnglesDown, faAnglesUp, faArrowUp, faXmark } from '@fortawesome/free-
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Icon } from '@/components/icon';
@@ -28,6 +29,7 @@ export default function NewTaskScreenRoute() {
 
 function NewTaskScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const dark = useIsDark();
   const { listId: presetListId } = useLocalSearchParams<{ listId?: string }>();
   const { org, depts, lists, scope, userId } = useWorkspace();
@@ -54,7 +56,7 @@ function NewTaskScreen() {
   const selectedId = listId ?? scope.listId ?? options.find((o) => lists.find((l) => l.id === o.value)?.departmentId === scope.levelId)?.value ?? options[0]?.value ?? null;
   const selected = options.find((o) => o.value === selectedId);
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/work'));
+  const close = () => (router.canGoBack() ? router.back() : router.replace('/dashboard'));
 
   function submit() {
     if (!selectedId || !title.trim()) return;
@@ -71,7 +73,7 @@ function NewTaskScreen() {
 
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
-      <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle }]}>
+      <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, paddingTop: insets.top + 6 }]}>
         <Text size="sm" weight="semibold" style={{ flex: 1 }}>
           New task
         </Text>
@@ -146,7 +148,7 @@ function NewTaskScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
-  close: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  close: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 12, gap: 16 },
   group: { gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

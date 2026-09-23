@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { Page, PageTitle, Panel } from '@/components/page';
+import { Page, Panel } from '@/components/page';
+import { TabHeader } from '@/components/shell/screen-header';
 import { StatusPill } from '@/components/tasks/status-pill';
 import { Text } from '@/components/text';
 import { IconButton } from '@/components/ui';
@@ -53,8 +54,11 @@ export default function CalendarScreen() {
   const shift = (n: number) => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + n, 1));
 
   return (
-    <Page gap={12} onRefresh={() => void active.refetch()} refreshing={active.isRefetching}>
-      <PageTitle>Calendar</PageTitle>
+    <Page
+      header={<TabHeader title="Calendar" />}
+      gap={12}
+      onRefresh={() => void active.refetch()}
+      refreshing={active.isRefetching}>
 
       <Panel style={{ gap: 8 }}>
         <View style={styles.monthRow}>
