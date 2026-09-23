@@ -60,6 +60,11 @@ async function getToken(force = false): Promise<string> {
   return inflight;
 }
 
+/** The API bearer token (cached / refreshed like `api()` does) — for the realtime socket's handshake. */
+export function getApiToken(): Promise<string> {
+  return getToken();
+}
+
 /** Nest error bodies are `{ statusCode, message, error }` where `message` may be an array (ValidationPipe). */
 function errorMessage(text: string, fallback: string): string {
   if (!text) return fallback;

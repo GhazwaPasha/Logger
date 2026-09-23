@@ -12,7 +12,7 @@ const GLASS = isLiquidGlassAvailable();
  * hairline border. Always fills its parent — size the parent, never animate this view's opacity (a glass
  * view with opacity 0 anywhere up its tree stops rendering).
  */
-export function BarSurface({ radius }: { radius: number }) {
+export function BarSurface({ radius, nested }: { radius: number; nested?: boolean }) {
   const theme = useTheme();
   const dark = useIsDark();
 
@@ -23,6 +23,25 @@ export function BarSurface({ radius }: { radius: number }) {
         isInteractive
         colorScheme={dark ? 'dark' : 'light'}
         style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
+      />
+    );
+  }
+
+  // A control inside a bar piece (e.g. the header's bell): without glass, the same surface would vanish into its
+  // pill, so it sits one step up — a faint fill and a hairline edge.
+  if (nested) {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: radius,
+            backgroundColor: alpha(theme.fg, dark ? 0.08 : 0.06),
+            borderColor: alpha(theme.fg, dark ? 0.1 : 0.07),
+            borderWidth: StyleSheet.hairlineWidth * 2,
+          },
+        ]}
       />
     );
   }

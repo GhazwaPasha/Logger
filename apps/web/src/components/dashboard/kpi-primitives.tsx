@@ -55,7 +55,10 @@ export function DonutChart({
   const total = segments.reduce((s, x) => s + x.count, 0);
   const visible = segments.filter((s) => s.count > 0);
   const gap = visible.length > 1 ? 0.8 : 0;
-  let offset = 0;
+  // Each arc starts where the previous ones end: running totals, computed up front (no mutation during render).
+  const starts = visible.map((_, i) =>
+    visible.slice(0, i).reduce((sum, s) => sum + (s.count / total) * 100, 0),
+  );
   return (
     <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`${centerLabel}: ${total}`}>
       <svg viewBox="0 0 42 42" className="h-full w-full -rotate-90">
@@ -67,10 +70,10 @@ export function DonutChart({
           strokeWidth="5"
           className="stroke-[color:var(--surface-muted)]"
         />
-        {visible.map(({ key, count, strokeClassName, title }) => {
+        {visible.map(({ key, count, strokeClassName, title }, i) => {
           const pct = (count / total) * 100;
           const dash = Math.max(pct - gap, 0.01);
-          const circle = (
+          return (
             <circle
               key={key}
               cx="21"
@@ -79,14 +82,12 @@ export function DonutChart({
               fill="none"
               strokeWidth="5"
               strokeDasharray={`${dash} ${100 - dash}`}
-              strokeDashoffset={-offset}
+              strokeDashoffset={-starts[i]}
               className={strokeClassName}
             >
               <title>{`${title}: ${count}`}</title>
             </circle>
           );
-          offset += pct;
-          return circle;
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">

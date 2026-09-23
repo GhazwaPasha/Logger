@@ -2,6 +2,7 @@ import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCalendarDays,
   faChevronLeft,
+  faChevronRight,
   faChevronUp,
   faCircleXmark,
   faHashtag,
@@ -312,7 +313,8 @@ export function FloatingTabBar() {
               onPress={restore}
               style={styles.compact}>
               <Icon icon={focusedDef.icon} size={19} color={theme.fg} />
-              <Icon icon={faChevronUp} size={11} color={theme.muted} />
+              {/* Tapping widens the pill back into the full bar, so the hint points the way it grows. */}
+              <Icon icon={faChevronRight} size={11} color={theme.muted} />
             </PressableScale>
           </Animated.View>
 

@@ -58,9 +58,6 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
             </span>
           </span>
         </button>
-        <Link href={`${basePath}/roadmap`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
-          Open Roadmap
-        </Link>
       </div>
 
       <div id="dashboard-roadmap-body" hidden={!expanded}>

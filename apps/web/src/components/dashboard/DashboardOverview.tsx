@@ -274,15 +274,7 @@ export function DashboardOverview({
 
       <div className="grid items-stretch gap-x-2.5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
         <div className="surface-elevated ui-elevated-panel flex flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
-              <p className="mt-0.5 text-sm text-[var(--muted)]">All active tasks (not deleted)</p>
-            </div>
-            <Link href={`${basePath}/work`} className="shrink-0 text-xs font-medium text-[var(--accent)] hover:underline">
-              Open Work
-            </Link>
-          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status mix</h2>
           <div className="mt-2 flex flex-1 items-center justify-center gap-6">
             <DonutChart segments={statusSegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
             <ul className="min-w-0 max-w-[14rem] flex-1 space-y-1.5">
@@ -306,7 +298,6 @@ export function DashboardOverview({
 
         <div className="surface-elevated ui-elevated-panel flex flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Priority</h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">Where urgency is set on tasks</p>
           <div className="mt-2 flex flex-1 items-center justify-center gap-6">
             <DonutChart segments={prioritySegments} centerLabel="Tasks" emptyLabel="No tasks yet" />
             <ul className="min-w-0 max-w-[14rem] flex-1 space-y-1.5 text-sm">
@@ -323,59 +314,57 @@ export function DashboardOverview({
           </div>
         </div>
 
-        <aside className="surface-elevated ui-elevated-panel flex min-h-0 flex-col rounded-2xl border border-[var(--border-subtle)] p-2.5 sm:col-span-2 lg:col-span-1">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Needs attention</h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">Jump to Work with filters applied.</p>
-          <div className="mt-2 grid flex-1 grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-x-2.5 gap-y-1.5 sm:col-span-2 lg:col-span-1" aria-label="Needs attention">
+          <Link
+            href={workHref(basePath, { status: "late" })}
+            className="surface-elevated ui-elevated-panel flex min-w-0 flex-col justify-center rounded-2xl border border-[var(--border-subtle)] px-3 py-2.5 transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.lateStatus}</span>
+            <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-hidden />
+              Late
+            </span>
+          </Link>
+          <Link
+            href={workHref(basePath, { due: "this_week" })}
+            className="surface-elevated ui-elevated-panel flex min-w-0 flex-col justify-center rounded-2xl border border-[var(--border-subtle)] px-3 py-2.5 transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.dueThisWeek}</span>
+            <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+              Due this week
+            </span>
+          </Link>
+          <Link
+            href={workHref(basePath, { unassigned: "1" })}
+            className="surface-elevated ui-elevated-panel flex min-w-0 flex-col justify-center rounded-2xl border border-[var(--border-subtle)] px-3 py-2.5 transition-colors hover:bg-[var(--surface-hover)]"
+          >
+            <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.unassignedPipeline}</span>
+            <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
+              Unassigned
+            </span>
+          </Link>
+          {currentUserId ? (
             <Link
-              href={workHref(basePath, { status: "late" })}
-              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
+              href={workHref(basePath, { mine: "1" })}
+              className="flex min-w-0 flex-col justify-center rounded-2xl border border-[var(--border-subtle)] px-3 py-2.5 transition-colors bg-[var(--accent-muted)] hover:opacity-90"
             >
-              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.lateStatus}</span>
+              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.minePipeline}</span>
               <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500" aria-hidden />
-                Late
+                My tasks
               </span>
             </Link>
-            <Link
-              href={workHref(basePath, { due: "this_week" })}
-              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
-            >
-              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.dueThisWeek}</span>
-              <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
-                Due this week
-              </span>
-            </Link>
-            <Link
-              href={workHref(basePath, { unassigned: "1" })}
-              className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]"
-            >
-              <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.unassignedPipeline}</span>
-              <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
-                Unassigned
-              </span>
-            </Link>
-            {currentUserId ? (
-              <Link
-                href={workHref(basePath, { mine: "1" })}
-                className="flex min-w-0 flex-col justify-center rounded-lg border border-[var(--border-subtle)] px-3 py-2 transition-colors bg-[var(--accent-muted)] hover:opacity-90"
-              >
-                <span className="text-2xl font-semibold tabular-nums leading-none">{loading ? "…" : stats.minePipeline}</span>
-                <span className="mt-1 flex items-center gap-1.5 truncate text-xs text-[var(--muted)]">
-                  My tasks
-                </span>
-              </Link>
-            ) : null}
-          </div>
-        </aside>
+          ) : null}
+        </div>
       </div>
 
       {stats.subtasksTotal > 0 ? (
         <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">
-            Subtasks across tasks · {stats.subtasksDone} of {stats.subtasksTotal} done ({subtaskPct}%)
-          </p>
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Checklist progress</h2>
+            <span className="text-xs tabular-nums text-[var(--muted)]">
+              {stats.subtasksDone}/{stats.subtasksTotal} · {subtaskPct}%
+            </span>
+          </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
             <div
               className="h-full rounded-full bg-emerald-500/70 transition-[width]"
@@ -390,9 +379,6 @@ export function DashboardOverview({
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             Active work by {NODE_LABELS.level.toLowerCase()}
           </h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">
-            Pipeline tasks grouped by {NODE_LABELS.list.toLowerCase()}&apos;s {NODE_LABELS.level.toLowerCase()}
-          </p>
           {stats.levelRows.length === 0 && !loading ? (
             <p className="mt-2 text-sm text-[var(--muted)]">No pipeline tasks to show.</p>
           ) : (
@@ -426,7 +412,6 @@ export function DashboardOverview({
 
         <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Assignee load</h2>
-          <p className="mt-0.5 text-sm text-[var(--muted)]">Pipeline tasks with someone assigned</p>
           {stats.topAssignees.length === 0 && !loading ? (
             <p className="mt-2 text-sm text-[var(--muted)]">No assigned pipeline work.</p>
           ) : (

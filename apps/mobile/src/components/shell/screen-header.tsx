@@ -11,8 +11,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, ZoomIn } from 'react-native-reanimated';
+import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -20,12 +20,13 @@ import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
 import { useNotifications } from '@/components/shell/notifications';
+import { useOnlineTeammates } from '@/components/shell/online-presence';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
 import { Duration, POP_EASE } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { queryClient } from '@/lib/query-client';
@@ -34,6 +35,12 @@ import { useWorkspace } from '@/lib/workspace';
 const HEADER_HEIGHT = 56;
 /** Height of the header's floating controls (workspace switcher, bell + avatar pill). */
 const CONTROL_H = 44;
+/**
+ * The round items inside those controls — workspace mark, bell and profile avatar — are all this size, and sit
+ * the same inset from every edge of their pill, so everything lines up across the header.
+ */
+const ITEM = 32;
+const INSET = (CONTROL_H - ITEM) / 2;
 
 /**
  * Header of a tab's root screen: the screen title (or, on Home, the workspace switcher) and a floating pill
@@ -56,17 +63,21 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
           {children}
         </View>
 
-        <View style={styles.controlPill}>
+        {/* The pill's width follows the online stack: `layout` springs it wider / narrower as people come and go. */}
+        <Animated.View layout={PILL_LAYOUT} style={styles.controlPill}>
           <BarSurface radius={CONTROL_H / 2} />
-          <View>
+          <OnlineStack />
+          <View style={styles.bell}>
+            {/* Its own glass capsule, like the pill it sits in. */}
+            <BarSurface radius={ITEM / 2} nested />
             <IconButton
               icon={faBell}
               label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
               onPress={openPanel}
-              size={36}
-              iconSize={17}
+              size={ITEM}
+              iconSize={15}
               tone="fg"
-              style={styles.round}
+              style={styles.bellButton}
             />
             {unreadCount > 0 ? (
               <Animated.View
@@ -77,9 +88,63 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
             ) : null}
           </View>
           <AccountButton />
-        </View>
+        </Animated.View>
       </View>
     </View>
+  );
+}
+
+/** Teammates shown as avatars before the rest fold into a "+N" chip. */
+const MAX_ONLINE_SHOWN = 3;
+const STACK_AVATAR = 26;
+const STACK_OVERLAP = 9;
+const PILL_LAYOUT = LinearTransition.springify().damping(20).stiffness(220);
+
+/**
+ * Who else is online right now: up to three overlapping avatars, then "+N". Each avatar pops in / out as people
+ * come and go, and the pill around it resizes with them. Hidden entirely when nobody else is online.
+ */
+function OnlineStack() {
+  const theme = useTheme();
+  const online = useOnlineTeammates();
+  if (online.length === 0) return null;
+  const shown = online.slice(0, MAX_ONLINE_SHOWN);
+  const more = online.length - shown.length;
+  const names = online.map((m) => m.name || m.email).join(', ');
+
+  return (
+    <Animated.View
+      layout={PILL_LAYOUT}
+      style={styles.stack}
+      accessible
+      accessibilityLabel={`${online.length} online: ${names}`}>
+      {shown.map((m, i) => (
+        <Animated.View
+          key={m.userId}
+          entering={ZoomIn.duration(Duration.pop).easing(POP_EASE)}
+          exiting={ZoomOut.duration(Duration.micro)}
+          layout={PILL_LAYOUT}
+          style={[styles.stackItem, { marginLeft: i === 0 ? 0 : -STACK_OVERLAP, borderColor: theme.surfaceElevated }]}>
+          <Avatar name={m.name} email={m.email} image={m.image} size={STACK_AVATAR} />
+        </Animated.View>
+      ))}
+      {more > 0 ? (
+        <Animated.View
+          key="more"
+          entering={ZoomIn.duration(Duration.pop).easing(POP_EASE)}
+          exiting={ZoomOut.duration(Duration.micro)}
+          layout={PILL_LAYOUT}
+          style={[
+            styles.stackItem,
+            styles.stackMore,
+            { marginLeft: -STACK_OVERLAP, borderColor: theme.surfaceElevated, backgroundColor: theme.accent },
+          ]}>
+          <Text size="10" weight="bold" color={theme.onAccent} tabular>
+            {`+${more}`}
+          </Text>
+        </Animated.View>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -179,13 +244,16 @@ function AccountButton() {
   const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
   const user = session?.user;
+  const dark = useIsDark();
+  const { height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
-  const { mounted, progress } = usePresence(open, { openMs: Duration.pop, closeMs: Duration.micro });
-  const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
-  const pop = useAnimatedStyle(() => ({
-    opacity: progress.value,
-    transform: [{ scale: 0.96 + 0.04 * progress.value }, { translateY: -4 * (1 - progress.value) }],
-  }));
+  // Bottom sheet: springs up over a fading scrim, eases back down (same feel as the app's other sheets).
+  const { mounted, progress } = usePresence(open, { spring: true });
+  const backdrop = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.max(0, progress.value)) }));
+  const sheet = useAnimatedStyle(() => {
+    const p = Math.min(1, Math.max(0, progress.value));
+    return { transform: [{ translateY: (1 - p) * height * 0.6 }] };
+  });
 
   if (!user) return null;
 
@@ -210,48 +278,45 @@ function AccountButton() {
         scaleTo={0.94}
         style={styles.avatarButton}
         hitSlop={8}>
-        <View style={[styles.avatarRing, { borderColor: theme.borderSubtle }]}>
-          <Avatar name={user.name} email={user.email} image={user.image} size={26} />
-        </View>
+        <Avatar name={user.name} email={user.email} image={user.image} size={ITEM} />
+        <View pointerEvents="none" style={[styles.avatarRing, { borderColor: alpha(theme.fg, 0.12) }]} />
         <View style={styles.presence} />
       </PressableScale>
 
-      <Modal visible={mounted} transparent animationType="none" onRequestClose={() => setOpen(false)}>
-        <Animated.View style={[StyleSheet.absoluteFill, backdrop]}>
+      <Modal visible={mounted} transparent animationType="none" statusBarTranslucent onRequestClose={() => setOpen(false)}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }, backdrop]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessibilityLabel="Close menu" />
         </Animated.View>
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+        <View pointerEvents="box-none" style={styles.sheetAnchor}>
           <Animated.View
             style={[
-              styles.menu,
-              {
-                top: insets.top + HEADER_HEIGHT - 4,
-                backgroundColor: theme.surfaceElevated,
-                borderColor: theme.borderSubtle,
-                transformOrigin: 'right top',
-              },
-              pop,
+              styles.sheet,
+              { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle, paddingBottom: insets.bottom + 12 },
+              sheet,
             ]}>
-            <ScrollView bounces={false} style={{ maxHeight: 520 }}>
-              <View style={styles.menuHead}>
-                <Text size="sm" weight="semibold" numberOfLines={1}>
+            <View style={[styles.handle, { backgroundColor: alpha(theme.fg, 0.18) }]} />
+
+            <View style={styles.sheetProfile}>
+              <Avatar name={user.name} email={user.email} image={user.image} size={48} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text font="outfit" size="base" weight="semibold" numberOfLines={1}>
                   {user.name || user.email}
                 </Text>
-                <Text font="mono" size="xs" color="muted" numberOfLines={1}>
+                <Text size="xs" color="muted" numberOfLines={1}>
                   {user.email}
                 </Text>
               </View>
+            </View>
 
-              <View style={[styles.section, { borderTopColor: theme.borderSubtle }]}>
-                {LINKS.map((l) => (
-                  <MenuRow key={l.label} label={l.label} icon={l.icon} onPress={() => go(l.href)} />
-                ))}
-              </View>
+            <View style={[styles.sheetGroup, { backgroundColor: alpha(theme.fg, dark ? 0.04 : 0.03) }]}>
+              {LINKS.map((l) => (
+                <MenuRow key={l.label} label={l.label} icon={l.icon} onPress={() => go(l.href)} />
+              ))}
+            </View>
 
-              <View style={[styles.section, { borderTopColor: theme.borderSubtle }]}>
-                <MenuRow label="Sign out" icon={faRightFromBracket} onPress={signOut} />
-              </View>
-            </ScrollView>
+            <View style={[styles.sheetGroup, { backgroundColor: alpha(theme.fg, dark ? 0.04 : 0.03) }]}>
+              <MenuRow label="Sign out" icon={faRightFromBracket} destructive onPress={signOut} />
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -264,15 +329,20 @@ function MenuRow({
   icon,
   selected,
   right,
+  destructive,
   onPress,
 }: {
   label: string;
   icon?: IconDefinition;
   selected?: boolean;
   right?: ReactNode;
+  /** Red, for sign out. */
+  destructive?: boolean;
   onPress: () => void;
 }) {
   const theme = useTheme();
+  const dark = useIsDark();
+  const tint = destructive ? (dark ? Tone.red400 : Tone.red600) : undefined;
   return (
     <Pressable
       accessibilityRole="menuitem"
@@ -282,8 +352,8 @@ function MenuRow({
         styles.menuItem,
         { backgroundColor: selected ? theme.accentMuted : pressed ? theme.surfaceHover : 'transparent' },
       ]}>
-      {icon ? <Icon icon={icon} size={14} color="muted" /> : null}
-      <Text size="sm" weight={selected ? 'semibold' : undefined} numberOfLines={1} style={{ flex: 1 }}>
+      {icon ? <Icon icon={icon} size={15} color={tint ?? 'muted'} /> : null}
+      <Text size="15" weight={selected ? 'semibold' : 'medium'} color={tint ?? 'fg'} numberOfLines={1} style={{ flex: 1 }}>
         {label}
       </Text>
       {right}
@@ -292,71 +362,84 @@ function MenuRow({
 }
 
 const styles = StyleSheet.create({
-  row: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8 },
+  // Same 12dp gutter as the page content, so the header pills and the cards below share one edge.
+  row: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   stackRow: { paddingHorizontal: 8, gap: 4 },
   back: { marginRight: 2 },
   titleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // A two-item pill in the Apple style: roomier left/right than top/bottom, with the items spaced apart.
   controlPill: {
     height: CONTROL_H,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 4,
+    gap: 14,
+    paddingHorizontal: INSET + 6,
     borderRadius: CONTROL_H / 2,
   },
-  round: { borderRadius: 18 },
-  avatarButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  // Same capsule as the dashboard's Overview / Activity log items (52 × 32), so the header chips match.
+  bell: { width: 52, height: ITEM, borderRadius: ITEM / 2 },
+  stack: { flexDirection: 'row', alignItems: 'center', marginRight: -4 },
+  // A 2dp ring in the pill's colour separates overlapping avatars.
+  stackItem: { borderRadius: 999, borderWidth: 2 },
+  stackMore: {
+    width: STACK_AVATAR + 4,
+    height: STACK_AVATAR + 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellButton: { width: 52, borderRadius: ITEM / 2, backgroundColor: 'transparent' },
+  avatarButton: { width: ITEM, height: ITEM },
   switcher: { height: CONTROL_H, maxWidth: 240, borderRadius: CONTROL_H / 2 },
   switcherInner: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingLeft: 6,
+    paddingLeft: INSET,
     paddingRight: 14,
     borderRadius: CONTROL_H / 2,
   },
-  switcherMark: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarRing: { borderRadius: 13, borderWidth: 1, overflow: 'hidden' },
+  // Same size as the profile avatar in the bell + avatar pill.
+  switcherMark: { width: ITEM, height: ITEM, borderRadius: ITEM / 2, alignItems: 'center', justifyContent: 'center' },
+  avatarRing: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, borderRadius: ITEM / 2, borderWidth: StyleSheet.hairlineWidth * 2 },
+  // Sits by the bell glyph's upper-right shoulder.
   unread: {
     position: 'absolute',
-    right: 8,
-    top: 8,
+    right: 15,
+    top: 6,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: Tone.red600,
   },
+  // Sits on the avatar's lower-right edge.
   presence: {
     position: 'absolute',
-    right: 4,
-    bottom: 4,
+    right: -1,
+    bottom: -1,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: Tone.green500,
   },
-  menu: {
-    position: 'absolute',
-    right: 12,
-    width: 260,
-    borderRadius: Radius.xxxl,
+  sheetAnchor: { flex: 1, justifyContent: 'flex-end' },
+  sheet: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    gap: 10,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: StyleSheet.hairlineWidth * 2,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
   },
-  menuHead: { paddingHorizontal: 14, paddingVertical: 12, gap: 2 },
-  section: { paddingVertical: 4, paddingHorizontal: 4, borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: 4 },
+  sheetProfile: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6, paddingVertical: 6 },
+  sheetGroup: { borderRadius: 20, padding: 4 },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    minHeight: 44,
-    paddingHorizontal: 10,
-    borderRadius: Radius.lg,
+    gap: 14,
+    minHeight: 50,
+    paddingHorizontal: 14,
+    borderRadius: Radius.xxxl,
   },
 });
