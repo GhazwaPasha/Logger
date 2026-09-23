@@ -18,6 +18,7 @@ import type {
   Org,
   SubtaskRow,
   TaskDetail,
+  TaskDueRepeat,
   TaskMutationResult,
   TaskPage,
   TaskRow,
@@ -272,8 +273,14 @@ export type TaskPatch = {
   status?: ManualTaskStatus;
   priority?: TaskPriority;
   title?: string;
+  listId?: string;
   assigneeUserIds?: string[];
   dueAt?: string | null;
+  dueRepeat?: TaskDueRepeat | null;
+  discordChannelId?: string | null;
+  discordSubmissionRequired?: boolean;
+  attachmentRequired?: boolean;
+  timeTrackingEnabled?: boolean;
 };
 
 const PATCH_KEY = ['patchTask'] as const;
@@ -348,6 +355,24 @@ export function useAddSubtask(taskId: string) {
   });
 }
 
+/** Renames a subtask (done-toggling stays on {@link useSetSubtaskDone}, which every board card also uses). */
+export function useUpdateSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { subtaskId: string; title: string }) =>
+      api(`/tasks/${taskId}/subtasks/${v.subtaskId}`, { method: 'PATCH', body: { title: v.title } }),
+    onSettled: () => invalidateTasks(qc, taskId),
+  });
+}
+
+export function useDeleteSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (subtaskId: string) => api(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'DELETE' }),
+    onSettled: () => invalidateTasks(qc, taskId),
+  });
+}
+
 export function useAddNote(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -410,7 +435,8 @@ export type CommentRow = {
   taskId: string;
   parentCommentId: string | null;
   authorId: string;
-  body: string;
+  /** Null when soft-deleted and the viewer is neither the author nor a workspace owner. */
+  body: string | null;
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
@@ -430,8 +456,34 @@ export function useComments(taskId: string | undefined) {
 export function usePostComment(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: string) => api(`/tasks/${taskId}/comments`, { method: 'POST', body: { body } }),
+    mutationFn: (v: { body: string; parentCommentId?: string }) =>
+      api(`/tasks/${taskId}/comments`, { method: 'POST', body: v }),
     onSettled: () => Promise.all([qc.invalidateQueries({ queryKey: ['comments', taskId] }), invalidateTasks(qc, taskId)]),
+  });
+}
+
+export function useEditComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { commentId: string; body: string }) =>
+      api(`/comments/${v.commentId}`, { method: 'PATCH', body: { body: v.body } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['comments', taskId] }),
+  });
+}
+
+export function useDeleteComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => api(`/comments/${commentId}`, { method: 'DELETE' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['comments', taskId] }),
+  });
+}
+
+export function useRestoreComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => api(`/comments/${commentId}/restore`, { method: 'POST' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['comments', taskId] }),
   });
 }
 

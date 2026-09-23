@@ -89,21 +89,26 @@ export type ApiOptions = {
   body?: unknown;
   params?: Params;
   signal?: AbortSignal;
+  /** Overrides the default 30s timeout — file uploads (Discord submission) need more room. */
+  timeoutMs?: number;
 };
 
 async function send(path: string, opts: ApiOptions, token: string): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? REQUEST_TIMEOUT_MS);
   opts.signal?.addEventListener('abort', () => controller.abort());
+  // FormData (file uploads) must go through untouched — stringifying it would send "[object
+  // FormData]", and setting Content-Type ourselves drops the multipart boundary fetch generates.
+  const isFormData = typeof FormData !== 'undefined' && opts.body instanceof FormData;
   try {
     return await fetch(`${API_URL}${withQuery(path, opts.params)}`, {
       method: opts.method ?? 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
-        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(opts.body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
       },
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body: opts.body === undefined ? undefined : isFormData ? (opts.body as FormData) : JSON.stringify(opts.body),
       signal: controller.signal,
     });
   } catch (e) {
