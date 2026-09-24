@@ -112,6 +112,7 @@ export function ActivityTerminal({
   return (
     <TerminalChrome>
       <ScrollView
+        showsHorizontalScrollIndicator={false}
         style={{ maxHeight }}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}

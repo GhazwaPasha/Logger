@@ -1,21 +1,22 @@
-import { faCheck, faPlus } from '@fortawesome/free-solid-svg-icons';
-import { useRef, useState } from 'react';
+import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { Panel, SectionLabel } from '@/components/page';
+import { SectionLabel } from '@/components/page';
 import { Text } from '@/components/text';
-import { listLayout, revealOut } from '@/constants/motion';
+import { listLayout } from '@/constants/motion';
 import { alpha, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import type { SubtaskRow } from '@/lib/types';
 
 /**
- * The checklist card — a port of the web's `TaskSubtaskList`: checkbox + inline rename-on-tap +
- * swipe-free "Remove", plus an "Add a subtask…" row. `toggleOnly` drops rename/remove/add for
- * participants who can't edit fields (the checkbox itself still works for anyone who can participate).
+ * The checklist, inline with the rest of the task (no card around it): each line is edited right where it sits
+ * — tap the text and type, it saves when you leave the line — and new lines are typed straight into the last row,
+ * which stays focused so several can be added in a row. `toggleOnly` (participants who can't edit fields) keeps
+ * just the checkboxes.
  */
 export function SubtaskListCard({
   subtasks,
@@ -39,11 +40,7 @@ export function SubtaskListCard({
   creating?: boolean;
 }) {
   const theme = useTheme();
-  const dark = useIsDark();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingVal, setEditingVal] = useState('');
   const [draft, setDraft] = useState('');
-  const creatingRef = useRef(false);
 
   if (subtasks.length === 0 && toggleOnly) return null;
 
@@ -51,105 +48,153 @@ export function SubtaskListCard({
 
   const commitDraft = () => {
     const title = draft.trim();
-    if (!title || disabled || creatingRef.current) return;
-    creatingRef.current = true;
+    if (!title || disabled) return;
     setDraft('');
     onCreate(title);
-    queueMicrotask(() => {
-      creatingRef.current = false;
-    });
-  };
-
-  const commitEdit = (id: string, original: string) => {
-    const next = editingVal.trim();
-    setEditingId(null);
-    if (!next || next === original) return;
-    onRename(id, next);
   };
 
   return (
-    <Panel style={{ gap: 4 }}>
-      <SectionLabel size="10">{subtasks.length > 0 ? `Subtasks — ${doneCount}/${subtasks.length} done` : 'Subtasks'}</SectionLabel>
-      {subtasks.map((item) => {
-        const busy = item.id.startsWith('optimistic-') || pendingSubtaskId === item.id;
-        return (
-          <Animated.View key={item.id} layout={listLayout} exiting={revealOut} style={styles.row}>
-            <PressableScale
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: item.done }}
-              disabled={disabled || busy}
-              haptic="select"
-              onPress={() => onToggle(item.id, !item.done)}
-              style={[
-                styles.checkbox,
-                item.done
-                  ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                  : { backgroundColor: theme.surfaceElevated, borderColor: alpha(theme.fg, dark ? 0.22 : 0.18) },
-              ]}>
-              {busy ? (
-                <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.55 }] }} />
-              ) : item.done ? (
-                <Icon icon={faCheck} size={10} color={theme.onAccent} />
-              ) : null}
-            </PressableScale>
-            {!toggleOnly && editingId === item.id ? (
-              <TextInput
-                autoFocus
-                value={editingVal}
-                onChangeText={setEditingVal}
-                onBlur={() => commitEdit(item.id, item.title)}
-                onSubmitEditing={() => commitEdit(item.id, item.title)}
-                style={[styles.editInput, { color: theme.fg }]}
-              />
-            ) : (
-              <PressableScale
-                disabled={disabled || toggleOnly}
-                style={{ flex: 1 }}
-                onPress={() => {
-                  setEditingId(item.id);
-                  setEditingVal(item.title);
-                }}>
-                <Text
-                  size="sm"
-                  color={item.done ? 'muted' : 'fg'}
-                  style={item.done ? { textDecorationLine: 'line-through', textDecorationColor: theme.muted } : undefined}>
-                  {item.title}
-                </Text>
-              </PressableScale>
-            )}
-            {!toggleOnly ? (
-              <PressableScale disabled={disabled || busy} hitSlop={8} onPress={() => onDelete(item.id)}>
-                <Text size="11" color="muted">
-                  Remove
-                </Text>
-              </PressableScale>
-            ) : null}
-          </Animated.View>
-        );
-      })}
+    <View style={styles.wrap}>
+      <SectionLabel size="10">{subtasks.length > 0 ? `Subtasks · ${doneCount}/${subtasks.length} done` : 'Subtasks'}</SectionLabel>
+      {subtasks.map((item) => (
+        <SubtaskLine
+          key={item.id}
+          item={item}
+          busy={item.id.startsWith('optimistic-') || pendingSubtaskId === item.id}
+          disabled={disabled}
+          toggleOnly={toggleOnly}
+          onToggle={onToggle}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      ))}
       {!toggleOnly ? (
-        <View style={[styles.row, { paddingVertical: 6 }]}>
-          <Text size="sm" color="muted">
-            +
-          </Text>
+        <View style={styles.row}>
+          <View style={styles.addMark}>
+            {creating ? (
+              <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.6 }] }} />
+            ) : (
+              <Icon icon={faPlus} size={11} color="muted" />
+            )}
+          </View>
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Add a subtask…"
+            placeholder="Add a subtask"
             placeholderTextColor={theme.muted}
-            onBlur={commitDraft}
+            editable={!disabled}
+            returnKeyType="done"
+            // Return adds the line and keeps the cursor here for the next one.
+            submitBehavior="submit"
             onSubmitEditing={commitDraft}
-            style={[styles.editInput, { color: theme.fg }]}
+            onBlur={commitDraft}
+            style={[styles.input, { color: theme.fg }]}
           />
-          {creating ? <ActivityIndicator size="small" color={theme.muted} /> : <Icon icon={faPlus} size={13} color="muted" style={{ opacity: 0.5 }} />}
         </View>
       ) : null}
-    </Panel>
+    </View>
+  );
+}
+
+function SubtaskLine({
+  item,
+  busy,
+  disabled,
+  toggleOnly,
+  onToggle,
+  onRename,
+  onDelete,
+}: {
+  item: SubtaskRow;
+  busy: boolean;
+  disabled?: boolean;
+  toggleOnly?: boolean;
+  onToggle: (subtaskId: string, done: boolean) => void;
+  onRename: (subtaskId: string, title: string) => void;
+  onDelete: (subtaskId: string) => void;
+}) {
+  const theme = useTheme();
+  const dark = useIsDark();
+  const [value, setValue] = useState(item.title);
+  const focused = useRef(false);
+  const [editing, setEditing] = useState(false);
+
+  // Follow the saved title (a teammate's edit, the server's answer) unless this line is being typed in.
+  useEffect(() => {
+    if (!focused.current) setValue(item.title);
+  }, [item.title]);
+
+  const commit = () => {
+    focused.current = false;
+    setEditing(false);
+    const next = value.trim();
+    if (!next) setValue(item.title); // an emptied line goes back to what it was; ✕ removes a line
+    else if (next !== item.title) onRename(item.id, next);
+  };
+
+  const struck = item.done ? ({ textDecorationLine: 'line-through', textDecorationColor: theme.muted } as const) : null;
+
+  return (
+    <Animated.View layout={listLayout} style={styles.row}>
+      <PressableScale
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: item.done }}
+        accessibilityLabel={item.title}
+        disabled={disabled || busy}
+        haptic="select"
+        hitSlop={8}
+        onPress={() => onToggle(item.id, !item.done)}
+        style={[
+          styles.checkbox,
+          item.done
+            ? { backgroundColor: theme.accent, borderColor: theme.accent }
+            : { borderColor: alpha(theme.fg, dark ? 0.28 : 0.22) },
+        ]}>
+        {busy ? (
+          <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.55 }] }} />
+        ) : item.done ? (
+          <Icon icon={faCheck} size={10} color={theme.onAccent} />
+        ) : null}
+      </PressableScale>
+
+      {toggleOnly ? (
+        <Text size="sm" color={item.done ? 'muted' : 'fg'} style={[{ flex: 1 }, struck]}>
+          {item.title}
+        </Text>
+      ) : (
+        <TextInput
+          value={value}
+          onChangeText={setValue}
+          editable={!disabled && !busy}
+          multiline
+          submitBehavior="blurAndSubmit"
+          returnKeyType="done"
+          onFocus={() => {
+            focused.current = true;
+            setEditing(true);
+          }}
+          onBlur={commit}
+          style={[styles.input, { color: item.done && !editing ? theme.muted : theme.fg }, !editing && struck]}
+        />
+      )}
+
+      {!toggleOnly && editing ? (
+        <PressableScale
+          disabled={disabled || busy}
+          hitSlop={10}
+          accessibilityLabel={`Remove ${item.title}`}
+          onPress={() => onDelete(item.id)}>
+          <Icon icon={faXmark} size={13} color="muted" />
+        </PressableScale>
+      ) : null}
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
-  checkbox: { width: 18, height: 18, borderRadius: Radius.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  editInput: { flex: 1, fontSize: 14, padding: 0 },
+  wrap: { gap: 2, paddingHorizontal: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 36 },
+  checkbox: { width: 18, height: 18, borderRadius: Radius.md, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  addMark: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, fontSize: 15, paddingVertical: 6, paddingHorizontal: 0 },
 });

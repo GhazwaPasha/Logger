@@ -220,7 +220,7 @@ function NotificationsPanel({
           <Button title="Close" variant="secondary" compact onPress={onClose} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
           {loading ? (
             <View style={styles.center}>
               <Spinner />

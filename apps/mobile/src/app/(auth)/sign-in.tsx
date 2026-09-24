@@ -1,7 +1,8 @@
 import { faDiscord, faGoogle } from '@fortawesome/free-brands-svg-icons';
-import { faArrowLeft, faEnvelope, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import { faArrowLeft, faEnvelope, faEye, faEyeSlash, faLock } from '@fortawesome/free-solid-svg-icons';
+import { useState, type ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,12 +10,14 @@ import { ConnectingStep } from '@/components/auth/connecting-step';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { LogoMark } from '@/components/logo-mark';
+import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
-import { Button, ErrorBanner, Input } from '@/components/ui';
-import { sequenceEnter } from '@/constants/motion';
+import { Button, ErrorBanner } from '@/components/ui';
+import { sequenceEnter, stateTransition } from '@/constants/motion';
 import { alpha, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
+import { clearForcedSignOut } from '@/lib/sign-out';
 import { nativeGoogleSignIn, pickGoogleIdToken } from '@/lib/google-sign-in';
 
 type Provider = 'discord' | 'google';
@@ -37,11 +40,24 @@ function BigLogo({ size, text }: { size: number; text: number }) {
   );
 }
 
-function Label({ children }: { children: string }) {
+/** A rounded field row: leading icon, the input, an optional trailing control; the border lights up on focus. */
+function Field({ label, icon, focused, children }: { label: string; icon: IconDefinition; focused: boolean; children: ReactNode }) {
+  const theme = useTheme();
   return (
-    <Text size="xs" weight="medium" color="muted" style={{ marginBottom: 6 }}>
-      {children}
-    </Text>
+    <View style={{ gap: 6 }}>
+      <Text size="11" weight="semibold" color="muted" uppercase tracking={0.8} style={{ paddingLeft: 4 }}>
+        {label}
+      </Text>
+      <View
+        style={[
+          styles.field,
+          { backgroundColor: theme.surfaceElevated, borderColor: focused ? theme.accent : theme.borderSubtle },
+          stateTransition,
+        ]}>
+        <Icon icon={icon} size={15} color={focused ? 'fg' : 'muted'} />
+        {children}
+      </View>
+    </View>
   );
 }
 
@@ -51,6 +67,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [focus, setFocus] = useState<'email' | 'password' | null>(null);
   const [busy, setBusy] = useState<'email' | Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +85,8 @@ export default function SignIn() {
     } finally {
       // Signed in: stay on the connecting state until the app swaps this screen out, instead of flashing the
       // options back for a moment.
-      if (!signedIn) setBusy(null);
+      if (signedIn) clearForcedSignOut();
+      else setBusy(null);
     }
   }
 
@@ -94,7 +112,7 @@ export default function SignIn() {
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
       <SafeAreaView style={styles.fill}>
         <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {busy === 'discord' || busy === 'google' ? (
               <ConnectingStep {...PROVIDERS[busy]} />
             ) : step === 'hub' ? (
@@ -159,68 +177,87 @@ export default function SignIn() {
                 ) : null}
               </View>
             ) : (
-              <Animated.View
-                entering={sequenceEnter(0, 14)}
-                style={[styles.card, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-                <PressableScale
-                  accessibilityRole="button"
-                  onPress={() => {
-                    setError(null);
-                    setStep('hub');
-                  }}
-                  style={styles.back}
-                  hitSlop={8}>
-                  <Icon icon={faArrowLeft} size={14} color="muted" />
-                  <Text size="sm" color="muted">
-                    Back
-                  </Text>
-                </PressableScale>
+              <View style={styles.emailWrap}>
+                <Animated.View entering={sequenceEnter(0, 12)} style={styles.backPill}>
+                  <BarSurface radius={22} />
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel="Back"
+                    scaleTo={0.96}
+                    haptic="select"
+                    hitSlop={8}
+                    onPress={() => {
+                      setError(null);
+                      setStep('hub');
+                    }}
+                    style={styles.backInner}>
+                    <Icon icon={faArrowLeft} size={13} color="fg" />
+                    <Text size="sm" weight="medium">
+                      Back
+                    </Text>
+                  </PressableScale>
+                </Animated.View>
 
-                <View style={{ alignItems: 'center', gap: 8 }}>
-                  <Text size="sm" color="muted">
-                    Continue to your
-                  </Text>
-                  <BigLogo size={40} text={24} />
-                </View>
+                <Animated.View entering={sequenceEnter(1, 12)} style={{ alignItems: 'center' }}>
+                  <BigLogo size={44} text={28} />
+                </Animated.View>
 
-                <View style={{ gap: 14, marginTop: 20 }}>
-                  <View>
-                    <Label>Email</Label>
-                    <Input
-                      style={{ borderRadius: Radius.xl }}
-                      placeholder="you@company.com"
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                      textContentType="emailAddress"
-                    />
+                <Animated.View
+                  entering={sequenceEnter(2, 12)}
+                  style={styles.form}>
+                  <View style={{ gap: 2 }}>
+                    <Text font="outfit" size="xl" weight="bold" tracking={-0.4}>
+                      Welcome back
+                    </Text>
+                    <Text size="sm" color="muted">
+                      Sign in with your email to continue
+                    </Text>
                   </View>
-                  <View>
-                    <Label>Password</Label>
-                    <View>
-                      <Input
-                        style={{ borderRadius: Radius.xl, paddingRight: 44 }}
-                        placeholder="Password"
+
+                  <View style={{ gap: 14 }}>
+                    <Field label="Email" icon={faEnvelope} focused={focus === 'email'}>
+                      <TextInput
+                        style={[styles.fieldInput, { color: theme.fg }]}
+                        placeholder="you@company.com"
+                        placeholderTextColor={theme.muted}
+                        cursorColor={theme.accent}
+                        value={email}
+                        onChangeText={setEmail}
+                        onFocus={() => setFocus('email')}
+                        onBlur={() => setFocus(null)}
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                        textContentType="emailAddress"
+                        returnKeyType="next"
+                      />
+                    </Field>
+                    <Field label="Password" icon={faLock} focused={focus === 'password'}>
+                      <TextInput
+                        style={[styles.fieldInput, { color: theme.fg }]}
+                        placeholder="Your password"
+                        placeholderTextColor={theme.muted}
+                        cursorColor={theme.accent}
                         value={password}
                         onChangeText={setPassword}
+                        onFocus={() => setFocus('password')}
+                        onBlur={() => setFocus(null)}
                         secureTextEntry={!showPassword}
                         autoCapitalize="none"
                         autoComplete="current-password"
                         textContentType="password"
+                        returnKeyType="go"
                         onSubmitEditing={signInEmail}
                       />
                       <PressableScale
                         accessibilityRole="button"
                         accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                         onPress={() => setShowPassword((v) => !v)}
-                        hitSlop={8}
-                        style={styles.eye}>
-                        <Icon icon={showPassword ? faEyeSlash : faEye} size={16} color="muted" />
+                        hitSlop={10}>
+                        <Icon icon={showPassword ? faEyeSlash : faEye} size={15} color="muted" />
                       </PressableScale>
-                    </View>
+                    </Field>
                   </View>
 
                   {error ? <ErrorBanner message={error} /> : null}
@@ -230,10 +267,10 @@ export default function SignIn() {
                     onPress={signInEmail}
                     loading={busy === 'email'}
                     disabled={!email.trim() || !password || busy !== null}
-                    style={{ borderRadius: Radius.xl }}
+                    style={styles.submit}
                   />
-                </View>
-              </Animated.View>
+                </Animated.View>
+              </View>
             )}
           </ScrollView>
 
@@ -261,20 +298,20 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     borderWidth: 1,
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    borderRadius: Radius.xl,
+  emailWrap: { width: '100%', maxWidth: 400, gap: 24 },
+  form: { gap: 24 },
+  backPill: { alignSelf: 'flex-start', height: 44, borderRadius: 22 },
+  backInner: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16 },
+  field: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    borderRadius: Radius.xxxl,
     borderWidth: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
   },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20, alignSelf: 'flex-start' },
-  eye: { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' },
+  fieldInput: { flex: 1, height: '100%', fontSize: 15, padding: 0 },
+  submit: { height: 52, borderRadius: Radius.xxxl },
   tagline: { textAlign: 'center', paddingBottom: 16 },
 });

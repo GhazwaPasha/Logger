@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react';
 
 import { api } from '@/lib/api';
 import { pendingCreations } from '@/lib/pending-creation';
-import { qk } from '@/lib/queries';
+import { markOwnWrite, qk, refreshTaskLists, syncActiveRow } from '@/lib/queries';
 import type { TaskDetail, TaskMutationResult, TaskRow } from '@/lib/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/lib/workspace';
@@ -55,27 +55,32 @@ function createDraftTask(qc: QueryClient, orgId: string, listId: string, assigne
 
   const creation = (async () => {
     try {
+      markOwnWrite(id);
       const res = await api<TaskMutationResult>(`/organizations/${orgId}/tasks`, {
         method: 'POST',
         body: { id, title: TASK_DEFAULT_TITLE, listId, assigneeUserIds: [], status: 'pending', priority: 'medium' },
       });
+      markOwnWrite(id);
+      // The server only echoes the stub back, while edits made meanwhile (title, AI fill, checklist) sit
+      // optimistically in the cache waiting on this POST: keep those, and take just what the server adds.
       qc.setQueryData<TaskDetail>(qk.task(id), (old) =>
         old
           ? {
               ...old,
-              task: { ...old.task, ...res.task },
+              task: { ...res.task, ...old.task },
               capabilities: res.capabilities,
-              assigneeUserIds: res.assigneeUserIds,
-              subtasks: res.subtasks,
-              ledger: res.ledgerDelta,
+              ledger: [...res.ledgerDelta, ...old.ledger],
             }
           : old,
       );
+      // The new task joins the lists: the dashboard's active list in place, mounted board columns refetch.
+      const detail = qc.getQueryData<TaskDetail>(qk.task(id));
+      if (detail) syncActiveRow(qc, { ...detail.task, assigneeUserIds: detail.assigneeUserIds, subtasks: detail.subtasks });
+      void refreshTaskLists(qc);
     } catch {
       qc.removeQueries({ queryKey: qk.task(id) });
     } finally {
       pendingCreations.delete(id);
-      void qc.invalidateQueries({ queryKey: qk.tasksRoot });
     }
   })();
   pendingCreations.set(id, creation);

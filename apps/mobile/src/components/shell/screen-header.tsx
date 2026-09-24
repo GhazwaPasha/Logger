@@ -25,7 +25,8 @@ import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
 import { Pulse } from '@/components/motion/pulse';
-import { chipEnter, Duration, POP_EASE } from '@/constants/motion';
+import { useChipEnter } from '@/components/motion/use-chip-enter';
+import { Duration, POP_EASE } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
@@ -50,6 +51,7 @@ const INSET = (CONTROL_H - ITEM) / 2;
 export function TabHeader({ title, children }: { title?: string; children?: ReactNode }) {
   const insets = useSafeAreaInsets();
   const { openPanel, unreadCount } = useNotifications();
+  const chipIn = useChipEnter(1);
 
   return (
     <View style={{ paddingTop: insets.top }}>
@@ -64,7 +66,7 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
         </View>
 
         {/* The pill's width follows the online stack: `layout` springs it wider / narrower as people come and go. */}
-        <Animated.View entering={chipEnter(1)} layout={PILL_LAYOUT} style={styles.controlPill}>
+        <Animated.View layout={PILL_LAYOUT} style={[styles.controlPill, chipIn]}>
           <BarSurface radius={CONTROL_H / 2} />
           <OnlineStack />
           <View style={styles.bell}>
@@ -191,55 +193,52 @@ export function WorkspaceSwitcher() {
   const theme = useTheme();
   const { orgs, org, setOrgId } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const chipIn = useChipEnter(-1);
 
-  // The chip is there from the first frame (sliding in like the bell + avatar pill) with a placeholder inside;
-  // the workspace fades in and the pill springs to its width once it resolves, so nothing pops in late.
-  if (!org) {
-    return (
-      <Animated.View entering={chipEnter(-1)} layout={PILL_LAYOUT} style={styles.switcher}>
-        <BarSurface radius={CONTROL_H / 2} />
-        <View style={styles.switcherInner}>
-          <Pulse style={[styles.switcherMark, { backgroundColor: alpha(theme.fg, 0.1) }]} />
-          <Pulse style={{ width: 84, height: 10, borderRadius: 5, backgroundColor: alpha(theme.fg, 0.1) }} />
-        </View>
-      </Animated.View>
-    );
-  }
-  const initial = org.name.trim().charAt(0).toUpperCase() || '?';
-
+  // One container for the whole life of the chip, so it slides in once: a placeholder sits inside until the
+  // workspace resolves, then the real content fades in over it. The chip's width simply follows its content.
   return (
     <>
-      <Animated.View entering={chipEnter(-1)} layout={PILL_LAYOUT} style={styles.switcher}>
+      <Animated.View style={[styles.switcher, chipIn]}>
         <BarSurface radius={CONTROL_H / 2} />
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={`Workspace: ${org.name}. Switch workspace`}
-          scaleTo={0.97}
-          haptic="select"
-          onPress={() => setOpen(true)}
-          style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
-          <Animated.View entering={FadeIn.duration(Duration.base)} style={styles.switcherContent}>
-            <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
-              <Text size="xs" weight="bold" color={theme.onAccent}>
-                {initial}
+        {org ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`Workspace: ${org.name}. Switch workspace`}
+            scaleTo={0.97}
+            haptic="select"
+            onPress={() => setOpen(true)}
+            style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
+            <Animated.View key={org.id} entering={FadeIn.duration(Duration.base)} style={styles.switcherContent}>
+              <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
+                <Text size="xs" weight="bold" color={theme.onAccent}>
+                  {org.name.trim().charAt(0).toUpperCase() || '?'}
+                </Text>
+              </View>
+              <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {org.name}
               </Text>
-            </View>
-            <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {org.name}
-            </Text>
-            <Icon icon={faChevronDown} size={11} color="muted" />
-          </Animated.View>
-        </PressableScale>
+              <Icon icon={faChevronDown} size={11} color="muted" />
+            </Animated.View>
+          </PressableScale>
+        ) : (
+          <View style={styles.switcherInner}>
+            <Pulse style={[styles.switcherMark, { backgroundColor: alpha(theme.fg, 0.1) }]} />
+            <Pulse style={{ width: 84, height: 10, borderRadius: 5, backgroundColor: alpha(theme.fg, 0.1) }} />
+          </View>
+        )}
       </Animated.View>
 
-      <MenuSheet<string>
-        visible={open}
-        title="Workspace"
-        value={org.id}
-        options={orgs.map((o) => ({ value: o.id, label: o.name }))}
-        onSelect={(id) => id !== org.id && setOrgId(id)}
-        onClose={() => setOpen(false)}
-      />
+      {org ? (
+        <MenuSheet<string>
+          visible={open}
+          title="Workspace"
+          value={org.id}
+          options={orgs.map((o) => ({ value: o.id, label: o.name }))}
+          onSelect={(id) => id !== org.id && setOrgId(id)}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -408,7 +407,7 @@ const styles = StyleSheet.create({
   bellButton: { width: 52, borderRadius: ITEM / 2, backgroundColor: 'transparent' },
   avatarButton: { width: ITEM, height: ITEM },
   switcher: { height: CONTROL_H, maxWidth: 240, borderRadius: CONTROL_H / 2 },
-  switcherContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  switcherContent: { flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   switcherInner: {
     flex: 1,
     flexDirection: 'row',

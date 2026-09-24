@@ -107,7 +107,7 @@ function formatExistingDraft(d: TaskAiExistingDraft | null | undefined): string 
 export function buildTaskFillUserTurn(body: TaskAiFillRequestBody, currentUserId: string): string {
   const { prompt, context } = body;
   const memberLines = context.members
-    .map((m) => `- userId=${m.userId} name="${m.name.replace(/"/g, "'")}" email=${m.email}`)
+    .map((m) => `- userId=${m.userId} name="${(m.name ?? "").replace(/"/g, "'")}" email=${m.email ?? ""}`)
     .join("\n");
 
   const draft = formatExistingDraft(context.existingDraft ?? undefined);

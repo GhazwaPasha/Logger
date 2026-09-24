@@ -6,7 +6,6 @@ import {
   faBell,
   faCalendarPlus,
   faCheck,
-  faChevronDown,
   faEllipsisVertical,
   faPaperclip,
   faPlus,
@@ -267,7 +266,7 @@ function TaskCardImpl({
           style={[
             styles.meta,
             { borderTopColor: alpha(theme.borderSubtle, 0.4) },
-            kanban ? { paddingTop: 8 } : { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8 },
+            kanban ? { paddingTop: 10 } : { paddingHorizontal: 12, paddingTop: 11, paddingBottom: 12 },
           ]}>
           <View style={styles.metaRow}>
             <PressableScale scaleTo={0.92}
@@ -285,7 +284,7 @@ function TaskCardImpl({
                 </Text>
               ) : null}
               {subtasks.length > 0 && !kanban ? (
-                <RotatingChevron open={expanded} icon={faChevronDown} openDeg={180} size={11} />
+                <RotatingChevron open={expanded} size={11} />
               ) : subtasks.length === 0 ? (
                 <Icon icon={faPlus} size={14} color="muted" style={{ opacity: 0.6 }} />
               ) : null}
@@ -384,10 +383,10 @@ export function TaskCardSkeleton() {
 
 const styles = StyleSheet.create({
   card: { borderRadius: Radius.xl, borderWidth: 1, overflow: 'hidden' },
-  skeleton: { paddingHorizontal: 10, paddingVertical: 10, opacity: 0.7 },
-  kanbanBody: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, gap: 6 },
+  skeleton: { paddingHorizontal: 12, paddingVertical: 16, opacity: 0.7 },
+  kanbanBody: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12, gap: 8 },
   header: { flexDirection: 'row', alignItems: 'center' },
-  headerList: { gap: 8, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 },
+  headerList: { gap: 8, paddingHorizontal: 12, paddingTop: 16, paddingBottom: 12 },
   headerKanban: { gap: 6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   overflow: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.base },

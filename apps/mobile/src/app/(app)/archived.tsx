@@ -35,6 +35,8 @@ function ArchivedScreen() {
 
   return (
     <FlatList
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
       style={{ flex: 1, backgroundColor: theme.surfaceBase }}
       contentContainerStyle={styles.content}
       data={rows}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api } from '@/lib/api';
+import { api, apiUpload } from '@/lib/api';
 
 /**
  * Extra task-detail resources beyond `TaskDetail` (subtasks/ledger/capabilities) — attachments,
@@ -39,27 +39,43 @@ export function useDeleteAttachment(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (attachmentId: string) => api(`/attachments/${attachmentId}`, { method: 'DELETE' }),
-    onSettled: () => qc.invalidateQueries({ queryKey: ['attachments', taskId] }),
+    // Gone from the list at once; put back if the server refuses.
+    onMutate: (attachmentId) => {
+      const prev = qc.getQueryData<AttachmentRow[]>(['attachments', taskId]);
+      qc.setQueryData<AttachmentRow[]>(['attachments', taskId], (old) => old?.filter((a) => a.id !== attachmentId));
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['attachments', taskId], ctx.prev);
+    },
   });
 }
 
-export type DiscordSubmitResult = { discord: { ok: true } | { ok: false; reason: string } };
+/** On success the API returns the new attachment row alongside the delivery result. */
+export type DiscordSubmitResult =
+  | (AttachmentRow & { discord: { ok: true } })
+  | { discord: { ok: false; reason: string } };
 
-/** Posts a picked file straight to the task's Discord channel; on success it also shows up in `useAttachments`. */
+/**
+ * Posts a picked file straight to the task's Discord channel, reporting real upload progress. A delivered file
+ * is written into the attachments cache from the response — it shows as sent at once, no refetch.
+ */
 export function useDiscordSubmit(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: { uri: string; name: string; mimeType?: string }) => {
+    mutationFn: (v: { uri: string; name: string; mimeType?: string; onProgress: (fraction: number) => void }) => {
       const form = new FormData();
-      // React Native's fetch accepts this {uri,name,type} shape in place of a real Blob/File.
-      form.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' } as unknown as Blob);
-      return api<DiscordSubmitResult>(`/tasks/${taskId}/attachments/discord-submit`, {
-        method: 'POST',
-        body: form,
-        timeoutMs: 120_000,
-      });
+      // React Native accepts this {uri,name,type} shape in place of a real Blob/File.
+      form.append('file', { uri: v.uri, name: v.name, type: v.mimeType || 'application/octet-stream' } as unknown as Blob);
+      return apiUpload<DiscordSubmitResult>(`/tasks/${taskId}/attachments/discord-submit`, form, v.onProgress);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['attachments', taskId] }),
+    onSuccess: (res) => {
+      if (!res.discord.ok || !('id' in res)) return;
+      const { discord, ...row } = res;
+      qc.setQueryData<AttachmentRow[]>(['attachments', taskId], (old) =>
+        old ? [...old.filter((a) => a.id !== row.id), row] : [row],
+      );
+    },
   });
 }
 

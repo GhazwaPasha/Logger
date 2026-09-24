@@ -13,6 +13,7 @@ import { useIsDark, useTheme, restoreThemePreference } from '@/hooks/use-theme';
 import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { queryClient, wireQueryManagers } from '@/lib/query-client';
+import { useForcedSignOut } from '@/lib/sign-out';
 
 SplashScreen.preventAutoHideAsync();
 void restoreThemePreference();
@@ -21,7 +22,9 @@ export default function RootLayout() {
   const dark = useIsDark();
   const theme = useTheme();
   const base = dark ? DarkTheme : DefaultTheme;
-  const { data: session, isPending } = authClient.useSession();
+  const { data: rawSession, isPending } = authClient.useSession();
+  const forcedOut = useForcedSignOut();
+  const session = forcedOut ? null : rawSession;
   const [fontsLoaded, fontError] = useFonts({
     DMSans_400Regular,
     DMSans_500Medium,

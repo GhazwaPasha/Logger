@@ -95,7 +95,9 @@ export function HBarChart({
         ) : null}
       </View>
 
-      {loading && sorted.length === 0 ? (
+      {/* Placeholders for the whole wait (rows can exist before their numbers do), so each bar mounts once, at
+          its real value, and grows a single time. */}
+      {loading ? (
         <View style={{ gap: 10, paddingVertical: 4 }}>
           {[0.8, 0.55, 0.35].map((w) => (
             <Pulse key={w} style={{ width: `${w * 100}%`, height: 14, borderRadius: 4, backgroundColor: alpha(theme.fg, 0.1) }} />

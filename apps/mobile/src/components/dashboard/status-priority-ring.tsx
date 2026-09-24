@@ -143,6 +143,8 @@ function FillArc({
   });
   const startDot = useAnimatedProps(() => ({ opacity: filled.value > from ? 1 : 0 }));
   const endDot = useAnimatedProps(() => ({ opacity: filled.value >= to - 1e-4 ? 1 : 0 }));
+  // The static props are the empty state: animated props only land a frame after mount, and without these the
+  // first frame would draw every arc and dot in full — a flash of the finished ring before it fills.
   return (
     <>
       <AnimatedPath
@@ -151,10 +153,15 @@ function FillArc({
         strokeWidth={stroke}
         fill="none"
         strokeDasharray={[length, length + 1]}
+        strokeDashoffset={length}
         animatedProps={arc}
       />
-      {startCap ? <AnimatedCircle cx={startCap.x} cy={startCap.y} r={stroke / 2} fill={color} animatedProps={startDot} /> : null}
-      {endCap ? <AnimatedCircle cx={endCap.x} cy={endCap.y} r={stroke / 2} fill={color} animatedProps={endDot} /> : null}
+      {startCap ? (
+        <AnimatedCircle cx={startCap.x} cy={startCap.y} r={stroke / 2} fill={color} opacity={0} animatedProps={startDot} />
+      ) : null}
+      {endCap ? (
+        <AnimatedCircle cx={endCap.x} cy={endCap.y} r={stroke / 2} fill={color} opacity={0} animatedProps={endDot} />
+      ) : null}
     </>
   );
 }
@@ -162,7 +169,8 @@ function FillArc({
 /**
  * The chunked ring. Both halves fill left → right: the top half (status) over the top, the bottom half
  * (priority) under the bottom. With a `focus`, every chunk outside that segment dims. The fill starts `fillAt`
- * ms after mount (so it can wait for an entrance to land) and replays whenever the data changes.
+ * ms after mount (so it can wait for an entrance to land) and replays whenever the data changes. It stays empty
+ * until `ready`, so numbers trickling in from separate queries don't each kick off a fill.
  */
 function TickRing({
   top,
@@ -171,6 +179,7 @@ function TickRing({
   focus,
   stroke,
   fillAt = 0,
+  ready = true,
 }: {
   top: RingSegment[];
   bottom: RingSegment[];
@@ -179,6 +188,7 @@ function TickRing({
   /** Arc thickness, in the ring's 200-unit viewBox. */
   stroke: number;
   fillAt?: number;
+  ready?: boolean;
 }) {
   const theme = useTheme();
   const dark = useIsDark();
@@ -188,9 +198,10 @@ function TickRing({
 
   useEffect(() => {
     filled.value = 0;
+    if (!ready) return;
     // Ease out: quick at first, settling into the last chunks.
     filled.value = withDelay(delayUntil(fillAt), withTiming(1, { duration: FILL_MS, easing: Easing.out(Easing.cubic) }));
-  }, [signature, fillAt, filled, delayUntil]);
+  }, [signature, fillAt, ready, filled, delayUntil]);
 
   const R = 84;
   const span = 180 - SEAM_DEG * 2;
@@ -398,6 +409,7 @@ export function StatusPriorityRing({
             focus={null}
             stroke={HERO_STROKE}
             fillAt={sequenceSettled(enterIndex)}
+            ready={!loading}
           />
           <View style={StyleSheet.absoluteFill}>
             {loading ? (

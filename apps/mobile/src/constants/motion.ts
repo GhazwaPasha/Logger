@@ -123,14 +123,6 @@ export function lineReveal(index: number) {
     .delay(Math.min(index, 20) * 25);
 }
 
-/** A header chip sliding in from its own edge (`-1` left, `1` right) — the switcher and the bell + avatar pill mirror each other. */
-export function chipEnter(side: -1 | 1) {
-  return new Keyframe({
-    from: { opacity: 0, transform: [{ translateX: side * 18 }, { scale: 0.96 }] },
-    to: { opacity: 1, transform: [{ translateX: 0 }, { scale: 1 }], easing: POP_EASE },
-  }).duration(Duration.panel);
-}
-
 /** The floating live-island toast dropping in. */
 export const islandIn = new Keyframe({
   from: { opacity: 0, transform: [{ translateY: -14 }, { scale: 0.94 }] },

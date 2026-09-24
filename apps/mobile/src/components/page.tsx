@@ -37,6 +37,8 @@ export function Page({
       {header}
       <PageEnter enabled={enter}>
         <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
           style={styles.fill}
           contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 32 + bottomInset, gap }}
           keyboardShouldPersistTaps="handled"

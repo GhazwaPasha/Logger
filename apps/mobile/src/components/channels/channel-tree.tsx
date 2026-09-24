@@ -342,6 +342,8 @@ export function ChannelTree() {
   return (
     <>
       <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         style={{ flex: 1, backgroundColor: theme.surfaceBase }}
         contentContainerStyle={[styles.content, { paddingBottom: 24 + bottomInset }]}
         keyboardShouldPersistTaps="handled"

@@ -285,7 +285,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = normalizeTaskAiFillPayload(data, allowedIds);
+  const result = normalizeTaskAiFillPayload(data, allowedIds, ctx.members);
   if (taskAiFillResultIsEmpty(result)) {
     return Response.json({ error: "I failed to understand, please try again!" }, { status: 422 });
   }

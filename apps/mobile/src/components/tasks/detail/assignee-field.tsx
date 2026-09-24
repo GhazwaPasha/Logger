@@ -20,7 +20,7 @@ import { usePresence } from '@/components/motion/use-presence';
 import { Panel, SectionLabel } from '@/components/page';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { listLayout, revealIn, revealOut, stateTransition } from '@/constants/motion';
+import { listLayout, revealIn, stateTransition } from '@/constants/motion';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MemberRow } from '@/lib/types';
@@ -60,7 +60,6 @@ export function AssigneeFieldCard({
               <Animated.View
                 key={id}
                 entering={revealIn}
-                exiting={revealOut}
                 layout={listLayout}
                 style={[styles.chip, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle }]}>
                 <Avatar name={m?.name} email={m?.email} image={m?.image} size={20} />
@@ -95,7 +94,7 @@ export function AssigneeFieldCard({
   );
 }
 
-function AssigneeSheet({
+export function AssigneeSheet({
   visible,
   assigneeIds,
   members,
@@ -151,7 +150,7 @@ function AssigneeSheet({
               },
             ]}>
             <Text size="11" weight="semibold" color="muted" uppercase tracking={0.8} style={{ paddingHorizontal: 4, paddingBottom: 4 }}>
-              Assignees
+              Assignee
             </Text>
             <TextInput
               value={query}
@@ -161,7 +160,7 @@ function AssigneeSheet({
               autoCorrect={false}
               style={[styles.search, { backgroundColor: theme.surfaceMuted, color: theme.fg, borderColor: theme.border }]}
             />
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {rows.length === 0 ? (
                 <Text size="xs" color="muted" style={{ padding: 12 }}>
                   {members.length === 0 ? 'No team members in this workspace.' : 'No matches.'}

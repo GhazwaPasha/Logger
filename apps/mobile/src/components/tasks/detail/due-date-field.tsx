@@ -20,7 +20,7 @@ const REPEAT_OPTIONS: { value: TaskDueRepeat; label: string }[] = [
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
 ];
-const REPEAT_LABEL: Record<TaskDueRepeat, string> = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
+export const REPEAT_LABEL: Record<TaskDueRepeat, string> = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
 
 function formatTrigger(d: Date | null): string {
   if (!d) return 'Set due';
@@ -111,7 +111,7 @@ export function DueDateFieldCard({
   );
 }
 
-function DueDateSheet({
+export function DueDateSheet({
   visible,
   due,
   dueRepeat,

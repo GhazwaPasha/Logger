@@ -8,7 +8,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { router } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -160,12 +160,33 @@ export function Board({
   // (often empty) done/cancelled ones usually land first — `every` would flash the empty state.
   const firstLoad = ready && listRows.length === 0 && TASK_FLOW_ORDER.some((s) => columns[s].isLoading);
   const anyError = TASK_FLOW_ORDER.map((s) => columns[s].error).find(Boolean) as Error | undefined;
-  const refreshing = TASK_FLOW_ORDER.some((s) => columns[s].isRefetching && !columns[s].isFetchingNextPage);
-
+  // The pull-to-refresh spinner is for a pull only. Background refetches (a teammate's change, a save
+  // settling) update the cards in place; showing the spinner for them made the whole board look like it reloaded.
+  const [pulling, setPulling] = useState(false);
   const refresh = () => {
-    TASK_FLOW_ORDER.forEach((s) => void columns[s].refetch());
-    void counts.refetch();
+    setPulling(true);
+    void Promise.allSettled([...TASK_FLOW_ORDER.map((s) => columns[s].refetch()), counts.refetch()]).finally(() =>
+      setPulling(false),
+    );
   };
+
+  // Cards slide in the first time they appear only. A card that moves (status change -> another column / place)
+  // or re-renders after a refetch is already known, so it doesn't replay its entrance.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(() => new Set());
+  const enterIndexFor = (key: string, index: number, cap: number) => (!seen.has(key) && index < cap ? index : undefined);
+  const shownKeys = useMemo(
+    () => [
+      ...TASK_FLOW_ORDER.flatMap((s) => flattenPages(columns[s].data).map((t) => t.id)),
+      ...[...combinedSeries.summaries, ...doneSeries.summaries, ...cancelledSeries.summaries].map((s) => `series-${s.seriesId}`),
+    ],
+    [columns, combinedSeries.summaries, doneSeries.summaries, cancelledSeries.summaries],
+  );
+  // Remembered after they've rendered once (their entrance has started), so later renders don't replay it.
+  useEffect(() => {
+    if (shownKeys.every((k) => seen.has(k))) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeen((prev) => new Set([...prev, ...shownKeys]));
+  }, [shownKeys, seen]);
   const loadMoreList = () => {
     const next = TASK_FLOW_ORDER.find((s) => columns[s].hasNextPage && !columns[s].isFetchingNextPage);
     if (next) void columns[next].fetchNextPage();
@@ -241,17 +262,19 @@ export function Board({
   } else if (viewMode === 'list') {
     body = (
       <Animated.FlatList
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         data={listRows}
         keyExtractor={(item) => (item.kind === 'task' ? item.task.id : `series-${item.summary.seriesId}`)}
         // Only the first screenful staggers in; appended pages and recycled rows shouldn't re-animate.
         renderItem={({ item, index }) =>
           item.kind === 'task' ? (
-            <TaskCard task={item.task} variant="list" enterIndex={index < 10 ? index : undefined} />
+            <TaskCard task={item.task} variant="list" enterIndex={enterIndexFor(item.task.id, index, 10)} />
           ) : (
             <RecurringSeriesCard
               summary={item.summary}
               occurrenceStatuses={DONE_CANCELLED_STATUSES}
-              enterIndex={index < 10 ? index : undefined}
+              enterIndex={enterIndexFor(`series-${item.summary.seriesId}`, index, 10)}
             />
           )
         }
@@ -263,7 +286,7 @@ export function Board({
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={loadingMore ? <ActivityIndicator style={{ padding: 16 }} color={theme.muted} /> : null}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.muted} />}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={refresh} tintColor={theme.muted} />}
         onEndReached={loadMoreList}
         onEndReachedThreshold={0.6}
         keyboardShouldPersistTaps="handled"
@@ -275,6 +298,7 @@ export function Board({
       <View style={{ flex: 1 }}>
         <View style={styles.kanbanHead}>{header}</View>
         <ScrollView
+          showsVerticalScrollIndicator={false}
           horizontal
           snapToInterval={colWidth + 10}
           decelerationRate="fast"
@@ -294,6 +318,7 @@ export function Board({
                   count={q.hasNextPage ? `${rows.length}/${total ?? '…'}` : (total ?? rows.length)}
                 />
                 <ScrollView
+                  showsHorizontalScrollIndicator={false}
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={[styles.columnList, { paddingBottom: 24 + bottomInset }]}
@@ -303,14 +328,14 @@ export function Board({
                   }}
                   scrollEventThrottle={200}>
                   {rows.map((t, i) => (
-                    <TaskCard key={t.id} task={t} variant="kanban" enterIndex={i < 8 ? i : undefined} />
+                    <TaskCard key={t.id} task={t} variant="kanban" enterIndex={enterIndexFor(t.id, i, 8)} />
                   ))}
                   {seriesForCol.map((s, i) => (
                     <RecurringSeriesCard
                       key={s.seriesId}
                       summary={s}
                       occurrenceStatuses={[status]}
-                      enterIndex={rows.length + i < 8 ? rows.length + i : undefined}
+                      enterIndex={enterIndexFor(`series-${s.seriesId}`, rows.length + i, 8)}
                     />
                   ))}
                   {q.isFetchingNextPage ? <ActivityIndicator style={{ padding: 12 }} color={theme.muted} /> : null}

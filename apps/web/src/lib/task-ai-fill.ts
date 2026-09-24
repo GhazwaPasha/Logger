@@ -90,7 +90,32 @@ function isTaskPriority(v: string): v is TaskPriority {
  * Maps model JSON to a full `TaskAiFillResult` (all keys set). Missing or invalid keys → `null` (no-op).
  * The model is expected to return every key; partial objects are tolerated for older clients.
  */
-export function normalizeTaskAiFillPayload(raw: unknown, allowedAssigneeIds: Set<string>): TaskAiFillResult {
+/**
+ * Maps one entry of the model's `assigneeUserIds` to a roster userId. Models sometimes echo the person's name or
+ * email instead of the id; those are resolved when they match exactly one member.
+ */
+function resolveAssigneeId(
+  raw: string,
+  allowedAssigneeIds: Set<string>,
+  roster: TaskAiFillMemberContext[],
+): string | null {
+  const v = raw.trim().replace(/^@/, "");
+  if (allowedAssigneeIds.has(v)) return v;
+  const lower = v.toLowerCase();
+  if (!lower) return null;
+  const only = (matches: TaskAiFillMemberContext[]) => (matches.length === 1 ? matches[0]!.userId : null);
+  return (
+    only(roster.filter((m) => (m.email ?? "").trim().toLowerCase() === lower)) ??
+    only(roster.filter((m) => (m.name ?? "").trim().toLowerCase() === lower)) ??
+    only(roster.filter((m) => ((m.name ?? "").trim().split(/\s+/)[0] ?? "").toLowerCase() === lower))
+  );
+}
+
+export function normalizeTaskAiFillPayload(
+  raw: unknown,
+  allowedAssigneeIds: Set<string>,
+  roster: TaskAiFillMemberContext[] = [],
+): TaskAiFillResult {
   const out: TaskAiFillResult = { ...EMPTY_RESULT };
   if (!raw || typeof raw !== "object") return out;
   const o = raw as Record<string, unknown>;
@@ -117,14 +142,15 @@ export function normalizeTaskAiFillPayload(raw: unknown, allowedAssigneeIds: Set
   if ("assigneeUserIds" in o) {
     if (o.assigneeUserIds === null) out.assigneeUserIds = null;
     else if (Array.isArray(o.assigneeUserIds)) {
-      out.assigneeUserIds = [
+      const given = o.assigneeUserIds.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+      const ids = [
         ...new Set(
-          o.assigneeUserIds
-            .filter((x): x is string => typeof x === "string")
-            .map((s) => s.trim())
-            .filter((id) => allowedAssigneeIds.has(id)),
+          given.map((x) => resolveAssigneeId(x, allowedAssigneeIds, roster)).filter((id): id is string => id !== null),
         ),
       ];
+      // The model named people but none resolved to a member: leave assignees alone. Only an explicit `[]`
+      // clears them — turning unmatched names into `[]` would wipe the task's assignees instead.
+      out.assigneeUserIds = given.length > 0 && ids.length === 0 ? null : ids;
     }
   }
 

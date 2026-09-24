@@ -141,3 +141,38 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
+
+/**
+ * Multipart POST that reports real upload progress (0 → 1 as the bytes leave the device). React Native's
+ * `fetch` has no upload progress, so this goes through XMLHttpRequest; auth and errors match {@link api}.
+ */
+export async function apiUpload<T = unknown>(
+  path: string,
+  form: FormData,
+  onProgress: (fraction: number) => void,
+  timeoutMs = 120_000,
+): Promise<T> {
+  const attempt = (token: string) =>
+    new Promise<{ status: number; text: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_URL}${path}`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.timeout = timeoutMs;
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
+      };
+      xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText ?? '' });
+      xhr.onerror = () => reject(new NetworkError("Can't reach the server. Check your connection."));
+      xhr.ontimeout = () => reject(new NetworkError('The server took too long to respond. Please try again.'));
+      xhr.send(form);
+    });
+
+  let res = await attempt(await getToken());
+  if (res.status === 401) {
+    onProgress(0);
+    res = await attempt(await getToken(true));
+  }
+  if (res.status < 200 || res.status >= 300) throw new ApiError(res.status, errorMessage(res.text, 'Upload failed'));
+  return (res.text ? JSON.parse(res.text) : undefined) as T;
+}

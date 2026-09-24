@@ -92,6 +92,8 @@ export default function SearchScreen() {
 
       <PageEnter>
         <Animated.ScrollView
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
           style={styles.fill}
           contentContainerStyle={[styles.content, { paddingBottom: 24 + bottomInset }]}
           keyboardShouldPersistTaps="handled"

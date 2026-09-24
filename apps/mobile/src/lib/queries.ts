@@ -256,7 +256,27 @@ export function useSearchTasks(orgId: string | undefined, query: string) {
   });
 }
 
+/** A task's row from whichever board / list cache already holds it. */
+function cachedTaskRow(qc: QueryClient, taskId: string): TaskRow | undefined {
+  for (const [, data] of qc.getQueriesData({ queryKey: qk.tasksRoot })) {
+    const rows = Array.isArray(data)
+      ? (data as TaskRow[])
+      : data && typeof data === 'object' && 'pages' in data
+        ? (data as InfiniteData<TaskPage>).pages.flatMap((p) => p.tasks)
+        : [];
+    const row = rows.find((t) => t?.id === taskId);
+    if (row) return row;
+  }
+  return undefined;
+}
+
+/**
+ * One task's detail. Opens instantly from the row the board already has (the web's `useTaskDetail`
+ * placeholder) while the full detail loads, and isn't refetched on every visit: our own saves write the
+ * server's answer into this cache, and teammates' changes arrive over the socket (`invalidateWorkspace`).
+ */
 export function useTaskDetail(taskId: string | undefined) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: qk.task(taskId ?? ''),
     queryFn: async () => {
@@ -264,7 +284,45 @@ export function useTaskDetail(taskId: string | undefined) {
       return api<TaskDetail>(`/tasks/${taskId}`);
     },
     enabled: !!taskId,
+    staleTime: 15_000,
+    placeholderData: (): TaskDetail | undefined => {
+      const row = taskId ? cachedTaskRow(qc, taskId) : undefined;
+      return row ? detailFromRow(row) : undefined;
+    },
   });
+}
+
+/** A detail stand-in built from a board row, until `GET /tasks/:id` lands. */
+function detailFromRow(row: TaskRow): TaskDetail {
+  return {
+    task: row,
+    // Field edits are gated on the client-side caps until the server's arrive.
+    capabilities: { canArchiveTask: false, canEditFields: false, canParticipate: true },
+    assigneeUserIds: row.assigneeUserIds ?? [],
+    subtasks: row.subtasks ?? [],
+    ledger: [],
+  };
+}
+
+/**
+ * Makes sure an edit has a cached detail to land in. While a task is still showing its board-row stand-in
+ * (placeholder data lives outside the cache), an optimistic update would have nowhere to go and the
+ * screen wouldn't move; seeding the cache from that row fixes it. The detail fetch in flight is left
+ * running — it replaces the seed when it lands.
+ */
+function ensureDetail(qc: QueryClient, taskId: string): boolean {
+  if (qc.getQueryData(qk.task(taskId)) !== undefined) return true;
+  const row = cachedTaskRow(qc, taskId);
+  if (!row) return false;
+  qc.setQueryData<TaskDetail>(qk.task(taskId), detailFromRow(row));
+  return false;
+}
+
+/** After a save lands: a detail fetch that started before it would bring back pre-save data, so fetch again. */
+function refetchIfRacing(qc: QueryClient, taskId: string) {
+  if (qc.getQueryState(qk.task(taskId))?.fetchStatus === 'fetching') {
+    void qc.invalidateQueries({ queryKey: qk.task(taskId) });
+  }
 }
 
 export type ActivityFeed = {
@@ -287,6 +345,96 @@ export function useOrgActivity(orgId: string | undefined, enabled = true, refetc
 // Mutations
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Tasks this device just wrote. The API echoes every write back over the socket as `workspace_changed`; for our
+ * own saves the caches already hold the server's answer, so those echoes are skipped instead of refetching
+ * the whole workspace a second time.
+ */
+const ownWrites = new Map<string, number>();
+const OWN_WRITE_ECHO_MS = 5000;
+export function markOwnWrite(taskId: string) {
+  ownWrites.set(taskId, Date.now());
+}
+function isOwnEcho(taskId: string) {
+  const at = ownWrites.get(taskId);
+  return at !== undefined && Date.now() - at < OWN_WRITE_ECHO_MS;
+}
+
+/** Rewrites one task wherever a board / list cache holds it. */
+function updateTaskRows(qc: QueryClient, taskId: string, fn: (t: TaskRow) => TaskRow) {
+  qc.setQueriesData({ queryKey: qk.tasksRoot }, (old) => mapTaskRows(old, (t) => (t.id === taskId ? fn(t) : t)));
+}
+
+const ACTIVE_STATUSES = new Set(['pending', 'in_progress']);
+
+/** Keeps the active-task list (dashboard stats) right in place: drops a task that closed, adds one that (re)opened. */
+export function syncActiveRow(qc: QueryClient, row: TaskRow) {
+  qc.setQueriesData<TaskRow[]>({ queryKey: qk.tasksRoot, predicate: (q) => q.queryKey[2] === 'active' }, (old) => {
+    if (!Array.isArray(old)) return old;
+    const open = ACTIVE_STATUSES.has(row.status) && !row.deletedAt;
+    const has = old.some((t) => t.id === row.id);
+    if (open) return has ? old.map((t) => (t.id === row.id ? row : t)) : [row, ...old];
+    return has ? old.filter((t) => t.id !== row.id) : old;
+  });
+}
+
+/**
+ * Board columns, counts and series summaries — the lists whose membership a status / channel / assignee /
+ * due change can alter. Only the mounted ones refetch; the (paged, heavy) active-task list is kept in sync
+ * in place by {@link syncActiveRow} instead of being re-crawled.
+ */
+export function refreshTaskLists(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: qk.tasksRoot, predicate: (q) => q.queryKey[2] !== 'active' });
+}
+
+/** Whether a task belongs in a board scoped by `filter` (channel or assignee); `null` when that can't be told locally. */
+function inFilter(filter: BoardFilter | undefined, t: TaskRow): boolean | null {
+  if (!filter) return null;
+  if (filter.listId) return t.listId === filter.listId;
+  if (filter.assigneeUserId) return (t.assigneeUserIds ?? []).includes(filter.assigneeUserId);
+  if (filter.departmentId) return null;
+  return true;
+}
+
+/**
+ * Moves a task between cached board columns and adjusts the column counts, the moment its status / channel /
+ * assignees change — so a card lands in its new column instantly instead of after a refetch of every column.
+ */
+function relocateTask(qc: QueryClient, before: TaskRow | undefined, after: TaskRow) {
+  for (const q of qc.getQueryCache().findAll({ queryKey: qk.tasksRoot })) {
+    const [, , kind, filter, status] = q.queryKey as [string, string, string, BoardFilter | undefined, string | undefined];
+    if (kind === 'column') {
+      const data = q.state.data as InfiniteData<TaskPage> | undefined;
+      if (!data?.pages.length) continue;
+      const belongs = inFilter(filter, after);
+      if (belongs === null) continue;
+      const has = data.pages.some((p) => p.tasks.some((t) => t.id === after.id));
+      const should = belongs && status === after.status && !after.deletedAt;
+      if (has && !should) {
+        qc.setQueryData<InfiniteData<TaskPage>>(q.queryKey, {
+          ...data,
+          pages: data.pages.map((p) => ({ ...p, tasks: p.tasks.filter((t) => t.id !== after.id) })),
+        });
+      } else if (!has && should) {
+        qc.setQueryData<InfiniteData<TaskPage>>(q.queryKey, {
+          ...data,
+          pages: [{ ...data.pages[0]!, tasks: [after, ...data.pages[0]!.tasks] }, ...data.pages.slice(1)],
+        });
+      }
+    } else if (kind === 'counts' && before) {
+      const counts = q.state.data as Record<string, number> | undefined;
+      if (!counts) continue;
+      const was = inFilter(filter, before);
+      const is = inFilter(filter, after);
+      if (was === null || is === null) continue;
+      const next = { ...counts };
+      if (was && !before.deletedAt) next[before.status] = Math.max(0, (next[before.status] ?? 0) - 1);
+      if (is && !after.deletedAt) next[after.status] = (next[after.status] ?? 0) + 1;
+      qc.setQueryData(q.queryKey, next);
+    }
+  }
+}
+
 function invalidateTasks(qc: QueryClient, taskId?: string) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.tasksRoot }),
@@ -299,8 +447,10 @@ function invalidateTasks(qc: QueryClient, taskId?: string) {
  * Someone changed the workspace (the API's `workspace_changed` socket event): refetch what could be stale.
  * `taskIds` are the tasks named by the events being handled; their detail and comments refetch too.
  */
-export function invalidateWorkspace(qc: QueryClient, orgId: string, taskIds: Iterable<string>) {
-  const ids = [...taskIds];
+export function invalidateWorkspace(qc: QueryClient, orgId: string, taskIds: Iterable<string>, untargeted = false) {
+  const ids = [...taskIds].filter((id) => !isOwnEcho(id));
+  // Only echoes of this device's own saves: every cache already has the result.
+  if (!untargeted && ids.length === 0) return Promise.resolve();
   return Promise.all([
     qc.invalidateQueries({ queryKey: ['tasks', orgId] }),
     qc.invalidateQueries({ queryKey: qk.bootstrap(orgId) }),
@@ -324,7 +474,12 @@ export type TaskPatch = {
   discordSubmissionRequired?: boolean;
   attachmentRequired?: boolean;
   timeTrackingEnabled?: boolean;
+  /** Checklist lines added in the same request (and transaction) as the field changes. */
+  subtasksToCreate?: { title: string }[];
 };
+
+/** Field changes that can move a task between board columns / filtered lists. */
+const MEMBERSHIP_FIELDS: (keyof TaskPatch)[] = ['status', 'listId', 'assigneeUserIds', 'dueAt', 'dueRepeat'];
 
 const PATCH_KEY = ['patchTask'] as const;
 
@@ -336,14 +491,86 @@ export function usePatchTask() {
       await afterCreation(taskId);
       return api<TaskMutationResult>(`/tasks/${taskId}`, { method: 'PATCH', body: patch });
     },
-    onSuccess: (res, { taskId }) => {
+    // Optimistic, like the web: the screen and every board show the change at once; the server's answer
+    // replaces it when it lands, and nothing is refetched unless the change can move the task between lists.
+    onMutate: async ({ taskId, patch }) => {
+      markOwnWrite(taskId);
+      // Cancelling only an overwrite of real data: cancelling a task's first load would strand the screen on
+      // its stand-in (that was the "only updates after going back and forth" bug).
+      if (ensureDetail(qc, taskId)) await qc.cancelQueries({ queryKey: qk.task(taskId) });
+      const moves = MEMBERSHIP_FIELDS.some((k) => patch[k] !== undefined);
+      // A board refetch already in flight would land pre-move data on top of the move; cancel those (only ones
+      // that already hold data — cancelling a first load would leave that list empty).
+      if (moves) await qc.cancelQueries({ queryKey: qk.tasksRoot, predicate: (q) => q.state.data !== undefined });
+      const prevDetail = qc.getQueryData<TaskDetail>(qk.task(taskId));
+      const snapshots = qc.getQueriesData({ queryKey: qk.tasksRoot });
+      const before = cachedTaskRow(qc, taskId) ?? prevDetail?.task;
+      const { assigneeUserIds, subtasksToCreate, ...fields } = patch;
+      const apply = (t: TaskRow): TaskRow => ({ ...t, ...fields, ...(assigneeUserIds ? { assigneeUserIds } : {}) });
+      qc.setQueryData<TaskDetail>(qk.task(taskId), (old) =>
+        old ? { ...old, task: apply(old.task), assigneeUserIds: assigneeUserIds ?? old.assigneeUserIds } : old,
+      );
+      updateTaskRows(qc, taskId, apply);
+      if (before && moves) {
+        const after = apply(before);
+        relocateTask(qc, before, after);
+        syncActiveRow(qc, after);
+      }
+      return { prevDetail, snapshots, before };
+    },
+    onError: (_e, { taskId }, ctx) => {
+      ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
+      if (ctx?.prevDetail) qc.setQueryData(qk.task(taskId), ctx.prevDetail);
+      void qc.invalidateQueries({ queryKey: qk.task(taskId) });
+    },
+    onSuccess: (res, { taskId, patch }, ctx) => {
+      // With another save of this task still in flight, this answer predates it: keep the optimistic state
+      // (the last save to land writes the final one) instead of flashing old values back.
+      const newer =
+        qc.isMutating({
+          mutationKey: PATCH_KEY,
+          predicate: (m) => (m.state.variables as { taskId?: string } | undefined)?.taskId === taskId,
+        }) > 1;
       qc.setQueryData<TaskDetail>(qk.task(taskId), (old) =>
         old
-          ? { ...old, task: res.task, subtasks: res.subtasks, assigneeUserIds: res.assigneeUserIds, ledger: [...old.ledger, ...res.ledgerDelta] }
+          ? newer
+            ? { ...old, ledger: [...old.ledger, ...res.ledgerDelta] }
+            : {
+                ...old,
+                task: { ...old.task, ...res.task },
+                capabilities: res.capabilities,
+                subtasks: res.subtasks,
+                assigneeUserIds: res.assigneeUserIds,
+                ledger: [...old.ledger, ...res.ledgerDelta],
+              }
           : old,
       );
+      const moves = MEMBERSHIP_FIELDS.some((k) => patch[k] !== undefined);
+      if (!newer) {
+        const merge = (t: TaskRow): TaskRow => ({ ...t, ...res.task, assigneeUserIds: res.assigneeUserIds, subtasks: res.subtasks });
+        updateTaskRows(qc, taskId, merge);
+        const merged = merge(cachedTaskRow(qc, taskId) ?? res.task);
+        // Settle on the server's answer (a no-op when it matches the optimistic move). No counts change here:
+        // they were adjusted once, in onMutate.
+        if (moves) relocateTask(qc, undefined, merged);
+        syncActiveRow(qc, merged);
+      }
+      refetchIfRacing(qc, taskId);
+      // The move is already on every board. Only what can't be worked out here is fetched for real: a new
+      // recurring occurrence, or a recurring task entering / leaving Done·Cancelled (its series card changes).
+      // Everything else is just marked stale, for the next time those boards open.
+      const recurringMove = !!(ctx?.before?.recurringSeriesId || res.task.recurringSeriesId) && patch.status !== undefined;
+      if (res.spawnedRecurringTaskId || recurringMove) void refreshTaskLists(qc);
+      else if (moves) {
+        void qc.invalidateQueries({
+          queryKey: qk.tasksRoot,
+          predicate: (q) => q.queryKey[2] !== 'active',
+          refetchType: 'none',
+        });
+      }
+      if (res.ledgerDelta.length) void qc.invalidateQueries({ queryKey: ['activity'] });
     },
-    onSettled: (_r, _e, { taskId }) => invalidateTasks(qc, taskId),
+    onSettled: (_r, _e, { taskId }) => markOwnWrite(taskId),
   });
 }
 
@@ -374,7 +601,7 @@ export function useSetSubtaskDone() {
     mutationFn: (v: { taskId: string; subtaskId: string; done: boolean }) =>
       api(`/tasks/${v.taskId}/subtasks/${v.subtaskId}`, { method: 'PATCH', body: { done: v.done } }),
     onMutate: async (v) => {
-      await qc.cancelQueries({ queryKey: qk.tasksRoot });
+      markOwnWrite(v.taskId);
       const flip = (s: SubtaskRow) => (s.id === v.subtaskId ? { ...s, done: v.done } : s);
       const snapshots = qc.getQueriesData({ queryKey: qk.tasksRoot });
       const prevDetail = qc.getQueryData<TaskDetail>(qk.task(v.taskId));
@@ -388,8 +615,25 @@ export function useSetSubtaskDone() {
       ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
       if (ctx?.prevDetail) qc.setQueryData(qk.task(v.taskId), ctx.prevDetail);
     },
-    onSettled: (_r, _e, v) => invalidateTasks(qc, v.taskId),
+    onSettled: (_r, _e, v) => afterSubtaskWrite(qc, v.taskId),
   });
+}
+
+/**
+ * After a checklist write: the caches already hold the result, so nothing refetches now. The detail is only
+ * marked stale (the server also logged a history note) and picks that up on its next visit.
+ */
+function afterSubtaskWrite(qc: QueryClient, taskId: string) {
+  markOwnWrite(taskId);
+  refetchIfRacing(qc, taskId);
+  return qc.invalidateQueries({ queryKey: qk.task(taskId), refetchType: 'none' });
+}
+
+/** Rewrites a task's checklist in its detail and every board row. */
+function setSubtasks(qc: QueryClient, taskId: string, fn: (subtasks: SubtaskRow[]) => SubtaskRow[]) {
+  ensureDetail(qc, taskId);
+  qc.setQueryData<TaskDetail>(qk.task(taskId), (old) => (old ? { ...old, subtasks: fn(old.subtasks) } : old));
+  updateTaskRows(qc, taskId, (t) => (t.subtasks ? { ...t, subtasks: fn(t.subtasks) } : t));
 }
 
 export function useAddSubtask(taskId: string) {
@@ -397,9 +641,17 @@ export function useAddSubtask(taskId: string) {
   return useMutation({
     mutationFn: async (title: string) => {
       await afterCreation(taskId);
-      return api(`/tasks/${taskId}/subtasks`, { method: 'POST', body: { title } });
+      return api<SubtaskRow>(`/tasks/${taskId}/subtasks`, { method: 'POST', body: { title } });
     },
-    onSettled: () => invalidateTasks(qc, taskId),
+    onMutate: (title) => {
+      markOwnWrite(taskId);
+      const tempId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      setSubtasks(qc, taskId, (list) => [...list, { id: tempId, taskId, title, done: false }]);
+      return { tempId };
+    },
+    onSuccess: (row, _title, ctx) => setSubtasks(qc, taskId, (list) => list.map((s) => (s.id === ctx?.tempId ? row : s))),
+    onError: (_e, _title, ctx) => setSubtasks(qc, taskId, (list) => list.filter((s) => s.id !== ctx?.tempId)),
+    onSettled: () => afterSubtaskWrite(qc, taskId),
   });
 }
 
@@ -408,8 +660,18 @@ export function useUpdateSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { subtaskId: string; title: string }) =>
-      api(`/tasks/${taskId}/subtasks/${v.subtaskId}`, { method: 'PATCH', body: { title: v.title } }),
-    onSettled: () => invalidateTasks(qc, taskId),
+      api<SubtaskRow>(`/tasks/${taskId}/subtasks/${v.subtaskId}`, { method: 'PATCH', body: { title: v.title } }),
+    onMutate: (v) => {
+      markOwnWrite(taskId);
+      const prev = qc.getQueryData<TaskDetail>(qk.task(taskId))?.subtasks.find((s) => s.id === v.subtaskId);
+      setSubtasks(qc, taskId, (list) => list.map((s) => (s.id === v.subtaskId ? { ...s, title: v.title } : s)));
+      return { prev };
+    },
+    onError: (_e, v, ctx) => {
+      const prev = ctx?.prev;
+      if (prev) setSubtasks(qc, taskId, (list) => list.map((s) => (s.id === v.subtaskId ? prev : s)));
+    },
+    onSettled: () => afterSubtaskWrite(qc, taskId),
   });
 }
 
@@ -417,7 +679,18 @@ export function useDeleteSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (subtaskId: string) => api(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'DELETE' }),
-    onSettled: () => invalidateTasks(qc, taskId),
+    onMutate: (subtaskId) => {
+      markOwnWrite(taskId);
+      const list = qc.getQueryData<TaskDetail>(qk.task(taskId))?.subtasks ?? [];
+      const index = list.findIndex((s) => s.id === subtaskId);
+      setSubtasks(qc, taskId, (l) => l.filter((s) => s.id !== subtaskId));
+      return { removed: index >= 0 ? list[index] : undefined, index };
+    },
+    onError: (_e, _id, ctx) => {
+      const removed = ctx?.removed;
+      if (removed) setSubtasks(qc, taskId, (l) => [...l.slice(0, ctx.index), removed, ...l.slice(ctx.index)]);
+    },
+    onSettled: () => afterSubtaskWrite(qc, taskId),
   });
 }
 
@@ -433,7 +706,10 @@ export function useAddNote(taskId: string) {
           clientMutationId: `m-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         },
       }),
-    onSettled: () => invalidateTasks(qc, taskId),
+    onSettled: () => {
+      markOwnWrite(taskId);
+      return Promise.all([qc.invalidateQueries({ queryKey: qk.task(taskId) }), qc.invalidateQueries({ queryKey: ['activity'] })]);
+    },
   });
 }
 
@@ -454,28 +730,94 @@ export function useCreateTask(orgId: string | undefined) {
   });
 }
 
-export function useArchiveTask() {
+/** Drops a task from every board / list cache (columns, active list, archived list). */
+function removeTaskRows(qc: QueryClient, taskId: string) {
+  qc.setQueriesData({ queryKey: qk.tasksRoot }, (old) => {
+    if (Array.isArray(old)) return (old as TaskRow[]).filter((t) => t.id !== taskId);
+    if (old && typeof old === 'object' && 'pages' in old) {
+      const data = old as InfiniteData<TaskPage>;
+      return { ...data, pages: data.pages.map((p) => ({ ...p, tasks: p.tasks.filter((t) => t.id !== taskId) })) };
+    }
+    return old;
+  });
+}
+
+/** Puts a task at the top of the cached archived list (first page). */
+function prependArchived(qc: QueryClient, row: TaskRow) {
+  qc.setQueriesData<InfiniteData<TaskPage>>(
+    { queryKey: qk.tasksRoot, predicate: (q) => q.queryKey[2] === 'archived' },
+    (old) =>
+      old && old.pages.length
+        ? { ...old, pages: [{ ...old.pages[0]!, tasks: [row, ...old.pages[0]!.tasks] }, ...old.pages.slice(1)] }
+        : old,
+  );
+}
+
+/**
+ * Archive / restore, both optimistic: the task leaves (or rejoins) the boards and the archived list at once,
+ * and its detail flips state, so nothing waits on the server. A failure puts every cache back.
+ */
+function useArchiveToggle(mode: 'archive' | 'restore') {
   const qc = useQueryClient();
   return useMutation({
+    mutationKey: ['archiveToggle', mode],
     mutationFn: async (taskId: string) => {
       await afterCreation(taskId);
-      return api(`/tasks/${taskId}/archive`, { method: 'POST' });
+      return api(`/tasks/${taskId}/${mode}`, { method: 'POST' });
     },
-    onSettled: (_r, _e, taskId) => invalidateTasks(qc, taskId),
+    onMutate: async (taskId) => {
+      markOwnWrite(taskId);
+      // No cancelling of in-flight list loads: cancelling a list's first load would leave it stuck empty.
+      const snapshots = qc.getQueriesData({ queryKey: qk.tasksRoot });
+      const prevDetail = qc.getQueryData<TaskDetail>(qk.task(taskId));
+      const row = prevDetail?.task ?? cachedTaskRow(qc, taskId);
+      const deletedAt = mode === 'archive' ? new Date().toISOString() : null;
+      removeTaskRows(qc, taskId);
+      if (row) {
+        const next: TaskRow = { ...row, deletedAt };
+        if (mode === 'archive') prependArchived(qc, next);
+        else syncActiveRow(qc, next);
+      }
+      qc.setQueryData<TaskDetail>(qk.task(taskId), (old) =>
+        old
+          ? {
+              ...old,
+              task: { ...old.task, deletedAt },
+              capabilities: {
+                ...old.capabilities,
+                canArchiveTask: mode === 'restore',
+                canRestoreTask: mode === 'archive',
+              },
+            }
+          : old,
+      );
+      return { snapshots, prevDetail, row: row ? { ...row, deletedAt } : undefined };
+    },
+    onError: (_e, taskId, ctx) => {
+      ctx?.snapshots.forEach(([key, data]) => qc.setQueryData(key, data));
+      if (ctx?.prevDetail) qc.setQueryData(qk.task(taskId), ctx.prevDetail);
+    },
+    onSuccess: (_r, taskId, ctx) => {
+      markOwnWrite(taskId);
+      // A dashboard load already in flight may have brought the old state back; settle it again.
+      if (ctx?.row) syncActiveRow(qc, ctx.row);
+      // Counts and filtered columns change; the detail picks up the server's capabilities.
+      void refreshTaskLists(qc);
+      void qc.invalidateQueries({ queryKey: qk.task(taskId) });
+      void qc.invalidateQueries({ queryKey: ['activity'] });
+    },
   });
 }
 
-export function useRestoreTask() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (taskId: string) => api(`/tasks/${taskId}/restore`, { method: 'POST' }),
-    onSettled: (_r, _e, taskId) => invalidateTasks(qc, taskId),
-  });
-}
+export const useArchiveTask = () => useArchiveToggle('archive');
+export const useRestoreTask = () => useArchiveToggle('restore');
 
 /** Flattened rows from an infinite task query. */
-export const flattenPages = (data: InfiniteData<TaskPage> | undefined): TaskRow[] =>
-  data?.pages.flatMap((p) => p.tasks) ?? [];
+export const flattenPages = (data: InfiniteData<TaskPage> | undefined): TaskRow[] => {
+  // De-duplicated: a task moved in locally can also come back on a later page.
+  const seen = new Set<string>();
+  return (data?.pages.flatMap((p) => p.tasks) ?? []).filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)));
+};
 
 // ---------------------------------------------------------------------------------------------
 // Comments & organization settings
@@ -509,7 +851,15 @@ export function usePostComment(taskId: string) {
   return useMutation({
     mutationFn: (v: { body: string; parentCommentId?: string }) =>
       api(`/tasks/${taskId}/comments`, { method: 'POST', body: v }),
-    onSettled: () => Promise.all([qc.invalidateQueries({ queryKey: ['comments', taskId] }), invalidateTasks(qc, taskId)]),
+    // The thread and this task's history only; board lists don't show comments.
+    onSettled: () => {
+      markOwnWrite(taskId);
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['comments', taskId] }),
+        qc.invalidateQueries({ queryKey: qk.task(taskId) }),
+        qc.invalidateQueries({ queryKey: ['activity'] }),
+      ]);
+    },
   });
 }
 

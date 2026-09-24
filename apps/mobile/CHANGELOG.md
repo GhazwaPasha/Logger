@@ -4,6 +4,44 @@ Every release build bumps the version in `app.json`: `version` (shown in Setting
 and `ios.buildNumber`, which must go up by one for every build you install over an older one or upload.
 Release APKs go in `releases/android/` at the repo root (git-ignored), named `LogBase-<version>-build<code>.apk`.
 
+## 1.5.0 (build 6) — 2026-09-24
+
+- Task editor updates on screen instantly: an edit made while a task was still loading no longer leaves the
+  screen stale until you go back and forth (removing an assignee, etc.).
+- Send to Discord: owners can switch it on (channel + "required") for any task, including new ones. Attaching
+  a file shows a real upload progress bar, then "Posting to #channel…"; delivered files stay listed as
+  "<file> sent to Discord". Failed sends show why, with retry.
+- Archive / restore are instant, with an "Archived" banner and Restore on the task screen (Archive now lives in
+  the ⋯ menu at the top).
+- Removing an attachment is instant.
+- Moving a task to another status is instant: the card moves to its new column at once, counts update, and the
+  board no longer shows a full refresh or replays the card's slide-in. Pull-to-refresh spinner only on a pull.
+- Task screen redesigned for the app: large title, one clean properties list (Status, Priority, Assignee, Due,
+  Channel — each opens its picker), a quiet "Saving" indicator, calmer spacing and a staggered entrance.
+- One assignee per task (the picker replaces; AI fill keeps the first person).
+- Subtasks are inline — no box; edit a line where it sits, add lines one after another.
+
+## 1.4.0 (build 5) — 2026-09-24
+
+- Task editing is live: changes show instantly and save in the background, and only the lists a change
+  actually affects refetch (no more reloading the whole workspace after every edit or comment).
+- Tasks open instantly from the board while the full details load.
+- AI fill saves everything (fields, assignees, subtasks) in one request; a due time already in the past no
+  longer makes the whole fill fail. AI assignee matching also handles names / emails (web `/api/ai/task-fill`).
+- AI fill sits above the title in the task editor.
+- Home header: the workspace switcher no longer clips its name or animates twice; the bell + avatar pill
+  springs again as teammates come online; the status ring no longer flashes its colours before filling.
+- Taller task cards in list and kanban views; the subtask chevron points right and turns down when open.
+- Scrollbars hidden everywhere.
+
+## 1.3.0 (build 4) — 2026-09-24
+
+- Creating a task is one page: it opens straight in the editor with autosave, like the web.
+- Assignees are picked from a bottom sheet; AI fill (describe a task in plain language) is in the editor.
+- Task cards slide in from the left in list and kanban views.
+- Home loads in one sequence: header chips, cards and charts appear first, numbers fill in after.
+- Cleaner email sign-in screen; signing out no longer flashes back into the app.
+
 ## 1.2.0 (build 3) — 2026-09-24
 
 - Push notifications on Android (Firebase Cloud Messaging), for the same events as the in-app bell. Tapping

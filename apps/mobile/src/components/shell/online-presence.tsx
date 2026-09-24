@@ -42,6 +42,8 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let refetchTimer: ReturnType<typeof setTimeout> | null = null;
     const changedTaskIds = new Set<string>();
+    // An event without a task (channels, members…) always refetches; task events skip this device's own saves.
+    let untargeted = false;
 
     void getApiToken()
       .then((token) => {
@@ -67,11 +69,13 @@ export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
         socket.on('workspace_changed', (p: WorkspaceChangedPayload) => {
           if (p?.organizationId !== orgId) return;
           if (p.taskId) changedTaskIds.add(p.taskId);
+          else untargeted = true;
           if (refetchTimer) clearTimeout(refetchTimer);
           refetchTimer = setTimeout(() => {
             refetchTimer = null;
-            void invalidateWorkspace(qc, orgId, changedTaskIds);
+            void invalidateWorkspace(qc, orgId, changedTaskIds, untargeted);
             changedTaskIds.clear();
+            untargeted = false;
           }, WORKSPACE_REFETCH_DEBOUNCE_MS);
         });
       })
