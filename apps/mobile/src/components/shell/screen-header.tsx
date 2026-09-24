@@ -12,7 +12,7 @@ import {
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
+import Animated, { FadeIn, LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -24,12 +24,12 @@ import { useOnlineTeammates } from '@/components/shell/online-presence';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
-import { Duration, POP_EASE } from '@/constants/motion';
+import { Pulse } from '@/components/motion/pulse';
+import { chipEnter, Duration, POP_EASE } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
-import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
-import { queryClient } from '@/lib/query-client';
+import { signOut } from '@/lib/sign-out';
 import { useWorkspace } from '@/lib/workspace';
 
 const HEADER_HEIGHT = 56;
@@ -64,7 +64,7 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
         </View>
 
         {/* The pill's width follows the online stack: `layout` springs it wider / narrower as people come and go. */}
-        <Animated.View layout={PILL_LAYOUT} style={styles.controlPill}>
+        <Animated.View entering={chipEnter(1)} layout={PILL_LAYOUT} style={styles.controlPill}>
           <BarSurface radius={CONTROL_H / 2} />
           <OnlineStack />
           <View style={styles.bell}>
@@ -191,12 +191,25 @@ export function WorkspaceSwitcher() {
   const theme = useTheme();
   const { orgs, org, setOrgId } = useWorkspace();
   const [open, setOpen] = useState(false);
-  if (!org) return null;
+
+  // The chip is there from the first frame (sliding in like the bell + avatar pill) with a placeholder inside;
+  // the workspace fades in and the pill springs to its width once it resolves, so nothing pops in late.
+  if (!org) {
+    return (
+      <Animated.View entering={chipEnter(-1)} layout={PILL_LAYOUT} style={styles.switcher}>
+        <BarSurface radius={CONTROL_H / 2} />
+        <View style={styles.switcherInner}>
+          <Pulse style={[styles.switcherMark, { backgroundColor: alpha(theme.fg, 0.1) }]} />
+          <Pulse style={{ width: 84, height: 10, borderRadius: 5, backgroundColor: alpha(theme.fg, 0.1) }} />
+        </View>
+      </Animated.View>
+    );
+  }
   const initial = org.name.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <>
-      <View style={styles.switcher}>
+      <Animated.View entering={chipEnter(-1)} layout={PILL_LAYOUT} style={styles.switcher}>
         <BarSurface radius={CONTROL_H / 2} />
         <PressableScale
           accessibilityRole="button"
@@ -205,17 +218,19 @@ export function WorkspaceSwitcher() {
           haptic="select"
           onPress={() => setOpen(true)}
           style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
-          <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
-            <Text size="xs" weight="bold" color={theme.onAccent}>
-              {initial}
+          <Animated.View entering={FadeIn.duration(Duration.base)} style={styles.switcherContent}>
+            <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
+              <Text size="xs" weight="bold" color={theme.onAccent}>
+                {initial}
+              </Text>
+            </View>
+            <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {org.name}
             </Text>
-          </View>
-          <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
-            {org.name}
-          </Text>
-          <Icon icon={faChevronDown} size={11} color="muted" />
+            <Icon icon={faChevronDown} size={11} color="muted" />
+          </Animated.View>
         </PressableScale>
-      </View>
+      </Animated.View>
 
       <MenuSheet<string>
         visible={open}
@@ -255,18 +270,19 @@ function AccountButton() {
     return { transform: [{ translateY: (1 - p) * height * 0.6 }] };
   });
 
-  if (!user) return null;
+  if (!user) {
+    // Hold the avatar's slot so the pill keeps its width while the session loads.
+    return <Pulse style={[styles.avatarButton, { borderRadius: ITEM / 2, backgroundColor: alpha(theme.fg, 0.1) }]} />;
+  }
 
   const go = (href: Href) => {
     setOpen(false);
     router.push(href);
   };
 
-  async function signOut() {
+  async function onSignOut() {
     setOpen(false);
-    clearTokenCache();
-    queryClient.clear();
-    await authClient.signOut();
+    await signOut();
   }
 
   return (
@@ -278,7 +294,9 @@ function AccountButton() {
         scaleTo={0.94}
         style={styles.avatarButton}
         hitSlop={8}>
-        <Avatar name={user.name} email={user.email} image={user.image} size={ITEM} />
+        <Animated.View entering={FadeIn.duration(Duration.base)}>
+          <Avatar name={user.name} email={user.email} image={user.image} size={ITEM} />
+        </Animated.View>
         <View pointerEvents="none" style={[styles.avatarRing, { borderColor: alpha(theme.fg, 0.12) }]} />
         <View style={styles.presence} />
       </PressableScale>
@@ -315,7 +333,7 @@ function AccountButton() {
             </View>
 
             <View style={[styles.sheetGroup, { backgroundColor: alpha(theme.fg, dark ? 0.04 : 0.03) }]}>
-              <MenuRow label="Sign out" icon={faRightFromBracket} destructive onPress={signOut} />
+              <MenuRow label="Sign out" icon={faRightFromBracket} destructive onPress={onSignOut} />
             </View>
           </Animated.View>
         </View>
@@ -390,6 +408,7 @@ const styles = StyleSheet.create({
   bellButton: { width: 52, borderRadius: ITEM / 2, backgroundColor: 'transparent' },
   avatarButton: { width: ITEM, height: ITEM },
   switcher: { height: CONTROL_H, maxWidth: 240, borderRadius: CONTROL_H / 2 },
+  switcherContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   switcherInner: {
     flex: 1,
     flexDirection: 'row',

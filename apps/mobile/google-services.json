@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "798457870679",
+    "project_id": "gen-lang-client-0639843296",
+    "storage_bucket": "gen-lang-client-0639843296.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798457870679:android:086fb307dddf8427592612",
+        "android_client_info": {
+          "package_name": "com.logbase.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAINhqhqCR59SO2wmnTL8LSZOnatALhGo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

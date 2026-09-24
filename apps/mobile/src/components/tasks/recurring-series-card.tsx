@@ -10,7 +10,7 @@ import { PressableScale } from '@/components/motion/pressable-scale';
 import { RotatingChevron } from '@/components/motion/rotating-chevron';
 import { useBoardActions } from '@/components/tasks/board-context';
 import { Text } from '@/components/text';
-import { itemEnter, listLayout, revealIn, revealOut } from '@/constants/motion';
+import { cardEnter, listLayout, revealIn, revealOut } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { formatDateOnly, formatLogTimestamp } from '@/lib/format';
@@ -119,7 +119,7 @@ export function RecurringSeriesCard({
   return (
     <Animated.View
       layout={listLayout}
-      entering={enterIndex === undefined ? undefined : itemEnter(enterIndex)}
+      entering={enterIndex === undefined ? undefined : cardEnter(enterIndex)}
       style={[styles.card, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
       {/* Series header row */}
       <View style={styles.header}>

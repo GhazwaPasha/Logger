@@ -56,6 +56,7 @@ import {
   type SortMode,
 } from '@/lib/task-board';
 import type { TaskRow } from '@/lib/types';
+import { useOpenNewTask } from '@/lib/draft-task';
 import { useWorkspace } from '@/lib/workspace';
 
 /** A list-view row: either a plain task card, or a recurring chain collapsed into one series card. */
@@ -84,6 +85,7 @@ export function Board({
   const bottomInset = useTabBarInset();
   const onScroll = useCollapseOnScroll();
   const { org } = useWorkspace();
+  const openNewTask = useOpenNewTask();
   const orgId = org?.id;
   const byChannel = !!listId;
 
@@ -178,9 +180,7 @@ export function Board({
           accessibilityLabel="New task"
           scaleTo={0.94}
           haptic="tap"
-          onPress={() =>
-            router.push({ pathname: '/task/new', params: listId ? { listId } : {} })
-          }
+          onPress={() => openNewTask(listId)}
           style={({ pressed }) => [
             styles.newTask,
             { backgroundColor: theme.accent, borderColor: theme.accent },

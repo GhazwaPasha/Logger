@@ -20,6 +20,7 @@ import { HistoryCard } from '@/components/tasks/detail/history-card';
 import { LevelListFieldCard } from '@/components/tasks/detail/level-list-field';
 import { SubtaskListCard } from '@/components/tasks/detail/subtask-list';
 import { TimeTrackingCard } from '@/components/tasks/detail/time-tracking-card';
+import { AiFillCard } from '@/components/tasks/detail/ai-fill-card';
 import { AssigneeFieldCard } from '@/components/tasks/detail/assignee-field';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
@@ -41,6 +42,7 @@ import {
   useUpdateSubtask,
   useDeleteSubtask,
   useTaskDetail,
+  type TaskPatch,
 } from '@/lib/queries';
 import {
   useAttachments,
@@ -60,6 +62,8 @@ import {
   taskPriority,
   type TaskPriority,
 } from '@/lib/task-board';
+import { isDefaultTitle } from '@/lib/draft-task';
+import { toDueLocal, type TaskAiFillResult } from '@/lib/task-ai-fill';
 import { useWorkspace } from '@/lib/workspace';
 
 const PRIORITY_ICON = { high: faAnglesUp, medium: faArrowUp, low: faAnglesDown } as const;
@@ -79,7 +83,7 @@ function TaskScreen() {
   const theme = useTheme();
   const dark = useIsDark();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, draft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const { org, members, lists, depts, userId } = useWorkspace();
   const timeZone = org?.timeZone ?? 'UTC';
 
@@ -114,12 +118,27 @@ function TaskScreen() {
   useEffect(() => {
     if (task) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTitle(task.title);
+      setTitle(isDefaultTitle(task.title) ? '' : task.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
-  const close = () => (router.canGoBack() ? router.back() : router.replace('/dashboard'));
+  const close = () => {
+    // A draft that was never filled in is discarded (the web's `onDeleteDraft`), so backing out leaves no "Untitled task".
+    if (
+      draft === '1' &&
+      task &&
+      isDefaultTitle(task.title) &&
+      !title.trim() &&
+      !detail.data?.subtasks.length &&
+      !detail.data?.assigneeUserIds.length &&
+      !task.dueAt
+    ) {
+      archive.mutate(task.id);
+    }
+    if (router.canGoBack()) router.back();
+    else router.replace('/dashboard');
+  };
 
   const topBar = (
     <View style={[styles.topBar, { borderBottomColor: theme.borderSubtle, paddingTop: insets.top + 6 }]}>
@@ -166,7 +185,42 @@ function TaskScreen() {
   const commitTitle = () => {
     const trimmed = title.trim();
     if (trimmed && trimmed !== task.title) patch.mutate({ taskId: task.id, patch: { title: trimmed } });
-    else if (!trimmed) setTitle(task.title);
+    else if (!trimmed && !isDefaultTitle(task.title)) setTitle(task.title);
+  };
+
+  const applyAi = (r: TaskAiFillResult) => {
+    const p: TaskPatch = {};
+    if (r.title) {
+      p.title = r.title;
+      setTitle(r.title);
+    }
+    if (r.priority) p.priority = r.priority;
+    if (r.status) p.status = r.status;
+    if (r.assigneeUserIds) p.assigneeUserIds = r.assigneeUserIds;
+    if (r.dueLocal !== null) {
+      if (r.dueLocal === '') {
+        p.dueAt = null;
+        p.dueRepeat = null;
+      } else {
+        p.dueAt = new Date(r.dueLocal).toISOString();
+      }
+    }
+    if (r.dueRepeat !== null && p.dueAt !== null && (p.dueAt || task.dueAt)) {
+      p.dueRepeat = r.dueRepeat === 'none' ? null : r.dueRepeat;
+    }
+    if (Object.keys(p).length > 0) patch.mutate({ taskId: task.id, patch: p });
+    const lines = r.subtasks ?? [];
+    if (lines.length > 0) {
+      void (async () => {
+        for (const line of lines) {
+          try {
+            await addSubtask.mutateAsync(line);
+          } catch {
+            break;
+          }
+        }
+      })();
+    }
   };
 
   return (
@@ -181,6 +235,9 @@ function TaskScreen() {
               onBlur={commitTitle}
               onSubmitEditing={commitTitle}
               multiline
+              autoFocus={draft === '1'}
+              placeholder="Task title"
+              placeholderTextColor={theme.muted}
               style={[styles.titleInput, { color: theme.fg }]}
             />
           ) : (
@@ -188,6 +245,14 @@ function TaskScreen() {
               {task.title}
             </Text>
           )}
+
+          {canEdit ? (
+            <AiFillCard
+              members={members}
+              existingDraft={{ title: title.trim() || undefined, dueLocal: toDueLocal(task.dueAt), dueRepeat: task.dueRepeat ?? null }}
+              onApply={applyAi}
+            />
+          ) : null}
 
           <SubtaskListCard
             subtasks={subtasks}

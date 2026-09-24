@@ -10,6 +10,7 @@ import {
 import { useCallback, useState } from 'react';
 
 import { api } from '@/lib/api';
+import { afterCreation } from '@/lib/pending-creation';
 import type { ManualTaskStatus, TaskPriority } from '@/lib/task-board';
 import type {
   Dept,
@@ -258,7 +259,10 @@ export function useSearchTasks(orgId: string | undefined, query: string) {
 export function useTaskDetail(taskId: string | undefined) {
   return useQuery({
     queryKey: qk.task(taskId ?? ''),
-    queryFn: () => api<TaskDetail>(`/tasks/${taskId}`),
+    queryFn: async () => {
+      await afterCreation(taskId ?? '');
+      return api<TaskDetail>(`/tasks/${taskId}`);
+    },
     enabled: !!taskId,
   });
 }
@@ -291,6 +295,23 @@ function invalidateTasks(qc: QueryClient, taskId?: string) {
   ]);
 }
 
+/**
+ * Someone changed the workspace (the API's `workspace_changed` socket event): refetch what could be stale.
+ * `taskIds` are the tasks named by the events being handled; their detail and comments refetch too.
+ */
+export function invalidateWorkspace(qc: QueryClient, orgId: string, taskIds: Iterable<string>) {
+  const ids = [...taskIds];
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ['tasks', orgId] }),
+    qc.invalidateQueries({ queryKey: qk.bootstrap(orgId) }),
+    qc.invalidateQueries({ queryKey: qk.activity(orgId) }),
+    qc.invalidateQueries({ queryKey: ['roadmap', orgId] }),
+    qc.invalidateQueries({ queryKey: ['search', orgId] }),
+    ...ids.map((id) => qc.invalidateQueries({ queryKey: qk.task(id) })),
+    ...ids.map((id) => qc.invalidateQueries({ queryKey: ['comments', id] })),
+  ]);
+}
+
 export type TaskPatch = {
   status?: ManualTaskStatus;
   priority?: TaskPriority;
@@ -311,8 +332,10 @@ export function usePatchTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationKey: PATCH_KEY,
-    mutationFn: ({ taskId, patch }: { taskId: string; patch: TaskPatch }) =>
-      api<TaskMutationResult>(`/tasks/${taskId}`, { method: 'PATCH', body: patch }),
+    mutationFn: async ({ taskId, patch }: { taskId: string; patch: TaskPatch }) => {
+      await afterCreation(taskId);
+      return api<TaskMutationResult>(`/tasks/${taskId}`, { method: 'PATCH', body: patch });
+    },
     onSuccess: (res, { taskId }) => {
       qc.setQueryData<TaskDetail>(qk.task(taskId), (old) =>
         old
@@ -372,7 +395,10 @@ export function useSetSubtaskDone() {
 export function useAddSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (title: string) => api(`/tasks/${taskId}/subtasks`, { method: 'POST', body: { title } }),
+    mutationFn: async (title: string) => {
+      await afterCreation(taskId);
+      return api(`/tasks/${taskId}/subtasks`, { method: 'POST', body: { title } });
+    },
     onSettled: () => invalidateTasks(qc, taskId),
   });
 }
@@ -431,7 +457,10 @@ export function useCreateTask(orgId: string | undefined) {
 export function useArchiveTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => api(`/tasks/${taskId}/archive`, { method: 'POST' }),
+    mutationFn: async (taskId: string) => {
+      await afterCreation(taskId);
+      return api(`/tasks/${taskId}/archive`, { method: 'POST' });
+    },
     onSettled: (_r, _e, taskId) => invalidateTasks(qc, taskId),
   });
 }

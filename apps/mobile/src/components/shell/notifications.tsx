@@ -5,7 +5,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isLedgerEntryNotifiableToUser } from '@work-ledger/contracts';
 
+import { LedgerLineBody } from '@/components/activity/ledger-line';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
 import { Text } from '@/components/text';
@@ -13,8 +15,7 @@ import { Duration } from '@/constants/motion';
 import { Button, EmptyState, ErrorBanner, Spinner } from '@/components/ui';
 import { alpha, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { describeLedger, formatLogTimestamp } from '@/lib/format';
-import { isLedgerEntryNotifiableToUser, isTaskCreatedNote } from '@/lib/notification-eligibility';
+import { formatLogTimestamp } from '@/lib/format';
 import { liveIsland } from '@/lib/live-island';
 import { useOrgActivity, type ActivityFeed } from '@/lib/queries';
 import { useWorkspace } from '@/lib/workspace';
@@ -44,7 +45,7 @@ const toNumber = (raw: string | null) => (raw && !Number.isNaN(Number(raw)) ? Nu
 
 /**
  * In-app notifications, derived like the web's `WorkspaceNotificationsProvider`: the workspace activity feed
- * filtered to events on tasks you're assigned to (or assigned), excluding your own actions. Read / cleared
+ * filtered by the shared rule in `@work-ledger/contracts` (`isLedgerEntryNotifiableToUser`). Read / cleared
  * state is a pair of timestamps kept per workspace.
  */
 export function NotificationsProvider({ children }: { children: ReactNode }) {
@@ -52,8 +53,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const orgId = org?.id;
   const timeZone = org?.timeZone ?? 'UTC';
 
-  // The activity feed refreshes every minute while the app is open (the web relies on a socket for this).
-  const feed = useOrgActivity(orgId, !!userId, 60_000);
+  // Live updates come from the `workspace_changed` socket event (online-presence.tsx refetches the feed); this
+  // interval is only a fallback for missed events, like the web's.
+  const feed = useOrgActivity(orgId, !!userId, 5 * 60_000);
   const [panelOpen, setPanelOpen] = useState(false);
   const [read, setRead] = useState<ReadState | null>(null);
 
@@ -75,12 +77,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const entries = useMemo(() => {
     const data = feed.data;
     if (!data || !userId) return [];
-    return data.entries.filter((e) => {
-      if (isTaskCreatedNote(e)) return false;
-      const assignees = data.assigneesByTaskId?.[e.taskId] ?? [];
-      const assignerId = data.tasksById[e.taskId]?.assignerId ?? null;
-      return isLedgerEntryNotifiableToUser(e, userId, assignees, assignerId);
-    });
+    return data.entries.filter((e) =>
+      isLedgerEntryNotifiableToUser(e, userId, {
+        assigneeUserIds: data.assigneesByTaskId?.[e.taskId] ?? [],
+        assignerId: data.tasksById[e.taskId]?.assignerId ?? null,
+      }),
+    );
   }, [feed.data, userId]);
 
   const panelEntries = useMemo(
@@ -247,12 +249,12 @@ function NotificationsPanel({
                 <Text size="xs" weight="medium">
                   {feed?.tasksById[e.taskId]?.title ?? 'Task'}
                 </Text>
-                <Text font="mono" size="xs" color="muted" style={{ marginTop: 4 }}>
-                  {formatLogTimestamp(e.createdAt, timeZone)}
-                  {' · '}
-                  <Text font="mono" size="xs">
-                    {names.get(e.actorId) ?? 'Someone'} {describeLedger(e, names, timeZone)}
+                {/* Same line as the web panel: muted timestamp, then the coloured ledger description. */}
+                <Text font="mono" size="xs" lh={17} style={{ marginTop: 4 }}>
+                  <Text font="mono" size="xs" color="muted">
+                    {`${formatLogTimestamp(e.createdAt, timeZone)} · `}
                   </Text>
+                  <LedgerLineBody entry={e} names={names} timeZone={timeZone} />
                 </Text>
               </PressableScale>
             ))

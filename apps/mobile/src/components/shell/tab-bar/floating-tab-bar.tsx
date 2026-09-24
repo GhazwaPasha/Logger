@@ -162,7 +162,10 @@ export function FloatingTabBar() {
 
   function leaveSearch() {
     Keyboard.dismiss();
-    switchTab(lastTab.current, {});
+    // Go *back*, not forward: switching tabs would push the previous tab after search in the tab history
+    // ([Home, Search] → [Search, Home]), so the next Back would reopen search — a loop. Popping drops search.
+    if (router.canGoBack()) router.back();
+    else switchTab(lastTab.current, {});
   }
 
   function restore() {

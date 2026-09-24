@@ -84,15 +84,34 @@ export function itemEnter(index: number) {
   return FadeIn.duration(Duration.micro).delay(Math.min(index, STAGGER_CAP) * STAGGER_MS);
 }
 
+/** A task card sliding in from the left with a fade, staggered for the first few cards. */
+export function cardEnter(index: number) {
+  return new Keyframe({
+    from: { opacity: 0, transform: [{ translateX: -28 }] },
+    to: { opacity: 1, transform: [{ translateX: 0 }], easing: POP_EASE },
+  })
+    .duration(Duration.slide)
+    .delay(Math.min(index, STAGGER_CAP) * 45);
+}
+
+const SEQUENCE_STEP_MS = 60;
+const SEQUENCE_ENTER_MS = 360;
+
 /** A larger element entering in sequence (sign-in, dashboard panels). */
 export function sequenceEnter(index: number, offset = 10) {
   return new Keyframe({
     from: { opacity: 0, transform: [{ translateY: offset }] },
     to: { opacity: 1, transform: [{ translateY: 0 }], easing: POP_EASE },
   })
-    .duration(360)
-    .delay(index * 60);
+    .duration(SEQUENCE_ENTER_MS)
+    .delay(index * SEQUENCE_STEP_MS);
 }
+
+/**
+ * Ms after mount at which step `index` of a sequence has mostly landed â€” when its own content animation (a ring
+ * filling, bars growing) should begin, so that plays after the entrance instead of racing it.
+ */
+export const sequenceSettled = (index: number) => index * SEQUENCE_STEP_MS + SEQUENCE_ENTER_MS * 0.7;
 
 /** Activity-log lines revealing one after another (web `term-line-reveal`). */
 export function lineReveal(index: number) {
@@ -102,6 +121,14 @@ export function lineReveal(index: number) {
   })
     .duration(Duration.base)
     .delay(Math.min(index, 20) * 25);
+}
+
+/** A header chip sliding in from its own edge (`-1` left, `1` right) — the switcher and the bell + avatar pill mirror each other. */
+export function chipEnter(side: -1 | 1) {
+  return new Keyframe({
+    from: { opacity: 0, transform: [{ translateX: side * 18 }, { scale: 0.96 }] },
+    to: { opacity: 1, transform: [{ translateX: 0 }, { scale: 1 }], easing: POP_EASE },
+  }).duration(Duration.panel);
 }
 
 /** The floating live-island toast dropping in. */

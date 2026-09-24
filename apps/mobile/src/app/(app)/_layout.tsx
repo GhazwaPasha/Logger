@@ -5,7 +5,12 @@ import { LiveIsland } from '@/components/shell/live-island';
 import { NotificationsProvider } from '@/components/shell/notifications';
 import { OnlinePresenceProvider } from '@/components/shell/online-presence';
 import { useTheme } from '@/hooks/use-theme';
+import { authClient } from '@/lib/auth-client';
+import { usePushNotifications } from '@/lib/push';
 import { WorkspaceProvider } from '@/lib/workspace';
+
+/** The tabs sit at the bottom of this stack, so anything pushed on top (a task, settings…) backs out to them. */
+export const unstable_settings = { anchor: '(tabs)' };
 
 /**
  * Authenticated area: workspace data, notifications and live presence around a stack. The tabs (with the
@@ -14,6 +19,9 @@ import { WorkspaceProvider } from '@/lib/workspace';
  */
 export default function AppLayout() {
   const theme = useTheme();
+  const { data: session } = authClient.useSession();
+  // Register this device for push, and open the task when a notification is tapped.
+  usePushNotifications(session?.user.id ?? null);
   return (
     <WorkspaceProvider>
       <NotificationsProvider>
@@ -26,7 +34,6 @@ export default function AppLayout() {
                 contentStyle: { backgroundColor: theme.surfaceBase },
               }}>
               <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-              <Stack.Screen name="task/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             </Stack>
             <LiveIsland />
           </View>

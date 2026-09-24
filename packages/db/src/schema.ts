@@ -735,6 +735,26 @@ export const pushSubscriptions = pgTable(
   ],
 );
 
+/** Mobile app push tokens (Firebase Cloud Messaging registration tokens), one row per installed device. */
+export const mobilePushTokens = pgTable(
+  "mobile_push_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    /** "android" | "ios". */
+    platform: text("platform").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mobile_push_tokens_token_uidx").on(t.token),
+    index("mobile_push_tokens_user_idx").on(t.userId),
+  ],
+);
+
 export const usersRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),

@@ -14,8 +14,8 @@ import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription"
 import { EmptyState } from "@/components/ui/EmptyState";
 import { backdropVariants, motionDuration } from "@/components/ui/motion-presets";
 import type { OrgActivityLedgerRow } from "@/lib/ledger-types";
-import { isLedgerEntryNotifiableToUser } from "@/lib/notification-eligibility";
-import { isTaskCreatedNote, formatLogTimestamp } from "@/lib/task-activity-log";
+import { isLedgerEntryNotifiableToUser } from "@work-ledger/contracts";
+import { formatLogTimestamp } from "@/lib/task-activity-log";
 import { subscribeWebPush } from "@/lib/web-push-client";
 
 const NOTIF_PANEL_HEADER_ROW =
@@ -94,11 +94,10 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
     const list: OrgActivityLedgerRow[] = [];
     const tasksById = activityQuery.data?.tasksById;
     for (const e of entries) {
-      if (isTaskCreatedNote(e)) continue;
-      const assignees = assigneesByTaskId[e.taskId] ?? [];
+      const assigneeUserIds = assigneesByTaskId[e.taskId] ?? [];
       const assignerId =
         tasksById?.[e.taskId]?.assignerId ?? tasks.find((t) => t.id === e.taskId)?.assignerId ?? null;
-      if (!isLedgerEntryNotifiableToUser(e, userId, assignees, assignerId)) continue;
+      if (!isLedgerEntryNotifiableToUser(e, userId, { assigneeUserIds, assignerId })) continue;
       list.push(e);
     }
     return list;

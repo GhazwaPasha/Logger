@@ -6,10 +6,9 @@ import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Avatar, Button } from '@/components/ui';
 import { useThemePreference, useTheme, type ThemePreference } from '@/hooks/use-theme';
-import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { API_URL } from '@/lib/config';
-import { queryClient } from '@/lib/query-client';
+import { signOut } from '@/lib/sign-out';
 import { useWorkspace } from '@/lib/workspace';
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -33,11 +32,6 @@ export default function SettingsScreen() {
   const { org, me } = useWorkspace();
   const [pref, setPref] = useThemePreference();
 
-  async function signOut() {
-    clearTokenCache();
-    queryClient.clear();
-    await authClient.signOut();
-  }
 
   return (
     <Page header={<StackHeader title="Your settings" />} gap={16}>

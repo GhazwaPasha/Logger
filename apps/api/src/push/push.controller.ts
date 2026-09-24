@@ -24,4 +24,16 @@ export class PushController {
   unsubscribe(@CurrentUser() user: RequestUser, @Body() body: { endpoint?: string }) {
     return this.push.deleteSubscription(user.id, body?.endpoint);
   }
+
+  /** Mobile app: register this device's FCM token for the signed-in user. */
+  @Post("device-token")
+  registerDevice(@CurrentUser() user: RequestUser, @Body() body: unknown) {
+    return this.push.saveDeviceToken(user.id, body);
+  }
+
+  /** Mobile app: stop pushing to this device (sign-out). */
+  @Delete("device-token")
+  unregisterDevice(@CurrentUser() user: RequestUser, @Body() body: { token?: string }) {
+    return this.push.deleteDeviceToken(user.id, body?.token);
+  }
 }

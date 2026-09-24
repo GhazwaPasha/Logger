@@ -1,15 +1,26 @@
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { Pulse } from '@/components/motion/pulse';
 import { usePresence } from '@/components/motion/use-presence';
+import { useSequenceClock } from '@/components/motion/use-sequence-clock';
 import { Text } from '@/components/text';
-import { Duration, POP_EASE, sequenceEnter } from '@/constants/motion';
+import { Duration, POP_EASE, sequenceEnter, sequenceSettled } from '@/constants/motion';
 import { alpha, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 
@@ -32,6 +43,8 @@ const CHUNK_GAP_DEG = 4;
 const SEAM_DEG = CHUNK_GAP_DEG / 2;
 /** How long a half takes to fill, chunk by chunk. */
 const FILL_MS = 900;
+/** In the focused view, the ring starts filling once the stage has mostly sprung in. */
+const FOCUS_FILL_AT = 160;
 
 /** Smallest slice of a half a non-zero segment is drawn with, so tiny counts stay visible. */
 const MIN_SHARE = 0.07;
@@ -83,28 +96,73 @@ function arcPath(r: number, fromDeg: number, toDeg: number) {
   return `M ${pt(a)} A ${r} ${r} 0 0 1 ${pt(b)}`;
 }
 
-/** 0 → 1 over FILL_MS whenever `signature` changes, so the meter refills when the data does. */
-function useFill(signature: string) {
-  const [filled, setFilled] = useState(0);
-  useEffect(() => {
-    let frame = 0;
-    const start = Date.now();
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / FILL_MS);
-      // Ease out: quick at first, settling into the last chunks.
-      setFilled(1 - Math.pow(1 - t, 3));
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    // The first frame lands at t ≈ 0, which empties the meter before it refills.
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [signature]);
-  return filled;
+/** SVG arc drawn from `fromDeg` towards `toDeg` (either way round), so a dash reveals it in that direction. */
+function directedArc(r: number, fromDeg: number, toDeg: number) {
+  const pt = (deg: number) => {
+    const rad = (deg * Math.PI) / 180;
+    return `${(100 + r * Math.cos(rad)).toFixed(3)} ${(100 + r * Math.sin(rad)).toFixed(3)}`;
+  };
+  return `M ${pt(fromDeg)} A ${r} ${r} 0 0 ${toDeg > fromDeg ? 1 : 0} ${pt(toDeg)}`;
+}
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+/**
+ * One coloured run inside a chunk. Its geometry is fixed; only the dash offset follows `filled`, on the UI
+ * thread, so the meter fills without re-rendering the ring every frame.
+ */
+function FillArc({
+  filled,
+  from,
+  to,
+  fromDeg,
+  toDeg,
+  r,
+  color,
+  stroke,
+  startCap,
+  endCap,
+}: {
+  filled: SharedValue<number>;
+  /** The run's slice of its half, 0 → 1 in fill order. */
+  from: number;
+  to: number;
+  fromDeg: number;
+  toDeg: number;
+  r: number;
+  color: string;
+  stroke: number;
+  startCap: { x: number; y: number } | null;
+  endCap: { x: number; y: number } | null;
+}) {
+  const length = (Math.abs(toDeg - fromDeg) * Math.PI * r) / 180;
+  const arc = useAnimatedProps(() => {
+    const shown = Math.min(1, Math.max(0, (filled.value - from) / (to - from)));
+    return { strokeDashoffset: length * (1 - shown) };
+  });
+  const startDot = useAnimatedProps(() => ({ opacity: filled.value > from ? 1 : 0 }));
+  const endDot = useAnimatedProps(() => ({ opacity: filled.value >= to - 1e-4 ? 1 : 0 }));
+  return (
+    <>
+      <AnimatedPath
+        d={directedArc(r, fromDeg, toDeg)}
+        stroke={color}
+        strokeWidth={stroke}
+        fill="none"
+        strokeDasharray={[length, length + 1]}
+        animatedProps={arc}
+      />
+      {startCap ? <AnimatedCircle cx={startCap.x} cy={startCap.y} r={stroke / 2} fill={color} animatedProps={startDot} /> : null}
+      {endCap ? <AnimatedCircle cx={endCap.x} cy={endCap.y} r={stroke / 2} fill={color} animatedProps={endDot} /> : null}
+    </>
+  );
 }
 
 /**
  * The chunked ring. Both halves fill left → right: the top half (status) over the top, the bottom half
- * (priority) under the bottom. With a `focus`, every chunk outside that segment dims.
+ * (priority) under the bottom. With a `focus`, every chunk outside that segment dims. The fill starts `fillAt`
+ * ms after mount (so it can wait for an entrance to land) and replays whenever the data changes.
  */
 function TickRing({
   top,
@@ -112,6 +170,7 @@ function TickRing({
   size,
   focus,
   stroke,
+  fillAt = 0,
 }: {
   top: RingSegment[];
   bottom: RingSegment[];
@@ -119,11 +178,19 @@ function TickRing({
   focus: Focus;
   /** Arc thickness, in the ring's 200-unit viewBox. */
   stroke: number;
+  fillAt?: number;
 }) {
   const theme = useTheme();
   const dark = useIsDark();
   const signature = [...top, ...bottom].map((s) => s.value).join(',');
-  const filled = useFill(signature);
+  const filled = useSharedValue(0);
+  const delayUntil = useSequenceClock();
+
+  useEffect(() => {
+    filled.value = 0;
+    // Ease out: quick at first, settling into the last chunks.
+    filled.value = withDelay(delayUntil(fillAt), withTiming(1, { duration: FILL_MS, easing: Easing.out(Easing.cubic) }));
+  }, [signature, fillAt, filled, delayUntil]);
 
   const R = 84;
   const span = 180 - SEAM_DEG * 2;
@@ -152,35 +219,39 @@ function TickRing({
           // The chunk's drawable arc (degrees along the half), inset for the round caps.
           const c0 = SEAM_DEG + i * (each + CHUNK_GAP_DEG) + capDeg;
           const c1 = SEAM_DEG + i * (each + CHUNK_GAP_DEG) + each - capDeg;
-          // The slice of the data (0 → 1) this chunk shows, clipped by how far the meter has filled.
+          // The slice of the data (0 → 1) this chunk shows; how much of it is drawn follows `filled`.
           const f0 = i / chunks;
-          const f1 = Math.min((i + 1) / chunks, filled);
+          const f1 = (i + 1) / chunks;
           const toDeg = (f: number) => c0 + ((f - f0) * chunks) * (c1 - c0);
           const at = (deg: number) => 180 + dir * deg;
 
-          const parts = f1 > f0
-            ? pieces
-                .map((p) => ({ seg: p.seg, from: Math.max(p.from, f0), to: Math.min(p.to, f1) }))
-                .filter((p) => p.to > p.from)
-            : [];
+          const parts = pieces
+            .map((p) => ({ seg: p.seg, from: Math.max(p.from, f0), to: Math.min(p.to, f1) }))
+            .filter((p) => p.to > p.from);
 
           return (
             <G key={`${half}-${i}`}>
               <Path d={arcPath(R, at(c0), at(c1))} stroke={track} strokeWidth={stroke} strokeLinecap="round" fill="none" />
-              {parts.map((p, k) => {
+              {parts.map((p) => {
                 const dimmed = focus !== null && !(focus.half === half && focus.key === p.seg.key);
                 const d0 = toDeg(p.from);
                 const d1 = toDeg(p.to);
-                const opacity = dimmed ? 0.16 : 1;
                 // Butt ends inside the chunk (colours meet edge to edge); a dot rounds off the chunk's own ends.
                 // (Compared with a tolerance: the running sums behind `spans` pick up float error.)
-                const startCap = Math.abs(p.from - f0) < 1e-6 ? point(at(d0)) : null;
-                const endCap = Math.abs(p.to - (i + 1) / chunks) < 1e-6 ? point(at(d1)) : null;
                 return (
-                  <G key={k} opacity={opacity}>
-                    <Path d={arcPath(R, at(d0), at(d1))} stroke={p.seg.color} strokeWidth={stroke} fill="none" />
-                    {startCap ? <Circle cx={startCap.x} cy={startCap.y} r={stroke / 2} fill={p.seg.color} /> : null}
-                    {endCap ? <Circle cx={endCap.x} cy={endCap.y} r={stroke / 2} fill={p.seg.color} /> : null}
+                  <G key={p.seg.key} opacity={dimmed ? 0.16 : 1}>
+                    <FillArc
+                      filled={filled}
+                      from={p.from}
+                      to={p.to}
+                      fromDeg={at(d0)}
+                      toDeg={at(d1)}
+                      r={R}
+                      color={p.seg.color}
+                      stroke={stroke}
+                      startCap={Math.abs(p.from - f0) < 1e-6 ? point(at(d0)) : null}
+                      endCap={Math.abs(p.to - f1) < 1e-6 ? point(at(d1)) : null}
+                    />
                   </G>
                 );
               })}
@@ -275,6 +346,8 @@ export function StatusPriorityRing({
   bottomTitle,
   topLabel,
   bottomLabel,
+  enterIndex,
+  loading = false,
 }: {
   top: RingSegment[];
   bottom: RingSegment[];
@@ -282,6 +355,10 @@ export function StatusPriorityRing({
   bottomTitle: string;
   topLabel: string;
   bottomLabel: string;
+  /** Position in the page's entrance sequence; the ring starts filling once its entrance has landed. */
+  enterIndex: number;
+  /** Data still on its way: the centre shows a placeholder and the ring fills once the numbers land. */
+  loading?: boolean;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -306,7 +383,7 @@ export function StatusPriorityRing({
 
   return (
     <>
-      <Animated.View entering={sequenceEnter(4, 8)}>
+      <Animated.View entering={sequenceEnter(enterIndex, 8)}>
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${topTitle} and ${bottomTitle}. ${sum(top)} ${topLabel}, ${sum(bottom)} ${bottomLabel}. Show breakdown`}
@@ -314,9 +391,22 @@ export function StatusPriorityRing({
           haptic="tap"
           onPress={() => setOpen(true)}
           style={[styles.hero, { width: heroSize, height: heroSize }]}>
-          <TickRing top={top} bottom={bottom} size={heroSize} focus={null} stroke={HERO_STROKE} />
+          <TickRing
+            top={top}
+            bottom={bottom}
+            size={heroSize}
+            focus={null}
+            stroke={HERO_STROKE}
+            fillAt={sequenceSettled(enterIndex)}
+          />
           <View style={StyleSheet.absoluteFill}>
-            <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={null} hint />
+            {loading ? (
+              <View style={styles.centre} pointerEvents="none">
+                <Pulse style={{ width: 56, height: 30, borderRadius: 8, backgroundColor: alpha(theme.fg, 0.1) }} />
+              </View>
+            ) : (
+              <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={null} hint />
+            )}
           </View>
         </PressableScale>
       </Animated.View>
@@ -349,7 +439,7 @@ export function StatusPriorityRing({
             onPress={() => setFocus(null)}
             accessibilityLabel="Clear highlight"
             style={[styles.focusRing, { width: focusSize, height: focusSize }]}>
-            <TickRing top={top} bottom={bottom} size={focusSize} focus={focus} stroke={FOCUS_STROKE} />
+            <TickRing top={top} bottom={bottom} size={focusSize} focus={focus} stroke={FOCUS_STROKE} fillAt={FOCUS_FILL_AT} />
             <View style={StyleSheet.absoluteFill}>
               <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={focus} large />
             </View>

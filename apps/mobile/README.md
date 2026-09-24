@@ -32,3 +32,15 @@ npm run dev:mobile     # Metro; open in Expo Go or an emulator
 ```
 
 The app finds the local servers from Metro's host address, so no env setup is needed. Restart Metro (`expo start --clear`) after running `npm install`; a running dev server keeps a stale file map and reports modules as missing.
+
+## Native Google sign-in
+
+The Google button opens the system account picker (`@react-native-google-signin/google-signin`) and sends the ID token to better-auth (`signIn.social({ provider: 'google', idToken })`): no browser. It needs a development build (not Expo Go) and, in Google Cloud Console → Credentials, in the same project as the web client:
+
+1. **Web client**: the existing one whose ID is the auth server's `GOOGLE_CLIENT_ID`. Set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` to that ID. The token's audience is this client, so the server needs no change.
+2. **Android client**: package `com.logbase.app` plus the SHA-1 of every signing key in use (debug keystore: `cd android && ./gradlew signingReport`; Play-signed builds: the app-signing SHA-1 from Play Console). No env var needed.
+3. **iOS client**: bundle `com.logbase.app`. Set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`; `app.config.js` then adds the plugin with its URL scheme.
+
+Without `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` the button falls back to the browser flow. `DEVELOPER_ERROR` on Android almost always means the SHA-1 / package pair isn't registered.
+
+Discord has no native sign-in for third-party apps: Discord won't hand identify/email OAuth to its app. It stays in the in-app auth sheet (Custom Tabs / ASWebAuthenticationSession), which keeps the discord.com session, so later sign-ins are one tap.

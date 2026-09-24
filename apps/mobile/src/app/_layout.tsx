@@ -6,10 +6,11 @@ import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { useIsDark, useTheme, restoreThemePreference } from '@/hooks/use-theme';
+import { clearTokenCache } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { queryClient, wireQueryManagers } from '@/lib/query-client';
 
@@ -35,12 +36,25 @@ export default function RootLayout() {
 
   useEffect(() => wireQueryManagers(), []);
 
-  const ready = (fontsLoaded || !!fontError) && !isPending;
+  // Hold the app back (splash up) only for the first session check. better-auth flips `isPending` back on
+  // whenever it refetches without a session — right after signing in, for one — and unmounting the navigator
+  // then blanks the screen and remounts it from scratch on whatever tab it defaults to.
+  const [booted, setBooted] = useState(false);
+  if (!booted && (fontsLoaded || !!fontError) && !isPending) setBooted(true);
   useEffect(() => {
-    if (ready) void SplashScreen.hideAsync();
-  }, [ready]);
+    if (booted) void SplashScreen.hideAsync();
+  }, [booted]);
 
-  if (!ready) return null;
+  // Signed out (from any screen): drop the previous account's cached data and API token. Done here, once the
+  // signed-in screens have unmounted, so they don't blank out and refetch while still on screen.
+  const userId = session?.user.id ?? null;
+  useEffect(() => {
+    if (userId) return;
+    clearTokenCache();
+    queryClient.clear();
+  }, [userId]);
+
+  if (!booted) return null;
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -2,13 +2,14 @@ import { faChartPie, faTerminal } from '@fortawesome/free-solid-svg-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeInDown, FadeInUp, FadeOutUp } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { ActivityTerminal } from '@/components/activity/activity-terminal';
 import { HBarChart } from '@/components/dashboard/hbar-chart';
 import { StatusPriorityRing } from '@/components/dashboard/status-priority-ring';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { Pulse } from '@/components/motion/pulse';
 import { Page, SectionLabel } from '@/components/page';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Icon } from '@/components/icon';
@@ -16,7 +17,7 @@ import { TabHeader, WorkspaceSwitcher } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
 import { sequenceEnter, stateTransition } from '@/constants/motion';
-import { Radius, Tone } from '@/constants/theme';
+import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NODE_LABELS } from '@/lib/labels';
 import { useActiveTasks, useBoardCounts, useOrgActivity, useSeriesSummaries, type BoardFilter, type SeriesSummaryRow } from '@/lib/queries';
@@ -113,11 +114,14 @@ function KpiLabel({ children }: { children: ReactNode }) {
     </Text>
   );
 }
-const KpiValue = ({ children, color }: { children: ReactNode; color?: string }) => (
+const KpiValue = ({ children, color, loading }: { children: ReactNode; color?: string; loading?: boolean }) =>
+  loading ? (
+    <Pulse style={{ width: 44, height: 32, borderRadius: 8, marginTop: 6, marginBottom: 2, backgroundColor: 'rgba(120,120,120,0.18)' }} />
+  ) : (
   <Text size="3xl" lh={36} weight="semibold" tabular tracking={-0.6} color={color ?? 'fg'} style={{ fontSize: 36, marginTop: 2 }}>
     {children}
   </Text>
-);
+  );
 
 /** How often the greeting's fact line rotates. */
 const FACT_MS = 9000;
@@ -128,11 +132,12 @@ function partOfDay(d = new Date()) {
 }
 
 /**
- * Home greeting: "Good afternoon, Ghazwa" (fading up as it appears), with a line underneath that
+ * Home greeting: "Good afternoon, Ghazwa", with a line underneath that
  * rotates through what's worth knowing right now — overdue, in progress, unassigned… — sliding each fact up.
  */
 function Greeting({ facts, loading }: { facts: (string | null)[]; loading: boolean }) {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
+  const theme = useTheme();
   const first = session?.user.name?.trim().split(/\s+/)[0] || 'there';
   const lines = facts.filter((f): f is string => !!f);
   const shown = loading ? ['Catching up on your workspace…'] : lines.length ? lines : ['All caught up — nice work'];
@@ -147,12 +152,15 @@ function Greeting({ facts, loading }: { facts: (string | null)[]; loading: boole
   const fact = shown[tick % shown.length];
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
-      {/* One text, one entrance: split into per-word views, a word could be caught mid-rise and sit off the line. */}
-      <Animated.View entering={FadeInDown.duration(420).delay(80)}>
-        <Text font="outfit" size="lg" weight="bold" tracking={-0.3} lh={24} numberOfLines={1}>
-          {`${partOfDay()}, ${first}`}
-        </Text>
-      </Animated.View>
+      {isPending && !session ? (
+        <Pulse style={{ width: 150, height: 16, borderRadius: 5, marginVertical: 4, backgroundColor: alpha(theme.fg, 0.1) }} />
+      ) : (
+        <Animated.View entering={FadeIn.duration(220)}>
+          <Text font="outfit" size="lg" weight="bold" tracking={-0.3} lh={24} numberOfLines={1}>
+            {`${partOfDay()}, ${first}`}
+          </Text>
+        </Animated.View>
+      )}
       <View style={styles.greetFact}>
         {/* Absolutely placed: the outgoing and incoming facts overlap while they swap instead of stacking. */}
         <Animated.View key={fact} entering={FadeInUp.duration(320)} exiting={FadeOutUp.duration(220)} style={styles.greetFactLine}>
@@ -208,7 +216,7 @@ const KpiNote = ({ children }: { children: ReactNode }) => (
 
 export default function DashboardScreen() {
   const dark = useIsDark();
-  const { org, depts, lists, members, userId, scope } = useWorkspace();
+  const { org, depts, lists, members, userId, scope, isLoading: workspaceLoading } = useWorkspace();
   const active = useActiveTasks(org?.id);
   /** The work links open the last channel's board (or the channel list when there is none yet). */
   const openBoard = () =>
@@ -221,7 +229,10 @@ export default function DashboardScreen() {
   const [view, setView] = useState<View_>('overview');
   const activity = useOrgActivity(org?.id, view === 'activity');
 
-  const loading = active.isLoading || counts.isLoading || doneChains.isLoading || cancelledChains.isLoading;
+  // Until the workspace resolves, the task queries sit disabled (not "loading"), so count that wait too —
+  // otherwise the overview flashes zeros, then refills and re-animates once the real numbers land.
+  const loading =
+    workspaceLoading || active.isLoading || counts.isLoading || doneChains.isLoading || cancelledChains.isLoading;
   const tasks = useMemo(() => active.data ?? [], [active.data]);
 
   const stats = useMemo(() => {
@@ -252,7 +263,6 @@ export default function DashboardScreen() {
     cancelled: countChainsOnce(counts.data?.cancelled ?? 0, cancelledChains.summaries),
   };
   const names = useMemo(() => new Map(members.map((m) => [m.userId, m.name || m.email])), [members]);
-  const value = (n: number) => (loading ? '…' : String(n));
   const topAssignees = [...stats.byAssignee.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const memberById = new Map(members.map((m) => [m.userId, m]));
 
@@ -269,8 +279,11 @@ export default function DashboardScreen() {
         void activity.refetch();
       }}
       refreshing={active.isRefetching || counts.isRefetching}
+      enter={false}
       gap={10}>
-      <View style={styles.greetRow}>
+      {/* The page plays one sequence, top to bottom: this row, the four cards, the ring (then its fill), the two
+          charts (then their bars). The overview waits for its data, so nothing lands on placeholder numbers. */}
+      <Animated.View entering={sequenceEnter(0)} style={styles.greetRow}>
         <Greeting
           loading={loading}
           facts={[
@@ -282,98 +295,108 @@ export default function DashboardScreen() {
           ]}
         />
         <ViewChip value={view} onChange={setView} />
-      </View>
+      </Animated.View>
 
       {active.error || counts.error ? (
         <ErrorBanner message={((active.error ?? counts.error) as Error).message} />
       ) : null}
 
       {view === 'overview' ? (
-        <>
-          <View style={styles.kpiGrid}>
-            <KpiCard tone="rose" index={0} onPress={() => openBoard()}>
-              <KpiLabel>Overdue</KpiLabel>
-              <KpiValue color={stats.overdue > 0 ? (dark ? Tone.red400 : Tone.red600) : undefined}>
-                {value(stats.overdue)}
-              </KpiValue>
-              <KpiNote>Past their due date</KpiNote>
-            </KpiCard>
-            <KpiCard tone="amber" index={1} onPress={() => openBoard()}>
-              <KpiLabel>Unassigned</KpiLabel>
-              <KpiValue>{value(stats.unassigned)}</KpiValue>
-              <KpiNote>Waiting for an owner</KpiNote>
-            </KpiCard>
-            <KpiCard tone="blue" index={2} onPress={() => router.navigate('/my-tasks')}>
-              <KpiLabel>Assigned to me</KpiLabel>
-              <KpiValue>{value(stats.mine)}</KpiValue>
-              <KpiNote>On your plate</KpiNote>
-            </KpiCard>
-            <KpiCard tone="peach" index={3}>
-              <KpiLabel>Workspace</KpiLabel>
-              <View style={styles.workspaceRow}>
-                {[
-                  { label: 'Members', n: members.length },
-                  { label: NODE_LABELS.levelPlural, n: depts.length },
-                  { label: NODE_LABELS.listPlural, n: lists.length },
-                ].map((x) => (
-                  <View key={x.label} style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="xl" lh={22} weight="semibold" tabular>
-                      {loading ? '…' : x.n}
-                    </Text>
-                    <Text size="10" color="muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-                      {x.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </KpiCard>
-          </View>
-
-          <StatusPriorityRing
-            topTitle="Status"
-            bottomTitle="Priority"
-            topLabel="tasks"
-            bottomLabel="open"
-            top={TASK_FLOW_ORDER.map((st) => ({
-              key: st,
-              label: FLOW_COLUMN_LABELS[st],
-              value: workflow[st],
-              color: STATUS_COLOR[st],
-            }))}
-            bottom={PRIORITY_ORDER.map((p) => ({
-              key: p,
-              label: PRIORITY_LABELS[p],
-              value: stats.priority[p],
-              color: PRIORITY_COLOR[p],
-            }))}
-          />
-
-          <HBarChart
-            title={`By ${NODE_LABELS.level.toLowerCase()}`}
-            total={`${tasks.length} open`}
-            color={Tone.violet500}
-            emptyLabel={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet.`}
-            enterIndex={7}
-            rows={depts.map((d) => ({ key: d.id, label: d.name, value: stats.byDept.get(d.id) ?? 0 }))}
-          />
-
-          <HBarChart
-            title="Assignee load"
-            total="open tasks"
-            color={Tone.sky500}
-            emptyLabel="Nobody is assigned yet."
-            enterIndex={8}
-            rows={topAssignees.map(([id, n]) => {
-              const m = memberById.get(id);
-              return {
-                key: id,
-                label: names.get(id) ?? 'Someone',
-                value: n,
-                avatar: { name: m?.name, email: m?.email, image: m?.image },
-              };
-            })}
-          />
-        </>
+        (
+          <>
+            <View style={styles.kpiGrid}>
+              <KpiCard tone="rose" index={1} onPress={() => openBoard()}>
+                <KpiLabel>Overdue</KpiLabel>
+                <KpiValue loading={loading} color={stats.overdue > 0 ? (dark ? Tone.red400 : Tone.red600) : undefined}>
+                  {stats.overdue}
+                </KpiValue>
+                <KpiNote>Past their due date</KpiNote>
+              </KpiCard>
+              <KpiCard tone="amber" index={2} onPress={() => openBoard()}>
+                <KpiLabel>Unassigned</KpiLabel>
+                <KpiValue loading={loading}>{stats.unassigned}</KpiValue>
+                <KpiNote>Waiting for an owner</KpiNote>
+              </KpiCard>
+              <KpiCard tone="blue" index={3} onPress={() => router.navigate('/my-tasks')}>
+                <KpiLabel>Assigned to me</KpiLabel>
+                <KpiValue loading={loading}>{stats.mine}</KpiValue>
+                <KpiNote>On your plate</KpiNote>
+              </KpiCard>
+              <KpiCard tone="peach" index={4}>
+                <KpiLabel>Workspace</KpiLabel>
+                <View style={styles.workspaceRow}>
+                  {[
+                    { label: 'Members', n: members.length },
+                    { label: NODE_LABELS.levelPlural, n: depts.length },
+                    { label: NODE_LABELS.listPlural, n: lists.length },
+                  ].map((x) => (
+                    <View key={x.label} style={{ flex: 1, minWidth: 0 }}>
+                      {loading ? (
+                        <Pulse style={{ width: 24, height: 18, borderRadius: 5, marginVertical: 2, backgroundColor: 'rgba(120,120,120,0.18)' }} />
+                      ) : (
+                        <Text size="xl" lh={22} weight="semibold" tabular>
+                          {x.n}
+                        </Text>
+                      )}
+                      <Text size="10" color="muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        {x.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </KpiCard>
+            </View>
+  
+            <StatusPriorityRing
+              topTitle="Status"
+              bottomTitle="Priority"
+              topLabel="tasks"
+              bottomLabel="open"
+              enterIndex={5}
+              loading={loading}
+              top={TASK_FLOW_ORDER.map((st) => ({
+                key: st,
+                label: FLOW_COLUMN_LABELS[st],
+                value: workflow[st],
+                color: STATUS_COLOR[st],
+              }))}
+              bottom={PRIORITY_ORDER.map((p) => ({
+                key: p,
+                label: PRIORITY_LABELS[p],
+                value: stats.priority[p],
+                color: PRIORITY_COLOR[p],
+              }))}
+            />
+  
+            <HBarChart
+              title={`By ${NODE_LABELS.level.toLowerCase()}`}
+              total={`${tasks.length} open`}
+              color={Tone.violet500}
+              emptyLabel={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet.`}
+              enterIndex={6}
+              loading={loading}
+              rows={depts.map((d) => ({ key: d.id, label: d.name, value: stats.byDept.get(d.id) ?? 0 }))}
+            />
+  
+            <HBarChart
+              title="Assignee load"
+              total="open tasks"
+              color={Tone.sky500}
+              emptyLabel="Nobody is assigned yet."
+              enterIndex={7}
+              loading={loading}
+              rows={topAssignees.map(([id, n]) => {
+                const m = memberById.get(id);
+                return {
+                  key: id,
+                  label: names.get(id) ?? 'Someone',
+                  value: n,
+                  avatar: { name: m?.name, email: m?.email, image: m?.image },
+                };
+              })}
+            />
+          </>
+        )
       ) : (
         <View style={{ gap: 6 }}>
           <SectionLabel>Workspace activity</SectionLabel>

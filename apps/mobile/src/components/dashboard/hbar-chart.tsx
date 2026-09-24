@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
+import { Pulse } from '@/components/motion/pulse';
+import { useSequenceClock } from '@/components/motion/use-sequence-clock';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { sequenceEnter } from '@/constants/motion';
+import { sequenceEnter, sequenceSettled } from '@/constants/motion';
 import { alpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -34,13 +36,17 @@ function niceMax(max: number) {
   return Math.max(TICKS, Math.ceil(step) * TICKS);
 }
 
-function Bar({ value, axisMax, color, index }: { value: number; axisMax: number; color: string; index: number }) {
+/** Gap between neighbouring bars starting to grow. */
+const BAR_STAGGER_MS = 60;
+
+function Bar({ value, axisMax, color, growAt }: { value: number; axisMax: number; color: string; growAt: number }) {
   const pct = axisMax ? (value / axisMax) * 100 : 0;
   const width = useSharedValue(0);
+  const delayUntil = useSequenceClock();
 
   useEffect(() => {
-    width.value = withDelay(120 + index * 70, withTiming(pct, { duration: 650, easing: Easing.out(Easing.cubic) }));
-  }, [pct, index, width]);
+    width.value = withDelay(delayUntil(growAt), withTiming(pct, { duration: 650, easing: Easing.out(Easing.cubic) }));
+  }, [pct, growAt, width, delayUntil]);
 
   const style = useAnimatedStyle(() => ({ width: `${width.value}%` }));
   return <Animated.View style={[styles.bar, { backgroundColor: color, minWidth: value > 0 ? 4 : 0 }, style]} />;
@@ -58,6 +64,7 @@ export function HBarChart({
   color,
   emptyLabel,
   enterIndex,
+  loading = false,
 }: {
   title: string;
   /** Shown quietly beside the title, e.g. "59 open". */
@@ -66,6 +73,8 @@ export function HBarChart({
   color: string;
   emptyLabel: string;
   enterIndex: number;
+  /** Data still on its way: pulsing placeholder rows stand in for the bars. */
+  loading?: boolean;
 }) {
   const theme = useTheme();
   const sorted = [...rows].sort((a, b) => b.value - a.value);
@@ -86,7 +95,13 @@ export function HBarChart({
         ) : null}
       </View>
 
-      {sorted.length === 0 ? (
+      {loading && sorted.length === 0 ? (
+        <View style={{ gap: 10, paddingVertical: 4 }}>
+          {[0.8, 0.55, 0.35].map((w) => (
+            <Pulse key={w} style={{ width: `${w * 100}%`, height: 14, borderRadius: 4, backgroundColor: alpha(theme.fg, 0.1) }} />
+          ))}
+        </View>
+      ) : sorted.length === 0 ? (
         <Text size="sm" color="muted">
           {emptyLabel}
         </Text>
@@ -122,7 +137,12 @@ export function HBarChart({
 
             {sorted.map((r, i) => (
               <View key={r.key} style={styles.barCell}>
-                <Bar value={r.value} axisMax={axisMax} color={i === 0 ? color : alpha(color, 0.55)} index={i} />
+                <Bar
+                  value={r.value}
+                  axisMax={axisMax}
+                  color={i === 0 ? color : alpha(color, 0.55)}
+                  growAt={sequenceSettled(enterIndex) + i * BAR_STAGGER_MS}
+                />
                 <Text size="xs" weight="semibold" tabular style={styles.value} numberOfLines={1}>
                   {r.value}
                 </Text>

@@ -14,19 +14,32 @@ coverage
 # Cursor stop-hook audit (one line per agent completion)
 second-memory/Inbox/_session-log.txt
 
-# Android TWA (Bubblewrap): signing keys/passwords and generated Gradle project + build output
-android/node_modules
-android/*.keystore
-android/*.jks
-android/keystore-password.local.txt
-android/app/
-android/build/
-android/.gradle/
-android/gradle/
-android/gradlew
-android/gradlew.bat
-android/local.properties
-android/*.apk
-android/*.aab
-android/*.idsig
-android/manifest-checksum.txt
+# Signing keys and their passwords (the mobile app's native android/ + ios/ folders are generated and ignored
+# in apps/mobile/.gitignore)
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*keystore-password*.txt
+*.idsig
+
+# Credentials: Google OAuth client downloads, the EAS / OAuth credentials folder, and Firebase service-account
+# keys (the API's FIREBASE_SERVICE_ACCOUNT — never commit it). The app's google-services.json and
+# GoogleService-Info.plist are *not* secrets and stay committed (EAS builds need them).
+client_secret_*.json
+client_*.apps.googleusercontent.com.plist
+/eas credentials/
+/credentials/
+*service-account*.json
+*firebase-adminsdk*.json
+
+# Release builds (APKs / AABs kept locally under releases/)
+/releases/
+*.apk
+*.aab
+
+# Build / tool caches
+.gradle/
+.kotlin/
+*.hprof

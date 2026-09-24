@@ -27,7 +27,7 @@ import { useBoardActions } from '@/components/tasks/board-context';
 import { StatusPill } from '@/components/tasks/status-pill';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
-import { Duration, itemEnter, listLayout, POP_EASE, revealIn, revealOut, stateTransition } from '@/constants/motion';
+import { Duration, cardEnter, listLayout, POP_EASE, revealIn, revealOut, stateTransition } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { formatDueForListPill } from '@/lib/format';
@@ -193,7 +193,7 @@ function TaskCardImpl({
   return (
     <Animated.View
       layout={listLayout}
-      entering={enterIndex === undefined ? undefined : itemEnter(enterIndex)}
+      entering={enterIndex === undefined ? undefined : cardEnter(enterIndex)}
       style={[
         styles.card,
         {

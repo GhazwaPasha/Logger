@@ -295,6 +295,13 @@
       "when": 1785900003000,
       "tag": "0041_backfill_orphaned_task_assignees",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1785900004000,
+      "tag": "0042_mobile_push_tokens",
+      "breakpoints": true
     }
   ]
 }

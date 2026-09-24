@@ -19,12 +19,15 @@ export function Page({
   onRefresh,
   refreshing,
   gap = 12,
+  enter = true,
 }: {
   children: ReactNode;
   header?: ReactNode;
   onRefresh?: () => void;
   refreshing?: boolean;
   gap?: number;
+  /** Off for pages that sequence their own sections in; a whole-page rise on top would move them twice. */
+  enter?: boolean;
 }) {
   const theme = useTheme();
   const bottomInset = useTabBarInset();
@@ -32,7 +35,7 @@ export function Page({
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
       {header}
-      <PageEnter>
+      <PageEnter enabled={enter}>
         <Animated.ScrollView
           style={styles.fill}
           contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 4, paddingBottom: 32 + bottomInset, gap }}
@@ -50,9 +53,9 @@ export function Page({
 }
 
 /** A screen's root: fades in with a 6px rise when it mounts (the web's route template). */
-export function PageEnter({ children }: { children: ReactNode }) {
+export function PageEnter({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   return (
-    <Animated.View entering={pageEnter} style={styles.fill}>
+    <Animated.View entering={enabled ? pageEnter : undefined} style={styles.fill}>
       {children}
     </Animated.View>
   );

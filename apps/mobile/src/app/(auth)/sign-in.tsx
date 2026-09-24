@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ConnectingStep } from '@/components/auth/connecting-step';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { LogoMark } from '@/components/logo-mark';
@@ -14,6 +15,7 @@ import { sequenceEnter } from '@/constants/motion';
 import { alpha, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
+import { nativeGoogleSignIn, pickGoogleIdToken } from '@/lib/google-sign-in';
 
 type Provider = 'discord' | 'google';
 
@@ -52,28 +54,50 @@ export default function SignIn() {
   const [busy, setBusy] = useState<'email' | Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /** `action` resolves to null when the user backed out (closed the account picker / auth sheet). */
   async function run(kind: NonNullable<typeof busy>, action: () => Promise<unknown>) {
     setBusy(kind);
     setError(null);
+    let signedIn = false;
     try {
-      const { error: err } = (await action()) as { error?: { message?: string } | null };
-      if (err) setError(err.message || 'Sign in failed');
+      const result = (await action()) as { data?: unknown; error?: { message?: string } | null } | null;
+      if (result?.error) setError(result.error.message || 'Sign in failed');
+      else signedIn = !!result?.data;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Can't reach the server.");
     } finally {
-      setBusy(null);
+      // Signed in: stay on the connecting state until the app swaps this screen out, instead of flashing the
+      // options back for a moment.
+      if (!signedIn) setBusy(null);
     }
   }
 
   const signInEmail = () => run('email', () => authClient.signIn.email({ email: email.trim(), password }));
-  const signInSocial = (provider: Provider) => run(provider, () => authClient.signIn.social({ provider, callbackURL: '/' }));
+  const signInSocial = (provider: Provider) =>
+    run(provider, async () => {
+      // Google: the native account picker, then the ID token straight to the auth server.
+      if (provider === 'google' && nativeGoogleSignIn) {
+        const token = await pickGoogleIdToken();
+        if (!token) return null;
+        return authClient.signIn.social({ provider, idToken: { token }, callbackURL: '/' });
+      }
+      // Discord has no native sign-in for third-party apps (it won't hand OAuth logins to its app), so it runs
+      // in an in-app auth sheet (Custom Tabs / ASWebAuthenticationSession) that returns here via `logbase://`.
+      // It resolves the same way whether the sheet was completed or closed, so ask for the session to tell.
+      const res = await authClient.signIn.social({ provider, callbackURL: '/' });
+      if (res.error) return res;
+      const session = await authClient.getSession();
+      return session.data ? session : null;
+    });
 
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
       <SafeAreaView style={styles.fill}>
         <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            {step === 'hub' ? (
+            {busy === 'discord' || busy === 'google' ? (
+              <ConnectingStep {...PROVIDERS[busy]} />
+            ) : step === 'hub' ? (
               <View style={styles.hub}>
                 <Animated.View entering={sequenceEnter(0, 12)}>
                   <BigLogo size={64} text={36} />
@@ -95,12 +119,11 @@ export default function SignIn() {
                             {
                               borderColor: alpha(meta.color, 0.3),
                               backgroundColor: alpha(meta.color, pressed ? 0.14 : 0.08),
-                              opacity: busy !== null && busy !== p ? 0.6 : 1,
                             },
                           ]}>
                           <Icon icon={meta.icon} size={20} color={meta.color} />
                           <Text size="base" weight="medium">
-                            {busy === p ? 'Connecting…' : `Continue with ${meta.label}`}
+                            {`Continue with ${meta.label}`}
                           </Text>
                         </PressableScale>
                       </Animated.View>
