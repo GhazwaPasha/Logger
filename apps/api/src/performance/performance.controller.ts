@@ -3,6 +3,7 @@ import type { Response } from "express";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { MemoryCacheService } from "../cache/memory-cache.service";
+import { NotModifiedException } from "../cache/not-modified.exception";
 import { PerformanceService } from "./performance.service";
 
 /** Results differ by requester's role (manager sees a scoped roster) — always key by requester, never shared. */
@@ -27,8 +28,7 @@ export class PerformanceController {
     const key = `perf:scorecards:${organizationId}:${user.id}:${dateFrom ?? ""}:${dateTo ?? ""}`;
     const cached = this.cache.get(key);
     if (cached && cached.etag === ifNoneMatch) {
-      res!.status(304).end();
-      return;
+      throw new NotModifiedException();
     }
     if (cached) {
       res!.setHeader("ETag", cached.etag);

@@ -4,6 +4,12 @@ Every release build bumps the version in `app.json`: `version` (shown in Setting
 and `ios.buildNumber`, which must go up by one for every build you install over an older one or upload.
 Release APKs go in `releases/android/` at the repo root (git-ignored), named `LogBase-<version>-build<code>.apk`.
 
+## 1.6.2 (build 9) — 2026-09-24
+
+- Home header: the workspace switcher and the bell + avatar pill always sit in their place, lined up with the
+  page (their slide-in could be cut short and leave them slightly off). The pill still springs as teammates
+  come online.
+
 ## 1.6.1 (build 8) — 2026-09-24
 
 - Picker sheets (Discord channel, status, priority, workspace…) are capped at ~60% of the screen and scroll;

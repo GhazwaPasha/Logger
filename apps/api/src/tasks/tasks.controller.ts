@@ -21,6 +21,7 @@ import {
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { MemoryCacheService } from "../cache/memory-cache.service";
+import { NotModifiedException } from "../cache/not-modified.exception";
 import { TasksService } from "./tasks.service";
 
 /** Task rows are the most frequently mutated data in the app — short TTL keeps cross-user staleness bounded. */
@@ -48,8 +49,7 @@ export class TasksController {
     const key = `tasks:${organizationId}:${user.id}:${JSON.stringify(query)}`;
     const cached = this.cache.get(key);
     if (cached && cached.etag === ifNoneMatch) {
-      res.status(304).end();
-      return;
+      throw new NotModifiedException();
     }
     if (cached) {
       res.setHeader("ETag", cached.etag);
@@ -101,8 +101,7 @@ export class TasksController {
     const key = `taskcounts:${organizationId}:${user.id}:${JSON.stringify(query)}`;
     const cached = this.cache.get(key);
     if (cached && cached.etag === ifNoneMatch) {
-      res.status(304).end();
-      return;
+      throw new NotModifiedException();
     }
     if (cached) {
       res.setHeader("ETag", cached.etag);
@@ -129,8 +128,7 @@ export class TasksController {
     const key = `seriessummary:${organizationId}:${user.id}:${JSON.stringify(query)}`;
     const cached = this.cache.get(key);
     if (cached && cached.etag === ifNoneMatch) {
-      res.status(304).end();
-      return;
+      throw new NotModifiedException();
     }
     if (cached) {
       res.setHeader("ETag", cached.etag);

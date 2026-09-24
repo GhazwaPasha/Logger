@@ -25,7 +25,6 @@ import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
 import { Pulse } from '@/components/motion/pulse';
-import { useChipEnter } from '@/components/motion/use-chip-enter';
 import { Duration, POP_EASE } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
@@ -51,7 +50,6 @@ const INSET = (CONTROL_H - ITEM) / 2;
 export function TabHeader({ title, children }: { title?: string; children?: ReactNode }) {
   const insets = useSafeAreaInsets();
   const { openPanel, unreadCount } = useNotifications();
-  const chipIn = useChipEnter(1);
 
   return (
     <View style={{ paddingTop: insets.top }}>
@@ -66,7 +64,7 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
         </View>
 
         {/* The pill's width follows the online stack: `layout` springs it wider / narrower as people come and go. */}
-        <Animated.View layout={PILL_LAYOUT} style={[styles.controlPill, chipIn]}>
+        <Animated.View layout={PILL_LAYOUT} style={styles.controlPill}>
           <BarSurface radius={CONTROL_H / 2} />
           <OnlineStack />
           <View style={styles.bell}>
@@ -193,13 +191,13 @@ export function WorkspaceSwitcher() {
   const theme = useTheme();
   const { orgs, org, setOrgId } = useWorkspace();
   const [open, setOpen] = useState(false);
-  const chipIn = useChipEnter(-1);
 
-  // One container for the whole life of the chip, so it slides in once: a placeholder sits inside until the
-  // workspace resolves, then the real content fades in over it. The chip's width simply follows its content.
+  // One container for the whole life of the chip, always in its place (no entrance motion: a transform entrance
+  // could be cut short and leave the chip off its spot): a placeholder sits inside until the workspace resolves,
+  // then the real content fades in. The chip's width simply follows its content.
   return (
     <>
-      <Animated.View style={[styles.switcher, chipIn]}>
+      <View style={styles.switcher}>
         <BarSurface radius={CONTROL_H / 2} />
         {org ? (
           <PressableScale
@@ -227,7 +225,7 @@ export function WorkspaceSwitcher() {
             <Pulse style={{ width: 84, height: 10, borderRadius: 5, backgroundColor: alpha(theme.fg, 0.1) }} />
           </View>
         )}
-      </Animated.View>
+      </View>
 
       {org ? (
         <MenuSheet<string>

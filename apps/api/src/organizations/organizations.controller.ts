@@ -3,6 +3,7 @@ import type { Response } from "express";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { MemoryCacheService } from "../cache/memory-cache.service";
+import { NotModifiedException } from "../cache/not-modified.exception";
 import { OrganizationsService } from "./organizations.service";
 
 /** Same result for every org member (no role gate) — safe to key by org only. */
@@ -40,8 +41,7 @@ export class OrganizationsController {
     const key = `workspace:${organizationId}`;
     const cached = this.cache.get(key);
     if (cached && cached.etag === ifNoneMatch) {
-      res!.status(304).end();
-      return;
+      throw new NotModifiedException();
     }
     if (cached) {
       res!.setHeader("ETag", cached.etag);
