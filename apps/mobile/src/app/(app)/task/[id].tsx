@@ -320,8 +320,28 @@ function TaskScreen() {
             </Text>
           </Animated.View>
 
+          <Animated.View entering={sequenceEnter(2, 8)}>
+            <SubtaskListCard
+              subtasks={subtasks}
+              disabled={!canParticipate}
+              toggleOnly={!canEdit}
+              pendingSubtaskId={
+                updateSubtask.isPending
+                  ? (updateSubtask.variables?.subtaskId ?? null)
+                  : deleteSubtask.isPending
+                    ? (deleteSubtask.variables ?? null)
+                    : null
+              }
+              creating={addSubtask.isPending}
+              onToggle={(subtaskId, done) => setSubtaskDone.mutate({ taskId: task.id, subtaskId, done })}
+              onRename={(subtaskId, newTitle) => updateSubtask.mutate({ subtaskId, title: newTitle })}
+              onDelete={(subtaskId) => deleteSubtask.mutate(subtaskId)}
+              onCreate={(newTitle) => addSubtask.mutate(newTitle)}
+            />
+          </Animated.View>
+
           <TaskProperties
-            enterIndex={2}
+            enterIndex={3}
             status={storedStatusToFlowColumn(stored)}
             statusOptions={canParticipate ? stageControlDropdownOptions(stored, canEdit) : []}
             statusPending={patch.isPending && patch.variables?.patch.status !== undefined}
@@ -349,25 +369,6 @@ function TaskScreen() {
             </Animated.View>
           ) : null}
 
-          <Animated.View entering={sequenceEnter(3, 8)}>
-            <SubtaskListCard
-              subtasks={subtasks}
-              disabled={!canParticipate}
-              toggleOnly={!canEdit}
-              pendingSubtaskId={
-                updateSubtask.isPending
-                  ? (updateSubtask.variables?.subtaskId ?? null)
-                  : deleteSubtask.isPending
-                    ? (deleteSubtask.variables ?? null)
-                    : null
-              }
-              creating={addSubtask.isPending}
-              onToggle={(subtaskId, done) => setSubtaskDone.mutate({ taskId: task.id, subtaskId, done })}
-              onRename={(subtaskId, newTitle) => updateSubtask.mutate({ subtaskId, title: newTitle })}
-              onDelete={(subtaskId) => deleteSubtask.mutate(subtaskId)}
-              onCreate={(newTitle) => addSubtask.mutate(newTitle)}
-            />
-          </Animated.View>
 
           {hasWorkSection ? (
             <Animated.View entering={sequenceEnter(4, 8)} style={styles.section}>

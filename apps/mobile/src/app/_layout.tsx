@@ -24,7 +24,13 @@ export default function RootLayout() {
   const base = dark ? DarkTheme : DefaultTheme;
   const { data: rawSession, isPending } = authClient.useSession();
   const forcedOut = useForcedSignOut();
-  const session = forcedOut ? null : rawSession;
+  // Hold on to the signed-in session while better-auth re-checks it (on launch, on coming back to the app): a
+  // re-check can briefly report no session, and dropping it for that moment unmounted the whole signed-in
+  // area and mounted it again — the dashboard loading twice. Only a settled "no session" signs out here.
+  const [held, setHeld] = useState(rawSession);
+  if (rawSession && rawSession !== held) setHeld(rawSession);
+  if (!rawSession && !isPending && held) setHeld(null);
+  const session = forcedOut ? null : (rawSession ?? held);
   const [fontsLoaded, fontError] = useFonts({
     DMSans_400Regular,
     DMSans_500Medium,

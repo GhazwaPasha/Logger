@@ -1,5 +1,5 @@
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -196,9 +196,20 @@ function TickRing({
   const filled = useSharedValue(0);
   const delayUntil = useSequenceClock();
 
+  // The fill plays once, when the numbers first land. Later changes (a teammate's edit arriving live, a refetch)
+  // just redraw the ring full — replaying the fill for those made Home look like it was loading again.
+  const hasFilled = useRef(false);
   useEffect(() => {
+    if (!ready) {
+      filled.value = 0;
+      return;
+    }
+    if (hasFilled.current) {
+      filled.value = 1;
+      return;
+    }
+    hasFilled.current = true;
     filled.value = 0;
-    if (!ready) return;
     // Ease out: quick at first, settling into the last chunks.
     filled.value = withDelay(delayUntil(fillAt), withTiming(1, { duration: FILL_MS, easing: Easing.out(Easing.cubic) }));
   }, [signature, fillAt, ready, filled, delayUntil]);

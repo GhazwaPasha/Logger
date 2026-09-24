@@ -8,6 +8,7 @@ import { Avatar, Button } from '@/components/ui';
 import { useThemePreference, useTheme, type ThemePreference } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
 import { API_URL } from '@/lib/config';
+import { usePushPermission } from '@/lib/push';
 import { signOut } from '@/lib/sign-out';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
   const user = session?.user;
   const { org, me } = useWorkspace();
   const [pref, setPref] = useThemePreference();
+  const push = usePushPermission();
 
 
   return (
@@ -66,6 +68,34 @@ export default function SettingsScreen() {
         />
       </Panel>
 
+      {push.state !== 'unsupported' ? (
+        <Panel style={{ gap: 8 }}>
+          <SectionLabel>Notifications</SectionLabel>
+          <View style={styles.pushRow}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text size="sm" weight="medium">
+                Push notifications
+              </Text>
+              <Text size="xs" color="muted">
+                {push.state === 'granted'
+                  ? 'On — assignments, finished work, due-date changes and comments.'
+                  : push.state === 'blocked'
+                    ? 'Off in system settings. Turn them on there.'
+                    : 'Off — get told about your tasks even when the app is closed.'}
+              </Text>
+            </View>
+            {push.state === 'ask' || push.state === 'blocked' ? (
+              <Button
+                title={push.state === 'blocked' ? 'Open settings' : 'Turn on'}
+                variant="secondary"
+                compact
+                onPress={() => void push.enable()}
+              />
+            ) : null}
+          </View>
+        </Panel>
+      ) : null}
+
       <Panel>
         <SectionLabel>About</SectionLabel>
         <Row label="Version" value={Constants.expoConfig?.version ?? '—'} />
@@ -79,6 +109,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pushRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

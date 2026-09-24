@@ -66,7 +66,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const orgs = useMemo(() => orgsQuery.data ?? [], [orgsQuery.data]);
-  const org = orgs.find((o) => o.id === storedOrgId) ?? orgs[0] ?? null;
+  // Nothing is picked until the saved choice has been read: falling back to the first workspace in the meantime
+  // loaded the dashboard for it, then switched to the saved one and loaded everything a second time.
+  const org = restored ? (orgs.find((o) => o.id === storedOrgId) ?? orgs[0] ?? null) : null;
 
   const orgId = org?.id;
   const bootstrap = useWorkspaceBootstrap(orgId);

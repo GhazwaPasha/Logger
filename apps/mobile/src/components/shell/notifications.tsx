@@ -1,8 +1,8 @@
 import { faCircleCheck } from '@fortawesome/free-solid-svg-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { AppState, Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Modal, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isLedgerEntryNotifiableToUser } from '@work-ledger/contracts';
@@ -16,7 +16,6 @@ import { Button, EmptyState, ErrorBanner, Spinner } from '@/components/ui';
 import { alpha, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatLogTimestamp } from '@/lib/format';
-import { liveIsland } from '@/lib/live-island';
 import { useOrgActivity, type ActivityFeed } from '@/lib/queries';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -113,35 +112,6 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     persist({ lastSeen: Date.now() });
   }, [persist]);
   const closePanel = useCallback(() => setPanelOpen(false), []);
-
-  // Raise a toast for activity that arrives while the app is open (the web's live-island). The first load only
-  // records what's already there, so opening the app never toasts old events.
-  const knownIds = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    knownIds.current = null;
-  }, [orgId]);
-  useEffect(() => {
-    if (!feed.isFetched || !userId) return;
-    if (knownIds.current === null) {
-      knownIds.current = new Set(entries.map((e) => e.id));
-      return;
-    }
-    const seen = knownIds.current;
-    const fresh = entries.filter((e) => !seen.has(e.id));
-    if (fresh.length === 0) return;
-    fresh.forEach((e) => seen.add(e.id));
-    if (panelOpen || AppState.currentState !== 'active') return;
-    const title = feed.data?.tasksById[fresh[0].taskId]?.title ?? 'Task';
-    liveIsland.show({
-      title,
-      description: "Tap to see what's new.",
-      groupKey: 'activity',
-      by: fresh.length,
-      titleForCount: (count) => (count <= 1 ? title : `New activity on ${count} tasks you follow`),
-      actionLabel: 'Open',
-      onAction: openPanel,
-    });
-  }, [entries, feed.isFetched, feed.data, userId, panelOpen, openPanel]);
 
   const clearAll = () => {
     const newest = panelEntries.reduce((max, e) => Math.max(max, new Date(e.createdAt).getTime()), 0);

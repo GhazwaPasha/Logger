@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Linking, Platform } from 'react-native';
 
 import { api } from '@/lib/api';
 
@@ -19,7 +19,7 @@ export const pushSupported = Platform.OS === 'android';
 const CHANNEL_ID = 'activity';
 const TOKEN_KEY = 'logbase.push.token';
 
-// In the foreground the app raises its own toast (the live island), so don't also drop a system banner.
+// In the foreground the bell's unread dot shows new activity; no system banner on top of the open app.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: false,
@@ -41,11 +41,51 @@ async function registerForPush() {
     description: 'Assignments, finished work, due-date changes and comments on your tasks.',
     importance: Notifications.AndroidImportance.HIGH,
   });
-  let { status } = await Notifications.getPermissionsAsync();
-  if (status === 'undetermined') ({ status } = await Notifications.requestPermissionsAsync());
+  // Android reports a never-asked permission as `denied` + `canAskAgain` (not `undetermined`), so ask whenever
+  // it isn't granted and the system still allows asking — only an explicit "Don't allow" stops the prompt.
+  let { status, canAskAgain } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted' && canAskAgain) ({ status, canAskAgain } = await Notifications.requestPermissionsAsync());
   if (status !== 'granted') return;
   const { data } = await Notifications.getDevicePushTokenAsync();
   if (typeof data === 'string' && data) await register(data);
+}
+
+export type PushPermission = 'granted' | 'ask' | 'blocked' | 'unsupported' | 'unknown';
+
+/**
+ * This device's push permission for Settings, re-checked whenever the app comes back to the foreground (the
+ * user may have changed it in system settings). `enable()` asks when the system still allows asking, and
+ * otherwise opens the app's system settings, where a blocked permission can be turned back on.
+ */
+export function usePushPermission() {
+  const [state, setState] = useState<PushPermission>(pushSupported ? 'unknown' : 'unsupported');
+
+  const refresh = useCallback(async () => {
+    if (!pushSupported) return;
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    setState(status === 'granted' ? 'granted' : canAskAgain ? 'ask' : 'blocked');
+  }, []);
+
+  useEffect(() => {
+    // Async: the state is set once the permission check resolves, not synchronously in the effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void refresh();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') void refresh();
+    });
+    return () => sub.remove();
+  }, [refresh]);
+
+  const enable = useCallback(async () => {
+    if (state === 'blocked') {
+      await Linking.openSettings();
+      return;
+    }
+    await registerForPush().catch(() => {});
+    await refresh();
+  }, [state, refresh]);
+
+  return { state, enable };
 }
 
 /** Sign-out: stop pushing to this device. Needs the session, so call it before signing out. */

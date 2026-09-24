@@ -3,19 +3,19 @@
     "name": "LogBase",
     "slug": "logbase",
     "scheme": "logbase",
-    "version": "1.5.0",
+    "version": "1.6.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.logbase.app",
-      "buildNumber": "6",
+      "buildNumber": "8",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.logbase.app",
-      "versionCode": 6,
+      "versionCode": 8,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

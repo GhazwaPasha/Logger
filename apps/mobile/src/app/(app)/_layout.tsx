@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 
-import { LiveIsland } from '@/components/shell/live-island';
 import { NotificationsProvider } from '@/components/shell/notifications';
 import { OnlinePresenceProvider } from '@/components/shell/online-presence';
 import { useTheme } from '@/hooks/use-theme';
@@ -35,7 +34,6 @@ export default function AppLayout() {
               }}>
               <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
             </Stack>
-            <LiveIsland />
           </View>
         </OnlinePresenceProvider>
       </NotificationsProvider>
