@@ -60,10 +60,12 @@ export class OrganizationsController {
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query("limit") limitRaw?: string,
+    @Query("cursor") cursor?: string,
   ) {
     const n = limitRaw !== undefined ? Number(limitRaw) : undefined;
     return this.orgs.activityFeed(user.id, organizationId, {
       limit: n !== undefined && Number.isFinite(n) ? n : undefined,
+      cursor,
     });
   }
 

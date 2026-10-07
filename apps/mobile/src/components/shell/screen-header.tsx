@@ -11,7 +11,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -183,6 +183,23 @@ export function StackHeader({
   );
 }
 
+/** The workspace's linked Discord server icon, or its initial on accent when there's none (or it fails to load). */
+function OrgMark({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+  const theme = useTheme();
+  const [failed, setFailed] = useState(false);
+  return (
+    <View style={[styles.switcherMark, { backgroundColor: theme.accent, overflow: 'hidden' }]}>
+      {avatarUrl && !failed ? (
+        <Image source={{ uri: avatarUrl }} onError={() => setFailed(true)} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        <Text size="xs" weight="bold" color={theme.onAccent}>
+          {name.trim().charAt(0).toUpperCase() || '?'}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 /**
  * Workspace switcher for the Home header's far left: a floating pill (same surface and height as the bell +
  * avatar pill) with the workspace's initial, name and a chevron; tapping it opens a sheet of your workspaces.
@@ -208,11 +225,7 @@ export function WorkspaceSwitcher() {
             onPress={() => setOpen(true)}
             style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
             <Animated.View key={org.id} entering={FadeIn.duration(Duration.base)} style={styles.switcherContent}>
-              <View style={[styles.switcherMark, { backgroundColor: theme.accent }]}>
-                <Text size="xs" weight="bold" color={theme.onAccent}>
-                  {org.name.trim().charAt(0).toUpperCase() || '?'}
-                </Text>
-              </View>
+              <OrgMark key={org.avatarUrl ?? org.id} name={org.name} avatarUrl={org.avatarUrl} />
               <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
                 {org.name}
               </Text>

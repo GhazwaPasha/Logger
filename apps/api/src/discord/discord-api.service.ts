@@ -21,7 +21,14 @@ export class DiscordApiError extends Error {
   }
 }
 
-export type DiscordChannel = { id: string; name: string; position: number; isPrivate: boolean };
+/** Public CDN URL for a guild's icon (no auth needed); `a_`-prefixed hashes are animated. */
+export function guildIconUrl(guildId: string, iconHash: string | null | undefined): string | null {
+  if (!iconHash) return null;
+  const ext = iconHash.startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.${ext}?size=256`;
+}
+
+export type DiscordChannel ={ id: string; name: string; position: number; isPrivate: boolean };
 
 type DiscordApiChannel = {
   id: string;
@@ -97,12 +104,14 @@ export class DiscordApiService implements OnModuleInit {
     });
   }
 
-  async testConnection(guildId: string): Promise<{ ok: true; guildName: string } | { ok: false; reason: string }> {
+  async testConnection(
+    guildId: string,
+  ): Promise<{ ok: true; guildName: string; iconHash: string | null } | { ok: false; reason: string }> {
     try {
       const res = await this.request(`/guilds/${guildId}`);
       if (!res.ok) return { ok: false, reason: describeStatus(res.status) };
-      const body = (await res.json()) as { name?: string };
-      return { ok: true, guildName: body.name ?? guildId };
+      const body = (await res.json()) as { name?: string; icon?: string | null };
+      return { ok: true, guildName: body.name ?? guildId, iconHash: body.icon ?? null };
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : "Connection failed" };
     }

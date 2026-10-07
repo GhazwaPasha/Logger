@@ -1,6 +1,6 @@
 /** API response shapes used by the app. Mirrors `apps/web/src/lib/ledger-types.ts`. */
 
-export type Org = { id: string; name: string; slug?: string; timeZone: string };
+export type Org = { id: string; name: string; slug?: string; timeZone: string; /** Linked Discord server icon; null = show the initial. */ avatarUrl?: string | null };
 export type Dept = { id: string; name: string; organizationId: string; orderIndex: number };
 export type ListRow = {
   id: string;

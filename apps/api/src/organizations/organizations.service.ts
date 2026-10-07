@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import {
   createOrganizationSchema,
   updateOrganizationSchema,
@@ -9,6 +9,7 @@ import {
 import {
   activityLedger,
   deletionLog,
+  discordIntegrations,
   organizationMemberManagedDepartments,
   organizationMembers,
   organizations,
@@ -19,12 +20,15 @@ import {
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AttachmentsService } from "../attachments/attachments.service";
-import { AuthorizationService } from "../authorization/authorization.service";
+import { AuthorizationService, decodeCursor, encodeCursor } from "../authorization/authorization.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { guildIconUrl } from "../discord/discord-api.service";
 import { ListsService } from "../lists/lists.service";
 import { CollaborationService } from "../realtime/collaboration.service";
 
 const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
+
+type OrganizationRow = typeof organizations.$inferSelect;
 
 @Injectable()
 export class OrganizationsService {
@@ -57,10 +61,30 @@ export class OrganizationsService {
     throw new Error("Could not allocate organization slug");
   }
 
+  /** Adds `avatarUrl`: the linked Discord server's icon, or null (clients fall back to the name's initial). */
+  private async withAvatars(orgs: OrganizationRow[]) {
+    if (orgs.length === 0) return [];
+    const integrations = await this.db
+      .select({
+        organizationId: discordIntegrations.organizationId,
+        guildId: discordIntegrations.guildId,
+        iconHash: discordIntegrations.iconHash,
+      })
+      .from(discordIntegrations)
+      .where(inArray(discordIntegrations.organizationId, orgs.map((o) => o.id)));
+    const byOrg = new Map(integrations.map((i) => [i.organizationId, guildIconUrl(i.guildId, i.iconHash)]));
+    return orgs.map((o) => ({ ...o, avatarUrl: byOrg.get(o.id) ?? null }));
+  }
+
+  private async withAvatar(org: OrganizationRow) {
+    const [withUrl] = await this.withAvatars([org]);
+    return withUrl!;
+  }
+
   async listForUser(userId: string) {
     const ids = await this.authz.listOrganizationIdsForUser(userId);
     if (ids.length === 0) return [];
-    return this.db.select().from(organizations).where(inArray(organizations.id, ids));
+    return this.withAvatars(await this.db.select().from(organizations).where(inArray(organizations.id, ids)));
   }
 
   async create(userId: string, body: unknown) {
@@ -74,7 +98,7 @@ export class OrganizationsService {
       role: "owner",
     });
     this.collaboration.notifyOrgChanged(org.id, null);
-    return org;
+    return { ...org, avatarUrl: null };
   }
 
   async getById(userId: string, organizationId: string) {
@@ -82,25 +106,26 @@ export class OrganizationsService {
     const rows = await this.db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
     const org = rows[0];
     if (!org) throw new NotFoundException("Organization not found");
-    return org;
+    return this.withAvatar(org);
   }
 
   /**
    * Activity ledger across all tasks the user can see in this org (same rules as task list),
    * newest first. Caps at 500 rows per request.
    */
-  async activityFeed(userId: string, organizationId: string, opts?: { limit?: number }) {
+  async activityFeed(userId: string, organizationId: string, opts?: { limit?: number; cursor?: string }) {
     await this.authz.assertOrgMember(userId, organizationId);
     const raw = opts?.limit;
     const limit =
       typeof raw === "number" && Number.isFinite(raw)
         ? Math.min(Math.max(Math.floor(raw), 1), 500)
         : 150;
+    const decoded = opts?.cursor ? decodeCursor(opts.cursor) : null;
 
     const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
 
     if (taskIds.length === 0) {
-      return { entries: [], tasksById: {}, assigneesByTaskId: {} };
+      return { entries: [], tasksById: {}, assigneesByTaskId: {}, nextCursor: null };
     }
 
     const taskMetaRows = await this.db
@@ -114,7 +139,20 @@ export class OrganizationsService {
       ]),
     );
 
-    const rows = await this.db
+    const cursorCondition = decoded
+      ? or(
+          lt(activityLedger.createdAt, decoded.createdAt),
+          and(eq(activityLedger.createdAt, decoded.createdAt), lt(activityLedger.id, decoded.id)),
+        )
+      : undefined;
+
+    const baseConditions = [
+      inArray(activityLedger.taskId, taskIds),
+      sql`${activityLedger.payload} ->> 'subtaskTitle' is null`,
+    ];
+    const selectConditions = cursorCondition ? [...baseConditions, cursorCondition] : baseConditions;
+
+    const pageRows = await this.db
       .select({
         id: activityLedger.id,
         taskId: activityLedger.taskId,
@@ -125,14 +163,13 @@ export class OrganizationsService {
         createdAt: activityLedger.createdAt,
       })
       .from(activityLedger)
-      .where(
-        and(
-          inArray(activityLedger.taskId, taskIds),
-          sql`${activityLedger.payload} ->> 'subtaskTitle' is null`,
-        ),
-      )
-      .orderBy(desc(activityLedger.createdAt))
-      .limit(limit);
+      .where(and(...selectConditions))
+      .orderBy(desc(activityLedger.createdAt), desc(activityLedger.id))
+      .limit(limit + 1);
+
+    const hasMore = pageRows.length > limit;
+    const rows = hasMore ? pageRows.slice(0, limit) : pageRows;
+    const nextCursor = hasMore && rows.length > 0 ? encodeCursor(rows[rows.length - 1]!) : null;
 
     const taskIdsInFeed = [...new Set(rows.map((r) => r.taskId))];
     const assigneesByTaskId: Record<string, string[]> = {};
@@ -148,7 +185,7 @@ export class OrganizationsService {
       }
     }
 
-    return { entries: rows, tasksById, assigneesByTaskId };
+    return { entries: rows, tasksById, assigneesByTaskId, nextCursor };
   }
 
   /** Single round-trip workspace payload for app shell (parallel DB reads). Tasks now fetched per-column via paginated endpoint. */
@@ -177,7 +214,7 @@ export class OrganizationsService {
       .returning();
     if (!row) throw new NotFoundException("Organization not found");
     this.collaboration.notifyOrgChanged(organizationId, null);
-    return row;
+    return this.withAvatar(row);
   }
 
   /** Owner only. Cascades members, levels, lists, tasks (FK). */

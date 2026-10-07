@@ -20,6 +20,7 @@ export function Page({
   refreshing,
   gap = 12,
   enter = true,
+  onNearEnd,
 }: {
   children: ReactNode;
   header?: ReactNode;
@@ -28,10 +29,12 @@ export function Page({
   gap?: number;
   /** Off for pages that sequence their own sections in; a whole-page rise on top would move them twice. */
   enter?: boolean;
+  /** Pagination trigger: fires once each time the scroll nears the bottom (see `useCollapseOnScroll`). */
+  onNearEnd?: () => void;
 }) {
   const theme = useTheme();
   const bottomInset = useTabBarInset();
-  const onScroll = useCollapseOnScroll();
+  const onScroll = useCollapseOnScroll(onNearEnd);
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
       {header}

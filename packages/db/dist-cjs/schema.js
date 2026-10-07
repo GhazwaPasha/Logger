@@ -508,6 +508,8 @@ exports.discordIntegrations = (0, pg_core_1.pgTable)("discord_integrations", {
         .notNull()
         .references(() => exports.organizations.id, { onDelete: "cascade" }),
     guildId: (0, pg_core_1.text)("guild_id").notNull(),
+    /** Server icon hash from `GET /guilds/{id}`, refreshed on save/test; null = no icon (or not fetched yet). Used as the org avatar. */
+    iconHash: (0, pg_core_1.text)("icon_hash"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
         .notNull()

@@ -635,6 +635,10 @@ export function WorkspaceSidebar({
             aria-expanded={workspacePickerOpen}
             aria-label="Toggle workspace switcher"
           >
+            {selectedOrg?.avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- remote Discord CDN icon, same as member avatars
+              <img src={selectedOrg.avatarUrl} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-[var(--fg)]">{orgLabel}</p>
               <p className="truncate text-sm text-[var(--muted)]">{userLabel}</p>

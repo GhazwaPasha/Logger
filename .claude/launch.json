@@ -19,9 +19,7 @@
         "run",
         "android",
         "-w",
-        "@work-ledger/mobile",
-        "--",
-        "--clear"
+        "@work-ledger/mobile"
       ],
       "port": 8081
     },

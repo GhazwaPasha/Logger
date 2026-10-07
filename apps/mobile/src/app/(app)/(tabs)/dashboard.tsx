@@ -10,17 +10,17 @@ import { HBarChart } from '@/components/dashboard/hbar-chart';
 import { StatusPriorityRing } from '@/components/dashboard/status-priority-ring';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Pulse } from '@/components/motion/pulse';
-import { Page, SectionLabel } from '@/components/page';
+import { Page } from '@/components/page';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { Icon } from '@/components/icon';
 import { TabHeader, WorkspaceSwitcher } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
-import { sequenceEnter, stateTransition } from '@/constants/motion';
+import { fadeOut, sequenceEnter, stateTransition } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NODE_LABELS } from '@/lib/labels';
-import { useActiveTasks, useBoardCounts, useOrgActivity, useSeriesSummaries, type BoardFilter, type SeriesSummaryRow } from '@/lib/queries';
+import { useActiveTasks, useBoardCounts, useOrgActivityFeed, useSeriesSummaries, type BoardFilter, type SeriesSummaryRow } from '@/lib/queries';
 import { FLOW_COLUMN_LABELS, PRIORITY_LABELS, taskIsOverdue, taskPriority, TASK_FLOW_ORDER, type TaskPriority } from '@/lib/task-board';
 import { authClient } from '@/lib/auth-client';
 import { useWorkspace } from '@/lib/workspace';
@@ -227,7 +227,7 @@ export default function DashboardScreen() {
   const doneChains = useSeriesSummaries(org?.id, WHOLE_WORKSPACE, DONE_ONLY);
   const cancelledChains = useSeriesSummaries(org?.id, WHOLE_WORKSPACE, CANCELLED_ONLY);
   const [view, setView] = useState<View_>('overview');
-  const activity = useOrgActivity(org?.id, view === 'activity');
+  const activity = useOrgActivityFeed(org?.id, view === 'activity');
 
   // Until the workspace resolves, the task queries sit disabled (not "loading"), so count that wait too —
   // otherwise the overview flashes zeros, then refills and re-animates once the real numbers land.
@@ -279,6 +279,7 @@ export default function DashboardScreen() {
         void activity.refetch();
       }}
       refreshing={active.isRefetching || counts.isRefetching}
+      onNearEnd={view === 'activity' && activity.hasMore && !activity.loadingMore ? activity.loadMore : undefined}
       enter={false}
       gap={10}>
       {/* The page plays one sequence, top to bottom: this row, the four cards, the ring (then its fill), the two
@@ -301,10 +302,22 @@ export default function DashboardScreen() {
         <ErrorBanner message={((active.error ?? counts.error) as Error).message} />
       ) : null}
 
-      {view === 'overview' ? (
-        (
-          <>
-            <View style={styles.kpiGrid}>
+      {view === 'activity' ? (
+        <Animated.View key="activity" exiting={fadeOut}>
+          <ActivityTerminal
+            entries={activity.entries}
+            tasksById={activity.tasksById}
+            names={names}
+            timeZone={org?.timeZone ?? 'UTC'}
+            isLoading={activity.isLoading}
+            loadingMore={activity.loadingMore}
+            errorMessage={activity.error ? (activity.error as Error).message : null}
+            onOpenTask={(taskId) => router.push({ pathname: '/task/[id]', params: { id: taskId } })}
+          />
+        </Animated.View>
+      ) : (
+        <Animated.View key="overview" exiting={fadeOut} style={styles.overview}>
+      <View style={styles.kpiGrid}>
               <KpiCard tone="rose" index={1} onPress={() => openBoard()}>
                 <KpiLabel>Overdue</KpiLabel>
                 <KpiValue loading={loading} color={stats.overdue > 0 ? (dark ? Tone.red400 : Tone.red600) : undefined}>
@@ -395,26 +408,7 @@ export default function DashboardScreen() {
                 };
               })}
             />
-          </>
-        )
-      ) : (
-        <View style={{ gap: 6 }}>
-          <SectionLabel>Workspace activity</SectionLabel>
-          <Text size="sm" color="muted">
-            Ledger from tasks you can access, newest first.
-          </Text>
-          <View style={{ marginTop: 6 }}>
-            <ActivityTerminal
-              entries={activity.data?.entries ?? []}
-              tasksById={activity.data?.tasksById ?? {}}
-              names={names}
-              timeZone={org?.timeZone ?? 'UTC'}
-              isLoading={activity.isLoading}
-              errorMessage={activity.error ? (activity.error as Error).message : null}
-              onOpenTask={(taskId) => router.push({ pathname: '/task/[id]', params: { id: taskId } })}
-            />
-          </View>
-        </View>
+        </Animated.View>
       )}
     </Page>
   );
@@ -434,6 +428,9 @@ const styles = StyleSheet.create({
   greetFact: { height: 20, overflow: 'hidden' },
   greetFactLine: { position: 'absolute', left: 0, right: 0, top: 0 },
   viewItem: { width: 52, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  // The Overview and Activity panels are now each a single animated child of the scroll view's gapped
+  // column, so this re-creates the 10dp rhythm between the KPI grid, the ring, and the two bar charts.
+  overview: { gap: 10 },
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   kpiOuter: { flexGrow: 1, flexBasis: '46%' },
   kpi: {

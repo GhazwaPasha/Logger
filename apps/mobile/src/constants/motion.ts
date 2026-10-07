@@ -112,13 +112,3 @@ export function sequenceEnter(index: number, offset = 10) {
  * filling, bars growing) should begin, so that plays after the entrance instead of racing it.
  */
 export const sequenceSettled = (index: number) => index * SEQUENCE_STEP_MS + SEQUENCE_ENTER_MS * 0.7;
-
-/** Activity-log lines revealing one after another (web `term-line-reveal`). */
-export function lineReveal(index: number) {
-  return new Keyframe({
-    from: { opacity: 0, transform: [{ translateY: 4 }] },
-    to: { opacity: 1, transform: [{ translateY: 0 }], easing: POP_EASE },
-  })
-    .duration(Duration.base)
-    .delay(Math.min(index, 20) * 25);
-}

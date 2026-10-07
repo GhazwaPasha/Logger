@@ -1,7 +1,7 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
-    "appVersionSource": "local"
+    "version": ">= 24.7.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "base": {
@@ -21,7 +21,16 @@
       "android": { "buildType": "apk" }
     },
     "production": {
-      "extends": "base"
+      "extends": "base",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      }
     }
   }
 }

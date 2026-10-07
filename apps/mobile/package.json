@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eas-build-post-install": "cd ../.. && npm run build -w @work-ledger/contracts"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.9",

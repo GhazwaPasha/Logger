@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import {
+  runOnJS,
   useAnimatedScrollHandler,
   useSharedValue,
   withTiming,
@@ -60,13 +61,19 @@ export function useTabBarInset(): number {
 const TOP_ZONE = 48;
 /** Per-event movement that counts as a deliberate scroll direction. */
 const DIRECTION_SLOP = 6;
+/** How close to the bottom (px) counts as "near the end", for `onNearEnd`. */
+const NEAR_END_ZONE = 300;
 
 /**
  * Scroll handler that collapses the bar while scrolling down and restores it when scrolling up (Apple's
  * `minimizeBehavior="onScrollDown"`). Pass it to an `Animated.ScrollView` / `Animated.FlatList` `onScroll`.
  * Outside the tabs it drives a throwaway value, so screens can use it unconditionally.
+ *
+ * `onNearEnd`, when given, fires once (edge-triggered, like a `FlatList`'s `onEndReached`) each time the
+ * scroll position crosses into the last `NEAR_END_ZONE` px of content — a pagination trigger for screens
+ * that aren't a `FlatList` themselves.
  */
-export function useCollapseOnScroll() {
+export function useCollapseOnScroll(onNearEnd?: () => void) {
   const ctx = useContext(TabBarContext);
   const fallback = useSharedValue(0);
   const fallbackTarget = useSharedValue(0);
@@ -75,6 +82,7 @@ export function useCollapseOnScroll() {
   const target = ctx?.collapseTarget ?? fallbackTarget;
   const locked = ctx?.collapseLocked ?? fallbackLocked;
   const lastY = useSharedValue(0);
+  const nearEndFired = useSharedValue(0);
 
   return useAnimatedScrollHandler({
     onScroll: (e) => {
@@ -89,6 +97,18 @@ export function useCollapseOnScroll() {
       if (next !== target.value) {
         target.value = next;
         collapse.value = withTiming(next, { duration: Duration.pill, easing: POP_EASE });
+      }
+
+      if (onNearEnd) {
+        const distanceFromEnd = e.contentSize.height - (y + e.layoutMeasurement.height);
+        if (distanceFromEnd < NEAR_END_ZONE) {
+          if (nearEndFired.value === 0) {
+            nearEndFired.value = 1;
+            runOnJS(onNearEnd)();
+          }
+        } else {
+          nearEndFired.value = 0;
+        }
       }
     },
   });

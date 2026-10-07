@@ -46,6 +46,7 @@ export const qk = {
   archived: (orgId: string) => ['tasks', orgId, 'archived'] as const,
   task: (taskId: string) => ['task', taskId] as const,
   activity: (orgId: string) => ['activity', orgId] as const,
+  activityFeed: (orgId: string) => ['activity', orgId, 'feed'] as const,
 };
 
 const COLUMN_PAGE_SIZE = 25;
@@ -339,6 +340,39 @@ export function useOrgActivity(orgId: string | undefined, enabled = true, refetc
     refetchInterval,
     queryFn: () => api<ActivityFeed>(`/organizations/${orgId}/activity`),
   });
+}
+
+type ActivityFeedPage = ActivityFeed & { nextCursor: string | null };
+
+/** Rows per page of the dashboard's activity terminal — small, since the feed loads more as you scroll. */
+const ACTIVITY_PAGE_SIZE = 40;
+
+/** Cursor-paginated activity feed for the dashboard terminal — the single-shot `useOrgActivity` above is for
+ * the notifications panel, which always wants one bounded recent window instead. */
+export function useOrgActivityFeed(orgId: string | undefined, enabled = true) {
+  const q = useInfiniteQuery({
+    queryKey: qk.activityFeed(orgId ?? ''),
+    enabled: !!orgId && enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      api<ActivityFeedPage>(`/organizations/${orgId}/activity`, {
+        params: { limit: ACTIVITY_PAGE_SIZE, cursor: pageParam },
+      }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+
+  const pages = q.data?.pages ?? [];
+  return {
+    entries: pages.flatMap((p) => p.entries),
+    tasksById: Object.assign({}, ...pages.map((p) => p.tasksById)) as ActivityFeed['tasksById'],
+    isLoading: q.isLoading,
+    error: q.error,
+    hasMore: q.hasNextPage,
+    loadingMore: q.isFetchingNextPage,
+    loadMore: q.fetchNextPage,
+    refetch: q.refetch,
+    isRefetching: q.isRefetching,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -40,17 +40,30 @@ export class DiscordIntegrationService {
       .values({ organizationId, guildId: parsed.guildId })
       .onConflictDoUpdate({
         target: discordIntegrations.organizationId,
-        set: { guildId: parsed.guildId },
+        // Clear the old server's icon; the test below fills in the new one if the bot can see the guild.
+        set: { guildId: parsed.guildId, iconHash: null },
       });
 
-    return this.discordApi.testConnection(parsed.guildId);
+    return this.testAndStoreIcon(organizationId, parsed.guildId);
   }
 
   async testConnection(userId: string, organizationId: string) {
     await this.authz.assertOrgOwner(userId, organizationId);
     const row = await this.getRow(organizationId);
     if (!row) return { ok: false as const, reason: "Discord is not connected for this workspace" };
-    return this.discordApi.testConnection(row.guildId);
+    return this.testAndStoreIcon(organizationId, row.guildId);
+  }
+
+  /** Each successful check refreshes the stored icon hash (the org avatar), so a changed server icon heals itself. */
+  private async testAndStoreIcon(organizationId: string, guildId: string) {
+    const result = await this.discordApi.testConnection(guildId);
+    if (result.ok) {
+      await this.db
+        .update(discordIntegrations)
+        .set({ iconHash: result.iconHash })
+        .where(eq(discordIntegrations.organizationId, organizationId));
+    }
+    return result;
   }
 
   async deleteConfig(userId: string, organizationId: string) {

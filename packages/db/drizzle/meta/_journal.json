@@ -302,6 +302,13 @@
       "when": 1785900004000,
       "tag": "0042_mobile_push_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1785900005000,
+      "tag": "0043_discord_icon_hash",
+      "breakpoints": true
     }
   ]
 }

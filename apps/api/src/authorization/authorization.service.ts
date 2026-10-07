@@ -72,11 +72,11 @@ export type SeriesSummaryRow = {
   } | null;
 };
 
-function encodeCursor(task: { createdAt: Date; id: string }): string {
+export function encodeCursor(task: { createdAt: Date; id: string }): string {
   return Buffer.from(JSON.stringify({ createdAt: task.createdAt.toISOString(), id: task.id })).toString("base64url");
 }
 
-function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
+export function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
   try {
     const raw = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as {
       createdAt: string;

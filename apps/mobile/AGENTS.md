@@ -36,6 +36,7 @@ Docs: https://docs.expo.dev/eas/index.md
 
 ## Rules
 
+- Never take full-desktop screenshots (e.g. a full-screen capture tool) to check device/emulator or app state — it can expose unrelated windows elsewhere on the user's desktop. Use a scoped capture instead, e.g. `adb exec-out screencap -p` for just the Android emulator's device screen, or another window-specific capture method.
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md

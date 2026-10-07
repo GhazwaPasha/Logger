@@ -640,6 +640,8 @@ export const discordIntegrations = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     guildId: text("guild_id").notNull(),
+    /** Server icon hash from `GET /guilds/{id}`, refreshed on save/test; null = no icon (or not fetched yet). Used as the org avatar. */
+    iconHash: text("icon_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
