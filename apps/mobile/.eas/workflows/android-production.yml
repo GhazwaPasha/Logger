@@ -1,4 +1,6 @@
-# Push to main touching the mobile app (or the shared packages it bundles) → production Android build → Play internal track.
+# Push to main touching the mobile app (or the shared packages it bundles) → production Android build → draft release on the Play closed testing (alpha) track.
+# Draft because Google only accepts draft releases on non-internal tracks while the app is unpublished;
+# switch eas.json `releaseStatus` to "completed" once the app is live.
 # Requires: GitHub repo linked on expo.dev with base directory `apps/mobile`, Android keystore on EAS,
 # and a Google Play service account key uploaded to EAS credentials (the local key file is gitignored).
 name: Android production build + submit
@@ -19,7 +21,7 @@ jobs:
       profile: production
 
   submit_android:
-    name: Submit to Google Play (internal)
+    name: Submit to Google Play (closed testing, draft)
     needs: [build_android]
     type: submit
     params:
