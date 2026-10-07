@@ -1,0 +1,27 @@
+# Push to main touching the mobile app (or the shared packages it bundles) → production Android build → Play internal track.
+# Requires: GitHub repo linked on expo.dev with base directory `apps/mobile`, Android keystore on EAS,
+# and a Google Play service account key uploaded to EAS credentials (the local key file is gitignored).
+name: Android production build + submit
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'apps/mobile/**'
+      - 'packages/contracts/**'
+
+jobs:
+  build_android:
+    name: Build Android (production)
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  submit_android:
+    name: Submit to Google Play (internal)
+    needs: [build_android]
+    type: submit
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+      profile: production
