@@ -1,20 +1,12 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Res } from "@nestjs/common";
-import type { Response } from "express";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
-import { MemoryCacheService } from "../cache/memory-cache.service";
-import { NotModifiedException } from "../cache/not-modified.exception";
+import { OrgVersioned } from "../cache/org-versioned";
 import { OrganizationsService } from "./organizations.service";
-
-/** Same result for every org member (no role gate) — safe to key by org only. */
-const WORKSPACE_BOOTSTRAP_TTL_SECONDS = 30;
 
 @Controller("organizations")
 export class OrganizationsController {
-  constructor(
-    private readonly orgs: OrganizationsService,
-    private readonly cache: MemoryCacheService,
-  ) {}
+  constructor(private readonly orgs: OrganizationsService) {}
 
   @Get()
   list(@CurrentUser() user: RequestUser) {
@@ -31,41 +23,27 @@ export class OrganizationsController {
     return this.orgs.patch(user.id, organizationId, body);
   }
 
+  /** Departments, lists and members — identical for every member, so one cached copy per org. */
   @Get(":organizationId/workspace")
-  async workspace(
-    @CurrentUser() user: RequestUser,
-    @Param("organizationId") organizationId: string,
-    @Headers("if-none-match") ifNoneMatch?: string,
-    @Res({ passthrough: true }) res?: Response,
-  ) {
-    const key = `workspace:${organizationId}`;
-    const cached = this.cache.get(key);
-    if (cached && cached.etag === ifNoneMatch) {
-      throw new NotModifiedException();
-    }
-    if (cached) {
-      res!.setHeader("ETag", cached.etag);
-      res!.setHeader("Cache-Control", "private, no-cache");
-      return cached.data;
-    }
-    const data = await this.orgs.workspaceBootstrap(user.id, organizationId);
-    const etag = this.cache.set(key, data, WORKSPACE_BOOTSTRAP_TTL_SECONDS);
-    res!.setHeader("ETag", etag);
-    res!.setHeader("Cache-Control", "private, no-cache");
-    return data;
+  @OrgVersioned({ namespace: "workspace", shared: true })
+  workspace(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
+    return this.orgs.workspaceBootstrap(user.id, organizationId);
   }
 
   @Get(":organizationId/activity")
+  @OrgVersioned({ namespace: "activity" })
   activityFeed(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query("limit") limitRaw?: string,
     @Query("cursor") cursor?: string,
+    @Query("actorId") actorId?: string,
   ) {
     const n = limitRaw !== undefined ? Number(limitRaw) : undefined;
     return this.orgs.activityFeed(user.id, organizationId, {
       limit: n !== undefined && Number.isFinite(n) ? n : undefined,
       cursor,
+      actorId: actorId || undefined,
     });
   }
 

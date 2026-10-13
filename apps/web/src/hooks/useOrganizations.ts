@@ -18,9 +18,8 @@ export function useOrganizations(token: string | null) {
     refetchOnWindowFocus: false,
   });
 
-  // When the user returns to the tab, retry only if the query is in a bad state
-  // (error or no data). Refetching healthy cached data needlessly risks hitting
-  // an expired-token 401 which would trigger the wl:auth-expired flow.
+  // When the user returns to the tab, retry only if the query is in a bad state (error or no data);
+  // healthy cached data is kept fresh by realtime events.
   useEffect(() => {
     if (!token) return;
     function onVisible() {

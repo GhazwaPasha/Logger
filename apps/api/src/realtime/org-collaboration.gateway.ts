@@ -7,6 +7,8 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
+import { HttpException } from "@nestjs/common";
+import { REALTIME_EVENTS, type ApiErrorCode, type RealtimeRejection, isApiErrorCode } from "@work-ledger/contracts";
 import type { Server, Socket } from "socket.io";
 import type { RedisClientType } from "redis";
 import { AuthService } from "../auth/auth.service";
@@ -14,15 +16,30 @@ import { AuthorizationService } from "../authorization/authorization.service";
 import { corsAllowedOrigins } from "../cors-origins";
 import { CollaborationService, orgSocketRoom, userSocketRoom } from "./collaboration.service";
 
-/**
- * Org-scoped collaboration channel. Auth uses handshake `auth.token` (JWT) and
- * `auth.organizationId` (must be an org the user belongs to).
- *
- * Global `JwtAuthGuard` skips `ws` contexts; we verify JWT here in `handleConnection`.
- */
 export type PresenceSyncPayload = { onlineUserIds: string[]; awayUserIds: string[] };
 export type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
 
+type SocketIdentity = { userId: string; organizationId: string };
+
+/** Handshakes allowed per user per minute. A healthy client needs one per page load / network blip. */
+const HANDSHAKES_PER_USER_PER_MINUTE = 30;
+
+/** Credential problems are fixed by re-minting; everything else except membership is transient. */
+const TERMINAL_CODES: readonly ApiErrorCode[] = ["NOT_A_MEMBER", "NOT_FOUND"];
+
+/** A handshake refusal the client receives as `connect_error` with typed `data`. */
+function rejection(code: ApiErrorCode, message: string): Error & { data: RealtimeRejection } {
+  return Object.assign(new Error(message), { data: { code, retryable: !TERMINAL_CODES.includes(code) } });
+}
+
+/**
+ * Org-scoped collaboration channel.
+ *
+ * Authentication and membership are enforced in Socket.IO middleware, i.e. during the handshake: a
+ * refused client never becomes "connected", and receives a typed {@link RealtimeRejection} telling it
+ * whether retrying can ever help. Clients re-read their token on every reconnect attempt, so token
+ * renewal never requires tearing the connection down.
+ */
 @WebSocketGateway({
   cors: {
     origin: corsAllowedOrigins(),
@@ -46,6 +63,21 @@ export class OrgCollaborationGateway
 
   /** orgId → Set<userId>: users who are idle (away) */
   private readonly awayUsers = new Map<string, Set<string>>();
+
+  /** userId → recent handshake timestamps (sliding one-minute window). */
+  private readonly handshakes = new Map<string, number[]>();
+
+  private allowHandshake(userId: string): boolean {
+    const now = Date.now();
+    const recent = (this.handshakes.get(userId) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length >= HANDSHAKES_PER_USER_PER_MINUTE) {
+      this.handshakes.set(userId, recent);
+      return false;
+    }
+    recent.push(now);
+    this.handshakes.set(userId, recent);
+    return true;
+  }
 
   constructor(
     private readonly auth: AuthService,
@@ -84,6 +116,17 @@ export class OrgCollaborationGateway
 
   async afterInit(server: Server): Promise<void> {
     this.collaboration.bindServer(server);
+    server.use((socket, next) => {
+      this.authenticate(socket).then(
+        () => next(),
+        (err: Error & { data?: RealtimeRejection }) => {
+          this.log.warn(
+            `Socket handshake refused (${err.data?.code ?? "SERVER_ERROR"}): ${err.message} ip=${socket.handshake.address}`,
+          );
+          next(err);
+        },
+      );
+    });
 
     const redisUrl = process.env.REDIS_URL?.trim();
     if (!redisUrl) {
@@ -114,79 +157,86 @@ export class OrgCollaborationGateway
     this.redisSub = null;
   }
 
-  handleConnection(client: Socket): void {
-    void this.verifyAndJoin(client);
+  /** Handshake middleware body: resolves identity or throws a typed rejection. */
+  private async authenticate(socket: Socket): Promise<void> {
+    const auth = socket.handshake.auth as { token?: unknown; organizationId?: unknown };
+    const token = typeof auth?.token === "string" ? auth.token : "";
+    const organizationId = typeof auth?.organizationId === "string" ? auth.organizationId : "";
+    if (!token) throw rejection("TOKEN_MISSING", "Missing token");
+    if (!organizationId) throw rejection("NOT_FOUND", "Missing organizationId");
+
+    let userId: string;
+    try {
+      userId = (await this.auth.verifyBearerJwt(token)).sub as string;
+    } catch (e) {
+      throw this.toRejection(e);
+    }
+
+    if (!this.allowHandshake(userId)) throw rejection("RATE_LIMITED", "Too many connection attempts");
+
+    let isMember: boolean;
+    try {
+      isMember = (await this.authz.findMembership(userId, organizationId)) !== null;
+    } catch (e) {
+      throw rejection("SERVER_ERROR", e instanceof Error ? e.message : "Membership lookup failed");
+    }
+    if (!isMember) throw rejection("NOT_A_MEMBER", "Not a member of this organization");
+
+    const identity: SocketIdentity = { userId, organizationId };
+    socket.data = identity;
+  }
+
+  private toRejection(e: unknown): Error & { data: RealtimeRejection } {
+    if (e instanceof HttpException) {
+      const body = e.getResponse() as { code?: unknown; message?: unknown };
+      const code = isApiErrorCode(body?.code) ? body.code : "TOKEN_INVALID";
+      return rejection(code, typeof body?.message === "string" ? body.message : e.message);
+    }
+    return rejection("SERVER_ERROR", e instanceof Error ? e.message : String(e));
+  }
+
+  async handleConnection(client: Socket): Promise<void> {
+    const { userId, organizationId } = client.data as SocketIdentity;
+    await client.join([orgSocketRoom(organizationId), userSocketRoom(userId)]);
+    this.addPresence(organizationId, userId, client.id);
+
+    const syncPayload: PresenceSyncPayload = {
+      onlineUserIds: this.onlineUserIds(organizationId),
+      awayUserIds: this.awayUserIds(organizationId),
+    };
+    client.emit(REALTIME_EVENTS.presenceSync, syncPayload);
+
+    const updatePayload: PresenceUpdatePayload = { userId, status: "online" };
+    client.to(orgSocketRoom(organizationId)).emit(REALTIME_EVENTS.presenceUpdate, updatePayload);
   }
 
   handleDisconnect(client: Socket): void {
-    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    const { userId, organizationId } = (client.data ?? {}) as Partial<SocketIdentity>;
     if (!userId || !organizationId) return;
     this.awayUsers.get(organizationId)?.delete(userId);
     const wasLast = this.removePresence(organizationId, userId, client.id);
     if (wasLast) {
       const payload: PresenceUpdatePayload = { userId, status: "offline" };
-      this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
+      this.server.to(orgSocketRoom(organizationId)).emit(REALTIME_EVENTS.presenceUpdate, payload);
     }
   }
 
-  @SubscribeMessage("presence_away")
+  @SubscribeMessage(REALTIME_EVENTS.presenceAway)
   handleAway(client: Socket): void {
-    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    const { userId, organizationId } = (client.data ?? {}) as Partial<SocketIdentity>;
     if (!userId || !organizationId) return;
     if (!this.awayUsers.has(organizationId)) this.awayUsers.set(organizationId, new Set());
     this.awayUsers.get(organizationId)!.add(userId);
     const payload: PresenceUpdatePayload = { userId, status: "away" };
-    this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
+    this.server.to(orgSocketRoom(organizationId)).emit(REALTIME_EVENTS.presenceUpdate, payload);
   }
 
-  @SubscribeMessage("presence_active")
+  @SubscribeMessage(REALTIME_EVENTS.presenceActive)
   handleActive(client: Socket): void {
-    const { userId, organizationId } = client.data as { userId?: string; organizationId?: string };
+    const { userId, organizationId } = (client.data ?? {}) as Partial<SocketIdentity>;
     if (!userId || !organizationId) return;
     this.awayUsers.get(organizationId)?.delete(userId);
     const payload: PresenceUpdatePayload = { userId, status: "online" };
-    this.server.to(orgSocketRoom(organizationId)).emit("presence_update", payload);
-  }
-
-  private async verifyAndJoin(client: Socket): Promise<void> {
-    try {
-      const auth = client.handshake.auth as { token?: unknown; organizationId?: unknown };
-      const token = typeof auth?.token === "string" ? auth.token : "";
-      const organizationId = typeof auth?.organizationId === "string" ? auth.organizationId : "";
-      if (!token || !organizationId) {
-        client.emit("collaboration_auth_error", { reason: "missing_credentials" });
-        client.disconnect(true);
-        return;
-      }
-      const payload = await this.auth.verifyBearerJwt(token);
-      const userId = typeof payload.sub === "string" ? payload.sub : "";
-      if (!userId) {
-        client.emit("collaboration_auth_error", { reason: "invalid_token" });
-        client.disconnect(true);
-        return;
-      }
-      await this.authz.assertOrgMember(userId, organizationId);
-      await client.join([orgSocketRoom(organizationId), userSocketRoom(userId)]);
-
-      client.data.userId = userId;
-      client.data.organizationId = organizationId;
-
-      this.addPresence(organizationId, userId, client.id);
-
-      // Send current online snapshot to the newly connected client
-      const syncPayload: PresenceSyncPayload = {
-        onlineUserIds: this.onlineUserIds(organizationId),
-        awayUserIds: this.awayUserIds(organizationId),
-      };
-      client.emit("presence_sync", syncPayload);
-
-      // Notify others in the org room that this user came online
-      const updatePayload: PresenceUpdatePayload = { userId, status: "online" };
-      client.to(orgSocketRoom(organizationId)).emit("presence_update", updatePayload);
-    } catch (e) {
-      this.log.debug(`Socket auth failed: ${e instanceof Error ? e.message : String(e)}`);
-      client.emit("collaboration_auth_error", { reason: "unauthorized" });
-      client.disconnect(true);
-    }
+    this.server.to(orgSocketRoom(organizationId)).emit(REALTIME_EVENTS.presenceUpdate, payload);
   }
 }

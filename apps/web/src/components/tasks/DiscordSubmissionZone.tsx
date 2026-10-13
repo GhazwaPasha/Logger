@@ -83,9 +83,6 @@ export function DiscordSubmissionZone({
             body: form,
             signal: AbortSignal.timeout(120_000),
           });
-          if (res.status === 401 && typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-          }
           if (!res.ok) {
             const text = await res.text();
             throw new Error(text || res.statusText);

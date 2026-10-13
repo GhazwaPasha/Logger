@@ -1,95 +1,89 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { RealtimeClient } from '@work-ledger/client-core';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { io, type Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 
-import { getApiToken } from '@/lib/api';
+import { tokenManager } from '@/lib/api';
 import { API_URL } from '@/lib/config';
 import { invalidateWorkspace } from '@/lib/queries';
 import { useWorkspace } from '@/lib/workspace';
 
-type PresenceSyncPayload = { onlineUserIds: string[]; awayUserIds?: string[] };
-type PresenceUpdatePayload = { userId: string; status: 'online' | 'offline' | 'away' };
-type WorkspaceChangedPayload = { organizationId?: string; taskId?: string | null };
-
 /** Coalesce a burst of `workspace_changed` events (e.g. autosave, bulk moves) into one refetch, like the web. */
-const WORKSPACE_REFETCH_DEBOUNCE_MS = 1500;
+const WORKSPACE_REFETCH_DEBOUNCE_MS = 750;
 
 /** Teammates currently online in this workspace (away ones excluded), in the order they came online. */
 const OnlinePresenceContext = createContext<string[]>([]);
 
 /**
- * Live "who's online" for the workspace, from the API's collaboration socket (`org-collaboration.gateway.ts`,
- * the same channel the web header uses): a `presence_sync` snapshot on connect, then `presence_update`s.
- * Connected only while the app is in the foreground, so this device counts as online only while it's open.
- * The same socket carries `workspace_changed`, which refetches tasks and the rest of the workspace live.
+ * Live "who's online" and live workspace updates, over the API's collaboration socket (shared
+ * `RealtimeClient`, same as the web). The socket lives as long as the workspace is open: it is
+ * suspended in the background and resumed in the foreground, and re-reads the current token on every
+ * reconnect, so token renewal never interrupts it. Handshake refusals are typed — a removed member
+ * stops for good instead of retrying.
  */
 export function OnlinePresenceProvider({ children }: { children: ReactNode }) {
   const { org } = useWorkspace();
   const orgId = org?.id;
   const qc = useQueryClient();
   const [online, setOnline] = useState<string[]>([]);
-  const [foreground, setForeground] = useState(AppState.currentState === 'active');
 
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => setForeground(s === 'active'));
-    return () => sub.remove();
-  }, []);
-
-  useEffect(() => {
-    if (!orgId || !foreground) return;
-    let socket: Socket | null = null;
-    let cancelled = false;
+    if (!orgId) return;
     let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastVersion = 0;
     const changedTaskIds = new Set<string>();
     // An event without a task (channels, members…) always refetches; task events skip this device's own saves.
     let untargeted = false;
 
-    void getApiToken()
-      .then((token) => {
-        if (cancelled) return;
-        socket = io(API_URL, {
-          path: '/socket.io/',
-          auth: { token, organizationId: orgId },
-          transports: ['websocket'],
-          reconnectionAttempts: 8,
-          reconnectionDelay: 1500,
+    const client = new RealtimeClient({
+      io,
+      url: API_URL,
+      organizationId: orgId,
+      tokens: tokenManager,
+      transports: ['websocket'],
+      onPresenceSync: (p) => {
+        const away = new Set(p.awayUserIds ?? []);
+        setOnline(p.onlineUserIds.filter((id) => !away.has(id)));
+      },
+      onPresenceUpdate: (p) => {
+        setOnline((prev) => {
+          const rest = prev.filter((id) => id !== p.userId);
+          return p.status === 'online' ? [...rest, p.userId] : rest;
         });
-        socket.on('presence_sync', (p: PresenceSyncPayload) => {
-          const away = new Set(p.awayUserIds ?? []);
-          setOnline(p.onlineUserIds.filter((id) => !away.has(id)));
-        });
-        socket.on('presence_update', (p: PresenceUpdatePayload) => {
-          setOnline((prev) => {
-            const rest = prev.filter((id) => id !== p.userId);
-            return p.status === 'online' ? [...rest, p.userId] : rest;
-          });
-        });
-        // Tasks, comments, channels… changed by anyone (this device included — a refetch is harmless).
-        socket.on('workspace_changed', (p: WorkspaceChangedPayload) => {
-          if (p?.organizationId !== orgId) return;
-          if (p.taskId) changedTaskIds.add(p.taskId);
-          else untargeted = true;
-          if (refetchTimer) clearTimeout(refetchTimer);
-          refetchTimer = setTimeout(() => {
-            refetchTimer = null;
-            void invalidateWorkspace(qc, orgId, changedTaskIds, untargeted);
-            changedTaskIds.clear();
-            untargeted = false;
-          }, WORKSPACE_REFETCH_DEBOUNCE_MS);
-        });
-      })
-      .catch(() => {
-        // Not signed in / offline: no presence, the header just shows the bell and avatar.
-      });
+      },
+      onWorkspaceChanged: (e) => {
+        if (e.version <= lastVersion) return;
+        lastVersion = e.version;
+        if (e.scope === 'task' && e.taskId) changedTaskIds.add(e.taskId);
+        else untargeted = true;
+        if (refetchTimer) clearTimeout(refetchTimer);
+        refetchTimer = setTimeout(() => {
+          refetchTimer = null;
+          void invalidateWorkspace(qc, orgId, changedTaskIds, untargeted);
+          changedTaskIds.clear();
+          untargeted = false;
+        }, WORKSPACE_REFETCH_DEBOUNCE_MS);
+      },
+      onStatus: (s) => {
+        if (s.state !== 'connected') setOnline([]);
+      },
+    });
+
+    // Only count as online while the app is open.
+    if (AppState.currentState !== 'active') client.suspend();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') client.resume();
+      else client.suspend();
+    });
 
     return () => {
-      cancelled = true;
+      sub.remove();
       if (refetchTimer) clearTimeout(refetchTimer);
-      socket?.disconnect();
+      client.close();
       setOnline([]);
     };
-  }, [orgId, foreground, qc]);
+  }, [orgId, qc]);
 
   return <OnlinePresenceContext.Provider value={online}>{children}</OnlinePresenceContext.Provider>;
 }

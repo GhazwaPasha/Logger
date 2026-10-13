@@ -1,0 +1,28 @@
+{
+  "name": "@work-ledger/client-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist-cjs/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.cjs.json && node -e \"require('node:fs').writeFileSync('dist-cjs/package.json', '{\\\"type\\\":\\\"commonjs\\\"}\\n')\"",
+    "test": "tsc -p tsconfig.test.json && node scripts/mark-cjs.cjs test-dist && node --test test-dist/__tests__/session.test.js",
+    "lint": "echo ok"
+  },
+  "dependencies": {
+    "@work-ledger/contracts": "^0.0.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1",
+    "typescript": "^5.7.3"
+  }
+}

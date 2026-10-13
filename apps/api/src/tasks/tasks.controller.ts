@@ -20,43 +20,23 @@ import {
 } from "@work-ledger/contracts";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
-import { MemoryCacheService } from "../cache/memory-cache.service";
-import { NotModifiedException } from "../cache/not-modified.exception";
+import { OrgVersioned } from "../cache/org-versioned";
 import { TasksService } from "./tasks.service";
-
-/** Task rows are the most frequently mutated data in the app — short TTL keeps cross-user staleness bounded. */
-const TASKS_LIST_TTL_SECONDS = 15;
 
 @Controller("organizations/:organizationId/tasks")
 export class TasksController {
-  constructor(
-    private readonly tasks: TasksService,
-    private readonly cache: MemoryCacheService,
-  ) {}
+  constructor(private readonly tasks: TasksService) {}
 
+  /** Role-scoped (owner: org, manager: managed departments, member: assigned) — cached per requester. */
   @Get()
-  async list(
+  @OrgVersioned({ namespace: "tasks" })
+  list(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query() rawQuery: Record<string, string>,
-    @Headers("if-none-match") ifNoneMatch: string | undefined,
-    @Res({ passthrough: true }) res: Response,
   ) {
     const query = listTasksQuerySchema.parse(rawQuery);
-    // Results are role-scoped (owner sees the org, manager sees managed departments, member sees
-    // only assigned tasks) — must key by requester, never shared. Filters are baked in too, since
-    // each status/cursor/limit combination is effectively a different query.
-    const key = `tasks:${organizationId}:${user.id}:${JSON.stringify(query)}`;
-    const cached = this.cache.get(key);
-    if (cached && cached.etag === ifNoneMatch) {
-      throw new NotModifiedException();
-    }
-    if (cached) {
-      res.setHeader("ETag", cached.etag);
-      res.setHeader("Cache-Control", "private, no-cache");
-      return cached.data;
-    }
-    const data = await this.tasks.list(user.id, organizationId, {
+    return this.tasks.list(user.id, organizationId, {
       includeSubtasks: query.includeSubtasks,
       status: query.status,
       listId: query.listId,
@@ -69,10 +49,6 @@ export class TasksController {
       archivedOnly: query.archived,
       excludeRecurringSeries: query.excludeRecurringSeries,
     });
-    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
-    res.setHeader("ETag", etag);
-    res.setHeader("Cache-Control", "private, no-cache");
-    return data;
   }
 
   @Post()
@@ -90,52 +66,25 @@ export class TasksController {
    * before — and independent of whether — the board has paginated that far.
    */
   @Get("counts")
-  async counts(
+  @OrgVersioned({ namespace: "taskcounts" })
+  counts(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query() rawQuery: Record<string, string>,
-    @Headers("if-none-match") ifNoneMatch: string | undefined,
-    @Res({ passthrough: true }) res: Response,
   ) {
-    const query = taskCountsQuerySchema.parse(rawQuery);
-    const key = `taskcounts:${organizationId}:${user.id}:${JSON.stringify(query)}`;
-    const cached = this.cache.get(key);
-    if (cached && cached.etag === ifNoneMatch) {
-      throw new NotModifiedException();
-    }
-    if (cached) {
-      res.setHeader("ETag", cached.etag);
-      res.setHeader("Cache-Control", "private, no-cache");
-      return cached.data;
-    }
-    const data = await this.tasks.counts(user.id, organizationId, query);
-    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
-    res.setHeader("ETag", etag);
-    res.setHeader("Cache-Control", "private, no-cache");
-    return data;
+    return this.tasks.counts(user.id, organizationId, taskCountsQuerySchema.parse(rawQuery));
   }
 
   /** Collapsed-card stats (count + latest + last completion) per recurring chain — see {@link counts} for why this is separate from `list()`. */
   @Get("series-summary")
-  async seriesSummary(
+  @OrgVersioned({ namespace: "seriessummary" })
+  seriesSummary(
     @CurrentUser() user: RequestUser,
     @Param("organizationId") organizationId: string,
     @Query() rawQuery: Record<string, string>,
-    @Headers("if-none-match") ifNoneMatch: string | undefined,
-    @Res({ passthrough: true }) res: Response,
   ) {
     const query = seriesSummaryQuerySchema.parse(rawQuery);
-    const key = `seriessummary:${organizationId}:${user.id}:${JSON.stringify(query)}`;
-    const cached = this.cache.get(key);
-    if (cached && cached.etag === ifNoneMatch) {
-      throw new NotModifiedException();
-    }
-    if (cached) {
-      res.setHeader("ETag", cached.etag);
-      res.setHeader("Cache-Control", "private, no-cache");
-      return cached.data;
-    }
-    const data = await this.tasks.seriesSummaries(user.id, organizationId, {
+    return this.tasks.seriesSummaries(user.id, organizationId, {
       statuses: query.status,
       listId: query.listId,
       departmentId: query.departmentId,
@@ -144,10 +93,6 @@ export class TasksController {
       dueDateFrom: query.dueDateFrom,
       dueDateTo: query.dueDateTo,
     });
-    const etag = this.cache.set(key, data, TASKS_LIST_TTL_SECONDS);
-    res.setHeader("ETag", etag);
-    res.setHeader("Cache-Control", "private, no-cache");
-    return data;
   }
 
   /** Full occurrence list for one recurring chain — only called once its RecurringSeriesCard is expanded. */

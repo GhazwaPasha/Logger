@@ -1,144 +1,123 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { RealtimeClient } from "@work-ledger/client-core";
+import { REALTIME_EVENTS, type WorkspaceChangedEvent } from "@work-ledger/contracts";
+import { useEffect } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
-import { getApiBaseUrl } from "@/lib/api";
-import { performanceKeys, roadmapKeys, workspaceKeys } from "@/lib/query-keys";
+import { orgKeys, performanceKeys, roadmapKeys, taskKeys, workspaceKeys } from "@/lib/query-keys";
+import { getApiBaseUrl, tokenManager } from "@/lib/session";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
 const IDLE_AFTER_MS = 10 * 60 * 1000; // 10 minutes
-/** Coalesce rapid workspace_changed events (e.g. autosave) into one list refetch. */
-const WORKSPACE_INVALIDATE_DEBOUNCE_MS = 1500;
+/** Coalesce a burst of change events (autosave, bulk moves) into one targeted refresh. */
+const INVALIDATE_DEBOUNCE_MS = 750;
 
-type WorkspaceChangedPayload = {
-  type?: string;
-  organizationId?: string;
-  taskId?: string | null;
-};
-
-type PresenceSyncPayload = { onlineUserIds: string[]; awayUserIds?: string[] };
-type PresenceUpdatePayload = { userId: string; status: "online" | "offline" | "away" };
-
-/** Subscribes to org collaboration events; invalidates workspace (and optional task) cache. */
+/**
+ * Keeps this workspace live: one long-lived socket (see `RealtimeClient`) whose change events
+ * refresh only what the change could affect. Session problems are handled by the token manager —
+ * nothing here can trigger token refreshes or app-wide refetches.
+ */
 export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: string }) {
   const { token } = useApiSession();
+  const signedIn = token !== null;
   const queryClient = useQueryClient();
   const { setOnlineUserIds, setAwayUserIds } = useOnlinePresence();
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const workspaceInvalidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isAwayRef = useRef(false);
 
   useEffect(() => {
-    if (!token) return;
+    if (!signedIn) return;
 
-    const socket = io(getApiBaseUrl(), {
-      path: "/socket.io/",
-      auth: { token, organizationId: workspaceId },
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 8,
-      reconnectionDelay: 1200,
+    let lastVersion = 0;
+    let pending: { taskIds: Set<string>; workspace: boolean } = { taskIds: new Set(), workspace: false };
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      flushTimer = null;
+      const { taskIds, workspace } = pending;
+      pending = { taskIds: new Set(), workspace: false };
+      const ws = workspaceKeys.workspace(workspaceId);
+      void queryClient.invalidateQueries({ queryKey: ws, exact: true });
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.activity(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: [...ws, "task-counts"] });
+      void queryClient.invalidateQueries({ queryKey: [...ws, "series-summary"] });
+      void queryClient.invalidateQueries({ queryKey: [...ws, "series-occurrences"] });
+      void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: [...performanceKeys.all, workspaceId] });
+      for (const id of taskIds) void queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
+      if (workspace) {
+        void queryClient.invalidateQueries({ queryKey: [...ws, "archived-tasks"] });
+        void queryClient.invalidateQueries({ queryKey: [...ws, "deletion-log"] });
+        void queryClient.invalidateQueries({ queryKey: orgKeys.all });
+      }
+    };
+
+    const onWorkspaceChanged = (e: WorkspaceChangedEvent) => {
+      // Versions are monotonic per org; a stale or duplicate delivery carries nothing new.
+      if (e.version <= lastVersion) return;
+      lastVersion = e.version;
+      if (e.scope === "task" && e.taskId) pending.taskIds.add(e.taskId);
+      else pending.workspace = true;
+      if (flushTimer) clearTimeout(flushTimer);
+      flushTimer = setTimeout(flush, INVALIDATE_DEBOUNCE_MS);
+    };
+
+    const client = new RealtimeClient({
+      io,
+      url: getApiBaseUrl(),
+      organizationId: workspaceId,
+      tokens: tokenManager,
+      onWorkspaceChanged,
+      onPresenceSync: (p) => {
+        const away = new Set(p.awayUserIds ?? []);
+        setAwayUserIds(away);
+        setOnlineUserIds(new Set(p.onlineUserIds.filter((id) => !away.has(id))));
+      },
+      onPresenceUpdate: (p) => {
+        setAwayUserIds((prev) => {
+          const next = new Set(prev);
+          if (p.status === "away") next.add(p.userId);
+          else next.delete(p.userId);
+          return next;
+        });
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          if (p.status === "online") next.add(p.userId);
+          else next.delete(p.userId);
+          return next;
+        });
+      },
     });
 
-    const onWorkspaceChanged = (payload: WorkspaceChangedPayload) => {
-      if (payload?.organizationId !== workspaceId) return;
-      if (workspaceInvalidateTimerRef.current) {
-        clearTimeout(workspaceInvalidateTimerRef.current);
-      }
-      workspaceInvalidateTimerRef.current = setTimeout(() => {
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
-        void queryClient.invalidateQueries({
-          queryKey: workspaceKeys.activity(workspaceId),
-        });
-        // Task completion/linking elsewhere should refresh roadmap rollups without a manual reload.
-        void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(workspaceId) });
-        // Matches every date-range variant of the scorecards query (prefix match on performanceKeys.all).
-        void queryClient.invalidateQueries({ queryKey: [...performanceKeys.all, workspaceId] });
-      }, WORKSPACE_INVALIDATE_DEBOUNCE_MS);
-      // Task detail is updated by mutation handlers (PATCH / subtask APIs).
+    // Idle detection: tell teammates we're away after inactivity.
+    let isAway = false;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    const goAway = () => {
+      if (isAway) return;
+      isAway = true;
+      client.emit(REALTIME_EVENTS.presenceAway);
     };
-
-    const onPresenceSync = (payload: PresenceSyncPayload) => {
-      const away = new Set(payload.awayUserIds ?? []);
-      const online = new Set(
-        payload.onlineUserIds.filter((id) => !away.has(id)),
-      );
-      setAwayUserIds(away);
-      setOnlineUserIds(online);
-    };
-
-    const onPresenceUpdate = (payload: PresenceUpdatePayload) => {
-      if (payload.status === "away") {
-        setAwayUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
-        setOnlineUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
-      } else if (payload.status === "online") {
-        setAwayUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
-        setOnlineUserIds((prev) => { const next = new Set(prev); next.add(payload.userId); return next; });
-      } else {
-        setAwayUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
-        setOnlineUserIds((prev) => { const next = new Set(prev); next.delete(payload.userId); return next; });
+    const comeBack = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (isAway) {
+        isAway = false;
+        client.emit(REALTIME_EVENTS.presenceActive);
       }
+      idleTimer = setTimeout(goAway, IDLE_AFTER_MS);
     };
-
-    const onAuthError = () => {
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-      }
-    };
-
-    const onConnectError = (err: Error) => {
-      const msg = (err?.message ?? "").toLowerCase();
-      if (
-        msg.includes("unauthorized") ||
-        msg.includes("invalid") ||
-        msg.includes("forbidden") ||
-        msg.includes("jwt")
-      ) {
-        onAuthError();
-      }
-    };
-
-    socket.on("workspace_changed", onWorkspaceChanged);
-    socket.on("presence_sync", onPresenceSync);
-    socket.on("presence_update", onPresenceUpdate);
-    socket.on("collaboration_auth_error", onAuthError);
-    socket.on("connect_error", onConnectError);
-
-    // Idle detection
-    function goAway() {
-      if (isAwayRef.current) return;
-      isAwayRef.current = true;
-      socket.emit("presence_away");
-    }
-
-    function comeBack() {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      if (isAwayRef.current) {
-        isAwayRef.current = false;
-        socket.emit("presence_active");
-      }
-      idleTimerRef.current = setTimeout(goAway, IDLE_AFTER_MS);
-    }
-
     const activityEvents = ["mousemove", "keydown", "click", "touchstart"] as const;
     activityEvents.forEach((ev) => window.addEventListener(ev, comeBack, { passive: true }));
-    idleTimerRef.current = setTimeout(goAway, IDLE_AFTER_MS);
+    idleTimer = setTimeout(goAway, IDLE_AFTER_MS);
 
     return () => {
-      socket.off("workspace_changed", onWorkspaceChanged);
-      socket.off("presence_sync", onPresenceSync);
-      socket.off("presence_update", onPresenceUpdate);
-      socket.off("collaboration_auth_error", onAuthError);
-      socket.off("connect_error", onConnectError);
-      socket.disconnect();
+      client.close();
       setOnlineUserIds(new Set());
       setAwayUserIds(new Set());
       activityEvents.forEach((ev) => window.removeEventListener(ev, comeBack));
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      if (workspaceInvalidateTimerRef.current) clearTimeout(workspaceInvalidateTimerRef.current);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (flushTimer) clearTimeout(flushTimer);
     };
-  }, [token, workspaceId, queryClient, setOnlineUserIds, setAwayUserIds]);
+  }, [signedIn, workspaceId, queryClient, setOnlineUserIds, setAwayUserIds]);
 
   return null;
 }

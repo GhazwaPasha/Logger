@@ -16,7 +16,6 @@ import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { useApiSession } from "@/hooks/useApiSession";
 import { usePerformanceScorecards } from "@/hooks/usePerformanceScorecards";
 import { usePrefetchMemberTasks } from "@/hooks/usePrefetchMemberTasks";
-import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
 import { canViewPerformance } from "@/lib/workspace-permissions";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
@@ -39,7 +38,6 @@ export default function WorkspacePerformancePage() {
   const range = useMemo(() => presetToRange(rangeDays), [rangeDays]);
 
   const scorecardsQuery = usePerformanceScorecards(token, workspaceId, allowed, range);
-  const activityQuery = useOrgActivityFeed(token, workspaceId, allowed);
   const prefetchMemberTasks = usePrefetchMemberTasks(token, workspaceId, range);
 
   const scorecardMembers = scorecardsQuery.data?.members ?? [];
@@ -121,11 +119,11 @@ export default function WorkspacePerformancePage() {
             <p className="mt-0.5 text-sm text-[var(--muted)]">Everyone&rsquo;s activity, newest first — filter down to one person</p>
             <div className="mt-2">
               <PerformanceActivityFeed
-                activity={activityQuery.data}
+                token={token}
+                organizationId={workspaceId}
+                enabled={allowed}
                 members={members}
                 workHrefBase={base}
-                isLoading={activityQuery.isPending}
-                errorMessage={activityQuery.error ? (activityQuery.error as Error).message : null}
               />
             </div>
           </div>

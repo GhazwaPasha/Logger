@@ -10,10 +10,10 @@ import { useEffect, useState } from 'react';
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 
 import { useIsDark, useTheme, restoreThemePreference } from '@/hooks/use-theme';
-import { clearTokenCache } from '@/lib/api';
+import { clearTokenCache, onSessionLost } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
 import { queryClient, wireQueryManagers } from '@/lib/query-client';
-import { useForcedSignOut } from '@/lib/sign-out';
+import { signOut, useForcedSignOut } from '@/lib/sign-out';
 
 SplashScreen.preventAutoHideAsync();
 void restoreThemePreference();
@@ -44,6 +44,9 @@ export default function RootLayout() {
   });
 
   useEffect(() => wireQueryManagers(), []);
+  // The API stopped accepting this session (breaker tripped / signed out server-side): sign the device out
+  // instead of retrying — a fresh sign-in is the only thing that can recover it.
+  useEffect(() => onSessionLost(() => void signOut()), []);
 
   // Hold the app back (splash up) only for the first session check. better-auth flips `isPending` back on
   // whenever it refetches without a session — right after signing in, for one — and unmounting the navigator

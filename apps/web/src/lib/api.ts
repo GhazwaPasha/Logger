@@ -1,142 +1,59 @@
-export function getApiBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-  return "http://localhost:4000";
+import type { RequestOptions } from "@work-ledger/client-core";
+import { apiClient } from "@/lib/session";
+
+export { ApiError, NetworkError, SessionLostError, isTerminalError } from "@work-ledger/client-core";
+export { NETWORK_STATUS_EVENT, getApiBaseUrl } from "@/lib/session";
+
+/**
+ * `token` is accepted for call-site compatibility only and ignored: credentials are owned by the
+ * session's token manager (see `lib/session.ts`), so a request can never carry a stale token.
+ */
+type LegacyInit = Omit<RequestInit, "body" | "method" | "headers"> & {
+  token?: string | null;
+  method?: string;
+  body?: BodyInit | null;
+  headers?: HeadersInit;
+};
+
+function toOptions(init: LegacyInit = {}): RequestOptions {
+  const headers: Record<string, string> = {};
+  new Headers(init.headers).forEach((value, key) => {
+    headers[key] = value;
+  });
+  // Call sites pass pre-serialized JSON strings; label them like the old helper did.
+  if (typeof init.body === "string" && !("content-type" in headers)) headers["content-type"] = "application/json";
+  return {
+    method: (init.method?.toUpperCase() ?? "GET") as RequestOptions["method"],
+    body: init.body ?? undefined,
+    headers,
+    signal: init.signal ?? undefined,
+    // Matches the old helper: a caller-supplied signal (e.g. a long upload timeout) replaces the default.
+    timeoutMs: init.signal ? 10 * 60_000 : undefined,
+  };
 }
 
-function apiBase(): string {
-  return getApiBaseUrl();
+/** Authenticated request returning the Response as-is (callers inspect `res.ok`). */
+export function apiFetch(path: string, init: LegacyInit = {}): Promise<Response> {
+  return apiClient.raw(path, toOptions(init), { throwOnError: false });
 }
 
-/** Nest error bodies are `{ statusCode, message, error }`, with `message` sometimes an array
- *  (ValidationPipe). Unwrap that instead of surfacing the raw JSON blob to the user. */
-function extractErrorMessage(text: string, fallback: string): string {
-  if (!text) return fallback;
-  try {
-    const parsed = JSON.parse(text) as { message?: string | string[] };
-    if (Array.isArray(parsed.message) && parsed.message.length > 0) return parsed.message.join(" ");
-    if (typeof parsed.message === "string" && parsed.message) return parsed.message;
-  } catch {
-    // Body wasn't JSON — fall through and use the raw text.
-  }
-  return text;
-}
-
-/** The request never got a response (offline, server down, DNS, timeout) — as opposed to an HTTP error status. */
-export class NetworkError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NetworkError";
-  }
-}
-
-/** Fired after every API request with `{ reachable }`; `NetworkStatusBanner` listens to this. */
-export const NETWORK_STATUS_EVENT = "wl:network-status";
-
-function reportReachable(reachable: boolean) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(NETWORK_STATUS_EVENT, { detail: { reachable } }));
-}
-
-/** Turns the browser's raw "Failed to fetch" into something readable; anything else passes through untouched
- *  (notably a caller's own AbortError, which React Query relies on for cancellation). */
-function toNetworkError(err: unknown): unknown {
-  if (err instanceof DOMException && err.name === "TimeoutError") {
-    return new NetworkError("The server took too long to respond. Please try again.");
-  }
-  if (err instanceof TypeError) {
-    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-    return new NetworkError(
-      offline
-        ? "You're offline. Check your connection and try again."
-        : "Can't reach the server. Please try again in a moment.",
-    );
-  }
-  return err;
-}
-
-export async function apiFetch(
-  path: string,
-  options: RequestInit & { token?: string | null } = {},
-): Promise<Response> {
-  const { token, headers: initHeaders, ...rest } = options;
-  const headers = new Headers(initHeaders);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  if (!headers.has("Content-Type") && rest.body && !(rest.body instanceof FormData)) {
-    headers.set("Content-Type", "application/json");
-  }
-  try {
-    const res = await fetch(`${apiBase()}${path}`, {
-      ...rest,
-      headers,
-      cache: rest.cache ?? "no-store",
-      signal: rest.signal ?? AbortSignal.timeout(30_000),
-    });
-    reportReachable(true);
-    return res;
-  } catch (err) {
-    const mapped = toNetworkError(err);
-    if (mapped instanceof NetworkError) reportReachable(false);
-    throw mapped;
-  }
-}
-
-export async function apiJson<T>(
-  path: string,
-  options: RequestInit & { token?: string | null } = {},
-): Promise<T> {
-  const res = await apiFetch(path, options);
-  if (res.status === 401 && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(extractErrorMessage(text, res.statusText));
-  }
-  return res.json() as Promise<T>;
+export function apiJson<T>(path: string, init: LegacyInit = {}): Promise<T> {
+  return apiClient.json<T>(path, toOptions(init));
 }
 
 /**
- * Conditional-GET counterpart to `apiJson` for endpoints that support ETag revalidation
- * (workspace bootstrap, roadmap, performance scorecards). Sends `If-None-Match` when an `etag`
- * is passed; a `304` means the caller's existing cached data is still current — `data` comes
- * back `null` and the caller should keep what it already has instead of treating this as empty.
+ * Conditional GET for ETag-revalidated endpoints. A `304` means the caller's cached data is still
+ * current — `data` comes back `null` and the caller should keep what it already has.
  */
-export async function apiJsonConditional<T>(
+export function apiJsonConditional<T>(
   path: string,
-  options: RequestInit & { token?: string | null; etag?: string | null } = {},
+  init: LegacyInit & { etag?: string | null } = {},
 ): Promise<{ data: T | null; etag: string | null; notModified: boolean }> {
-  const { etag, headers: initHeaders, ...rest } = options;
-  const headers = new Headers(initHeaders);
-  if (etag) headers.set("If-None-Match", etag);
-  const res = await apiFetch(path, { ...rest, headers });
-  if (res.status === 401 && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-  }
-  if (res.status === 304) {
-    return { data: null, etag: etag ?? null, notModified: true };
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(extractErrorMessage(text, res.statusText));
-  }
-  const data = (await res.json()) as T;
-  return { data, etag: res.headers.get("ETag"), notModified: false };
+  const { etag, ...rest } = init;
+  return apiClient.conditional<T>(path, etag, toOptions(rest));
 }
 
 /** For DELETE / no-response-body endpoints. */
-export async function apiVoid(
-  path: string,
-  options: RequestInit & { token?: string | null } = {},
-): Promise<void> {
-  const res = await apiFetch(path, options);
-  if (res.status === 401 && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("wl:auth-expired"));
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(extractErrorMessage(text, res.statusText));
-  }
+export async function apiVoid(path: string, init: LegacyInit = {}): Promise<void> {
+  await apiClient.json<unknown>(path, toOptions(init));
 }

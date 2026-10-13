@@ -25,18 +25,25 @@ import { DepartmentsService } from "../departments/departments.service";
 import { guildIconUrl } from "../discord/discord-api.service";
 import { ListsService } from "../lists/lists.service";
 import { CollaborationService } from "../realtime/collaboration.service";
-import { MemoryCacheService } from "../cache/memory-cache.service";
 
 const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
 
-/** Per-user activity feed cache. Writes bust it immediately via notifyOrgChanged, so this only bounds repeat reads. */
-const ACTIVITY_FEED_TTL_SECONDS = 30;
-
 type OrganizationRow = typeof organizations.$inferSelect;
 
+/** Largest activity page. Feeds paginate; nothing needs more than this in one response. */
+const ACTIVITY_PAGE_MAX = 50;
+
 type ActivityFeedResult = {
-  entries: unknown[];
-  tasksById: Record<string, unknown>;
+  entries: {
+    id: string;
+    taskId: string;
+    actorId: string;
+    type: string;
+    payload: Record<string, unknown>;
+    clientMutationId: string | null;
+    createdAt: Date;
+  }[];
+  tasksById: Record<string, { id: string; title: string; assignerId: string | null; dueAt: string | null }>;
   assigneesByTaskId: Record<string, string[]>;
   nextCursor: string | null;
 };
@@ -50,7 +57,6 @@ export class OrganizationsService {
     private readonly lists: ListsService,
     private readonly collaboration: CollaborationService,
     private readonly attachments: AttachmentsService,
-    private readonly cache: MemoryCacheService,
   ) {}
 
   private slugifyName(name: string): string {
@@ -122,53 +128,42 @@ export class OrganizationsService {
   }
 
   /**
-   * Activity ledger across all tasks the user can see in this org (same rules as task list),
-   * newest first. Caps at 500 rows per request.
+   * Activity ledger across all tasks the user can see in this org (same rules as the task list),
+   * newest first, keyset-paginated. Each page is one indexed range read on
+   * `(organization_id, created_at, id)` with visibility applied as a join, so its cost is bounded by
+   * the page size — independent of how many tasks or ledger rows the org has accumulated.
    */
-  async activityFeed(userId: string, organizationId: string, opts?: { limit?: number; cursor?: string }) {
-    await this.authz.assertOrgMember(userId, organizationId);
+  async activityFeed(
+    userId: string,
+    organizationId: string,
+    opts?: { limit?: number; cursor?: string; actorId?: string },
+  ): Promise<ActivityFeedResult> {
     const raw = opts?.limit;
     const limit =
       typeof raw === "number" && Number.isFinite(raw)
-        ? Math.min(Math.max(Math.floor(raw), 1), 500)
-        : 150;
+        ? Math.min(Math.max(Math.floor(raw), 1), ACTIVITY_PAGE_MAX)
+        : ACTIVITY_PAGE_MAX;
     const decoded = opts?.cursor ? decodeCursor(opts.cursor) : null;
+    const actorId = opts?.actorId;
 
-    // Short-lived per-user cache, busted by every org write (see CollaborationService.notifyOrgChanged).
-    // Without it every client refresh re-reads the whole org's task list from Postgres.
-    const cacheKey = `activity:${organizationId}:${userId}:${limit}:${opts?.cursor ?? ""}`;
-    const cached = this.cache.get(cacheKey);
-    if (cached) return cached.data as ActivityFeedResult;
+    const scope = await this.authz.taskScopeConditions(userId, organizationId);
+    if (!scope) return { entries: [], tasksById: {}, assigneesByTaskId: {}, nextCursor: null };
 
-    const data = await this.buildActivityFeed(userId, organizationId, limit, decoded);
-    this.cache.set(cacheKey, data, ACTIVITY_FEED_TTL_SECONDS);
-    return data;
-  }
-
-  private async buildActivityFeed(
-    userId: string,
-    organizationId: string,
-    limit: number,
-    decoded: ReturnType<typeof decodeCursor> | null,
-  ): Promise<ActivityFeedResult> {
-    const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
-
-    if (taskIds.length === 0) {
-      return { entries: [], tasksById: {}, assigneesByTaskId: {}, nextCursor: null };
-    }
-
-    const cursorCondition = decoded
-      ? or(
-          lt(activityLedger.createdAt, decoded.createdAt),
-          and(eq(activityLedger.createdAt, decoded.createdAt), lt(activityLedger.id, decoded.id)),
-        )
-      : undefined;
-
-    const baseConditions = [
-      inArray(activityLedger.taskId, taskIds),
+    const conditions = [
+      eq(activityLedger.organizationId, organizationId),
+      ...scope,
+      // Subtask churn stays in per-task history only.
       sql`${activityLedger.payload} ->> 'subtaskTitle' is null`,
     ];
-    const selectConditions = cursorCondition ? [...baseConditions, cursorCondition] : baseConditions;
+    if (actorId) conditions.push(eq(activityLedger.actorId, actorId));
+    if (decoded) {
+      conditions.push(
+        or(
+          lt(activityLedger.createdAt, decoded.createdAt),
+          and(eq(activityLedger.createdAt, decoded.createdAt), lt(activityLedger.id, decoded.id)),
+        )!,
+      );
+    }
 
     const pageRows = await this.db
       .select({
@@ -179,42 +174,42 @@ export class OrganizationsService {
         payload: activityLedger.payload,
         clientMutationId: activityLedger.clientMutationId,
         createdAt: activityLedger.createdAt,
+        taskTitle: tasks.title,
+        taskAssignerId: tasks.assignerId,
+        taskDueAt: tasks.dueAt,
       })
       .from(activityLedger)
-      .where(and(...selectConditions))
+      .innerJoin(tasks, eq(tasks.id, activityLedger.taskId))
+      .where(and(...conditions))
       .orderBy(desc(activityLedger.createdAt), desc(activityLedger.id))
       .limit(limit + 1);
 
     const hasMore = pageRows.length > limit;
-    const rows = hasMore ? pageRows.slice(0, limit) : pageRows;
-    const nextCursor = hasMore && rows.length > 0 ? encodeCursor(rows[rows.length - 1]!) : null;
+    const page = hasMore ? pageRows.slice(0, limit) : pageRows;
+    const nextCursor = hasMore && page.length > 0 ? encodeCursor(page[page.length - 1]!) : null;
 
-    const taskIdsInFeed = [...new Set(rows.map((r) => r.taskId))];
+    const tasksById: ActivityFeedResult["tasksById"] = {};
+    const entries = page.map(({ taskTitle, taskAssignerId, taskDueAt, ...entry }) => {
+      tasksById[entry.taskId] ??= {
+        id: entry.taskId,
+        title: taskTitle,
+        assignerId: taskAssignerId,
+        dueAt: taskDueAt ? taskDueAt.toISOString() : null,
+      };
+      return entry;
+    });
+
     const assigneesByTaskId: Record<string, string[]> = {};
-    const tasksById: Record<string, { id: string; title: string; assignerId: string | null; dueAt: string | null }> = {};
-    if (taskIdsInFeed.length > 0) {
-      // Metadata only for tasks that appear in this page, not every task in the org.
-      const [taskMetaRows, assigneeRows] = await Promise.all([
-        this.db
-          .select({ id: tasks.id, title: tasks.title, assignerId: tasks.assignerId, dueAt: tasks.dueAt })
-          .from(tasks)
-          .where(inArray(tasks.id, taskIdsInFeed)),
-        this.db
-          .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
-          .from(taskAssignees)
-          .where(inArray(taskAssignees.taskId, taskIdsInFeed)),
-      ]);
-      for (const t of taskMetaRows) {
-        tasksById[t.id] = { id: t.id, title: t.title, assignerId: t.assignerId, dueAt: t.dueAt ? t.dueAt.toISOString() : null };
-      }
-      for (const r of assigneeRows) {
-        const list = assigneesByTaskId[r.taskId] ?? [];
-        list.push(r.userId);
-        assigneesByTaskId[r.taskId] = list;
-      }
+    const taskIdsInPage = Object.keys(tasksById);
+    if (taskIdsInPage.length > 0) {
+      const assigneeRows = await this.db
+        .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+        .from(taskAssignees)
+        .where(inArray(taskAssignees.taskId, taskIdsInPage));
+      for (const r of assigneeRows) (assigneesByTaskId[r.taskId] ??= []).push(r.userId);
     }
 
-    return { entries: rows, tasksById, assigneesByTaskId, nextCursor };
+    return { entries, tasksById, assigneesByTaskId, nextCursor };
   }
 
   /** Single round-trip workspace payload for app shell (parallel DB reads). Tasks now fetched per-column via paginated endpoint. */
@@ -376,6 +371,7 @@ export class OrganizationsService {
       .delete(organizationMemberManagedDepartments)
       .where(eq(organizationMemberManagedDepartments.organizationMemberId, member.id));
     await this.db.delete(organizationMembers).where(eq(organizationMembers.id, member.id));
+    this.collaboration.revokeMembership(organizationId, targetUserId);
 
     if (affected.length > 0) {
       const taskIds = [...new Set(affected.map((r) => r.taskId))];

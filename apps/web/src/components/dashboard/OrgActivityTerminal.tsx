@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { LoadingLinesBlock } from "@/components/ui/LoadingFrame";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
@@ -17,6 +17,10 @@ type Props = {
   errorMessage: string | null;
   /** Tailwind max-height class for the scrollable log list. */
   maxHeightClassName?: string;
+  /** Older pages exist; `onLoadMore` is called when the reader scrolls to the end of the log. */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 const DEFAULT_MAX_HEIGHT_CLASSNAME = "max-h-[min(55vh,26rem)]";
@@ -83,8 +87,27 @@ export function OrgActivityTerminal({
   isLoading,
   errorMessage,
   maxHeightClassName = DEFAULT_MAX_HEIGHT_CLASSNAME,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: Props) {
   const { timeZone } = useWorkspaceRoute();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLParagraphElement>(null);
+
+  // Load the next (older) page when the end of the log scrolls into view.
+  useEffect(() => {
+    const end = endRef.current;
+    if (!end || !hasMore || loadingMore || !onLoadMore) return;
+    const observer = new IntersectionObserver(
+      (items) => {
+        if (items.some((i) => i.isIntersecting)) onLoadMore();
+      },
+      { root: scrollRef.current, rootMargin: "120px" },
+    );
+    observer.observe(end);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore, entries.length]);
   // Snapshot "now" after mount (not during render) so recency checks stay pure;
   // re-snapshots whenever entries change so freshly-arrived rows get the type-in animation.
   const [now, setNow] = useState(0);
@@ -124,6 +147,7 @@ export function OrgActivityTerminal({
   return (
     <TerminalChrome label="activity.log">
       <div
+        ref={scrollRef}
         className={`scrollbar-hide ${maxHeightClassName} overflow-y-auto overflow-x-hidden overscroll-contain p-3 font-mono-ledger text-[12px] leading-snug`}
       >
         <div className="space-y-2">
@@ -150,6 +174,11 @@ export function OrgActivityTerminal({
               </p>
             );
           })}
+          {hasMore && (
+            <p ref={endRef} className="text-[var(--term-muted)]">
+              {loadingMore ? "loading older entries…" : ""}
+            </p>
+          )}
         </div>
       </div>
     </TerminalChrome>

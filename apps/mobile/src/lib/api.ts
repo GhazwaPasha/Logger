@@ -1,93 +1,69 @@
+import {
+  ApiClient,
+  ApiError,
+  NetworkError,
+  SessionLostError,
+  TokenManager,
+  type SessionLostReason,
+} from '@work-ledger/client-core';
+import { TOKEN_REFRESHABLE_CODES, apiErrorCodeForStatus, isApiErrorCode } from '@work-ledger/contracts';
+
+import { Platform } from 'react-native';
+
 import { authClient } from '@/lib/auth-client';
 import { API_URL } from '@/lib/config';
 
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
+export { ApiError, NetworkError, SessionLostError, isTerminalError } from '@work-ledger/client-core';
+
+type SessionLostListener = (reason: SessionLostReason) => void;
+const sessionLostListeners = new Set<SessionLostListener>();
+
+/** "The API will no longer accept this session" — the root layout signs the device out. */
+export function onSessionLost(listener: SessionLostListener): () => void {
+  sessionLostListeners.add(listener);
+  return () => sessionLostListeners.delete(listener);
 }
 
-/** The request never got a response (offline, server down, timeout). */
-export class NetworkError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NetworkError';
-  }
-}
-
-const REQUEST_TIMEOUT_MS = 30_000;
-const TOKEN_SKEW_MS = 30_000;
-
-let cached: { token: string; expiresAt: number } | null = null;
-let inflight: Promise<string> | null = null;
-
-function jwtExpiryMs(token: string): number {
-  try {
-    const payload = token.split('.')[1] ?? '';
-    const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const json = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))) as { exp?: number };
-    return (json.exp ?? 0) * 1000;
-  } catch {
-    return 0;
-  }
-}
-
-export function clearTokenCache() {
-  cached = null;
-  inflight = null;
-}
-
-async function getToken(force = false): Promise<string> {
-  if (!force && cached && cached.expiresAt - Date.now() > TOKEN_SKEW_MS) return cached.token;
-  inflight ??= (async () => {
-    try {
-      // Better Auth types this call as a union that includes the raw (throwing) response; we use the {data, error} form.
-      const { data, error } = (await authClient.token()) as unknown as {
-        data?: { token?: string } | null;
-        error?: unknown;
-      };
-      if (error || !data?.token) throw new ApiError(401, 'Not signed in');
-      cached = { token: data.token, expiresAt: jwtExpiryMs(data.token) };
-      return data.token;
-    } finally {
-      inflight = null;
+/**
+ * The device's one credential owner (session cookie lives in SecureStore via expoClient; the API is
+ * called with short-lived JWTs minted from it). Shared engine: see `@work-ledger/client-core`.
+ */
+export const tokenManager = new TokenManager({
+  mint: async () => {
+    // Better Auth types this call as a union that includes the raw (throwing) response; we use the {data, error} form.
+    const { data, error } = (await authClient.token()) as unknown as {
+      data?: { token?: string } | null;
+      error?: { status?: number; message?: string } | null;
+    };
+    if (error) {
+      if (error.status === 401) return null;
+      throw new NetworkError(error.message ?? "Can't reach the server. Check your connection.");
     }
-  })();
-  return inflight;
+    return data?.token ?? null;
+  },
+  onSessionLost: (reason) => {
+    reportClientEvent('session_lost', reason);
+    for (const l of sessionLostListeners) l(reason);
+  },
+});
+
+/** Best-effort beacon so the API's alerting sees devices that deliberately went quiet. */
+function reportClientEvent(type: 'session_lost' | 'realtime_stopped', reason: string) {
+  void fetch(`${API_URL}/telemetry/client-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, reason, platform: Platform.OS === 'ios' ? 'ios' : 'android' }),
+  }).catch(() => undefined);
 }
 
-/** The API bearer token (cached / refreshed like `api()` does) — for the realtime socket's handshake. */
-export function getApiToken(): Promise<string> {
-  return getToken();
-}
+export const apiClient = new ApiClient({ baseUrl: API_URL, tokens: tokenManager });
 
-/** Nest error bodies are `{ statusCode, message, error }` where `message` may be an array (ValidationPipe). */
-function errorMessage(text: string, fallback: string): string {
-  if (!text) return fallback;
-  try {
-    const parsed = JSON.parse(text) as { message?: string | string[] };
-    if (Array.isArray(parsed.message) && parsed.message.length > 0) return parsed.message.join(' ');
-    if (typeof parsed.message === 'string' && parsed.message) return parsed.message;
-  } catch {
-    // not JSON
-  }
-  return text;
+/** Forget the cached token and re-arm the session (sign-in, sign-out). */
+export function clearTokenCache() {
+  tokenManager.reset();
 }
 
 type Params = Record<string, string | number | boolean | null | undefined>;
-
-function withQuery(path: string, params?: Params): string {
-  if (!params) return path;
-  const qs = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-    .join('&');
-  return qs ? `${path}?${qs}` : path;
-}
 
 export type ApiOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
@@ -98,53 +74,28 @@ export type ApiOptions = {
   timeoutMs?: number;
 };
 
-async function send(path: string, opts: ApiOptions, token: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? REQUEST_TIMEOUT_MS);
-  opts.signal?.addEventListener('abort', () => controller.abort());
-  // FormData (file uploads) must go through untouched — stringifying it would send "[object
-  // FormData]", and setting Content-Type ourselves drops the multipart boundary fetch generates.
-  const isFormData = typeof FormData !== 'undefined' && opts.body instanceof FormData;
-  try {
-    return await fetch(`${API_URL}${withQuery(path, opts.params)}`, {
-      method: opts.method ?? 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        ...(opts.body !== undefined && !isFormData ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: opts.body === undefined ? undefined : isFormData ? (opts.body as FormData) : JSON.stringify(opts.body),
-      signal: controller.signal,
-    });
-  } catch (e) {
-    if (opts.signal?.aborted) throw e;
-    throw new NetworkError(
-      controller.signal.aborted
-        ? 'The server took too long to respond. Please try again.'
-        : "Can't reach the server. Check your connection.",
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+/** JSON request to the LogBase API. Auth, one-shot token refresh, backoff and session loss are handled by the engine. */
+export function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
+  return apiClient.json<T>(path, opts);
 }
 
-/** JSON request to the LogBase API with Bearer auth; refreshes the JWT once on 401. */
-export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
-  let res = await send(path, opts, await getToken());
-  if (res.status === 401) {
-    res = await send(path, opts, await getToken(true));
+function parseXhrError(status: number, text: string): ApiError {
+  let code = apiErrorCodeForStatus(status);
+  let message = 'Upload failed';
+  try {
+    const parsed = JSON.parse(text) as { code?: unknown; message?: string | string[] };
+    if (isApiErrorCode(parsed.code)) code = parsed.code;
+    const msg = Array.isArray(parsed.message) ? parsed.message.join(' ') : parsed.message;
+    if (msg) message = msg;
+  } catch {
+    // not JSON
   }
-  if (!res.ok) {
-    throw new ApiError(res.status, errorMessage(await res.text(), res.statusText || 'Request failed'));
-  }
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  return new ApiError(status, code, message);
 }
 
 /**
  * Multipart POST that reports real upload progress (0 → 1 as the bytes leave the device). React Native's
- * `fetch` has no upload progress, so this goes through XMLHttpRequest; auth and errors match {@link api}.
+ * `fetch` has no upload progress, so this goes through XMLHttpRequest, with the same token rules as {@link api}.
  */
 export async function apiUpload<T = unknown>(
   path: string,
@@ -155,7 +106,7 @@ export async function apiUpload<T = unknown>(
   const attempt = (token: string) =>
     new Promise<{ status: number; text: string }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${API_URL}${path}`);
+      xhr.open('POST', apiClient.url(path));
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.setRequestHeader('Accept', 'application/json');
       xhr.timeout = timeoutMs;
@@ -168,11 +119,17 @@ export async function apiUpload<T = unknown>(
       xhr.send(form);
     });
 
-  let res = await attempt(await getToken());
-  if (res.status === 401) {
+  let token = await tokenManager.getToken();
+  let res = await attempt(token);
+  if (res.status === 401 && TOKEN_REFRESHABLE_CODES.includes(parseXhrError(401, res.text).code)) {
     onProgress(0);
-    res = await attempt(await getToken(true));
+    token = await tokenManager.refreshAfterRejection(token);
+    res = await attempt(token);
+    if (res.status === 401) {
+      tokenManager.declareLost('rejected');
+      throw new SessionLostError('rejected');
+    }
   }
-  if (res.status < 200 || res.status >= 300) throw new ApiError(res.status, errorMessage(res.text, 'Upload failed'));
+  if (res.status < 200 || res.status >= 300) throw parseXhrError(res.status, res.text);
   return (res.text ? JSON.parse(res.text) : undefined) as T;
 }

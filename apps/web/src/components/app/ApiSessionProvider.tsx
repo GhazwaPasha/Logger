@@ -1,17 +1,24 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { SessionLostReason } from "@work-ledger/client-core";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
-import { clearJwtCapture, getJwtCapturedFromGetSession } from "@/lib/auth-session-jwt-capture";
+import { onSessionLost, tokenManager } from "@/lib/session";
 
 type ApiSessionContextValue = {
   session: ReturnType<typeof authClient.useSession>["data"];
   /** True while Better Auth session is loading (block routes that need login state). */
   isSessionPending: boolean;
-  /** True while session is loading or JWT is still resolving for a logged-in user (safe for API calls). */
+  /** True while session is loading or the first API token is still being minted. */
   isPending: boolean;
+  /**
+   * Readiness marker: non-null once this signed-in user can call the API. It changes only on
+   * sign-in / sign-out — never on token renewal — so nothing re-renders or reconnects when the
+   * credential rotates. API helpers ignore it; credentials live in `lib/session.ts`.
+   */
   token: string | null;
-  refreshToken: () => Promise<void>;
+  /** Set when the API will no longer accept this session; the app stops all traffic and asks to sign in. */
+  sessionLost: SessionLostReason | null;
 };
 
 const ApiSessionContext = createContext<ApiSessionContextValue | null>(null);
@@ -21,65 +28,44 @@ export function ApiSessionProvider({ children }: { children: ReactNode }) {
   const sessionUserId = session?.user?.id ?? null;
   const [token, setToken] = useState<string | null>(null);
   const [tokenResolved, setTokenResolved] = useState(false);
+  const [sessionLost, setSessionLost] = useState<SessionLostReason | null>(null);
 
-  const refreshToken = useCallback(async () => {
-    const { data, error } = await authClient.token();
-    if (error) {
-      setToken(null);
-      // The JWT couldn't be refreshed. Re-check the underlying Better Auth session so a
-      // truly dead session (not just an expired JWT) updates useSession() and triggers
-      // AppAuthenticatedProviders' redirect-to-login effect, instead of leaving the user
-      // stuck on the page with a stale "invalid token" error banner.
-      void authClient.getSession();
-      return;
-    }
-    setToken(data?.token ?? null);
-  }, []);
+  useEffect(() => onSessionLost(setSessionLost), []);
 
   useEffect(() => {
+    tokenManager.reset();
+    setSessionLost(null);
+    setToken(null);
     if (!sessionUserId) {
-      setToken(null);
       setTokenResolved(true);
-      clearJwtCapture();
       return;
     }
     setTokenResolved(false);
     let cancelled = false;
-    void (async () => {
-      const captured = getJwtCapturedFromGetSession();
-      if (captured) {
+    tokenManager.getToken().then(
+      (t) => {
         if (cancelled) return;
-        setToken(captured);
+        setToken(t);
         setTokenResolved(true);
-        return;
-      }
-      const { data, error } = await authClient.token();
-      if (cancelled) return;
-      if (error) {
-        setToken(null);
+      },
+      () => {
+        if (cancelled) return;
+        // Signed out server-side, or unreachable: re-check the Better Auth session so a dead one
+        // redirects to login; a live one shows the session-lost screen via onSessionLost.
         void authClient.getSession();
-      } else {
-        setToken(data?.token ?? null);
-      }
-      setTokenResolved(true);
-    })();
+        setTokenResolved(true);
+      },
+    );
     return () => {
       cancelled = true;
     };
   }, [sessionUserId]);
 
-  const isSessionPending = sessionPending;
   const isPending = sessionPending || (Boolean(sessionUserId) && !tokenResolved);
 
   const value = useMemo<ApiSessionContextValue>(
-    () => ({
-      session,
-      isSessionPending,
-      isPending,
-      token,
-      refreshToken,
-    }),
-    [session, isSessionPending, isPending, token, refreshToken],
+    () => ({ session, isSessionPending: sessionPending, isPending, token, sessionLost }),
+    [session, sessionPending, isPending, token, sessionLost],
   );
 
   return <ApiSessionContext.Provider value={value}>{children}</ApiSessionContext.Provider>;

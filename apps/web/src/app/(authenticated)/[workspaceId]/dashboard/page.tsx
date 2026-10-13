@@ -7,7 +7,7 @@ import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
-import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
+import { useActivityFeedPages } from "@/hooks/useOrgActivityFeed";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
 
 type DashboardView = "overview" | "activity";
@@ -18,7 +18,7 @@ export default function WorkspaceDashboardPage() {
   const { depts, tasks, members, lists, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [view, setView] = useState<DashboardView>("overview");
 
-  const activityQuery = useOrgActivityFeed(token, workspaceId, view === "activity");
+  const activityQuery = useActivityFeedPages(token, workspaceId, view === "activity");
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -89,6 +89,9 @@ export default function WorkspaceDashboardPage() {
               isLoading={activityQuery.isPending}
               errorMessage={activityQuery.error ? (activityQuery.error as Error).message : null}
               maxHeightClassName="max-h-[min(65vh,32rem)]"
+              hasMore={activityQuery.hasMore}
+              loadingMore={activityQuery.loadingMore}
+              onLoadMore={activityQuery.loadMore}
             />
           </div>
         </section>

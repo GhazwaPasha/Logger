@@ -1,13 +1,9 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from "@nestjs/common";
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
 import { AuthService } from "./auth.service";
 import { IS_PUBLIC_KEY } from "./public.decorator";
+import { tokenMissing } from "../common/api-error";
 
 export type RequestUser = { id: string };
 
@@ -32,15 +28,11 @@ export class JwtAuthGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request>();
     const header = req.headers.authorization;
     if (!header?.startsWith("Bearer ")) {
-      throw new UnauthorizedException("Missing Bearer token");
+      throw tokenMissing();
     }
     const token = header.slice("Bearer ".length).trim();
     const payload = await this.auth.verifyBearerJwt(token);
-    const sub = payload.sub;
-    if (!sub || typeof sub !== "string") {
-      throw new UnauthorizedException("Invalid token subject");
-    }
-    (req as Request & { user: RequestUser }).user = { id: sub };
+    (req as Request & { user: RequestUser }).user = { id: payload.sub as string };
     return true;
   }
 }

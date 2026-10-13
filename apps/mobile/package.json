@@ -9,7 +9,7 @@
     "ios": "expo run:ios",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "eas-build-post-install": "cd ../.. && npm run build -w @work-ledger/contracts"
+    "eas-build-post-install": "cd ../.. && npm run build -w @work-ledger/contracts && npm run build -w @work-ledger/client-core"
   },
   "dependencies": {
     "@better-auth/expo": "1.6.9",
@@ -24,6 +24,7 @@
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-google-signin/google-signin": "^16.1.5",
     "@tanstack/react-query": "^5.103.2",
+    "@work-ledger/client-core": "^0.0.1",
     "@work-ledger/contracts": "^0.0.1",
     "better-auth": "1.6.9",
     "expo": "~57.0.24",

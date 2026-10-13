@@ -91,6 +91,8 @@ try {
 
     await client.query("BEGIN");
     try {
+      // Schema changes and backfills are exempt from any role-level statement_timeout.
+      await client.query("SET LOCAL statement_timeout = 0");
       for (const stmt of migration.sql) {
         const text = stmt.trim();
         if (text.length === 0) continue;

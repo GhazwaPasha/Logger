@@ -2,6 +2,9 @@ import { join } from "path";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { SentryModule } from "@sentry/nestjs/setup";
+import { ObservabilityModule } from "./observability/observability.module";
 import { AccountModule } from "./account/account.module";
 import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { CacheModule } from "./cache/cache.module";
@@ -35,7 +38,15 @@ import { PerformanceModule } from "./performance/performance.module";
         join(__dirname, "..", "..", "..", ".env.local"),
       ],
     }),
+    SentryModule.forRoot(),
     ScheduleModule.forRoot(),
+    // Per-user budgets (see ApiThrottlerGuard). Normal use peaks well below both; a stuck client
+    // refetch loop (~5 req/s, as on Oct 11) trips `sustained` within about three minutes.
+    ThrottlerModule.forRoot([
+      { name: "burst", ttl: 10_000, limit: 120 },
+      { name: "sustained", ttl: 300_000, limit: 900 },
+    ]),
+    ObservabilityModule,
     CacheModule,
     DbModule,
     AuthorizationModule,

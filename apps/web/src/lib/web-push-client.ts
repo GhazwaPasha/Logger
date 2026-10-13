@@ -1,4 +1,5 @@
-import { apiFetch, apiJson } from "@/lib/api";
+import { apiJson } from "@/lib/api";
+import { apiClient } from "@/lib/session";
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -13,7 +14,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function fetchWebPushPublicKey(): Promise<string | null> {
-  const res = await apiFetch("/push/vapid-public-key");
+  const res = await apiClient.raw("/push/vapid-public-key", { anonymous: true }, { throwOnError: false });
   if (!res.ok) return null;
   const data = (await res.json()) as { publicKey?: string | null };
   const key = typeof data.publicKey === "string" ? data.publicKey.trim() : "";

@@ -17,6 +17,7 @@ import {
 } from "@work-ledger/db/schema";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
+import { JWKS_GRACE_PERIOD_SECONDS, JWKS_ROTATION_INTERVAL_SECONDS, jwksAdapter } from "./auth-jwks";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -195,12 +196,13 @@ export const auth = betterAuth({
   plugins: [
     expo(),
     jwt({
+      // Private keys are encrypted at rest with BETTER_AUTH_SECRET and rotated on a schedule. Every
+      // environment that mints tokens against this database must share that secret.
       jwks: {
-        // Default encrypts JWKS private keys with BETTER_AUTH_SECRET; changing the secret without DB cleanup
-        // causes "Failed to decrypt private key" and 500s on get-session. Storing the key material unencrypted
-        // in Postgres (still protected by DB access) avoids deploy/env secret mismatches with Neon.
-        disablePrivateKeyEncryption: true,
+        rotationInterval: JWKS_ROTATION_INTERVAL_SECONDS,
+        gracePeriod: JWKS_GRACE_PERIOD_SECONDS,
       },
+      adapter: jwksAdapter,
     }),
     mcp({
       loginPage: "/login",

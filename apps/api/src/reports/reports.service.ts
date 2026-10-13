@@ -34,14 +34,14 @@ export class ReportsService {
     organizationId: string,
     opts?: { dateFrom?: string; dateTo?: string; deptId?: string; status?: string },
   ): Promise<string> {
-    const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
-    if (taskIds.length === 0) return "";
+    const scope = await this.authz.taskScopeConditions(userId, organizationId);
+    if (!scope) return "";
 
     if (opts?.dateFrom) {
       assertReportRange(new Date(opts.dateFrom), opts.dateTo ? new Date(opts.dateTo) : new Date());
     }
     const timeZone = await getOrganizationTimeZone(this.db, organizationId);
-    const conditions = [inArray(tasks.id, taskIds), isNull(tasks.deletedAt)];
+    const conditions = [...scope];
     if (opts?.status) conditions.push(eq(tasks.status, opts.status as any));
     if (opts?.dateFrom) conditions.push(gte(tasks.createdAt, new Date(opts.dateFrom)));
     if (opts?.dateTo) conditions.push(lte(tasks.createdAt, new Date(opts.dateTo)));
@@ -122,10 +122,10 @@ export class ReportsService {
     organizationId: string,
     opts?: { dateFrom?: string; dateTo?: string },
   ): Promise<string> {
-    const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
-    if (taskIds.length === 0) return "";
+    const scope = await this.authz.taskScopeConditions(userId, organizationId);
+    if (!scope) return "";
 
-    const conditions = [inArray(activityLedger.taskId, taskIds)];
+    const conditions = [eq(activityLedger.organizationId, organizationId), ...scope];
     if (opts?.dateFrom) conditions.push(gte(activityLedger.createdAt, new Date(opts.dateFrom)));
     if (opts?.dateTo) conditions.push(lte(activityLedger.createdAt, new Date(opts.dateTo)));
 
@@ -140,6 +140,7 @@ export class ReportsService {
         actorName: user.name,
       })
       .from(activityLedger)
+      .innerJoin(tasks, eq(tasks.id, activityLedger.taskId))
       .innerJoin(user, eq(activityLedger.actorId, user.id))
       .where(and(...conditions))
       .orderBy(activityLedger.createdAt)

@@ -333,6 +333,12 @@ exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     taskId: (0, pg_core_1.uuid)("task_id")
         .notNull()
         .references(() => exports.tasks.id, { onDelete: "cascade" }),
+    /**
+     * Denormalized from the task so org-wide feeds read one index range instead of joining every task.
+     * NOT NULL in the database and filled by the `activity_ledger_set_organization` trigger from
+     * `task_id`, so writers never set it (hence optional here).
+     */
+    organizationId: (0, pg_core_1.uuid)("organization_id").references(() => exports.organizations.id, { onDelete: "cascade" }),
     actorId: (0, pg_core_1.text)("actor_id")
         .notNull()
         .references(() => exports.user.id, { onDelete: "restrict" }),
@@ -340,7 +346,10 @@ exports.activityLedger = (0, pg_core_1.pgTable)("activity_ledger", {
     payload: (0, pg_core_1.jsonb)("payload").notNull().$type(),
     clientMutationId: (0, pg_core_1.text)("client_mutation_id"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [(0, pg_core_1.index)("activity_ledger_task_created_idx").on(t.taskId, t.createdAt)]);
+}, (t) => [
+    (0, pg_core_1.index)("activity_ledger_task_created_idx").on(t.taskId, t.createdAt),
+    (0, pg_core_1.index)("activity_ledger_org_created_idx").on(t.organizationId, t.createdAt.desc(), t.id.desc()),
+]);
 /** Blocking relationship: taskId is blocked by dependsOnTaskId. */
 exports.taskDependencies = (0, pg_core_1.pgTable)("task_dependencies", {
     taskId: (0, pg_core_1.uuid)("task_id")

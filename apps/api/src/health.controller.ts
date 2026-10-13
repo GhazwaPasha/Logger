@@ -1,8 +1,10 @@
 import { Controller, Get, Inject } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { Public } from "./auth/public.decorator";
 import { MemoryCacheService } from "./cache/memory-cache.service";
 import { Pool } from "pg";
 
+@SkipThrottle()
 @Controller()
 export class HealthController {
   constructor(

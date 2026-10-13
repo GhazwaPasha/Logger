@@ -7,7 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { liveIsland } from "@/components/app/live-island";
 import { useApiSession } from "@/hooks/useApiSession";
-import { useOrgActivityFeed } from "@/hooks/useOrgActivityFeed";
+import { useRecentActivity } from "@/hooks/useOrgActivityFeed";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
@@ -71,7 +71,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
   // WorkspaceRealtimeSubscriber), which invalidates this same query key instantly on any
   // change. This interval is only a fallback for missed/dropped socket events, so it can be
   // long — tightening it further just multiplies Supabase egress for no freshness benefit.
-  const activityQuery = useOrgActivityFeed(
+  const activityQuery = useRecentActivity(
     token,
     workspaceId,
     Boolean(token && workspaceId && userId),

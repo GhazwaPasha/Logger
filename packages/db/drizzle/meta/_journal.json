@@ -309,6 +309,20 @@
       "when": 1785900005000,
       "tag": "0043_discord_icon_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785900006000,
+      "tag": "0044_lockdown_public_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1785900007000,
+      "tag": "0045_activity_ledger_organization",
+      "breakpoints": true
     }
   ]
 }

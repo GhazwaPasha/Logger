@@ -5,6 +5,7 @@ import {
   count,
   desc,
   eq,
+  exists,
   gte,
   inArray,
   isNotNull,
@@ -27,7 +28,17 @@ import {
 } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
+import { MemoryCacheService } from "../cache/memory-cache.service";
+import { notAMember } from "../common/api-error";
 import { coerceLegacyTaskStatus } from "../tasks/task-status-automation";
+
+export type OrganizationMember = typeof organizationMembers.$inferSelect;
+
+const MEMBERSHIP_TTL_SECONDS = 60;
+
+export function membershipCacheKey(organizationId: string, userId?: string): string {
+  return userId ? `member:${organizationId}:${userId}` : `member:${organizationId}:`;
+}
 
 export interface ListTasksOpts {
   includeSubtasks?: boolean;
@@ -90,7 +101,7 @@ export function decodeCursor(cursor: string): { createdAt: Date; id: string } | 
 
 export type TaskAccess = {
   task: typeof tasks.$inferSelect;
-  role: "owner" | "manager" | "member" | "assignee_only";
+  role: "owner" | "manager" | "member";
   isOwner: boolean;
   isDeptManager: boolean;
   isAssignee: boolean;
@@ -99,7 +110,29 @@ export type TaskAccess = {
 
 @Injectable()
 export class AuthorizationService {
-  constructor(@Inject(DRIZZLE) private readonly db: AppDatabase) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: AppDatabase,
+    private readonly cache: MemoryCacheService,
+  ) {}
+
+  /**
+   * The caller's membership row, or `null`. Every authenticated org request needs this (often several
+   * times), so it is memoized briefly; {@link CollaborationService.notifyOrgChanged} busts it on any
+   * org write, which covers every membership change.
+   */
+  async findMembership(userId: string, organizationId: string): Promise<OrganizationMember | null> {
+    const key = membershipCacheKey(organizationId, userId);
+    const cached = this.cache.get(key);
+    if (cached) return cached.data as OrganizationMember | null;
+    const [row] = await this.db
+      .select()
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
+      .limit(1);
+    const membership = row ?? null;
+    this.cache.set(key, membership, MEMBERSHIP_TTL_SECONDS);
+    return membership;
+  }
 
   /** Levels a manager may access; falls back to legacy `organization_members.department_id`. */
   private async managedDepartmentIdsForMember(
@@ -119,33 +152,15 @@ export class AuthorizationService {
 
   /** Public wrapper for callers outside task access (e.g. RoadmapService) that need a member's managed levels. */
   async managedDepartmentIdsForUser(userId: string, organizationId: string): Promise<string[]> {
-    const rows = await this.db
-      .select()
-      .from(organizationMembers)
-      .where(
-        and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)),
-      )
-      .limit(1);
-    const m = rows[0];
+    const m = await this.findMembership(userId, organizationId);
     if (!m) return [];
     return this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
   }
 
-  async assertOrgMember(userId: string, organizationId: string) {
-    const row = await this.db
-      .select()
-      .from(organizationMembers)
-      .where(
-        and(
-          eq(organizationMembers.organizationId, organizationId),
-          eq(organizationMembers.userId, userId),
-        ),
-      )
-      .limit(1);
-    if (row.length === 0) {
-      throw new ForbiddenException("Not a member of this organization");
-    }
-    return row[0]!;
+  async assertOrgMember(userId: string, organizationId: string): Promise<OrganizationMember> {
+    const membership = await this.findMembership(userId, organizationId);
+    if (!membership) throw notAMember();
+    return membership;
   }
 
   /** Membership plus an owner-role check, for owner-only actions (billing, integrations, org deletion). */
@@ -165,50 +180,33 @@ export class AuthorizationService {
     if (listRows.length === 0) throw new NotFoundException("Task list not found");
     const list = listRows[0]!;
 
-    const [assigneeRows, memberRows] = await Promise.all([
+    const [assigneeRows, membership] = await Promise.all([
       this.db
         .select()
         .from(taskAssignees)
         .where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)))
         .limit(1),
-      this.db
-        .select()
-        .from(organizationMembers)
-        .where(
-          and(
-            eq(organizationMembers.organizationId, task.organizationId),
-            eq(organizationMembers.userId, userId),
-          ),
-        )
-        .limit(1),
+      this.findMembership(userId, task.organizationId),
     ]);
+    // Same rule as every org route: being assigned a task never grants access without membership.
+    if (!membership) throw notAMember();
     const isAssignee = assigneeRows.length > 0;
     const isAssigner = task.assignerId === userId;
-    const membership = memberRows[0];
 
-    const isOwner = membership?.role === "owner";
-    const managedDeptIds = membership
-      ? await this.managedDepartmentIdsForMember(
-          membership.id,
-          membership.role,
-          membership.departmentId,
-        )
-      : [];
-    const isDeptManager =
-      membership?.role === "manager" && managedDeptIds.includes(list.departmentId);
+    const isOwner = membership.role === "owner";
+    const managedDeptIds = await this.managedDepartmentIdsForMember(
+      membership.id,
+      membership.role,
+      membership.departmentId,
+    );
+    const isDeptManager = membership.role === "manager" && managedDeptIds.includes(list.departmentId);
 
     const canParticipate = isOwner || isDeptManager || isAssignee || isAssigner;
     if (!canParticipate) {
       throw new ForbiddenException("No access to this task");
     }
 
-    const role: TaskAccess["role"] = isOwner
-      ? "owner"
-      : isDeptManager
-        ? "manager"
-        : membership
-          ? "member"
-          : "assignee_only";
+    const role: TaskAccess["role"] = isOwner ? "owner" : isDeptManager ? "manager" : "member";
 
     return { task, role, isOwner, isDeptManager, isAssignee, isAssigner };
   }
@@ -236,81 +234,24 @@ export class AuthorizationService {
     };
   }
 
+  /**
+   * Organizations the user belongs to. Membership is the single source of truth for org access —
+   * HTTP routes, the realtime socket and this list all agree, so a client can never be shown an org
+   * it will then be refused.
+   */
   async listOrganizationIdsForUser(userId: string): Promise<string[]> {
-    const [fromMembers, fromAssignees] = await Promise.all([
-      this.db
-        .selectDistinct({ id: organizationMembers.organizationId })
-        .from(organizationMembers)
-        .where(eq(organizationMembers.userId, userId)),
-      this.db
-        .selectDistinct({ id: tasks.organizationId })
-        .from(taskAssignees)
-        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-        .where(eq(taskAssignees.userId, userId)),
-    ]);
-
-    const set = new Set<string>();
-    for (const r of fromMembers) set.add(r.id);
-    for (const r of fromAssignees) set.add(r.id);
-    return [...set];
-  }
-
-  /** Fast ID-only list for internal callers (activity feed, search). No filters or pagination. */
-  async listTaskIdsForUser(userId: string, organizationId: string): Promise<string[]> {
-    const orgIds = await this.listOrganizationIdsForUser(userId);
-    if (!orgIds.includes(organizationId)) {
-      throw new ForbiddenException("No access to this organization");
-    }
-
-    const memberRow = await this.db
-      .select()
+    const rows = await this.db
+      .selectDistinct({ id: organizationMembers.organizationId })
       .from(organizationMembers)
-      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
-      .limit(1);
-    const m = memberRow[0];
-
-    if (m?.role === "owner") {
-      const rows = await this.db
-        .select({ id: tasks.id })
-        .from(tasks)
-        .where(and(eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
-      return rows.map((r) => r.id);
-    }
-
-    if (m?.role === "manager") {
-      const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
-      if (managedDeptIds.length === 0) return [];
-      const managerLists = await this.db
-        .select({ id: lists.id })
-        .from(lists)
-        .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
-      if (managerLists.length === 0) return [];
-      const rows = await this.db
-        .select({ id: tasks.id })
-        .from(tasks)
-        .where(
-          and(
-            eq(tasks.organizationId, organizationId),
-            inArray(tasks.listId, managerLists.map((l) => l.id)),
-            isNull(tasks.deletedAt),
-          ),
-        );
-      return rows.map((r) => r.id);
-    }
-
-    const assignedRows = await this.db
-      .select({ taskId: taskAssignees.taskId })
-      .from(taskAssignees)
-      .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-      .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), isNull(tasks.deletedAt)));
-    return assignedRows.map((r) => r.taskId);
+      .where(eq(organizationMembers.userId, userId));
+    return rows.map((r) => r.id);
   }
 
   /**
-   * Same visibility rules as {@link listTaskIdsForUser}, but as SQL conditions to splice into a
-   * query on `tasks`. Use this instead of materializing every visible task id into an `IN (...)`
-   * list — that list grows with total history, while the date-range filters on reports don't.
-   * Returns `null` when the caller has no visible tasks.
+   * The caller's task visibility as SQL conditions to splice into any query that has `tasks` in
+   * its FROM clause. Never materialize visible ids into an `IN (...)` list — that grows with total
+   * history, while the query's own filters (page, date range) don't. Returns `null` when the caller
+   * can see no tasks at all.
    */
   async taskScopeConditions(userId: string, organizationId: string): Promise<SQL[] | null> {
     return this.roleScopedTaskConditions(userId, organizationId);
@@ -318,7 +259,7 @@ export class AuthorizationService {
 
   /**
    * Role-scoped base WHERE conditions for the tasks table (owner: whole org; manager: managed
-   * lists; member/no membership: assigned-only). Shared by every task-visibility query so a new
+   * lists; member: assigned-only; non-member: nothing). Shared by every task-visibility query so a new
    * one can't accidentally skip scoping. Returns `null` when the caller has no visible rows at all
    * (distinct from "org member with zero matches" — callers should short-circuit on `null`).
    */
@@ -327,17 +268,13 @@ export class AuthorizationService {
     organizationId: string,
     opts: { archivedOnly?: boolean } = {},
   ): Promise<SQL[] | null> {
-    const memberRow = await this.db
-      .select()
-      .from(organizationMembers)
-      .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
-      .limit(1);
-    const m = memberRow[0];
+    const m = await this.findMembership(userId, organizationId);
+    if (!m) return null;
     const deletedCondition = opts.archivedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt);
 
     const conditions: (SQL | undefined)[] = [eq(tasks.organizationId, organizationId), deletedCondition];
 
-    if (m?.role === "manager") {
+    if (m.role === "manager") {
       const managedDeptIds = await this.managedDepartmentIdsForMember(m.id, m.role, m.departmentId);
       if (managedDeptIds.length === 0) return null;
       const managerLists = await this.db
@@ -346,15 +283,17 @@ export class AuthorizationService {
         .where(and(eq(lists.organizationId, organizationId), inArray(lists.departmentId, managedDeptIds)));
       if (managerLists.length === 0) return null;
       conditions.push(inArray(tasks.listId, managerLists.map((l) => l.id)));
-    } else if (!m || m.role === "member") {
-      const assignedIds = await this.db
-        .select({ taskId: taskAssignees.taskId })
-        .from(taskAssignees)
-        .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
-        .where(and(eq(taskAssignees.userId, userId), eq(tasks.organizationId, organizationId), deletedCondition));
-      const ids = assignedIds.map((r) => r.taskId);
-      if (ids.length === 0) return null;
-      conditions.push(inArray(tasks.id, ids));
+    } else if (m.role === "member") {
+      // Correlated EXISTS instead of a materialized id list: cost stays bounded by the outer query's
+      // own filters (date range, page size) rather than growing with the member's task history.
+      conditions.push(
+        exists(
+          this.db
+            .select({ one: sql`1` })
+            .from(taskAssignees)
+            .where(and(eq(taskAssignees.taskId, tasks.id), eq(taskAssignees.userId, userId))),
+        ),
+      );
     }
 
     return conditions.filter((c): c is SQL => c !== undefined);
@@ -428,10 +367,7 @@ export class AuthorizationService {
     const includeSubtasks = opts?.includeSubtasks !== false;
     const limit = Math.min(opts?.limit ?? 50, 100);
 
-    const orgIds = await this.listOrganizationIdsForUser(userId);
-    if (!orgIds.includes(organizationId)) {
-      throw new ForbiddenException("No access to this organization");
-    }
+    await this.assertOrgMember(userId, organizationId);
 
     const roleConditions = await this.roleScopedTaskConditions(userId, organizationId, {
       archivedOnly: opts?.archivedOnly,
@@ -504,10 +440,7 @@ export class AuthorizationService {
     organizationId: string,
     opts: BoardFilterOpts = {},
   ): Promise<Record<string, number>> {
-    const orgIds = await this.listOrganizationIdsForUser(userId);
-    if (!orgIds.includes(organizationId)) {
-      throw new ForbiddenException("No access to this organization");
-    }
+    await this.assertOrgMember(userId, organizationId);
 
     const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
     if (roleConditions === null) return {};
@@ -542,10 +475,7 @@ export class AuthorizationService {
     organizationId: string,
     opts: BoardFilterOpts & { statuses: string[] },
   ): Promise<SeriesSummaryRow[]> {
-    const orgIds = await this.listOrganizationIdsForUser(userId);
-    if (!orgIds.includes(organizationId)) {
-      throw new ForbiddenException("No access to this organization");
-    }
+    await this.assertOrgMember(userId, organizationId);
 
     const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
     if (roleConditions === null) return [];

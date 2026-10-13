@@ -3,48 +3,43 @@
 import { useMemo, useState } from "react";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { SelectPopover } from "@/components/ui/SelectPopover";
+import { useActivityFeedPages } from "@/hooks/useOrgActivityFeed";
 import { memberDisplayName } from "@/lib/task-activity-log";
-import type { MemberRow, OrgActivityFeedResponse } from "@/lib/ledger-types";
+import type { MemberRow } from "@/lib/ledger-types";
 
 const ACTOR_FILTER_TRIGGER_CLASS =
   "flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]";
 
-/** Team activity, filterable down to one person at a time. */
+/** Team activity, filterable down to one person at a time (filtered server-side, paginated). */
 export function PerformanceActivityFeed({
-  activity,
+  token,
+  organizationId,
+  enabled,
   members,
   workHrefBase,
-  isLoading,
-  errorMessage,
 }: {
-  activity: OrgActivityFeedResponse | undefined;
+  token: string | null;
+  organizationId: string;
+  enabled: boolean;
   members: MemberRow[];
   workHrefBase: string;
-  isLoading: boolean;
-  errorMessage: string | null;
 }) {
   const [actorFilter, setActorFilter] = useState<string>("all");
+  const feed = useActivityFeedPages(token, organizationId, enabled, actorFilter === "all" ? undefined : actorFilter);
 
-  const entries = activity?.entries ?? [];
-  const tasksById = activity?.tasksById ?? {};
-
-  const actorOptions = useMemo(() => {
-    const ids = new Set(entries.map((e) => e.actorId));
-    return [...ids]
-      .map((id) => ({ value: id, label: memberDisplayName(members, id) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [entries, members]);
-
-  const selectOptions = useMemo(() => [{ value: "all", label: "Everyone" }, ...actorOptions], [actorOptions]);
-
-  const filteredEntries = useMemo(
-    () => (actorFilter === "all" ? entries : entries.filter((e) => e.actorId === actorFilter)),
-    [entries, actorFilter],
+  const selectOptions = useMemo(
+    () => [
+      { value: "all", label: "Everyone" },
+      ...members
+        .map((m) => ({ value: m.userId, label: memberDisplayName(members, m.userId) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
+    [members],
   );
 
   return (
     <div>
-      {actorOptions.length > 0 && (
+      {members.length > 0 && (
         <div className="mb-2">
           <SelectPopover
             value={actorFilter}
@@ -56,12 +51,15 @@ export function PerformanceActivityFeed({
         </div>
       )}
       <OrgActivityTerminal
-        entries={filteredEntries}
-        tasksById={tasksById}
+        entries={feed.data?.entries ?? []}
+        tasksById={feed.data?.tasksById ?? {}}
         members={members}
         workHrefBase={workHrefBase}
-        isLoading={isLoading}
-        errorMessage={errorMessage}
+        isLoading={feed.isPending}
+        errorMessage={feed.error ? (feed.error as Error).message : null}
+        hasMore={feed.hasMore}
+        loadingMore={feed.loadingMore}
+        onLoadMore={feed.loadMore}
       />
     </div>
   );

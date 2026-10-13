@@ -411,6 +411,12 @@ export const activityLedger = pgTable(
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
+    /**
+     * Denormalized from the task so org-wide feeds read one index range instead of joining every task.
+     * NOT NULL in the database and filled by the `activity_ledger_set_organization` trigger from
+     * `task_id`, so writers never set it (hence optional here).
+     */
+    organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }),
     actorId: text("actor_id")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -419,7 +425,10 @@ export const activityLedger = pgTable(
     clientMutationId: text("client_mutation_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("activity_ledger_task_created_idx").on(t.taskId, t.createdAt)],
+  (t) => [
+    index("activity_ledger_task_created_idx").on(t.taskId, t.createdAt),
+    index("activity_ledger_org_created_idx").on(t.organizationId, t.createdAt.desc(), t.id.desc()),
+  ],
 );
 
 /** Blocking relationship: taskId is blocked by dependsOnTaskId. */

@@ -43,3 +43,4 @@ client_*.apps.googleusercontent.com.plist
 .gradle/
 .kotlin/
 *.hprof
+test-dist
