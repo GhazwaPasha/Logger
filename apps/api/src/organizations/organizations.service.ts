@@ -25,10 +25,21 @@ import { DepartmentsService } from "../departments/departments.service";
 import { guildIconUrl } from "../discord/discord-api.service";
 import { ListsService } from "../lists/lists.service";
 import { CollaborationService } from "../realtime/collaboration.service";
+import { MemoryCacheService } from "../cache/memory-cache.service";
 
 const RESERVED_SLUGS = new Set(["app", "login", "audit", "api", "_next", "workspaces"]);
 
+/** Per-user activity feed cache. Writes bust it immediately via notifyOrgChanged, so this only bounds repeat reads. */
+const ACTIVITY_FEED_TTL_SECONDS = 30;
+
 type OrganizationRow = typeof organizations.$inferSelect;
+
+type ActivityFeedResult = {
+  entries: unknown[];
+  tasksById: Record<string, unknown>;
+  assigneesByTaskId: Record<string, string[]>;
+  nextCursor: string | null;
+};
 
 @Injectable()
 export class OrganizationsService {
@@ -39,6 +50,7 @@ export class OrganizationsService {
     private readonly lists: ListsService,
     private readonly collaboration: CollaborationService,
     private readonly attachments: AttachmentsService,
+    private readonly cache: MemoryCacheService,
   ) {}
 
   private slugifyName(name: string): string {
@@ -122,22 +134,28 @@ export class OrganizationsService {
         : 150;
     const decoded = opts?.cursor ? decodeCursor(opts.cursor) : null;
 
+    // Short-lived per-user cache, busted by every org write (see CollaborationService.notifyOrgChanged).
+    // Without it every client refresh re-reads the whole org's task list from Postgres.
+    const cacheKey = `activity:${organizationId}:${userId}:${limit}:${opts?.cursor ?? ""}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached.data as ActivityFeedResult;
+
+    const data = await this.buildActivityFeed(userId, organizationId, limit, decoded);
+    this.cache.set(cacheKey, data, ACTIVITY_FEED_TTL_SECONDS);
+    return data;
+  }
+
+  private async buildActivityFeed(
+    userId: string,
+    organizationId: string,
+    limit: number,
+    decoded: ReturnType<typeof decodeCursor> | null,
+  ): Promise<ActivityFeedResult> {
     const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
 
     if (taskIds.length === 0) {
       return { entries: [], tasksById: {}, assigneesByTaskId: {}, nextCursor: null };
     }
-
-    const taskMetaRows = await this.db
-      .select({ id: tasks.id, title: tasks.title, assignerId: tasks.assignerId, dueAt: tasks.dueAt })
-      .from(tasks)
-      .where(inArray(tasks.id, taskIds));
-    const tasksById = Object.fromEntries(
-      taskMetaRows.map((t) => [
-        t.id,
-        { id: t.id, title: t.title, assignerId: t.assignerId, dueAt: t.dueAt ? t.dueAt.toISOString() : null },
-      ]),
-    );
 
     const cursorCondition = decoded
       ? or(
@@ -173,11 +191,22 @@ export class OrganizationsService {
 
     const taskIdsInFeed = [...new Set(rows.map((r) => r.taskId))];
     const assigneesByTaskId: Record<string, string[]> = {};
+    const tasksById: Record<string, { id: string; title: string; assignerId: string | null; dueAt: string | null }> = {};
     if (taskIdsInFeed.length > 0) {
-      const assigneeRows = await this.db
-        .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
-        .from(taskAssignees)
-        .where(inArray(taskAssignees.taskId, taskIdsInFeed));
+      // Metadata only for tasks that appear in this page, not every task in the org.
+      const [taskMetaRows, assigneeRows] = await Promise.all([
+        this.db
+          .select({ id: tasks.id, title: tasks.title, assignerId: tasks.assignerId, dueAt: tasks.dueAt })
+          .from(tasks)
+          .where(inArray(tasks.id, taskIdsInFeed)),
+        this.db
+          .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+          .from(taskAssignees)
+          .where(inArray(taskAssignees.taskId, taskIdsInFeed)),
+      ]);
+      for (const t of taskMetaRows) {
+        tasksById[t.id] = { id: t.id, title: t.title, assignerId: t.assignerId, dueAt: t.dueAt ? t.dueAt.toISOString() : null };
+      }
       for (const r of assigneeRows) {
         const list = assigneesByTaskId[r.taskId] ?? [];
         list.push(r.userId);

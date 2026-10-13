@@ -307,6 +307,16 @@ export class AuthorizationService {
   }
 
   /**
+   * Same visibility rules as {@link listTaskIdsForUser}, but as SQL conditions to splice into a
+   * query on `tasks`. Use this instead of materializing every visible task id into an `IN (...)`
+   * list — that list grows with total history, while the date-range filters on reports don't.
+   * Returns `null` when the caller has no visible tasks.
+   */
+  async taskScopeConditions(userId: string, organizationId: string): Promise<SQL[] | null> {
+    return this.roleScopedTaskConditions(userId, organizationId);
+  }
+
+  /**
    * Role-scoped base WHERE conditions for the tasks table (owner: whole org; manager: managed
    * lists; member/no membership: assigned-only). Shared by every task-visibility query so a new
    * one can't accidentally skip scoping. Returns `null` when the caller has no visible rows at all

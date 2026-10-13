@@ -11,6 +11,10 @@ import {
 import type { AppDatabase } from "@work-ledger/db";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
+import { assertReportRange } from "./date-range.util";
+
+/** Hard cap on one member's drill-down list. The largest real member today has ~560 tasks. */
+const MEMBER_TASKS_LIMIT = 1000;
 
 export type PerformanceScorecardRow = {
   userId: string;
@@ -127,9 +131,11 @@ export class PerformanceService {
     const dateFrom = opts?.dateFrom
       ? new Date(opts.dateFrom)
       : new Date(dateTo.getTime() - 30 * 24 * 60 * 60 * 1000);
+    assertReportRange(dateFrom, dateTo);
 
     // Already role-scoped: full org for owners, tasks under managed departments' lists for managers.
-    const taskIds = await this.authz.listTaskIdsForUser(requesterId, organizationId);
+    // Kept as SQL conditions rather than an ID list so cost follows the date range, not total history.
+    const scope = await this.authz.taskScopeConditions(requesterId, organizationId);
 
     const allMembers = await this.db
       .select({
@@ -149,11 +155,12 @@ export class PerformanceService {
       // at the list/task level — so a manager's roster is derived from who is actually assigned
       // work inside their managed departments' task universe, not a member->department lookup.
       const scopedIds = new Set<string>([requesterId]);
-      if (taskIds.length > 0) {
+      if (scope) {
         const assigneeRows = await this.db
           .selectDistinct({ userId: taskAssignees.userId })
           .from(taskAssignees)
-          .where(inArray(taskAssignees.taskId, taskIds));
+          .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
+          .where(and(...scope));
         for (const r of assigneeRows) scopedIds.add(r.userId);
       }
       roster = allMembers.filter((m) => scopedIds.has(m.userId));
@@ -169,7 +176,7 @@ export class PerformanceService {
       return row;
     };
 
-    if (taskIds.length > 0) {
+    if (scope) {
       const [completionRows, workloadRows, complianceRows, attachmentFulfilledRows, timeRows] =
         await Promise.all([
           this.db
@@ -183,7 +190,7 @@ export class PerformanceService {
             .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
             .where(
               and(
-                inArray(tasks.id, taskIds),
+                ...scope,
                 isNull(tasks.deletedAt),
                 eq(tasks.status, "done"),
                 gte(tasks.completedAt, dateFrom),
@@ -206,7 +213,7 @@ export class PerformanceService {
             .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
             .where(
               and(
-                inArray(tasks.id, taskIds),
+                ...scope,
                 isNull(tasks.deletedAt),
                 notInArray(tasks.status, ["done", "cancelled"]),
               ),
@@ -230,7 +237,7 @@ export class PerformanceService {
             .innerJoin(tasks, eq(taskAssignees.taskId, tasks.id))
             .where(
               and(
-                inArray(tasks.id, taskIds),
+                ...scope,
                 isNull(tasks.deletedAt),
                 gte(tasks.createdAt, dateFrom),
                 lte(tasks.createdAt, dateTo),
@@ -248,7 +255,7 @@ export class PerformanceService {
             .innerJoin(taskAttachments, eq(taskAttachments.taskId, tasks.id))
             .where(
               and(
-                inArray(tasks.id, taskIds),
+                ...scope,
                 isNull(tasks.deletedAt),
                 eq(tasks.attachmentRequired, true),
                 gte(tasks.createdAt, dateFrom),
@@ -263,9 +270,10 @@ export class PerformanceService {
               seconds: sql<string>`coalesce(sum(${timeEntries.duration}::bigint), 0)`,
             })
             .from(timeEntries)
+            .innerJoin(tasks, eq(timeEntries.taskId, tasks.id))
             .where(
               and(
-                inArray(timeEntries.taskId, taskIds),
+                ...scope,
                 gte(timeEntries.createdAt, dateFrom),
                 lte(timeEntries.createdAt, dateTo),
               ),
@@ -371,11 +379,12 @@ export class PerformanceService {
     const dateFrom = opts?.dateFrom
       ? new Date(opts.dateFrom)
       : new Date(dateTo.getTime() - 30 * 24 * 60 * 60 * 1000);
+    assertReportRange(dateFrom, dateTo);
 
     // Same scoping as `scorecards()` — a manager querying a userId outside their managed
     // departments simply finds no matching tasks, which is a safe way to fail closed.
-    const taskIds = await this.authz.listTaskIdsForUser(requesterId, organizationId);
-    if (taskIds.length === 0) return [];
+    const scope = await this.authz.taskScopeConditions(requesterId, organizationId);
+    if (!scope) return [];
 
     const rows = await this.db
       .select({
@@ -397,7 +406,7 @@ export class PerformanceService {
       .where(
         and(
           eq(taskAssignees.userId, targetUserId),
-          inArray(tasks.id, taskIds),
+          ...scope,
           isNull(tasks.deletedAt),
           or(
             and(eq(tasks.status, "done"), gte(tasks.completedAt, dateFrom), lte(tasks.completedAt, dateTo)),
@@ -405,7 +414,8 @@ export class PerformanceService {
           ),
         ),
       )
-      .orderBy(tasks.dueAt);
+      .orderBy(tasks.dueAt)
+      .limit(MEMBER_TASKS_LIMIT);
 
     if (rows.length === 0) return [];
 

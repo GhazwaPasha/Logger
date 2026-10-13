@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { formatZonedDateKey } from "@work-ledger/contracts";
 import { activityLedger, departments, lists, organizationMembers, taskAssignees, tasks, user } from "@work-ledger/db";
@@ -7,6 +7,7 @@ import { DRIZZLE } from "../db/drizzle.constants";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { getOrganizationTimeZone } from "../db/org-timezone.util";
 import { PerformanceService } from "../performance/performance.service";
+import { MAX_EXPORT_ROWS, assertReportRange } from "../performance/date-range.util";
 
 function escapeCsv(val: unknown): string {
   const s = val == null ? "" : String(val);
@@ -36,6 +37,9 @@ export class ReportsService {
     const taskIds = await this.authz.listTaskIdsForUser(userId, organizationId);
     if (taskIds.length === 0) return "";
 
+    if (opts?.dateFrom) {
+      assertReportRange(new Date(opts.dateFrom), opts.dateTo ? new Date(opts.dateTo) : new Date());
+    }
     const timeZone = await getOrganizationTimeZone(this.db, organizationId);
     const conditions = [inArray(tasks.id, taskIds), isNull(tasks.deletedAt)];
     if (opts?.status) conditions.push(eq(tasks.status, opts.status as any));
@@ -54,8 +58,14 @@ export class ReportsService {
       })
       .from(tasks)
       .where(and(...conditions))
-      .orderBy(tasks.createdAt);
+      .orderBy(tasks.createdAt)
+      .limit(MAX_EXPORT_ROWS + 1);
 
+    if (rows.length > MAX_EXPORT_ROWS) {
+      throw new BadRequestException(
+        `This export has more than ${MAX_EXPORT_ROWS.toLocaleString("en-US")} tasks. Narrow the date range and try again.`,
+      );
+    }
     if (rows.length === 0) return "";
 
     const taskIdList = rows.map((r) => r.id);

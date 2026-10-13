@@ -47,6 +47,7 @@ export class CollaborationService {
     this.cache.invalidatePrefix(`workspace:${organizationId}`);
     this.cache.invalidatePrefix(`perf:scorecards:${organizationId}`);
     this.cache.invalidatePrefix(`tasks:${organizationId}`);
+    this.cache.invalidatePrefix(`activity:${organizationId}`);
     try {
       this.emitWorkspaceChanged(organizationId, taskId);
     } catch {

@@ -40,6 +40,8 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
       a.download = `${type}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Export failed. Try again.");
     } finally {
       setBusy(false);
       setRangeModalType(null);
