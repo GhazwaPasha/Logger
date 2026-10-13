@@ -1,5 +1,4 @@
 import "./load-env";
-import "./instrument";
 import compression from "compression";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";

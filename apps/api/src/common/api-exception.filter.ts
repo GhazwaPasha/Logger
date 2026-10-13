@@ -1,6 +1,5 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from "@nestjs/common";
 import { type ApiErrorBody, apiErrorCodeForStatus, isApiErrorCode } from "@work-ledger/contracts";
-import * as Sentry from "@sentry/nestjs";
 import type { Response } from "express";
 
 type ZodLikeError = { name: "ZodError"; issues: { path: (string | number)[]; message: string }[] };
@@ -31,7 +30,6 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const body = this.toBody(exception);
     if (body.statusCode >= 500) {
       this.log.error(exception instanceof Error ? (exception.stack ?? exception.message) : String(exception));
-      Sentry.captureException(exception);
     }
     if (body.code === "RATE_LIMITED" && body.retryAfterSeconds) {
       res.setHeader("Retry-After", String(body.retryAfterSeconds));

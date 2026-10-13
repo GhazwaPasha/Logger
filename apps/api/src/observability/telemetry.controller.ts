@@ -1,6 +1,5 @@
 import { Body, Controller, HttpCode, Post } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import * as Sentry from "@sentry/nestjs";
 import { z } from "zod";
 import { Public } from "../auth/public.decorator";
 import { log } from "./logger";
@@ -28,6 +27,5 @@ export class TelemetryController {
   clientEvent(@Body() body: unknown): void {
     const event = clientEventSchema.parse(body);
     log.warn({ msg: "client_event", ...event });
-    Sentry.captureMessage(`Client ${event.type}: ${event.reason}`, { level: "warning", extra: event });
   }
 }

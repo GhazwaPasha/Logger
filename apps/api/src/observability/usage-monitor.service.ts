@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import * as Sentry from "@sentry/nestjs";
 import { log } from "./logger";
 
 type Totals = { requests: number; dbRows: number; bytes: number };
@@ -14,8 +13,8 @@ const PER_USER_REQUEST_BUDGET = Number(process.env.USAGE_USER_REQUESTS_BUDGET ??
 const PER_USER_DB_ROWS_BUDGET = Number(process.env.USAGE_USER_DB_ROWS_BUDGET ?? 500_000);
 
 /**
- * Egress watchdog. Aggregates request telemetry in 15-minute windows and raises an alert (warn log +
- * Sentry event) when the service, or any single user, exceeds budget — so a runaway client is
+ * Egress watchdog. Aggregates request telemetry in 15-minute windows and raises an alert (a
+ * `usage_alert` warn log line) when the service, or any single user, exceeds budget — so a runaway client is
  * flagged within minutes, with the user, routes and volumes needed to act, instead of being
  * discovered days later on a billing chart.
  */
@@ -77,8 +76,6 @@ export class UsageMonitorService {
     for (const [tracker, n] of throttled) alerts.push(`${tracker} was rate-limited ${n} times`);
     if (alerts.length === 0) return;
 
-    const message = `Usage budget exceeded in the last ${WINDOW_MINUTES} min: ${alerts.join("; ")}`;
-    log.warn({ msg: "usage_alert", alerts, topUsers: top });
-    Sentry.captureMessage(message, { level: "warning", extra: { total, topUsers: top } });
+    log.warn({ msg: "usage_alert", windowMinutes: WINDOW_MINUTES, alerts, topUsers: top });
   }
 }
