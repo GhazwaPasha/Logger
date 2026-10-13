@@ -11,6 +11,7 @@ on:
     paths:
       - 'apps/mobile/**'
       - 'packages/contracts/**'
+      - 'packages/client-core/**'
 
 jobs:
   build_android:
