@@ -4,6 +4,13 @@ Every release build bumps the version in `app.json`: `version` (shown in Setting
 and `ios.buildNumber`, which must go up by one for every build you install over an older one or upload.
 Release APKs go in `releases/android/` at the repo root (git-ignored), named `LogBase-<version>-build<code>.apk`.
 
+## 1.6.3 — 2026-10-15
+
+- Release builds are minified and obfuscated with R8 (plus resource shrinking): smaller download, and clears
+  Play's "DEX code optimization" warning.
+- Tablets and foldables can rotate: the portrait lock moved out of the manifest (Play flags manifest locks, and
+  Android 16 ignores them on large screens) into the app, which keeps only phones in portrait.
+
 ## 1.6.2 (build 9) — 2026-09-24
 
 - Home header: the workspace switcher and the bell + avatar pill always sit in their place, lined up with the

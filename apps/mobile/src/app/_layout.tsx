@@ -12,11 +12,13 @@ import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { useIsDark, useTheme, restoreThemePreference } from '@/hooks/use-theme';
 import { clearTokenCache, onSessionLost } from '@/lib/api';
 import { authClient } from '@/lib/auth-client';
+import { lockPhonesToPortrait } from '@/lib/orientation';
 import { queryClient, wireQueryManagers } from '@/lib/query-client';
 import { signOut, useForcedSignOut } from '@/lib/sign-out';
 
 SplashScreen.preventAutoHideAsync();
 void restoreThemePreference();
+lockPhonesToPortrait();
 
 export default function RootLayout() {
   const dark = useIsDark();

@@ -4,8 +4,8 @@
     "slug": "logbase",
     "owner": "ghazwa_irshad",
     "scheme": "logbase",
-    "version": "1.6.2",
-    "orientation": "portrait",
+    "version": "1.6.3",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -44,6 +44,15 @@
           "icon": "./assets/notification-icon.png",
           "color": "#3b82f6",
           "defaultChannel": "activity"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
         }
       ]
     ],
