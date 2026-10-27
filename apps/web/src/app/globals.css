@@ -255,6 +255,28 @@ html[data-theme="light"] .dashboard-kpi-card--tone-amber {
   }
 }
 
+html[data-theme="light"] .dashboard-kpi-card--tone-rose {
+  background-color: #fdecef;
+  border-color: rgba(190, 70, 95, 0.16);
+}
+
+html[data-theme="light"] .dashboard-kpi-card--tone-gold {
+  background-color: #fdf5e1;
+  border-color: rgba(180, 130, 30, 0.16);
+}
+
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] .dashboard-kpi-card--tone-rose {
+    background-color: #fdecef;
+    border-color: rgba(190, 70, 95, 0.16);
+  }
+
+  html[data-theme="system"] .dashboard-kpi-card--tone-gold {
+    background-color: #fdf5e1;
+    border-color: rgba(180, 130, 30, 0.16);
+  }
+}
+
 .dashboard-kpi-wave {
   display: none;
 }

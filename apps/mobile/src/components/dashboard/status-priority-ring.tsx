@@ -28,20 +28,17 @@ export type RingSegment = { key: string; label: string; value: number; color: st
 type Half = 'top' | 'bottom';
 type Focus = { half: Half; key: string } | null;
 
-/** Chunks per half: the top half (status) is split into 4, the bottom half (priority) into 3. */
-const TOP_CHUNKS = 4;
-const BOTTOM_CHUNKS = 3;
 /** Arc thickness on the dashboard and in the focused view (viewBox units). */
 const HERO_STROKE = 10;
 const FOCUS_STROKE = 12;
-/** Degrees between neighbouring chunks. */
-const CHUNK_GAP_DEG = 4;
+/** Degrees between neighbouring pieces. */
+const GAP_DEG = 4;
 /**
- * Degrees left open on each side of the 3 and 9 o'clock seams — half a chunk gap, so the seam between the two
+ * Degrees left open on each side of the 3 and 9 o'clock seams — half a gap, so the seam between the two
  * halves is the same size as any other gap and the whole thing reads as one circle.
  */
-const SEAM_DEG = CHUNK_GAP_DEG / 2;
-/** How long a half takes to fill, chunk by chunk. */
+const SEAM_DEG = GAP_DEG / 2;
+/** How long a half takes to fill, piece by piece. */
 const FILL_MS = 900;
 /** In the focused view, the ring starts filling once the stage has mostly sprung in. */
 const FOCUS_FILL_AT = 160;
@@ -71,8 +68,7 @@ function displayShares(segments: RingSegment[]): number[] {
 }
 
 /**
- * Where each segment sits along its half, as fractions 0 → 1 in fill order. The chunks are only slots on top
- * of this: a segment flows through as many chunks as it needs, so one chunk can hold several colours.
+ * Where each segment sits along its half, as fractions 0 → 1 in fill order. Each one is drawn as its own piece.
  */
 function spans(segments: RingSegment[]) {
   const shares = displayShares(segments);
@@ -109,7 +105,7 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 /**
- * One coloured run inside a chunk. Its geometry is fixed; only the dash offset follows `filled`, on the UI
+ * One coloured piece of the ring. Its geometry is fixed; only the dash offset follows `filled`, on the UI
  * thread, so the meter fills without re-rendering the ring every frame.
  */
 function FillArc({
@@ -167,8 +163,8 @@ function FillArc({
 }
 
 /**
- * The chunked ring. Both halves fill left → right: the top half (status) over the top, the bottom half
- * (priority) under the bottom. With a `focus`, every chunk outside that segment dims. The fill starts `fillAt`
+ * The segmented ring, one piece per colour. Both halves fill left → right: the top half (status) over the top, the bottom half
+ * (priority) under the bottom. With a `focus`, every other piece dims. The fill starts `fillAt`
  * ms after mount (so it can wait for an entrance to land) and replays whenever the data changes. It stays empty
  * until `ready`, so numbers trickling in from separate queries don't each kick off a fill.
  */
@@ -210,21 +206,21 @@ function TickRing({
     }
     hasFilled.current = true;
     filled.value = 0;
-    // Ease out: quick at first, settling into the last chunks.
+    // Ease out: quick at first, settling into the last pieces.
     filled.value = withDelay(delayUntil(fillAt), withTiming(1, { duration: FILL_MS, easing: Easing.out(Easing.cubic) }));
   }, [signature, fillAt, ready, filled, delayUntil]);
 
   const R = 84;
   const span = 180 - SEAM_DEG * 2;
-  // Round caps reach past an arc's ends; pull each chunk in by that much so the gaps stay even.
+  // Round caps reach past an arc's ends; pull each piece in by that much so the gaps stay even.
   const capDeg = ((stroke / 2) / R) * (180 / Math.PI);
   const track = alpha(theme.fg, dark ? 0.1 : 0.08);
 
   // SVG angles run clockwise from 3 o'clock. Both halves fill left → right: the top half runs 180° → 360°
   // over the top, the bottom half 180° → 0° under the bottom.
-  const halves: { half: Half; segments: RingSegment[]; chunks: number; dir: 1 | -1 }[] = [
-    { half: 'top', segments: top, chunks: TOP_CHUNKS, dir: 1 },
-    { half: 'bottom', segments: bottom, chunks: BOTTOM_CHUNKS, dir: -1 },
+  const halves: { half: Half; segments: RingSegment[]; dir: 1 | -1 }[] = [
+    { half: 'top', segments: top, dir: 1 },
+    { half: 'bottom', segments: bottom, dir: -1 },
   ];
 
   const point = (deg: number) => {
@@ -234,49 +230,48 @@ function TickRing({
 
   return (
     <Svg width={size} height={size} viewBox="0 0 200 200">
-      {halves.map(({ half, segments, chunks, dir }) => {
-        const each = (span - CHUNK_GAP_DEG * (chunks - 1)) / chunks;
+      {halves.map(({ half, segments, dir }) => {
+        const at = (deg: number) => 180 + dir * deg;
         const pieces = spans(segments);
-        return Array.from({ length: chunks }, (_, i) => {
-          // The chunk's drawable arc (degrees along the half), inset for the round caps.
-          const c0 = SEAM_DEG + i * (each + CHUNK_GAP_DEG) + capDeg;
-          const c1 = SEAM_DEG + i * (each + CHUNK_GAP_DEG) + each - capDeg;
-          // The slice of the data (0 → 1) this chunk shows; how much of it is drawn follows `filled`.
-          const f0 = i / chunks;
-          const f1 = (i + 1) / chunks;
-          const toDeg = (f: number) => c0 + ((f - f0) * chunks) * (c1 - c0);
-          const at = (deg: number) => 180 + dir * deg;
-
-          const parts = pieces
-            .map((p) => ({ seg: p.seg, from: Math.max(p.from, f0), to: Math.min(p.to, f1) }))
-            .filter((p) => p.to > p.from);
-
+        // Nothing to show yet: one empty track across the half.
+        if (pieces.length === 0) {
           return (
-            <G key={`${half}-${i}`}>
+            <Path
+              key={`${half}-empty`}
+              d={arcPath(R, at(SEAM_DEG + capDeg), at(SEAM_DEG + span - capDeg))}
+              stroke={track}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              fill="none"
+            />
+          );
+        }
+        // Each segment is its own piece, as long as its share; the gaps sit only between colours.
+        const room = span - GAP_DEG * (pieces.length - 1);
+        return pieces.map((p, i) => {
+          const start = SEAM_DEG + p.from * room + i * GAP_DEG;
+          const end = start + (p.to - p.from) * room;
+          const c0 = start + capDeg;
+          // A sliver too short for its caps is drawn as a dot rather than flipping round.
+          const c1 = Math.max(c0 + 0.01, end - capDeg);
+          const dimmed = focus !== null && !(focus.half === half && focus.key === p.seg.key);
+          return (
+            <G key={`${half}-${p.seg.key}`}>
               <Path d={arcPath(R, at(c0), at(c1))} stroke={track} strokeWidth={stroke} strokeLinecap="round" fill="none" />
-              {parts.map((p) => {
-                const dimmed = focus !== null && !(focus.half === half && focus.key === p.seg.key);
-                const d0 = toDeg(p.from);
-                const d1 = toDeg(p.to);
-                // Butt ends inside the chunk (colours meet edge to edge); a dot rounds off the chunk's own ends.
-                // (Compared with a tolerance: the running sums behind `spans` pick up float error.)
-                return (
-                  <G key={p.seg.key} opacity={dimmed ? 0.16 : 1}>
-                    <FillArc
-                      filled={filled}
-                      from={p.from}
-                      to={p.to}
-                      fromDeg={at(d0)}
-                      toDeg={at(d1)}
-                      r={R}
-                      color={p.seg.color}
-                      stroke={stroke}
-                      startCap={Math.abs(p.from - f0) < 1e-6 ? point(at(d0)) : null}
-                      endCap={Math.abs(p.to - f1) < 1e-6 ? point(at(d1)) : null}
-                    />
-                  </G>
-                );
-              })}
+              <G opacity={dimmed ? 0.16 : 1}>
+                <FillArc
+                  filled={filled}
+                  from={p.from}
+                  to={p.to}
+                  fromDeg={at(c0)}
+                  toDeg={at(c1)}
+                  r={R}
+                  color={p.seg.color}
+                  stroke={stroke}
+                  startCap={point(at(c0))}
+                  endCap={point(at(c1))}
+                />
+              </G>
             </G>
           );
         });
@@ -357,9 +352,9 @@ function RingCentre({
 }
 
 /**
- * Dashboard hero: one big chunked ring — status mix across the top, priority across the bottom — with no
+ * Dashboard hero: one big segmented ring — status mix across the top, priority across the bottom — with no
  * legend. Tapping it brings the ring into focus over a dimmed screen and reveals the legend; tapping a legend
- * row highlights that segment's chunks.
+ * row highlights that segment's piece.
  */
 export function StatusPriorityRing({
   top,

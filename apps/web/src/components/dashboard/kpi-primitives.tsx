@@ -21,6 +21,15 @@ export const DASHBOARD_KPI_TONES = [
   },
 ] as const;
 
+/** The dashboard's own KPI strip, in the mobile Home's tones (rose, gold, periwinkle, peach). */
+export const HOME_KPI_TONES = {
+  rose: { toneClass: "dashboard-kpi-card--tone-rose", waveBack: "#f8cdd6", waveFront: "#f3b3c0" },
+  gold: { toneClass: "dashboard-kpi-card--tone-gold", waveBack: "#f6e3b0", waveFront: "#efd28c" },
+  periwinkle: DASHBOARD_KPI_TONES[0],
+  peach: DASHBOARD_KPI_TONES[3],
+} as const;
+export type KpiTone = (typeof HOME_KPI_TONES)[keyof typeof HOME_KPI_TONES];
+
 export function DashboardKpiWave({ back, front }: { back: string; front: string }) {
   return (
     <svg
@@ -38,69 +47,6 @@ export function DashboardKpiWave({ back, front }: { back: string; front: string 
         d="M0 50 C64 36 128 56 196 44 C248 34 296 48 344 42 C362 39 382 44 400 46 L400 72 L0 72 Z"
       />
     </svg>
-  );
-}
-
-const DONUT_RADIUS = 15.9155; // circumference ≈ 100, so dash lengths read as percentages
-
-export function DonutChart({
-  segments,
-  centerLabel,
-  emptyLabel,
-}: {
-  segments: { key: string; count: number; strokeClassName: string; title: string }[];
-  centerLabel: string;
-  emptyLabel: string;
-}) {
-  const total = segments.reduce((s, x) => s + x.count, 0);
-  const visible = segments.filter((s) => s.count > 0);
-  const gap = visible.length > 1 ? 0.8 : 0;
-  // Each arc starts where the previous ones end: running totals, computed up front (no mutation during render).
-  const starts = visible.map((_, i) =>
-    visible.slice(0, i).reduce((sum, s) => sum + (s.count / total) * 100, 0),
-  );
-  return (
-    <div className="relative h-32 w-32 shrink-0" role="img" aria-label={`${centerLabel}: ${total}`}>
-      <svg viewBox="0 0 42 42" className="h-full w-full -rotate-90">
-        <circle
-          cx="21"
-          cy="21"
-          r={DONUT_RADIUS}
-          fill="none"
-          strokeWidth="5"
-          className="stroke-[color:var(--surface-muted)]"
-        />
-        {visible.map(({ key, count, strokeClassName, title }, i) => {
-          const pct = (count / total) * 100;
-          const dash = Math.max(pct - gap, 0.01);
-          return (
-            <circle
-              key={key}
-              cx="21"
-              cy="21"
-              r={DONUT_RADIUS}
-              fill="none"
-              strokeWidth="5"
-              strokeDasharray={`${dash} ${100 - dash}`}
-              strokeDashoffset={-starts[i]}
-              className={strokeClassName}
-            >
-              <title>{`${title}: ${count}`}</title>
-            </circle>
-          );
-        })}
-      </svg>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        {total === 0 ? (
-          <span className="px-3 text-[10px] leading-tight text-[var(--muted)]">{emptyLabel}</span>
-        ) : (
-          <>
-            <span className="text-xl font-semibold tabular-nums leading-none text-[var(--fg)]">{total}</span>
-            <span className="mt-0.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">{centerLabel}</span>
-          </>
-        )}
-      </div>
-    </div>
   );
 }
 
