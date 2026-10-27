@@ -16,14 +16,28 @@ const KEY_CACHE_TTL_MS = 60_000;
 
 let cached: { keys: Jwk[]; expiresAt: number } | null = null;
 
+/** Secret versions configured in BETTER_AUTH_SECRETS ("<version>:<secret>,…"). */
+const SECRET_VERSIONS = new Set(
+  (process.env.BETTER_AUTH_SECRETS ?? "")
+    .split(",")
+    .map((entry) => entry.split(":")[0]?.trim())
+    .filter(Boolean),
+);
+
 /**
- * Encrypted private keys are stored as a JSON-encoded ciphertext *string*. Legacy keys minted while
- * encryption was disabled are a JSON-encoded JWK *object* — those were readable by anyone with
- * table access and must never sign or verify again.
+ * Private keys are stored as a JSON-encoded ciphertext string in Better Auth's versioned envelope
+ * (`$ba$<version>$<hex>`). Two kinds of legacy key must never sign or verify again:
+ * - a JSON-encoded JWK *object*: minted while encryption was disabled, readable by anyone with table access;
+ * - a bare-hex ciphertext: encrypted under the old unversioned secret, which was a fallback string
+ *   committed to the repo — so anyone with table access could decrypt it.
+ * Keys whose version is no longer configured are dropped too, so retiring a secret retires its keys.
  */
 function isEncryptedKey(key: Jwk): boolean {
   try {
-    return typeof JSON.parse(key.privateKey) === "string";
+    const ciphertext: unknown = JSON.parse(key.privateKey);
+    if (typeof ciphertext !== "string") return false;
+    const version = /^\$ba\$(\d+)\$/.exec(ciphertext)?.[1];
+    return version !== undefined && SECRET_VERSIONS.has(version);
   } catch {
     return false;
   }
@@ -32,7 +46,7 @@ function isEncryptedKey(key: Jwk): boolean {
 /**
  * JWKS storage for the Better Auth `jwt` plugin.
  *
- * - Only keys whose private half is encrypted at rest (with BETTER_AUTH_SECRET) are trusted. Dropping
+ * - Only keys whose private half is encrypted at rest (with a current BETTER_AUTH_SECRETS entry) are trusted. Dropping
  *   a legacy plaintext key from this set retires it everywhere at once: it stops signing, disappears
  *   from `/api/auth/jwks`, and the API rejects tokens it signed — clients transparently re-mint.
  * - Rows are memoized per server instance so token minting and JWKS serving don't each hit Postgres.

@@ -20,7 +20,7 @@ If issuer/audience don’t match JWT claims → **`401 Invalid or expired token`
 - **`DATABASE_URL`** — Required for auth adapter.
 - **`BETTER_AUTH_URL`** — Preferred canonical base for Better Auth when set.
 - **`NEXT_PUBLIC_APP_URL`** — Public site URL; used in **`resolveAuthBaseUrl()`** before **`VERCEL_URL`** so tokens use a **stable issuer** when explicit Better Auth URL is absent.
-- **`BETTER_AUTH_SECRET`** — Required in prod (dev fallback exists in code but must not ship).
+- **`BETTER_AUTH_SECRETS`** — Required everywhere, no fallback (`"1:<secret>"`; prepend `"2:<new>"` to rotate). Signing keys encrypted under a version no longer listed are ignored by `auth-jwks.ts`. The old unversioned `BETTER_AUTH_SECRET` fallback was a public string and is gone.
 - **`VERCEL_URL`** — Preview host; combined with trusted origins / fallbacks for CORS and auth base resolution.
 - **`AUTH_FORCE_INSECURE_COOKIES`** / **`AUTH_FORCE_SECURE_COOKIES`** — Optional overrides for **`advanced.useSecureCookies`** in **`apps/web/src/lib/auth.ts`** (`1` or `true`). Use the insecure flag only when debugging a **production build served over `http://` locally** with prod env pointing at **`https://…`** (otherwise **`__Secure-*`** session cookies are rejected by the browser).
 

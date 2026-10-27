@@ -18,7 +18,7 @@ Primary **LogBase** UI: marketing `/`, **Better Auth** session, authenticated **
 ## Important env vars (names only)
 
 - **`DATABASE_URL`** — Better Auth + Drizzle on the web server.
-- **`BETTER_AUTH_SECRET`**, optional **`BETTER_AUTH_URL`**, **`NEXT_PUBLIC_APP_URL`** — base URL / issuer stability (especially on Vercel).
+- **`BETTER_AUTH_SECRETS`** (`<version>:<secret>`, current first), optional **`BETTER_AUTH_URL`**, **`NEXT_PUBLIC_APP_URL`** — base URL / issuer stability (especially on Vercel).
 - **`NEXT_PUBLIC_API_URL`** — Must be the **API origin** in production (non-empty); blank previously caused org creation to hit the web app and 404.
 
 Optional Better Auth Infra: **`BETTER_AUTH_API_KEY`**, **`BETTER_AUTH_API_URL`**, **`BETTER_AUTH_KV_URL`** (dash plugin in `auth.ts`).

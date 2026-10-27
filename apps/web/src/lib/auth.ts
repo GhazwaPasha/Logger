@@ -24,6 +24,13 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is required for Better Auth");
 }
 
+// Read by Better Auth itself as "<version>:<secret>" entries, current first. Versioned secrets tag every
+// ciphertext with the version that encrypted it, which is how auth-jwks tells current signing keys apart
+// from ones encrypted under a retired secret. No fallback: a missing secret must stop the server.
+if (!process.env.BETTER_AUTH_SECRETS?.trim()) {
+  throw new Error('BETTER_AUTH_SECRETS is required for Better Auth (e.g. "1:<openssl rand -base64 32>")');
+}
+
 const pool = new Pool({ connectionString: normalizeDatabaseUrl(connectionString) });
 export const authDb = createDbFromPool(pool);
 
@@ -182,7 +189,6 @@ export const auth = betterAuth({
         profile.email ? resolveAvatarFields(profile.email, "google", profile.picture) : {},
     },
   },
-  secret: process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-in-production-min-32-chars!!",
   baseURL: authBaseUrl,
   trustedOrigins: resolveTrustedOrigins,
   session: {
@@ -196,7 +202,7 @@ export const auth = betterAuth({
   plugins: [
     expo(),
     jwt({
-      // Private keys are encrypted at rest with BETTER_AUTH_SECRET and rotated on a schedule. Every
+      // Private keys are encrypted at rest with BETTER_AUTH_SECRETS and rotated on a schedule. Every
       // environment that mints tokens against this database must share that secret.
       jwks: {
         rotationInterval: JWKS_ROTATION_INTERVAL_SECONDS,
