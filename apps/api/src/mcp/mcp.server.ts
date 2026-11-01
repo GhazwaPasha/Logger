@@ -10,6 +10,7 @@ import {
   patchTaskSchema,
 } from "@work-ledger/contracts";
 import { z } from "zod";
+import { AGENT_TOOLS_BY_NAME, MCP_SHARED_TOOL_NAMES, createToolContext, runAgentTool } from "../agent/agent-tools";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { DiscordIntegrationService } from "../discord/discord-integration.service";
@@ -18,10 +19,16 @@ import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { PerformanceService } from "../performance/performance.service";
+import { SearchService } from "../search/search.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
 
 export interface McpServices {
+  search: SearchService;
+  performance: PerformanceService;
+  /** The organization's IANA zone — shared registry tools format dates in it. */
+  timeZoneFor: (organizationId: string) => Promise<string>;
   tasks: TasksService;
   time: TimeService;
   comments: CommentsService;
@@ -292,6 +299,22 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
     },
     async ({ organizationId, ...body }) => runTool(() => services.milestones.create(userId, organizationId, body)),
   );
+
+  // Read tools shared with the in-app agent (see agent/agent-tools.ts) — one implementation for both.
+  for (const name of MCP_SHARED_TOOL_NAMES) {
+    const shared = AGENT_TOOLS_BY_NAME.get(name)!;
+    registerTool<{ organizationId: string } & Record<string, unknown>>(
+      server,
+      name,
+      { description: shared.description, inputSchema: { organizationId: z.string().uuid(), ...shared.input.shape } },
+      async ({ organizationId, ...args }) => {
+        const ctx = createToolContext(services, userId, organizationId, await services.timeZoneFor(organizationId));
+        const out = await runAgentTool(ctx, name, args);
+        if (!out.ok) return { isError: true, content: [{ type: "text" as const, text: out.error }] };
+        return { content: [{ type: "text" as const, text: JSON.stringify(out.result) }] };
+      },
+    );
+  }
 
   return server;
 }

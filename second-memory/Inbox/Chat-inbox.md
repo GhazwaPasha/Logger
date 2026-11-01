@@ -4,6 +4,26 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 
 ---
 
+### 2026-11-02 — Ask LogBase (agent phase 1: read-only) + API host is Render
+
+- **Context:** First step of making LogBase agentic. The plan has phases: P1 Ask (read-only) → P2 changes via approval cards → P3 proactive briefings and nudges → P4 agent as a teammate. Model provider stays **Gemini**.
+- **What we did:**
+  - **API:** new `AgentModule`, with a read-only tool registry that runs through the existing services *as the asking user*.
+    - Tools: workspace layout, people, tasks, search, task detail, comments, status counts, activity, roadmap, performance.
+    - Loop: a manual Gemini function-calling loop, streaming NDJSON from `POST /organizations/:id/agent/ask`.
+    - Threads API: `…/agent/threads`, `/agent/threads/:id`.
+    - Caps: 6 rounds and 16 tool calls per run; one run per user; `AGENT_DAILY_REQUESTS_PER_ORG` (default 300); `AGENT_ENABLED=false` turns it off.
+    - Unpinned threads are swept after 90 days.
+    - The MCP server also exposes four of the registry tools.
+  - **Web:** `AskPanel` (⌘K / LogBase mark in the header; "Ask" on the task view). Search as you type, steps shown as quiet mono lines, task links, history with pin and delete.
+  - **Mobile:** `(app)/ask.tsx`, entered from Search's "Ask LogBase" row and the task top bar. Streams via `expo/fetch`.
+- **Takeaway:**
+  - Models: `GEMINI_MODEL_AGENT` defaults to `gemini-3.5-flash`, `GEMINI_MODEL_FAST` to `gemini-3.5-flash-lite`. Other models returned 503s during testing.
+  - **`GEMINI_API_KEY` must be set on Render (`logger-api`).**
+  - The API host is **Render**, not Railway; the Topics notes are corrected and the websocket plan was renamed to [[Topics/Infrastructure/websocket-render-plan]].
+  - Migration **0047** (`agent_threads`, `agent_messages`, `agent_usage_daily`) has been applied.
+- **Code / repo:** `apps/api/src/agent/*`, `apps/api/src/mcp/*`, `packages/contracts/src/agent.ts`, `packages/db/src/schema.ts`, `packages/db/drizzle/0047_agent_threads.sql`, `apps/web/src/components/agent/*`, `apps/web/src/lib/agent.ts`, `apps/mobile/src/app/(app)/ask.tsx`, `apps/mobile/src/lib/agent.ts`, `render.yaml`.
+
 ### 2026-05-22 — Notifications panel: remove intro copy
 
 - **Context:** Bell slide-over had redundant explanatory paragraph under the header.
@@ -217,7 +237,7 @@ Cursor Agent turns append **here** when something is worth keeping beyond this c
 - **Context:** Multi-user UI; move toward push instead of polling-only.
 - **What we did:** **`RealtimeModule`** — **`CollaborationService`** (**`notifyOrgChanged`**, **`emitWorkspaceChanged`**), **`OrgCollaborationGateway`** (handshake **`auth.token`** + **`auth.organizationId`**, **`assertOrgMember`**, room **`org:{id}`**; **`collaboration_auth_error`** before disconnect on auth failure). **`TasksService`**, **`OrganizationsService`** (create / patch / member upsert), **`ListsService`**, **`DepartmentsService`** notify after writes. **`JwtAuthGuard`** skips **`ws`**. **`main.ts`:** **`cors-origins.ts`**, **`PORT ?? API_PORT`**. Optional **`REDIS_URL`** → **`@socket.io/redis-adapter`** + **`redis`**; gateway **`onModuleDestroy`**. **Web:** **`WorkspaceRealtimeSubscriber`** — **`collaboration_auth_error`** + **`connect_error`** (auth-like) → **`wl:auth-expired`**; invalidate **`workspace`**, **`activity`**, **`task.detail`**. **`getApiBaseUrl`**. Removed **`refetchInterval`** on **`useOrgWorkspace`** / **`useTaskDetail`** (kept **`refetchOnWindowFocus`**).
 - **Takeaway / follow-ups:** Set **`REDIS_URL`** on Railway when API replicas > 1. Tune **`connect_error`** heuristics if false-positive auth refresh.
-- **Code / repo:** `apps/api/src/realtime/*`, `cors-origins.ts`, `main.ts`, `jwt-auth.guard.ts`, `tasks.service.ts`, `organizations.service.ts`, `organizations.module.ts`, `lists.service.ts`, `lists.module.ts`, `departments.service.ts`, `departments.module.ts`, `WorkspaceRealtimeSubscriber.tsx`, `WorkspaceShell.tsx`, `apps/web/src/lib/api.ts`, `useOrgWorkspace.ts`, `useTaskDetail.ts`. [[Topics/Infrastructure/websocket-railway-plan]].
+- **Code / repo:** `apps/api/src/realtime/*`, `cors-origins.ts`, `main.ts`, `jwt-auth.guard.ts`, `tasks.service.ts`, `organizations.service.ts`, `organizations.module.ts`, `lists.service.ts`, `lists.module.ts`, `departments.service.ts`, `departments.module.ts`, `WorkspaceRealtimeSubscriber.tsx`, `WorkspaceShell.tsx`, `apps/web/src/lib/api.ts`, `useOrgWorkspace.ts`, `useTaskDetail.ts`. [[Topics/Infrastructure/websocket-render-plan]].
 
 ### 2026-05-05 — Prod CORS “random” sessions: merge origins + optional Vercel + preflight headers
 

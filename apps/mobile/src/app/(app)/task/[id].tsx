@@ -15,6 +15,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { LogoMark } from '@/components/logo-mark';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
@@ -149,6 +150,17 @@ function TaskScreen() {
         <Icon icon={faChevronLeft} size={18} color="fg" />
       </PressableScale>
       <View style={{ flex: 1 }} />
+      {id && id !== 'new' ? (
+        <PressableScale
+          scaleTo={0.94}
+          accessibilityRole="button"
+          accessibilityLabel="Ask LogBase about this task"
+          hitSlop={8}
+          onPress={() => router.push({ pathname: '/ask', params: { taskId: id } })}
+          style={styles.iconBtn}>
+          <LogoMark size={20} />
+        </PressableScale>
+      ) : null}
       {saving ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(250)} style={styles.saving}>
           <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.7 }] }} />

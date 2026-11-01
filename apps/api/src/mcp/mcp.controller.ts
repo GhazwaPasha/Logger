@@ -1,10 +1,13 @@
-import { Controller, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Controller, Inject, Post, Req, Res, UseGuards } from "@nestjs/common";
+import type { AppDatabase } from "@work-ledger/db";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Request, Response } from "express";
 import { McpAuthGuard } from "../auth/mcp-auth.guard";
 import { Public } from "../auth/public.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
 import { CommentsService } from "../comments/comments.service";
+import { DRIZZLE } from "../db/drizzle.constants";
+import { getOrganizationTimeZone } from "../db/org-timezone.util";
 import { DepartmentsService } from "../departments/departments.service";
 import { DiscordIntegrationService } from "../discord/discord-integration.service";
 import { ListsService } from "../lists/lists.service";
@@ -12,6 +15,8 @@ import { GoalsService } from "../roadmap/goals.service";
 import { MilestonesService } from "../roadmap/milestones.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
 import { OrganizationsService } from "../organizations/organizations.service";
+import { PerformanceService } from "../performance/performance.service";
+import { SearchService } from "../search/search.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
 import { createMcpServer } from "./mcp.server";
@@ -21,6 +26,9 @@ import { createMcpServer } from "./mcp.server";
 @UseGuards(McpAuthGuard)
 export class McpController {
   constructor(
+    @Inject(DRIZZLE) private readonly db: AppDatabase,
+    private readonly search: SearchService,
+    private readonly performance: PerformanceService,
     private readonly tasks: TasksService,
     private readonly time: TimeService,
     private readonly comments: CommentsService,
@@ -36,6 +44,9 @@ export class McpController {
   @Post()
   async handle(@Req() req: Request & { user: RequestUser }, @Res() res: Response) {
     const server = createMcpServer(req.user.id, {
+      search: this.search,
+      performance: this.performance,
+      timeZoneFor: (organizationId) => getOrganizationTimeZone(this.db, organizationId),
       tasks: this.tasks,
       time: this.time,
       comments: this.comments,

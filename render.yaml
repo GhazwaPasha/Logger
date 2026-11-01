@@ -8,3 +8,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Ask LogBase (apps/api/src/agent). Set the value in the Render dashboard; never commit it.
+      - key: GEMINI_API_KEY
+        sync: false

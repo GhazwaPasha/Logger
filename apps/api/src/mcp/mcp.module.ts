@@ -8,6 +8,8 @@ import { DiscordModule } from "../discord/discord.module";
 import { ListsModule } from "../lists/lists.module";
 import { RoadmapModule } from "../roadmap/roadmap.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PerformanceModule } from "../performance/performance.module";
+import { SearchModule } from "../search/search.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { TimeModule } from "../time/time.module";
 import { McpController } from "./mcp.controller";
@@ -25,6 +27,8 @@ import { McpController } from "./mcp.controller";
     DiscordModule,
     ListsModule,
     RoadmapModule,
+    SearchModule,
+    PerformanceModule,
   ],
   controllers: [McpController],
 })

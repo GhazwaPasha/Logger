@@ -766,6 +766,68 @@ export const mobilePushTokens = pgTable(
   ],
 );
 
+/** A conversation between one user and the LogBase agent, scoped to one organization. Private to that user. */
+export const agentThreads = pgTable(
+  "agent_threads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** Short title written by the agent from the first question. */
+    title: text("title").notNull(),
+    /** Set when the conversation was started from a task; it then also shows in that task's Agent section. */
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    /** Pinned threads are kept at the top of history and skipped by the retention sweep. */
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("agent_threads_user_org_last_idx").on(t.userId, t.organizationId, t.lastMessageAt.desc()),
+    index("agent_threads_task_idx").on(t.taskId),
+  ],
+);
+
+/** One turn in an agent thread. `steps` is the display trail of tools the agent ran for an assistant turn. */
+export const agentMessages = pgTable(
+  "agent_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => agentThreads.id, { onDelete: "cascade" }),
+    /** `user` | `assistant`. */
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    steps: jsonb("steps").$type<{ label: string }[]>(),
+    model: text("model"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("agent_messages_thread_created_idx").on(t.threadId, t.createdAt)],
+);
+
+/** Per-organization daily agent usage; the budget check reads one row instead of summing messages. */
+export const agentUsageDaily = pgTable(
+  "agent_usage_daily",
+  {
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** UTC day, `YYYY-MM-DD`. */
+    day: text("day").notNull(),
+    requests: integer("requests").notNull().default(0),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.organizationId, t.day] })],
+);
+
 export const usersRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),

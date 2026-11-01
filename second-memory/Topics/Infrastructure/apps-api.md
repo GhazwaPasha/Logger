@@ -5,14 +5,15 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 ## Runtime
 
 - **Bootstrap:** `apps/api/src/main.ts` — loads env via `load-env`, enables **CORS** from **`NEXT_PUBLIC_APP_URL`** (comma-separated, default `http://localhost:3000`) **merged** with **`API_CORS_ORIGINS`** when the latter is set (deduped), plus localhost regex and `exp://` for Expo. Optional **`API_CORS_ALLOW_VERCEL_APP`** (`1` / `true`) adds **`https://*.vercel.app`** for branch/preview deploys. Explicit **`methods`** + **`allowedHeaders`** (`Authorization`, `Content-Type`, `Accept`) for preflight. If the browser **`Origin`** is missing from this set, **`fetch`** fails with **Failed to fetch** / CORS — list **every** real web origin (custom domain, apex vs `www`, production vs preview) on the **API** host (see **Deployment** below).
-- **Port:** **`PORT`** (e.g. Railway) **or** **`API_PORT`**, default **4000**.
+- **Port:** **`PORT`** (set by Render) **or** **`API_PORT`**, default **4000**.
 - **Config:** `@nestjs/config` reads **repo-root** `.env` / `.env.local` (paths resolved from `dist/` up three levels in `app.module.ts`).
 
 ## Deployment (production)
 
-- **Canonical API host:** **Railway** (long-lived Node: REST + Socket.IO). Repo root **`railway.json`** + **`npm run build:api`** / **`npm run start:api`** — **do not** set Railway **Root Directory** to `apps/api`; the monorepo root must install workspace packages **`@work-ledger/db`** and **`@work-ledger/contracts`**.
-- **Web** stays on **Vercel** (`apps/web` only). **`NEXT_PUBLIC_API_URL`** on Vercel must be the **public HTTPS base URL** of the Railway API (no trailing slash).
-- **Retired:** a **second Vercel project** that deployed only **`apps/api`** — remove it in the Vercel dashboard once traffic uses Railway (avoids duplicate env, cost, and confusion). CORS / JWT env vars for the API live on **Railway**, not on a Vercel API project.
+- **Canonical API host:** **Render**, web service **`logger-api`** (long-lived Node: REST + Socket.IO), defined by repo-root **`render.yaml`**: **`npm ci && npm run build:api`**, start **`npm run start:api`**, health check **`/health`**. It builds from the **monorepo root** so the workspace packages **`@work-ledger/db`** and **`@work-ledger/contracts`** install — don't point it at `apps/api`.
+- **API secrets** (CORS, JWT, `DATABASE_URL`, **`GEMINI_API_KEY`** for Ask LogBase…) live in the **Render dashboard → logger-api → Environment**. Keys marked `sync: false` in `render.yaml` are declared there with no value; never commit values.
+- **Web** stays on **Vercel** (`apps/web` only). **`NEXT_PUBLIC_API_URL`** on Vercel must be the **public HTTPS base URL** of the Render API (no trailing slash).
+- **History:** the API previously ran on Railway (`railway.json`, since removed) and before that on a separate Vercel API project — neither is in use.
 - **Shared CORS config** with Socket.IO: `apps/api/src/cors-origins.ts`.
 
 ## Global authentication
@@ -65,6 +66,12 @@ Nest HTTP service for **organizations, structure (departments/lists), tasks, led
 - `GET/POST /tasks/:taskId/subtasks`, `PATCH .../subtasks/:subtaskId`
 - `POST /tasks/:taskId/archive` — **owner** or **department manager** for the task’s list’s level; soft-delete (`deletedAt` + ledger `archive`); response **slim**
 - `GET /tasks/:taskId/report.pdf` — PDF attachment (`pdf-lib`)
+
+**Agent (Ask LogBase)** — `apps/api/src/agent/`
+
+- `POST /organizations/:organizationId/agent/ask` — body `{ message, threadId?, taskId? }`. It streams **NDJSON** `AgentStreamEvent`s: `thread`, `step` (one line per tool), `answer`, `error`. Budget, permission and validation failures come back as normal JSON errors before the stream starts.
+- `GET /organizations/:organizationId/agent/threads` (`?taskId=`), `GET|PATCH|DELETE /agent/threads/:threadId`. Threads are private: anyone other than the owner gets a 404.
+- Tools are **read-only** and run through the existing services with the caller's `userId`, so the agent can never see more than the user. See `agent-tools.ts`.
 
 ## Guards beyond JWT
 

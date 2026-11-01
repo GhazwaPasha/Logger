@@ -26,6 +26,7 @@ import { RoadmapModule } from "./roadmap/roadmap.module";
 import { DiscordModule } from "./discord/discord.module";
 import { McpModule } from "./mcp/mcp.module";
 import { WellKnownModule } from "./well-known/well-known.module";
+import { AgentModule } from "./agent/agent.module";
 import { PerformanceModule } from "./performance/performance.module";
 
 @Module({
@@ -66,6 +67,7 @@ import { PerformanceModule } from "./performance/performance.module";
     RoadmapModule,
     DiscordModule,
     McpModule,
+    AgentModule,
     WellKnownModule,
   ],
   controllers: [HealthController],

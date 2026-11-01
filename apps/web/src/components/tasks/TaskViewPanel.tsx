@@ -10,6 +10,8 @@ import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { useDiscordChannels } from "@/hooks/useDiscordChannels";
+import { useAsk } from "@/components/agent/AskPanel";
+import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { useRouter } from "next/navigation";
 import { taskEditCaps } from "@/lib/workspace-permissions";
 import { DependencySection } from "@/components/tasks/DependencySection";
@@ -68,6 +70,7 @@ export function TaskViewPanel({
   const { workspaceSlug, workspaceId, timeZone } = useWorkspaceRoute();
 
   const prefersReduced = useReducedMotion();
+  const ask = useAsk();
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
@@ -139,6 +142,17 @@ export function TaskViewPanel({
       <div className="-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--fg)]">Task details</h2>
         <div className="flex items-center gap-2">
+          {ask && (
+            <button
+              type="button"
+              title="Ask LogBase about this task"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              onClick={() => ask.openAsk({ taskId })}
+            >
+              <LogBaseMark size={14} decorative />
+              Ask
+            </button>
+          )}
           <button
             type="button"
             className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)]"

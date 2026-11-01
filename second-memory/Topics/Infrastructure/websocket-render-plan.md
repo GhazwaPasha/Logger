@@ -1,16 +1,16 @@
-# WebSockets + Railway — implementation plan
+# WebSockets on the Render API — implementation plan
 
 ## Status (2026-05-05)
 
 **v1 shipped in repo:** Socket.IO gateway on Nest (`RealtimeModule`), `workspace_changed` emits from **`TasksService`**, **`OrganizationsService`** (create / patch / member upsert), **`ListsService`**, **`DepartmentsService`**; web **`WorkspaceRealtimeSubscriber`** invalidates workspace + activity + optional task detail; **`collaboration_auth_error`** + **`connect_error`** (auth-like messages) → **`wl:auth-expired`**. **`PORT`** in `main.ts`. **`JwtAuthGuard`** skips `ws`. **`REDIS_URL`:** when set, **`@socket.io/redis-adapter`** + **`redis`** clients enable multi-instance fan-out; gateway **`onModuleDestroy`** quits Redis. **`CollaborationService.notifyOrgChanged`** wraps emits in try/catch. Polling **`refetchInterval`** removed from workspace/task detail (push + refocus).
 
-For [[apps-api]] + [[apps-web]]: org-scoped **push** so teammates see updates without relying on polling. **Neon** unchanged. **Vercel** keeps Next; **Railway** runs Nest (REST + WS).
+For [[apps-api]] + [[apps-web]]: org-scoped **push** so teammates see updates without relying on polling. Postgres (Supabase) unchanged. **Vercel** keeps Next; **Render** (`logger-api`) runs Nest (REST + WS).
 
 ## Goals
 
 - After **any mutating** API path that should refresh others’ UIs, **broadcast** a tiny event to all sockets in that **organization**.
 - **Web** subscribes while `WorkspaceDataProvider` is mounted; on event → **`queryClient.invalidateQueries`** for `workspaceKeys.workspace(orgId)` and optionally `taskKeys.detail(taskId)`.
-- **Single Railway service** first; **Redis adapter** when API scales beyond one replica.
+- **Single Render service** first; **Redis adapter** when API scales beyond one replica.
 
 ## Transport choice (recommended)
 
@@ -74,14 +74,14 @@ Optional later: monotonic **`revision`** per org from DB to detect gaps after re
 
 ### 6) Multi-instance (phase 2)
 
-- When Railway **replicas > 1**, enable **Socket.IO Redis adapter** so publishes from instance A reach clients on instance B.
-- Env: **`REDIS_URL`** (Railway Redis plugin).
+- When the Render service runs **more than one instance**, enable **Socket.IO Redis adapter** so publishes from instance A reach clients on instance B.
+- Env: **`REDIS_URL`** (a Render Key Value instance).
 
-### 7) Railway-specific
+### 7) Render-specific
 
-- **`PORT`:** Railway sets `PORT`. Nest currently uses **`API_PORT`** in `main.ts`. Set **`API_PORT=$PORT`** in Railway **or** change bootstrap to `Number(process.env.PORT ?? process.env.API_PORT ?? 4000)`.
-- **Health:** existing **`GET /health`** — use for Railway health checks.
-- **HTTPS / WSS:** Railway provides TLS; browser uses **`wss://`** against `NEXT_PUBLIC_API_URL` host.
+- **`PORT`:** Render sets `PORT`; `main.ts` reads `PORT ?? API_PORT ?? 4000`.
+- **Health:** existing **`GET /health`** — Render health check (`healthCheckPath` in `render.yaml`).
+- **HTTPS / WSS:** Render provides TLS; browser uses **`wss://`** against `NEXT_PUBLIC_API_URL` host.
 
 ## Web (`apps/web`)
 
@@ -113,11 +113,11 @@ Optional later: monotonic **`revision`** per org from DB to detect gaps after re
 - Two browsers, same org: **A** edits task → **B** list updates without refresh.
 - Token expiry: disconnect or failed handshake; client should **not** spin forever (reconnect with backoff; 401 → dispatch `wl:auth-expired` if applicable).
 - Org switch: socket leaves old room, joins new.
-- Railway deploy: no regression on REST.
+- Render deploy: no regression on REST.
 
 ## Rollout order
 
-1. **`PORT` / `API_PORT`** fix + Railway deploy REST-only (no behavior change for users).
+1. **`PORT` / `API_PORT`** fix + deploy REST-only (no behavior change for users).
 2. **Gateway + guards + join room** (no emits yet) — verify client can connect from Vercel origin.
 3. **`CollaborationService.emit`** from **`TasksService`** (highest value).
 4. **Web client** hook + invalidate.

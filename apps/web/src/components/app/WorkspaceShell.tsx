@@ -9,6 +9,7 @@ import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { KeyboardShortcutsProvider } from "@/components/app/KeyboardShortcutsProvider";
+import { AskProvider } from "@/components/agent/AskPanel";
 import { OnlinePresenceProvider } from "@/components/app/OnlinePresenceProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { AppBootScreen } from "@/components/ui/LoadingFrame";
@@ -81,6 +82,7 @@ export function WorkspaceShell({
         <WorkspaceRealtimeSubscriber workspaceId={workspaceId} />
         <WorkspaceNotificationsProvider>
         <KeyboardShortcutsProvider>
+        <AskProvider>
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
             <AppHeader workspaceSlug={workspaceSlug} onMenuToggle={() => setMobileSidebarOpen((v) => !v)} />
             <div className="flex min-h-0 w-full flex-1 overflow-hidden md:flex-row md:items-stretch">
@@ -95,6 +97,7 @@ export function WorkspaceShell({
               </main>
             </div>
           </div>
+        </AskProvider>
         </KeyboardShortcutsProvider>
         </WorkspaceNotificationsProvider>
       </WorkspaceDataProvider>

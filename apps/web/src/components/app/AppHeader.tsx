@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { authClient } from "@/lib/auth-client";
 import { HeaderLiveIsland } from "./live-island";
 import { OnlineMembersAvatars } from "./OnlineMembersAvatars";
+import { useAsk } from "@/components/agent/AskPanel";
 
 function IconBell({ className }: { className?: string }) {
   return (
@@ -88,6 +89,7 @@ export function AppHeader({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const notifications = useOptionalWorkspaceNotifications();
+  const ask = useAsk();
 
   const closeAccountMenu = useCallback(() => setAccountMenuOpen(false), []);
 
@@ -135,6 +137,18 @@ export function AppHeader({
         </div>
         <div className="flex min-w-0 items-center justify-end gap-0.5 justify-self-end sm:gap-1">
           {settingsHref && <OnlineMembersAvatars />}
+          {ask && (
+            <button
+              type="button"
+              className={`${iconBtn} ${ask.isOpen ? "bg-[var(--surface-hover)]" : ""}`}
+              aria-label="Ask LogBase (Ctrl+K)"
+              title="Ask LogBase (Ctrl+K)"
+              aria-pressed={ask.isOpen}
+              onClick={ask.toggleAsk}
+            >
+              <LogBaseMark size={20} decorative />
+            </button>
+          )}
           {settingsHref && notifications && (
             <button
               type="button"

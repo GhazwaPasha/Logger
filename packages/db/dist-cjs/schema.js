@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = void 0;
+exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.agentUsageDaily = exports.agentMessages = exports.agentThreads = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -606,6 +606,53 @@ exports.mobilePushTokens = (0, pg_core_1.pgTable)("mobile_push_tokens", {
     (0, pg_core_1.uniqueIndex)("mobile_push_tokens_token_uidx").on(t.token),
     (0, pg_core_1.index)("mobile_push_tokens_user_idx").on(t.userId),
 ]);
+/** A conversation between one user and the LogBase agent, scoped to one organization. Private to that user. */
+exports.agentThreads = (0, pg_core_1.pgTable)("agent_threads", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    /** Short title written by the agent from the first question. */
+    title: (0, pg_core_1.text)("title").notNull(),
+    /** Set when the conversation was started from a task; it then also shows in that task's Agent section. */
+    taskId: (0, pg_core_1.uuid)("task_id").references(() => exports.tasks.id, { onDelete: "set null" }),
+    /** Pinned threads are kept at the top of history and skipped by the retention sweep. */
+    pinned: (0, pg_core_1.boolean)("pinned").notNull().default(false),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessageAt: (0, pg_core_1.timestamp)("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+    (0, pg_core_1.index)("agent_threads_user_org_last_idx").on(t.userId, t.organizationId, t.lastMessageAt.desc()),
+    (0, pg_core_1.index)("agent_threads_task_idx").on(t.taskId),
+]);
+/** One turn in an agent thread. `steps` is the display trail of tools the agent ran for an assistant turn. */
+exports.agentMessages = (0, pg_core_1.pgTable)("agent_messages", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    threadId: (0, pg_core_1.uuid)("thread_id")
+        .notNull()
+        .references(() => exports.agentThreads.id, { onDelete: "cascade" }),
+    /** `user` | `assistant`. */
+    role: (0, pg_core_1.text)("role").notNull(),
+    content: (0, pg_core_1.text)("content").notNull(),
+    steps: (0, pg_core_1.jsonb)("steps").$type(),
+    model: (0, pg_core_1.text)("model"),
+    inputTokens: (0, pg_core_1.integer)("input_tokens"),
+    outputTokens: (0, pg_core_1.integer)("output_tokens"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("agent_messages_thread_created_idx").on(t.threadId, t.createdAt)]);
+/** Per-organization daily agent usage; the budget check reads one row instead of summing messages. */
+exports.agentUsageDaily = (0, pg_core_1.pgTable)("agent_usage_daily", {
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    /** UTC day, `YYYY-MM-DD`. */
+    day: (0, pg_core_1.text)("day").notNull(),
+    requests: (0, pg_core_1.integer)("requests").notNull().default(0),
+    inputTokens: (0, pg_core_1.integer)("input_tokens").notNull().default(0),
+    outputTokens: (0, pg_core_1.integer)("output_tokens").notNull().default(0),
+}, (t) => [(0, pg_core_1.primaryKey)({ columns: [t.organizationId, t.day] })]);
 exports.usersRelations = (0, drizzle_orm_1.relations)(exports.user, ({ many }) => ({
     sessions: many(exports.session),
     accounts: many(exports.account),

@@ -13,7 +13,7 @@ const SHORTCUTS = [
   { group: "Navigation", keys: ["G", "then W"], description: "Go to Work" },
   { group: "Navigation", keys: ["G", "then C"], description: "Go to Calendar" },
   { group: "Tasks", keys: ["N"], description: "Open new task form (Work page)" },
-  { group: "Search", keys: ["⌘ K", "or Ctrl K"], description: "Open search" },
+  { group: "Search", keys: ["⌘ K", "or Ctrl K"], description: "Ask or search LogBase" },
   { group: "General", keys: ["?"], description: "Show keyboard shortcuts" },
   { group: "General", keys: ["Esc"], description: "Close panel / modal" },
 ];
@@ -101,7 +101,7 @@ export function KeyboardShortcutsProvider({ children }: { children: ReactNode })
         return;
       }
 
-      // Cmd+K / Ctrl+K handled by GlobalSearch
+      // Cmd+K / Ctrl+K handled by AskProvider
       if (isMeta && e.key === "k") return;
 
       if (isEditing) return;
