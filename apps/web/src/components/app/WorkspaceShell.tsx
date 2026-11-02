@@ -9,7 +9,7 @@ import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
 import { KeyboardShortcutsProvider } from "@/components/app/KeyboardShortcutsProvider";
-import { AskProvider } from "@/components/agent/AskPanel";
+import { AskPane, AskProvider } from "@/components/agent/AskPanel";
 import { OnlinePresenceProvider } from "@/components/app/OnlinePresenceProvider";
 import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { AppBootScreen } from "@/components/ui/LoadingFrame";
@@ -95,6 +95,7 @@ export function WorkspaceShell({
               <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
                 {children}
               </main>
+              <AskPane />
             </div>
           </div>
         </AskProvider>

@@ -30,8 +30,10 @@ export type AgentStep = { label: string };
 export type AgentStreamEvent =
   /** First event of every run: which thread the turn landed in (new threads get their title later). */
   | { type: "thread"; threadId: string; title: string }
-  /** One line per finished tool call, e.g. "Looked at 12 tasks". */
+  /** One line per finished tool call, e.g. "Looked at 12 tasks". Discard any `delta` text received before it. */
   | { type: "step"; label: string }
+  /** Answer text as it's written. Append to a draft; a later `step` means it was a preamble, so clear the draft. */
+  | { type: "delta"; text: string }
   | { type: "answer"; messageId: string; text: string; title: string }
   | { type: "error"; message: string };
 

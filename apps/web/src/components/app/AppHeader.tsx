@@ -140,10 +140,10 @@ export function AppHeader({
           {ask && (
             <button
               type="button"
-              className={`${iconBtn} ${ask.isOpen ? "bg-[var(--surface-hover)]" : ""}`}
+              className={`${iconBtn} ${ask.open ? "bg-[var(--surface-hover)]" : ""}`}
               aria-label="Ask LogBase (Ctrl+K)"
               title="Ask LogBase (Ctrl+K)"
-              aria-pressed={ask.isOpen}
+              aria-pressed={ask.open}
               onClick={ask.toggleAsk}
             >
               <LogBaseMark size={20} decorative />

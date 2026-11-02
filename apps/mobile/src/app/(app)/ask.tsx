@@ -52,8 +52,10 @@ export default function AskScreen() {
   const [taskId, setTaskId] = useState<string | null>(params.taskId ?? null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
+  /** Answer text streamed so far; a later tool step means it was a preamble and is dropped. */
+  const [draft, setDraft] = useState('');
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; retry: string | null } | null>(null);
   const [input, setInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -66,12 +68,21 @@ export default function AskScreen() {
     setTitle(null);
     setMessages([]);
     setLiveSteps([]);
+    setDraft('');
     setRunning(false);
     setError(null);
   }, []);
 
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setRunning(false);
+    setLiveSteps([]);
+    setDraft('');
+  }, []);
+
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, opts?: { retry?: boolean }) => {
       const message = text.trim();
       if (!message || running || !orgId) return;
       setInput('');
@@ -79,7 +90,9 @@ export default function AskScreen() {
       setView('chat');
       setRunning(true);
       setLiveSteps([]);
-      setMessages((m) => [...m, { id: `local-${Date.now()}`, role: 'user', content: message, steps: null }]);
+      setDraft('');
+      // Retrying: the failed question is already on screen, so it isn't added a second time.
+      if (!opts?.retry) setMessages((m) => [...m, { id: `local-${Date.now()}`, role: 'user', content: message, steps: null }]);
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -89,27 +102,34 @@ export default function AskScreen() {
           orgId,
           { message, threadId: threadId ?? undefined, taskId: threadId ? undefined : (taskId ?? undefined) },
           (e) => {
+            if (ctrl.signal.aborted) return;
             if (e.type === 'thread') {
               setThreadId(e.threadId);
               setTitle(e.title);
             } else if (e.type === 'step') {
               steps.push(e.label);
               setLiveSteps([...steps]);
+              setDraft('');
+            } else if (e.type === 'delta') {
+              setDraft((d) => d + e.text);
             } else if (e.type === 'answer') {
               setTitle(e.title);
+              setDraft('');
               setMessages((m) => [...m, { id: e.messageId, role: 'assistant', content: e.text, steps: steps.map((label) => ({ label })) }]);
             } else if (e.type === 'error') {
-              setError(e.message);
+              setError({ message: e.message, retry: message });
             }
           },
           ctrl.signal,
         );
       } catch (err) {
-        if (!ctrl.signal.aborted) setError(err instanceof Error ? err.message : 'Something went wrong.');
+        if (!ctrl.signal.aborted) setError({ message: err instanceof Error ? err.message : 'Something went wrong.', retry: message });
       } finally {
         if (abortRef.current === ctrl) {
+          abortRef.current = null;
           setRunning(false);
           setLiveSteps([]);
+          setDraft('');
           void queryClient.invalidateQueries({ queryKey: agentKeys.threads(orgId) });
         }
       }
@@ -132,7 +152,7 @@ export default function AskScreen() {
         setTaskId(detail.taskId);
         setMessages(detail.messages);
       } catch {
-        setError("Couldn't open that conversation.");
+        setError({ message: "Couldn't open that conversation.", retry: null });
       }
     },
     [queryClient, reset],
@@ -203,16 +223,16 @@ export default function AskScreen() {
             ) : (
               messages.map((m) =>
                 m.role === 'user' ? (
-                  <Text key={m.id} size="15" weight="semibold">
-                    {m.content}
-                  </Text>
+                  <View key={m.id} style={[styles.bubble, { backgroundColor: theme.surfaceElevated }]}>
+                    <Text size="15">{m.content}</Text>
+                  </View>
                 ) : (
                   <Animated.View key={m.id} entering={FadeIn.duration(180)} style={styles.answer}>
                     <View style={{ paddingTop: 2 }}>
                       <LogoMark size={18} />
                     </View>
                     <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
-                      {m.steps?.length ? <Steps steps={m.steps.map((s) => s.label)} /> : null}
+                      {m.steps?.length ? <StepsToggle steps={m.steps.map((s) => s.label)} /> : null}
                       <AgentText text={m.content} />
                     </View>
                   </Animated.View>
@@ -224,21 +244,35 @@ export default function AskScreen() {
                 <View style={{ paddingTop: 2 }}>
                   <LogoMark size={18} />
                 </View>
-                <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                  {liveSteps.length > 1 ? <Steps steps={liveSteps.slice(0, -1)} /> : null}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.7 }] }} />
-                    <Text size="xs" color="muted" numberOfLines={1} style={{ flex: 1 }}>
-                      {liveSteps.at(-1) ?? 'Working on it'}
-                    </Text>
-                  </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
+                  {liveSteps.length > 0 ? <Steps steps={liveSteps} /> : null}
+                  {draft ? (
+                    <AgentText text={draft} />
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.7 }] }} />
+                      <Text size="xs" color="muted" numberOfLines={1} style={{ flex: 1 }}>
+                        {liveSteps.length ? 'Reading the results' : 'Looking into it'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
             ) : null}
             {error ? (
-              <Text size="sm" color="#dc2626">
-                {error}
-              </Text>
+              <View style={[styles.errorRow, { borderColor: theme.borderSubtle }]}>
+                <View style={styles.errorDot} />
+                <Text size="sm" style={{ flex: 1 }}>
+                  {error.message}
+                </Text>
+                {error.retry ? (
+                  <PressableScale scaleTo={0.95} accessibilityRole="button" onPress={() => void send(error.retry!, { retry: true })}>
+                    <Text size="13" weight="semibold" color="muted">
+                      Retry
+                    </Text>
+                  </PressableScale>
+                ) : null}
+              </View>
             ) : null}
           </ScrollView>
 
@@ -256,22 +290,48 @@ export default function AskScreen() {
                 returnKeyType="send"
                 onSubmitEditing={() => void send(input)}
               />
-              <PressableScale
-                scaleTo={0.92}
-                accessibilityRole="button"
-                accessibilityLabel="Ask"
-                disabled={!input.trim() || running}
-                onPress={() => void send(input)}
-                style={[styles.sendBtn, { backgroundColor: theme.accent, opacity: !input.trim() || running ? 0.3 : 1 }]}>
-                <Icon icon={faArrowUp} size={14} color={theme.onAccent} />
-              </PressableScale>
+              {running ? (
+                <PressableScale
+                  scaleTo={0.92}
+                  accessibilityRole="button"
+                  accessibilityLabel="Stop"
+                  onPress={stop}
+                  style={[styles.sendBtn, { borderWidth: 1, borderColor: theme.border }]}>
+                  <View style={[styles.stopGlyph, { backgroundColor: theme.fg }]} />
+                </PressableScale>
+              ) : (
+                <PressableScale
+                  scaleTo={0.92}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ask"
+                  disabled={!input.trim()}
+                  onPress={() => void send(input)}
+                  style={[styles.sendBtn, { backgroundColor: theme.accent, opacity: input.trim() ? 1 : 0.3 }]}>
+                  <Icon icon={faArrowUp} size={14} color={theme.onAccent} />
+                </PressableScale>
+              )}
             </View>
             <Text size="10" color="muted" style={{ paddingHorizontal: 4 }}>
-              LogBase can read your workspace but can&apos;t change anything yet.
+              {taskId && !threadId ? 'About this task · read-only' : 'Reads your workspace · can’t make changes yet'}
             </Text>
           </View>
         </KeyboardAvoidingView>
       )}
+    </View>
+  );
+}
+
+/** A finished answer's lookups, folded behind a "N lookups" line so the answer stays the focus. */
+function StepsToggle({ steps }: { steps: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ gap: 4 }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={6} onPress={() => setOpen((v) => !v)}>
+        <Text size="11" font="mono" color="muted">
+          {`${open ? '▾' : '▸'} ${steps.length === 1 ? '1 lookup' : `${steps.length} lookups`}`}
+        </Text>
+      </Pressable>
+      {open ? <Steps steps={steps} /> : null}
     </View>
   );
 }
@@ -404,6 +464,10 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 7 },
   answer: { flexDirection: 'row', gap: 10 },
+  bubble: { alignSelf: 'flex-end', maxWidth: '85%', borderRadius: 18, borderBottomRightRadius: 6, paddingHorizontal: 14, paddingVertical: 9 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Radius.xxxl, paddingHorizontal: 12, paddingVertical: 10 },
+  errorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' },
+  stopGlyph: { width: 10, height: 10, borderRadius: 2 },
   composer: { paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2, gap: 6 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderWidth: 1, borderRadius: Radius.xxxl + 4, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
   input: { flex: 1, fontSize: 15, lineHeight: 21, maxHeight: 120, paddingVertical: 6 },

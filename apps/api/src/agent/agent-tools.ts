@@ -37,10 +37,13 @@ export interface AgentToolContext {
   services: AgentToolServices;
   /** Name lookups loaded once per run and shared by every tool call in it. */
   names: () => Promise<NameIndex>;
+  /** Calls already made this run, by tool + arguments — the model sometimes repeats a lookup. */
+  memo: Map<string, Promise<ToolOutcome>>;
 }
 
 export type NameIndex = {
   people: Map<string, string>;
+  roles: Map<string, string>;
   channels: Map<string, { name: string; categoryId: string }>;
   categories: Map<string, string>;
 };
@@ -155,7 +158,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   tool({
     name: "get_workspace",
     description:
-      "The workspace layout: categories (departments) and the channels (lists) inside each, with ids. " +
+      "The workspace layout: categories (departments) and the channels (lists) inside each, with ids. Only needed when " +
+      "the context block says the workspace is too large to list. " +
       "Use it to turn a category or channel name the user mentions into an id for list_tasks.",
     input: emptyInput,
     run: async (ctx) => {
@@ -171,7 +175,8 @@ export const AGENT_TOOLS: AgentTool[] = [
 
   tool({
     name: "list_people",
-    description: "Members of this workspace with their userId and role. Use it to resolve a person's name to a userId.",
+    description:
+      "Members of this workspace with their userId and role. Only needed when the context block doesn't list people.",
     input: emptyInput,
     run: async (ctx) => {
       const rows = await ctx.services.organizations.listMembers(ctx.userId, ctx.organizationId);
@@ -359,6 +364,7 @@ export function createToolContext(
     organizationId,
     timeZone,
     services,
+    memo: new Map(),
     names: () =>
       (names ??= Promise.all([
         services.organizations.listMembers(userId, organizationId),
@@ -366,31 +372,42 @@ export function createToolContext(
         services.departments.list(userId, organizationId),
       ]).then(([members, lists, depts]) => ({
         people: new Map(members.map((m) => [m.userId, m.name])),
+        roles: new Map(members.map((m) => [m.userId, m.role])),
         channels: new Map(lists.map((l) => [l.id, { name: l.name, categoryId: l.departmentId }])),
         categories: new Map(depts.map((d) => [d.id, d.name])),
       }))),
   };
 }
 
-/** Runs one tool call; a service's HTTP error (403, 404…) becomes `{ error }` the model can explain, not a crash. */
-export async function runAgentTool(
-  ctx: AgentToolContext,
-  name: string,
-  rawArgs: unknown,
-): Promise<{ ok: true; result: unknown; label: string } | { ok: false; error: string; label: string }> {
+export type ToolOutcome =
+  | { ok: true; result: unknown; label: string; repeat?: boolean }
+  | { ok: false; error: string; label: string; repeat?: boolean };
+
+/**
+ * Runs one tool call; a service's HTTP error (403, 404…) becomes `{ error }` the model can explain, not a crash.
+ * An identical call already made this run returns the same result without touching the database again.
+ */
+export async function runAgentTool(ctx: AgentToolContext, name: string, rawArgs: unknown): Promise<ToolOutcome> {
   const t = AGENT_TOOLS_BY_NAME.get(name);
   if (!t) return { ok: false, error: `Unknown tool ${name}`, label: "Tried an unknown tool" };
   const parsed = t.input.safeParse(rawArgs ?? {});
   if (!parsed.success) {
-    return { ok: false, error: `Invalid arguments: ${parsed.error.issues.map((i) => i.message).join("; ")}`, label: "Retried a lookup" };
+    return { ok: false, error: `Invalid arguments: ${parsed.error.issues.map((i) => i.message).join("; ")}`, label: "Adjusted a lookup" };
   }
-  try {
-    const result = await t.run(ctx, parsed.data);
-    return { ok: true, result, label: t.label(parsed.data, result) };
-  } catch (err) {
-    if (err instanceof HttpException) return { ok: false, error: err.message, label: "A lookup was not allowed" };
-    throw err;
-  }
+  const key = `${name}:${JSON.stringify(parsed.data)}`;
+  const seen = ctx.memo.get(key);
+  if (seen) return { ...(await seen), repeat: true };
+  const outcome = (async (): Promise<ToolOutcome> => {
+    try {
+      const result = await t.run(ctx, parsed.data);
+      return { ok: true, result, label: t.label(parsed.data, result) };
+    } catch (err) {
+      if (err instanceof HttpException) return { ok: false, error: err.message, label: "A lookup was not allowed" };
+      throw err;
+    }
+  })();
+  ctx.memo.set(key, outcome);
+  return outcome;
 }
 
 /** Zod → the OpenAPI-subset schema Gemini's `functionDeclarations.parameters` accepts. Covers the shapes used above. */
