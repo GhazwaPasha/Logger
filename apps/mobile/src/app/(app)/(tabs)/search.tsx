@@ -7,7 +7,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import { LogoMark } from '@/components/logo-mark';
+import { AiIcon } from '@/components/agent/ai-icon';
 import { PageEnter } from '@/components/page';
 import { useCollapseOnScroll, useTabBar, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { Text } from '@/components/text';
@@ -105,7 +105,7 @@ export default function SearchScreen() {
             <Section title="Ask">
               <Row
                 first
-                icon={<LogoMark size={22} />}
+                icon={<AiIcon size={20} />}
                 onPress={() => {
                   if (needle) remember();
                   router.push(needle ? { pathname: '/ask', params: { q: searchQuery.trim() } } : '/ask');

@@ -1,10 +1,17 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createRemoteJWKSet, errors as joseErrors, jwtVerify, type JWTPayload } from "jose";
 import { ApiException, tokenExpired, tokenInvalid } from "../common/api-error";
 
+/**
+ * jose's default JWKS timeout is 5s. Production's web app answers in milliseconds, but `next dev` compiles the
+ * JWKS route on its first hit, which regularly takes longer, so every request after a restart failed locally
+ * with "Authentication is temporarily unavailable".
+ */
+const JWKS_TIMEOUT_MS = process.env.NODE_ENV === "production" ? 5_000 : 30_000;
+
 @Injectable()
-export class AuthService {
+export class AuthService implements OnApplicationBootstrap {
   private readonly log = new Logger(AuthService.name);
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
@@ -13,9 +20,20 @@ export class AuthService {
   private getJwks() {
     if (!this.jwks) {
       const url = this.config.getOrThrow<string>("AUTH_JWKS_URL");
-      this.jwks = createRemoteJWKSet(new URL(url));
+      this.jwks = createRemoteJWKSet(new URL(url), { timeoutDuration: JWKS_TIMEOUT_MS });
     }
     return this.jwks;
+  }
+
+  /**
+   * Locally, ask the web app for its keys once at startup so `next dev` compiles the route before the first
+   * real request needs it. Best effort: a miss just means the first request fetches as usual.
+   */
+  onApplicationBootstrap() {
+    if (process.env.NODE_ENV === "production") return;
+    const url = this.config.get<string>("AUTH_JWKS_URL");
+    if (!url) return;
+    void fetch(url, { signal: AbortSignal.timeout(JWKS_TIMEOUT_MS) }).catch(() => undefined);
   }
 
   private getIssuerAndAudience(): { issuer: string | string[]; audience: string | string[] } {

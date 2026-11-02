@@ -28,6 +28,19 @@ export class AgentController {
     return this.agent.patchThread(user.id, threadId, body);
   }
 
+  /** Runs the proposed change as the caller. Only the person it was proposed to can approve it. */
+  @Post("agent/proposals/:proposalId/approve")
+  @HttpCode(200)
+  approveProposal(@CurrentUser() user: RequestUser, @Param("proposalId") proposalId: string) {
+    return this.agent.approveProposal(user.id, proposalId);
+  }
+
+  @Post("agent/proposals/:proposalId/reject")
+  @HttpCode(200)
+  rejectProposal(@CurrentUser() user: RequestUser, @Param("proposalId") proposalId: string) {
+    return this.agent.rejectProposal(user.id, proposalId);
+  }
+
   @Delete("agent/threads/:threadId")
   @HttpCode(204)
   deleteThread(@CurrentUser() user: RequestUser, @Param("threadId") threadId: string) {

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -21,20 +21,30 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   formatZonedDateKey,
   type AgentMessage,
+  type AgentProposal,
   type AgentThreadDetail,
   type AgentThreadSummary,
+  type AskAgentInput,
 } from "@work-ledger/contracts";
-import { LogBaseMark } from "@/components/brand/LogBaseMark";
+import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { POP_EASE } from "@/components/ui/motion-presets";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ApiError, apiJson, apiVoid } from "@/lib/api";
 import { agentKeys, streamAsk } from "@/lib/agent";
-import { AgentText } from "./AgentText";
+import { pathAfterWorkspace } from "@/lib/workspace-url";
+import { WORK_BOARD_SCOPE_EVENT, readWorkBoardScope, type WorkBoardScope } from "@/lib/work-board-scope";
+import { AiIcon } from "./AiIcon";
+import { AgentText, type TaskCardInfo } from "./AgentText";
 
 type OpenAskOptions = { prompt?: string; taskId?: string; send?: boolean };
+export type TaskRef = { id: string; title: string };
+/** What the user is looking at, as sent with a question so "what's late?" means late *here*. */
+type BoardView = NonNullable<AskAgentInput["view"]>;
 
-type ChatMessage = Pick<AgentMessage, "id" | "role" | "content" | "steps">;
+const TASK_LINK_RE = /\(task:([0-9a-f-]{36})\)/g;
+
+type ChatMessage = Pick<AgentMessage, "id" | "role" | "content" | "steps" | "proposals">;
 type SearchHit = { id: string; title: string; status: string };
 
 type AskState = {
@@ -49,6 +59,14 @@ type AskState = {
   draft: string;
   running: boolean;
   error: { message: string; retry: string | null } | null;
+  /** Tasks picked on the board that the next questions are about ("these"). */
+  selection: TaskRef[];
+  /** The user dismissed the "viewing" chip: ask about the whole workspace instead. */
+  scopeOff: boolean;
+  /** Highlight the tasks the latest answer mentions on the board beside the pane. */
+  showOnBoard: boolean;
+  /** Changes proposed during the run in progress (they move onto the answer when it lands). */
+  liveProposals: AgentProposal[];
 };
 
 type AskContextValue = AskState & {
@@ -61,6 +79,17 @@ type AskContextValue = AskState & {
   send: (text: string, opts?: { taskId?: string | null; fresh?: boolean; retry?: boolean }) => Promise<void>;
   stop: () => void;
   forgetThread: (id: string) => void;
+  /** The current page / board scope (null on workspace-wide pages). */
+  boardView: BoardView | null;
+  setScopeOff: (off: boolean) => void;
+  /** Opens the pane about these tasks; with a prompt, asks straight away. */
+  askAboutSelection: (tasks: TaskRef[], prompt?: string) => void;
+  clearSelection: () => void;
+  /** Task ids the latest answer mentions, when "Show on board" is on and the pane is open. */
+  highlightIds: ReadonlySet<string>;
+  setShowOnBoard: (on: boolean) => void;
+  /** Approve (runs the change as you) or reject a proposal card. */
+  decideProposal: (id: string, action: "approve" | "reject") => Promise<void>;
 };
 
 const AskContext = createContext<AskContextValue | null>(null);
@@ -91,7 +120,13 @@ const EMPTY: AskState = {
   draft: "",
   running: false,
   error: null,
+  selection: [],
+  scopeOff: false,
+  showOnBoard: true,
+  liveProposals: [],
 };
+
+const NO_IDS: ReadonlySet<string> = new Set();
 
 /**
  * Owns the Ask LogBase conversation. The pane itself is rendered by the workspace shell next to `<main>`
@@ -99,8 +134,39 @@ const EMPTY: AskState = {
  */
 export function AskProvider({ children }: { children: ReactNode }) {
   const { workspaceId } = useWorkspaceRoute();
+  const { lists, depts } = useWorkspaceData();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [state, setState] = useState<AskState>(EMPTY);
+
+  // The board's category / channel lives in session storage and announces changes with an event.
+  const [boardScope, setBoardScope] = useState<WorkBoardScope | null>(() => readWorkBoardScope(workspaceId));
+  useEffect(() => {
+    const sync = () => setBoardScope(readWorkBoardScope(workspaceId));
+    window.addEventListener(WORK_BOARD_SCOPE_EVENT, sync);
+    return () => window.removeEventListener(WORK_BOARD_SCOPE_EVENT, sync);
+  }, [workspaceId]);
+
+  const boardView = useMemo<BoardView | null>(() => {
+    const page = pathAfterWorkspace(pathname).split("/")[1] ?? "";
+    if (page === "work") {
+      const list = boardScope?.listId ? lists.find((l) => l.id === boardScope.listId) : undefined;
+      const deptId = list?.departmentId ?? boardScope?.levelId ?? undefined;
+      const dept = deptId ? depts.find((d) => d.id === deptId) : undefined;
+      if (list) return { label: dept ? `${dept.name} › ${list.name}` : list.name, channelId: list.id, categoryId: dept?.id };
+      if (dept) return { label: dept.name, categoryId: dept.id };
+      return null;
+    }
+    if (page === "my-tasks") return { label: "My tasks (assigned to me)" };
+    if (page === "calendar") return { label: "Calendar" };
+    if (page === "roadmap") return { label: "Roadmap" };
+    if (page === "performance") return { label: "Performance" };
+    return null;
+  }, [pathname, boardScope, lists, depts]);
+  const boardViewRef = useRef(boardView);
+  useLayoutEffect(() => {
+    boardViewRef.current = boardView;
+  });
   // Callbacks read the latest state through this ref so their identities stay stable across streaming updates.
   const stateRef = useRef(state);
   useLayoutEffect(() => {
@@ -142,6 +208,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
         running: true,
         error: null,
         liveSteps: [],
+        liveProposals: [],
         draft: "",
         messages: isRetry
           ? prev.messages
@@ -151,10 +218,17 @@ export function AskProvider({ children }: { children: ReactNode }) {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       const steps: string[] = [];
+      const proposals: AgentProposal[] = [];
       try {
         await streamAsk(
           workspaceId,
-          { message, threadId: threadId ?? undefined, taskId },
+          {
+            message,
+            threadId: threadId ?? undefined,
+            taskId,
+            view: s.scopeOff ? undefined : (boardViewRef.current ?? undefined),
+            selection: s.selection.length ? s.selection : undefined,
+          },
           (e) => {
             if (ctrl.signal.aborted) return;
             if (e.type === "thread") {
@@ -165,12 +239,28 @@ export function AskProvider({ children }: { children: ReactNode }) {
               setState((prev) => ({ ...prev, liveSteps: [...steps], draft: "" }));
             } else if (e.type === "delta") {
               setState((prev) => ({ ...prev, draft: prev.draft + e.text }));
+            } else if (e.type === "proposal") {
+              proposals.push(e.proposal);
+              setState((prev) => ({ ...prev, liveProposals: [...proposals] }));
             } else if (e.type === "answer") {
+              // The answer is final: drop the "working" turn now rather than when the stream closes a beat later.
               setState((prev) => ({
                 ...prev,
                 title: e.title,
                 draft: "",
-                messages: [...prev.messages, { id: e.messageId, role: "assistant", content: e.text, steps: steps.map((label) => ({ label })) }],
+                running: false,
+                liveSteps: [],
+                liveProposals: [],
+                messages: [
+                  ...prev.messages,
+                  {
+                    id: e.messageId,
+                    role: "assistant",
+                    content: e.text,
+                    steps: steps.map((label) => ({ label })),
+                    proposals: proposals.length ? [...proposals] : undefined,
+                  },
+                ],
               }));
             } else if (e.type === "error") {
               patch({ error: { message: e.message, retry: message } });
@@ -185,7 +275,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
       } finally {
         if (abortRef.current === ctrl) {
           abortRef.current = null;
-          setState((prev) => ({ ...prev, running: false, liveSteps: [], draft: "" }));
+          setState((prev) => ({ ...prev, running: false, liveSteps: [], liveProposals: [], draft: "" }));
         }
         void queryClient.invalidateQueries({ queryKey: agentKeys.threads(workspaceId) });
       }
@@ -247,9 +337,53 @@ export function AskProvider({ children }: { children: ReactNode }) {
     [newChat],
   );
 
-  // ⌘K / Ctrl+K: open and focus; pressed again while typing in the pane, close it.
+  const decideProposal = useCallback<AskContextValue["decideProposal"]>(
+    async (id, action) => {
+      const swap = (next: AgentProposal) =>
+        setState((prev) => ({
+          ...prev,
+          liveProposals: prev.liveProposals.map((x) => (x.id === id ? next : x)),
+          messages: prev.messages.map((m) =>
+            m.proposals?.some((x) => x.id === id) ? { ...m, proposals: m.proposals.map((x) => (x.id === id ? next : x)) } : m,
+          ),
+        }));
+      try {
+        const next = await apiJson<AgentProposal>(`/agent/proposals/${id}/${action}`, { method: "POST" });
+        swap(next);
+      } catch (err) {
+        patch({ error: { message: err instanceof Error ? err.message : "Couldn't apply that change.", retry: null } });
+        throw err;
+      }
+    },
+    [patch],
+  );
+
+  const askAboutSelection = useCallback<AskContextValue["askAboutSelection"]>(
+    (tasks, prompt) => {
+      const s = stateRef.current;
+      // A new set of tasks is a new subject: start a fresh conversation about them.
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setState({ ...EMPTY, open: true, selection: tasks, showOnBoard: s.showOnBoard });
+      stateRef.current = { ...EMPTY, open: true, selection: tasks, showOnBoard: s.showOnBoard };
+      if (prompt) void send(prompt, { fresh: true });
+      else focusInput();
+    },
+    [send, focusInput],
+  );
+
+  // ⌘K / Ctrl+K: open and focus; pressed again while typing in the pane, close it. "/" opens it from anywhere
+  // you're not already typing.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        patch({ open: true });
+        focusInput();
+        return;
+      }
       if (!((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) return;
       e.preventDefault();
       const inPane = document.activeElement?.closest("[data-ask-pane]");
@@ -265,9 +399,30 @@ export function AskProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // Tasks the latest answer mentions — highlighted on the board while the pane is open.
+  const highlightIds = useMemo<ReadonlySet<string>>(() => {
+    if (!state.open || !state.showOnBoard) return NO_IDS;
+    const last = [...state.messages].reverse().find((m) => m.role === "assistant");
+    const text = state.running && state.draft ? state.draft : (last?.content ?? "");
+    const ids = new Set<string>();
+    for (const m of text.matchAll(TASK_LINK_RE)) ids.add(m[1]!);
+    for (const t of state.selection) ids.add(t.id);
+    for (const pr of [...(last?.proposals ?? []), ...state.liveProposals]) {
+      if (pr.status === "pending") for (const it of pr.items) ids.add(it.taskId);
+    }
+    return ids.size ? ids : NO_IDS;
+  }, [state.open, state.showOnBoard, state.messages, state.running, state.draft, state.selection, state.liveProposals]);
+
   const value = useMemo<AskContextValue>(
     () => ({
       ...state,
+      boardView,
+      highlightIds,
+      askAboutSelection,
+      decideProposal,
+      setScopeOff: (scopeOff) => patch({ scopeOff }),
+      clearSelection: () => patch({ selection: [] }),
+      setShowOnBoard: (showOnBoard) => patch({ showOnBoard }),
       openAsk,
       toggleAsk,
       close,
@@ -278,7 +433,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
       stop,
       forgetThread,
     }),
-    [state, openAsk, toggleAsk, close, patch, newChat, loadThread, send, stop, forgetThread],
+    [state, boardView, highlightIds, askAboutSelection, decideProposal, openAsk, toggleAsk, close, patch, newChat, loadThread, send, stop, forgetThread],
   );
 
   return (
@@ -347,6 +502,14 @@ export function AskPane() {
     }
   };
 
+  // Other right-edge surfaces (the task details overlay) read this to sit beside the pane, not under it.
+  const docked = !!ask?.open && !isMobile;
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--ask-pane-w", docked ? `${width}px` : "0px");
+    return () => root.style.setProperty("--ask-pane-w", "0px");
+  }, [docked, width]);
+
   if (!ask) return null;
 
   if (isMobile) {
@@ -361,7 +524,7 @@ export function AskPane() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: reduceMotion ? 0 : 0.18, ease: POP_EASE }}
-            className="fixed inset-x-0 bottom-0 top-14 z-[45] flex flex-col bg-[var(--surface-base)]"
+            className="fixed inset-x-0 bottom-0 top-14 z-[70] flex flex-col bg-[var(--surface-base)]"
           >
             <AskChrome compact />
           </motion.aside>
@@ -426,7 +589,7 @@ function AskChrome({ compact }: { compact?: boolean }) {
   return (
     <>
       <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] pl-3.5 pr-1.5">
-        <LogBaseMark size={16} decorative />
+        <AiIcon className="size-4 text-[var(--fg)]" />
         <p className="ml-1 min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={heading}>
           {heading}
         </p>
@@ -464,6 +627,18 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const onNavigate = closeOnNavigate ? ask.close : undefined;
+  const { tasks, members } = useWorkspaceData();
+  const taskInfo = useMemo(() => {
+    const names = new Map(members.map((m) => [m.userId, { name: m.name || m.email, image: m.image ?? null }]));
+    const byId = new Map(tasks.map((t) => [t.id, t]));
+    return (id: string): TaskCardInfo | null => {
+      const t = byId.get(id);
+      if (!t) return null;
+      const who = t.assigneeUserIds?.[0] ? names.get(t.assigneeUserIds[0]) : undefined;
+      return { title: t.title, status: t.status, dueAt: t.dueAt, assignee: who?.name ?? null, assigneeImage: who?.image ?? null };
+    };
+  }, [tasks, members]);
+  const lastAnswerId = [...ask.messages].reverse().find((m) => m.role === "assistant")?.id;
 
   const isEmpty = ask.messages.length === 0 && !ask.running && !ask.error;
   const query = useDebounced(input.trim(), 220);
@@ -524,11 +699,28 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
               m.role === "user" ? (
                 <UserBubble key={m.id} text={m.content} />
               ) : (
-                <AssistantTurn key={m.id} steps={m.steps?.map((s) => s.label) ?? []} text={m.content} taskHref={taskHref} onNavigate={onNavigate} />
+                <AssistantTurn
+                  key={m.id}
+                  steps={m.steps?.map((s) => s.label) ?? []}
+                  text={m.content}
+                  taskHref={taskHref}
+                  taskInfo={taskInfo}
+                  onNavigate={onNavigate}
+                  latest={m.id === lastAnswerId && !ask.running}
+                  proposals={m.proposals}
+                />
               ),
             )}
             {ask.running && (
-              <AssistantTurn live steps={ask.liveSteps} text={ask.draft} taskHref={taskHref} onNavigate={onNavigate} />
+              <AssistantTurn
+                live
+                steps={ask.liveSteps}
+                text={ask.draft}
+                taskHref={taskHref}
+                taskInfo={taskInfo}
+                onNavigate={onNavigate}
+                proposals={ask.liveProposals}
+              />
             )}
             {ask.error && (
               <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5 text-[13px]">
@@ -556,6 +748,7 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
           submit();
         }}
       >
+        <ContextChips />
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] transition-colors focus-within:border-[color-mix(in_srgb,var(--muted)_60%,var(--border))]">
           <textarea
             ref={inputRef}
@@ -584,7 +777,7 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
             <p className="truncate pl-1 text-[11px] text-[var(--muted)]">
-              {ask.taskId && !ask.threadId ? "About this task · read-only" : "Reads your workspace · can't make changes yet"}
+              {ask.taskId && !ask.threadId ? "About this task · changes need your approval" : "Changes only happen when you approve them"}
             </p>
             {ask.running ? (
               <button
@@ -616,6 +809,192 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
   );
 }
 
+/**
+ * What the next question is about: the page / board scope the user is on (dismissable, to ask about the whole
+ * workspace instead) and any tasks picked on the board.
+ */
+function ContextChips() {
+  const ask = useAsk()!;
+  const view = ask.scopeOff ? null : ask.boardView;
+  if (!view && !ask.selection.length && !(ask.boardView && ask.scopeOff)) return null;
+  return (
+    <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
+      {ask.selection.length > 0 && (
+        <Chip
+          label={ask.selection.length === 1 ? ask.selection[0]!.title : `${ask.selection.length} selected tasks`}
+          title={ask.selection.map((t) => t.title).join("\n")}
+          icon={<path d="M5 10.5 8.5 14 15 6.5" />}
+          onRemove={ask.clearSelection}
+        />
+      )}
+      {view ? (
+        <Chip
+          label={view.label}
+          title="Questions are about this view. Remove to ask about the whole workspace."
+          icon={<path d="M3 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Zm7 2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />}
+          onRemove={() => ask.setScopeOff(true)}
+        />
+      ) : ask.boardView && ask.scopeOff ? (
+        <button
+          type="button"
+          onClick={() => ask.setScopeOff(false)}
+          className="rounded-full px-2 py-0.5 text-[11px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+        >
+          Whole workspace · use {ask.boardView.label}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function Chip({ label, title, icon, onRemove }: { label: string; title: string; icon: ReactNode; onRemove: () => void }) {
+  return (
+    <span
+      title={title}
+      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] py-0.5 pl-2 pr-0.5 text-[11px] text-[var(--fg)]"
+    >
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="size-3 shrink-0 text-[var(--muted)]" aria-hidden>
+        {icon}
+      </svg>
+      <span className="truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+      >
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="size-2.5" aria-hidden>
+          <path d="M6 6l8 8m0-8-8 8" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
+const PROPOSAL_STATE: Record<AgentProposal["status"], { label: string; tone: string }> = {
+  pending: { label: "Needs your approval", tone: "text-sky-500 dark:text-sky-400" },
+  applied: { label: "Applied", tone: "text-emerald-600 dark:text-emerald-400" },
+  partial: { label: "Partly applied", tone: "text-amber-600 dark:text-amber-400" },
+  failed: { label: "Couldn't apply", tone: "text-red-600 dark:text-red-400" },
+  rejected: { label: "Rejected", tone: "text-[var(--muted)]" },
+  expired: { label: "Expired", tone: "text-[var(--muted)]" },
+};
+const PROPOSAL_PREVIEW = 4;
+
+/**
+ * One change the agent wants to make: what changes on which tasks (before → after), and Approve / Reject.
+ * Nothing happens until Approve; then it runs as you and the card shows how each task went.
+ */
+function ProposalCard({
+  proposal,
+  taskHref,
+  onNavigate,
+}: {
+  proposal: AgentProposal;
+  taskHref: (id: string) => string;
+  onNavigate?: () => void;
+}) {
+  const ask = useAsk()!;
+  const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const pending = proposal.status === "pending";
+  const state = PROPOSAL_STATE[proposal.status];
+  const outcome = new Map((proposal.result ?? []).map((r) => [r.taskId, r]));
+  const rows = expanded ? proposal.items : proposal.items.slice(0, PROPOSAL_PREVIEW);
+  const isComment = proposal.kind === "comment";
+
+  const decide = async (action: "approve" | "reject") => {
+    setBusy(action);
+    try {
+      await ask.decideProposal(proposal.id, action);
+    } catch {
+      /* the pane shows the error */
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div
+      className={`overflow-hidden rounded-xl border bg-[var(--surface-base)] ${pending ? "border-sky-500/40" : "border-[var(--border-subtle)]"}`}
+    >
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
+        <AiIcon className={`size-3.5 shrink-0 ${pending ? "text-sky-400" : "text-[var(--muted)]"}`} />
+        <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]">{proposal.summary}</p>
+        <span className={`shrink-0 text-[11px] font-medium ${state.tone}`}>{state.label}</span>
+      </div>
+
+      <ul className="divide-y divide-[var(--border-subtle)]">
+        {rows.map((it) => {
+          const res = outcome.get(it.taskId);
+          return (
+            <li key={it.taskId} className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                {res && (
+                  <span
+                    className={`size-1.5 shrink-0 rounded-full ${res.ok ? "bg-emerald-500" : "bg-red-500"}`}
+                    title={res.ok ? "Done" : res.error}
+                    aria-hidden
+                  />
+                )}
+                <Link
+                  href={taskHref(it.taskId)}
+                  onClick={onNavigate}
+                  className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)] hover:underline"
+                >
+                  {it.title}
+                </Link>
+              </div>
+              {isComment ? (
+                <p className="mt-1 whitespace-pre-wrap rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] leading-relaxed text-[var(--fg)]">
+                  {it.to}
+                </p>
+              ) : (
+                <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                  <span className="truncate line-through decoration-[var(--border)]">{it.from ?? "None"}</span>
+                  <span aria-hidden>→</span>
+                  <span className="truncate font-medium text-[var(--fg)]">{it.to}</span>
+                </p>
+              )}
+              {res && !res.ok && <p className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{res.error}</p>}
+            </li>
+          );
+        })}
+      </ul>
+      {proposal.items.length > PROPOSAL_PREVIEW && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full border-t border-[var(--border-subtle)] px-3 py-1.5 text-left text-[11px] text-[var(--muted)] hover:text-[var(--fg)]"
+        >
+          {expanded ? "Show fewer" : `Show all ${proposal.items.length}`}
+        </button>
+      )}
+
+      {pending && (
+        <div className="flex items-center justify-end gap-1.5 border-t border-[var(--border-subtle)] px-2.5 py-2">
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => void decide("reject")}
+            className="rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] disabled:opacity-50"
+          >
+            {busy === "reject" ? "Rejecting…" : "Reject"}
+          </button>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => void decide("approve")}
+            className="rounded-lg bg-[var(--accent)] px-3 py-1 text-xs font-semibold text-[var(--on-accent)] transition-[opacity,transform] active:scale-[0.97] disabled:opacity-60"
+          >
+            {busy === "approve" ? "Applying…" : proposal.items.length > 1 ? `Approve ${proposal.items.length}` : "Approve"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UserBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-end">
@@ -630,15 +1009,24 @@ function AssistantTurn({
   steps,
   text,
   live,
+  latest,
   taskHref,
+  taskInfo,
   onNavigate,
+  proposals,
 }: {
   steps: string[];
   text: string;
   live?: boolean;
+  /** The newest finished answer: it alone offers "Show on board" (the board highlights follow it). */
+  latest?: boolean;
   taskHref: (id: string) => string;
+  taskInfo: (id: string) => TaskCardInfo | null;
   onNavigate?: () => void;
+  proposals?: AgentProposal[];
 }) {
+  const ask = useAsk()!;
+  const mentioned = latest ? new Set([...text.matchAll(TASK_LINK_RE)].map((m) => m[1]!)).size : 0;
   const [showSteps, setShowSteps] = useState(false);
   const [copied, setCopied] = useState(false);
   const waiting = live && !text;
@@ -646,7 +1034,9 @@ function AssistantTurn({
   return (
     <div className="group/turn flex gap-3">
       <span className="mt-0.5 shrink-0">
-        <LogBaseMark size={18} decorative />
+        <span className="flex size-6 items-center justify-center rounded-full bg-[var(--surface-elevated)] text-[var(--fg)]">
+          <AiIcon className="size-3.5" />
+        </span>
       </span>
       <div className="min-w-0 flex-1 space-y-2">
         {live ? (
@@ -693,9 +1083,23 @@ function AssistantTurn({
             </div>
           )
         )}
-        {text && <AgentText text={text} taskHref={taskHref} onNavigate={onNavigate} />}
+        {text && <AgentText text={text} taskHref={taskHref} taskInfo={taskInfo} onNavigate={onNavigate} />}
+        {proposals?.map((pr) => <ProposalCard key={pr.id} proposal={pr} taskHref={taskHref} onNavigate={onNavigate} />)}
         {!live && text && (
-          <div className="flex h-6 items-center opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/turn:opacity-100">
+          <div className="flex h-6 items-center gap-1">
+            {mentioned > 0 && (
+              <button
+                type="button"
+                aria-pressed={ask.showOnBoard}
+                onClick={() => ask.setShowOnBoard(!ask.showOnBoard)}
+                title="Highlight these tasks on the board"
+                className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors hover:bg-[var(--surface-hover)] ${ask.showOnBoard ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}
+              >
+                <span className={`size-1.5 rounded-full ${ask.showOnBoard ? "bg-sky-400" : "bg-[var(--border)]"}`} aria-hidden />
+                {ask.showOnBoard ? `Showing ${mentioned} on board` : `Show ${mentioned} on board`}
+              </button>
+            )}
+            <span className="flex items-center opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/turn:opacity-100">
             <button
               type="button"
               onClick={() => {
@@ -711,6 +1115,7 @@ function AssistantTurn({
             >
               {copied ? "Copied" : "Copy"}
             </button>
+            </span>
           </div>
         )}
       </div>
@@ -722,7 +1127,9 @@ function EmptyState({ fromTask, onSuggestion }: { fromTask: boolean; onSuggestio
   return (
     <div className="flex h-full flex-col justify-end gap-4 pb-2">
       <div className="space-y-1.5">
-        <LogBaseMark size={28} decorative />
+        <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-[var(--fg)]">
+          <AiIcon className="size-5" />
+        </span>
         <p className="pt-1 text-[15px] font-semibold text-[var(--fg)]">{fromTask ? "Ask about this task" : "Ask LogBase"}</p>
         <p className="text-[13px] leading-relaxed text-[var(--muted)]">
           {fromTask

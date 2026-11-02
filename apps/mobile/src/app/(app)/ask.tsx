@@ -1,7 +1,13 @@
 import { faArrowUp, faClockRotateLeft, faPen, faThumbtack, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatZonedDateKey, type AgentMessage, type AgentThreadDetail, type AgentThreadSummary } from '@work-ledger/contracts';
-import { useLocalSearchParams } from 'expo-router';
+import {
+  formatZonedDateKey,
+  type AgentMessage,
+  type AgentProposal,
+  type AgentThreadDetail,
+  type AgentThreadSummary,
+} from '@work-ledger/contracts';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AgentText } from '@/components/agent/agent-text';
 import { Icon } from '@/components/icon';
-import { LogoMark } from '@/components/logo-mark';
+import { AiIcon } from '@/components/agent/ai-icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
@@ -29,7 +35,7 @@ import { agentKeys, streamAsk } from '@/lib/agent';
 import { api } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace';
 
-type ChatMessage = Pick<AgentMessage, 'id' | 'role' | 'content' | 'steps'>;
+type ChatMessage = Pick<AgentMessage, 'id' | 'role' | 'content' | 'steps' | 'proposals'>;
 
 const SUGGESTIONS = ["What's overdue right now?", "What's due for me this week?", 'What changed today?'];
 const TASK_SUGGESTIONS = ['Summarize this task', "What's still left to do?", 'Who changed what recently?'];
@@ -54,6 +60,8 @@ export default function AskScreen() {
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
   /** Answer text streamed so far; a later tool step means it was a preamble and is dropped. */
   const [draft, setDraft] = useState('');
+  /** Changes proposed during the run in progress; they move onto the answer when it lands. */
+  const [liveProposals, setLiveProposals] = useState<AgentProposal[]>([]);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<{ message: string; retry: string | null } | null>(null);
   const [input, setInput] = useState('');
@@ -97,6 +105,8 @@ export default function AskScreen() {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       const steps: string[] = [];
+      const proposals: AgentProposal[] = [];
+      setLiveProposals([]);
       try {
         await streamAsk(
           orgId,
@@ -112,10 +122,26 @@ export default function AskScreen() {
               setDraft('');
             } else if (e.type === 'delta') {
               setDraft((d) => d + e.text);
+            } else if (e.type === 'proposal') {
+              proposals.push(e.proposal);
+              setLiveProposals([...proposals]);
             } else if (e.type === 'answer') {
+              // The answer is final: drop the working turn now rather than when the stream closes a beat later.
+              setRunning(false);
+              setLiveSteps([]);
               setTitle(e.title);
               setDraft('');
-              setMessages((m) => [...m, { id: e.messageId, role: 'assistant', content: e.text, steps: steps.map((label) => ({ label })) }]);
+              setLiveProposals([]);
+              setMessages((m) => [
+                ...m,
+                {
+                  id: e.messageId,
+                  role: 'assistant',
+                  content: e.text,
+                  steps: steps.map((label) => ({ label })),
+                  proposals: proposals.length ? [...proposals] : undefined,
+                },
+              ]);
             } else if (e.type === 'error') {
               setError({ message: e.message, retry: message });
             }
@@ -129,6 +155,7 @@ export default function AskScreen() {
           abortRef.current = null;
           setRunning(false);
           setLiveSteps([]);
+          setLiveProposals([]);
           setDraft('');
           void queryClient.invalidateQueries({ queryKey: agentKeys.threads(orgId) });
         }
@@ -136,6 +163,17 @@ export default function AskScreen() {
     },
     [running, orgId, threadId, taskId, queryClient],
   );
+
+  const decideProposal = useCallback(async (id: string, action: 'approve' | 'reject') => {
+    try {
+      const next = await api<AgentProposal>(`/agent/proposals/${id}/${action}`, { method: 'POST' });
+      const swap = (list?: AgentProposal[]) => list?.map((x) => (x.id === id ? next : x));
+      setLiveProposals((l) => swap(l) ?? l);
+      setMessages((ms) => ms.map((m) => (m.proposals?.some((x) => x.id === id) ? { ...m, proposals: swap(m.proposals) } : m)));
+    } catch (err) {
+      setError({ message: err instanceof Error ? err.message : "Couldn't apply that change.", retry: null });
+    }
+  }, []);
 
   const loadThread = useCallback(
     async (id: string) => {
@@ -229,11 +267,12 @@ export default function AskScreen() {
                 ) : (
                   <Animated.View key={m.id} entering={FadeIn.duration(180)} style={styles.answer}>
                     <View style={{ paddingTop: 2 }}>
-                      <LogoMark size={18} />
+                      <AiIcon size={16} />
                     </View>
                     <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
                       {m.steps?.length ? <StepsToggle steps={m.steps.map((s) => s.label)} /> : null}
                       <AgentText text={m.content} />
+                      {m.proposals?.map((pr) => <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />)}
                     </View>
                   </Animated.View>
                 ),
@@ -242,10 +281,13 @@ export default function AskScreen() {
             {running ? (
               <View style={styles.answer}>
                 <View style={{ paddingTop: 2 }}>
-                  <LogoMark size={18} />
+                  <AiIcon size={16} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
                   {liveSteps.length > 0 ? <Steps steps={liveSteps} /> : null}
+                  {liveProposals.map((pr) => (
+                    <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />
+                  ))}
                   {draft ? (
                     <AgentText text={draft} />
                   ) : (
@@ -312,11 +354,99 @@ export default function AskScreen() {
               )}
             </View>
             <Text size="10" color="muted" style={{ paddingHorizontal: 4 }}>
-              {taskId && !threadId ? 'About this task · read-only' : 'Reads your workspace · can’t make changes yet'}
+              {taskId && !threadId ? 'About this task · changes need your approval' : 'Changes only happen when you approve them'}
             </Text>
           </View>
         </KeyboardAvoidingView>
       )}
+    </View>
+  );
+}
+
+const PROPOSAL_STATE: Record<AgentProposal['status'], { label: string; color: string }> = {
+  pending: { label: 'Needs your approval', color: '#38bdf8' },
+  applied: { label: 'Applied', color: '#10b981' },
+  partial: { label: 'Partly applied', color: '#f59e0b' },
+  failed: { label: "Couldn't apply", color: '#ef4444' },
+  rejected: { label: 'Rejected', color: 'muted' },
+  expired: { label: 'Expired', color: 'muted' },
+};
+
+/** A change the agent wants to make: before → after per task, and Approve / Reject. Nothing happens until Approve. */
+function ProposalCard({ proposal, onDecide }: { proposal: AgentProposal; onDecide: (id: string, a: 'approve' | 'reject') => Promise<void> }) {
+  const theme = useTheme();
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const pending = proposal.status === 'pending';
+  const state = PROPOSAL_STATE[proposal.status];
+  const outcome = new Map((proposal.result ?? []).map((r) => [r.taskId, r]));
+  const decide = async (a: 'approve' | 'reject') => {
+    setBusy(a);
+    await onDecide(proposal.id, a);
+    setBusy(null);
+  };
+  return (
+    <View style={[styles.proposal, { borderColor: pending ? 'rgba(56,189,248,0.45)' : theme.borderSubtle, backgroundColor: theme.surfaceBase }]}>
+      <View style={[styles.proposalHead, { borderBottomColor: theme.borderSubtle }]}>
+        <AiIcon size={13} color={pending ? '#38bdf8' : 'muted'} />
+        <Text size="13" weight="semibold" numberOfLines={1} style={{ flex: 1 }}>
+          {proposal.summary}
+        </Text>
+        <Text size="11" weight="medium" color={state.color}>
+          {state.label}
+        </Text>
+      </View>
+      {proposal.items.map((it, i) => {
+        const res = outcome.get(it.taskId);
+        return (
+          <Pressable
+            key={it.taskId}
+            onPress={() => router.push({ pathname: '/task/[id]', params: { id: it.taskId } })}
+            style={[styles.proposalRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth * 2, borderTopColor: theme.borderSubtle }]}>
+            <Text size="13" numberOfLines={1}>
+              {res ? (res.ok ? '✓ ' : '✕ ') : ''}
+              {it.title}
+            </Text>
+            {proposal.kind === 'comment' ? (
+              <Text size="13" style={[styles.commentPreview, { backgroundColor: theme.surfaceElevated }]}>
+                {it.to}
+              </Text>
+            ) : (
+              <Text size="11" color="muted" numberOfLines={1}>
+                <Text size="11" color="muted" style={{ textDecorationLine: 'line-through' }}>
+                  {it.from ?? 'None'}
+                </Text>
+                {'  →  '}
+                <Text size="11" weight="semibold">
+                  {it.to}
+                </Text>
+              </Text>
+            )}
+            {res && !res.ok ? (
+              <Text size="11" color="#ef4444">
+                {res.error}
+              </Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+      {pending ? (
+        <View style={[styles.proposalActions, { borderTopColor: theme.borderSubtle }]}>
+          <PressableScale scaleTo={0.96} disabled={!!busy} onPress={() => void decide('reject')} style={styles.proposalBtn}>
+            <Text size="13" weight="medium" color="muted">
+              {busy === 'reject' ? 'Rejecting…' : 'Reject'}
+            </Text>
+          </PressableScale>
+          <PressableScale
+            scaleTo={0.96}
+            disabled={!!busy}
+            onPress={() => void decide('approve')}
+            style={[styles.proposalBtn, { backgroundColor: theme.accent, opacity: busy ? 0.6 : 1 }]}>
+            <Text size="13" weight="semibold" color={theme.onAccent}>
+              {busy === 'approve' ? 'Applying…' : proposal.items.length > 1 ? `Approve ${proposal.items.length}` : 'Approve'}
+            </Text>
+          </PressableScale>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -468,6 +598,12 @@ const styles = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Radius.xxxl, paddingHorizontal: 12, paddingVertical: 10 },
   errorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' },
   stopGlyph: { width: 10, height: 10, borderRadius: 2 },
+  proposal: { borderWidth: 1, borderRadius: Radius.xxxl, overflow: 'hidden' },
+  proposalHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
+  proposalRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 3 },
+  commentPreview: { marginTop: 4, borderRadius: Radius.xl, paddingHorizontal: 10, paddingVertical: 7 },
+  proposalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  proposalBtn: { borderRadius: Radius.xl, paddingHorizontal: 14, paddingVertical: 7 },
   composer: { paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2, gap: 6 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderWidth: 1, borderRadius: Radius.xxxl + 4, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
   input: { flex: 1, fontSize: 15, lineHeight: 21, maxHeight: 120, paddingVertical: 6 },

@@ -5,6 +5,7 @@ import type { Request, Response } from "express";
 import { McpAuthGuard } from "../auth/mcp-auth.guard";
 import { Public } from "../auth/public.decorator";
 import type { RequestUser } from "../auth/jwt-auth.guard";
+import { AuthorizationService } from "../authorization/authorization.service";
 import { CommentsService } from "../comments/comments.service";
 import { DRIZZLE } from "../db/drizzle.constants";
 import { getOrganizationTimeZone } from "../db/org-timezone.util";
@@ -28,6 +29,7 @@ export class McpController {
   constructor(
     @Inject(DRIZZLE) private readonly db: AppDatabase,
     private readonly search: SearchService,
+    private readonly authz: AuthorizationService,
     private readonly performance: PerformanceService,
     private readonly tasks: TasksService,
     private readonly time: TimeService,
@@ -45,6 +47,7 @@ export class McpController {
   async handle(@Req() req: Request & { user: RequestUser }, @Res() res: Response) {
     const server = createMcpServer(req.user.id, {
       search: this.search,
+      authz: this.authz,
       performance: this.performance,
       timeZoneFor: (organizationId) => getOrganizationTimeZone(this.db, organizationId),
       tasks: this.tasks,

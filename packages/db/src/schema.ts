@@ -812,6 +812,46 @@ export const agentMessages = pgTable(
   (t) => [index("agent_messages_thread_created_idx").on(t.threadId, t.createdAt)],
 );
 
+/**
+ * A change the agent proposed in a conversation. Nothing happens until the user approves it; approval runs the
+ * change through the normal task services *as that user*, so permissions and history work exactly as if they'd
+ * made it by hand.
+ */
+export const agentProposals = pgTable(
+  "agent_proposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => agentThreads.id, { onDelete: "cascade" }),
+    /** The assistant message that proposed it; set once that message is saved. */
+    messageId: uuid("message_id").references(() => agentMessages.id, { onDelete: "set null" }),
+    /** `reschedule` | `assign` | `status` | `comment`. */
+    kind: text("kind").notNull(),
+    summary: text("summary").notNull(),
+    /** What the card shows: one row per task, `{ taskId, title, from, to }`. */
+    items: jsonb("items").notNull().$type<{ taskId: string; title: string; from: string | null; to: string }[]>(),
+    /** What approval executes, per task. Shape depends on `kind`. */
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    /** `pending` | `applied` | `partial` | `failed` | `rejected` | `expired`. */
+    status: text("status").notNull().default("pending"),
+    /** Per-task outcome once decided: `{ taskId, ok, error? }[]`. */
+    result: jsonb("result").$type<{ taskId: string; ok: boolean; error?: string }[]>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("agent_proposals_thread_idx").on(t.threadId, t.createdAt),
+    index("agent_proposals_user_status_idx").on(t.userId, t.status),
+  ],
+);
+
 /** Per-organization daily agent usage; the budget check reads one row instead of summing messages. */
 export const agentUsageDaily = pgTable(
   "agent_usage_daily",

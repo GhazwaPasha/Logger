@@ -247,9 +247,12 @@ export function StatusPriorityRing({
   const focused = focus ? (focus.half === "top" ? top : bottom).find((s) => s.key === focus.key) : undefined;
 
   return (
-    <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-center lg:gap-8">
+    // Side-by-side only when *this card* has room (container query), not when the window does — a docked
+    // side pane can make the card narrow on a wide screen, and the legend labels then truncated to nothing.
+    <div className="@container">
+    <div className="flex flex-col items-center gap-6 @[30rem]:flex-row @[30rem]:items-center @[30rem]:justify-center @[44rem]:gap-8">
       <div
-        className="relative aspect-square w-full max-w-[17rem] shrink-0"
+        className="relative aspect-square w-full max-w-[17rem] shrink-0 @[30rem]:w-[45%]"
         role="img"
         aria-label={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
       >
@@ -279,7 +282,7 @@ export function StatusPriorityRing({
         </div>
       </div>
 
-      <div className="w-full min-w-0 max-w-[18rem] space-y-3" onMouseLeave={() => setHover(null)}>
+      <div className="w-full min-w-[12rem] max-w-[18rem] space-y-3" onMouseLeave={() => setHover(null)}>
         <LegendGroup
           title={topTitle}
           half="top"
@@ -300,6 +303,7 @@ export function StatusPriorityRing({
           onPin={setPinned}
         />
       </div>
+    </div>
     </div>
   );
 }

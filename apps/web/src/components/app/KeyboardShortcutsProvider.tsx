@@ -14,6 +14,8 @@ const SHORTCUTS = [
   { group: "Navigation", keys: ["G", "then C"], description: "Go to Calendar" },
   { group: "Tasks", keys: ["N"], description: "Open new task form (Work page)" },
   { group: "Search", keys: ["⌘ K", "or Ctrl K"], description: "Ask or search LogBase" },
+  { group: "Search", keys: ["/"], description: "Ask LogBase" },
+  { group: "Tasks", keys: ["Ctrl", "+ click card"], description: "Select tasks to ask about" },
   { group: "General", keys: ["?"], description: "Show keyboard shortcuts" },
   { group: "General", keys: ["Esc"], description: "Close panel / modal" },
 ];

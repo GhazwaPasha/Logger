@@ -1,6 +1,8 @@
 import { HttpException } from "@nestjs/common";
 import { formatInTimeZone, zonedPartsToUtc } from "@work-ledger/contracts";
 import { z } from "zod";
+import type { AgentProposalKind } from "@work-ledger/contracts";
+import { AuthorizationService } from "../authorization/authorization.service";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { ListsService } from "../lists/lists.service";
@@ -12,8 +14,9 @@ import { TasksService } from "../tasks/tasks.service";
 
 /**
  * The agent's tool registry. Every tool runs through the existing services *as the asking user*, so the
- * agent can never see or touch more than that user can. Tools here are read-only (`risk: "read"`); write
- * tools arrive with approval cards and must not be added without that gate.
+ * agent can never see or touch more than that user can. Read tools (`risk: "read"`) answer straight away.
+ * Write tools (`risk: "write"`) never change anything themselves: they check permissions, work out the
+ * before → after, and file a *proposal* the user approves or rejects in the chat (see AgentService).
  *
  * Outputs are deliberately compact and name-resolved (people, channels, categories) — every byte is
  * model input, and resolving ids here saves the model a lookup round per answer.
@@ -28,7 +31,16 @@ export interface AgentToolServices {
   comments: CommentsService;
   roadmap: RoadmapService;
   performance: PerformanceService;
+  authz: AuthorizationService;
 }
+
+/** What a write tool files for approval. `payload` is what approval executes; `items` is what the card shows. */
+export type NewProposal = {
+  kind: AgentProposalKind;
+  summary: string;
+  items: { taskId: string; title: string; from: string | null; to: string }[];
+  payload: Record<string, unknown>;
+};
 
 export interface AgentToolContext {
   userId: string;
@@ -39,6 +51,8 @@ export interface AgentToolContext {
   names: () => Promise<NameIndex>;
   /** Calls already made this run, by tool + arguments — the model sometimes repeats a lookup. */
   memo: Map<string, Promise<ToolOutcome>>;
+  /** Files a proposal in the current conversation. Absent where approval isn't possible (e.g. MCP). */
+  propose?: (p: NewProposal) => Promise<{ id: string }>;
 }
 
 export type NameIndex = {
@@ -51,7 +65,7 @@ export type NameIndex = {
 export interface AgentTool<Args extends Record<string, unknown> = Record<string, unknown>> {
   name: string;
   description: string;
-  risk: "read";
+  risk: "read" | "write";
   input: z.ZodObject<z.ZodRawShape>;
   run: (ctx: AgentToolContext, args: Args) => Promise<unknown>;
   /** The one-line trail entry shown to the user once the call finishes, e.g. "Looked at 12 tasks". */
@@ -143,6 +157,198 @@ const performanceInput = z.object({
 const emptyInput = z.object({});
 
 type ListTasksArgs = z.infer<typeof listTasksInput>;
+
+/** One task a write tool can act on, or why it can't. */
+type Target = { ok: true; id: string; title: string; dueAt: Date | null; status: string } | { ok: false; id: string; reason: string };
+
+/** Loads each task with the caller's permission for this kind of change. Unknown / forbidden tasks come back as reasons. */
+async function targets(ctx: AgentToolContext, ids: string[], need: "edit" | "participate"): Promise<Target[]> {
+  return Promise.all(
+    [...new Set(ids)].map(async (id): Promise<Target> => {
+      try {
+        const access = await ctx.services.authz.getTaskAccess(ctx.userId, id);
+        if (access.task.organizationId !== ctx.organizationId) return { ok: false, id, reason: "not in this workspace" };
+        const caps = ctx.services.authz.taskCapabilities(access, ctx.userId);
+        const allowed = need === "edit" ? caps.canEditFields : caps.canParticipate;
+        if (!allowed) {
+          return {
+            ok: false,
+            id,
+            reason: need === "edit" ? "only the owner, the category's manager or the task's creator can change this" : "task is archived",
+          };
+        }
+        const t = access.task;
+        return { ok: true, id, title: t.title, dueAt: t.dueAt, status: t.status };
+      } catch (err) {
+        return { ok: false, id, reason: err instanceof HttpException ? err.message : "couldn't load the task" };
+      }
+    }),
+  );
+}
+
+const STATUS_NAMES: Record<string, string> = { pending: "Pending", open: "Pending", assigned: "Pending", in_progress: "In progress", late: "In progress", done: "Done", cancelled: "Cancelled" };
+const LOCAL_DT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+/** "YYYY-MM-DDTHH:mm" read as wall-clock time in the workspace zone → UTC instant. */
+function localToUtc(local: string, timeZone: string): Date {
+  const [d, t] = local.split("T");
+  const [year, month, day] = d!.split("-").map(Number);
+  const [hour, minute] = t!.split(":").map(Number);
+  return zonedPartsToUtc({ year: year!, month: month!, day: day!, hour: hour!, minute: minute! }, timeZone);
+}
+
+/** Shared tail of every write tool: file the proposal and tell the model plainly that nothing happened yet. */
+async function fileProposal(ctx: AgentToolContext, proposal: NewProposal, skipped: { taskId: string; reason: string }[]) {
+  if (!ctx.propose) throw new HttpException("Changes can only be proposed from Ask LogBase.", 400);
+  if (!proposal.items.length) return { proposed: false, skipped, note: "Nothing to propose: every task was skipped." };
+  const { id } = await ctx.propose(proposal);
+  return {
+    proposed: true,
+    proposalId: id,
+    summary: proposal.summary,
+    skipped: skipped.length ? skipped : undefined,
+    note: "Shown to the user as an approval card. NOT applied yet: it only happens if they approve.",
+  };
+}
+
+function writeTool<S extends z.ZodObject<z.ZodRawShape>>(def: {
+  name: string;
+  description: string;
+  input: S;
+  run: (ctx: AgentToolContext, args: z.infer<S>) => Promise<unknown>;
+  label: (args: z.infer<S>, result: unknown) => string;
+}): AgentTool {
+  return { ...def, risk: "write" } as unknown as AgentTool;
+}
+
+const proposedLabel = (r: unknown) => {
+  const out = r as { proposed?: boolean; summary?: string };
+  return out.proposed ? `Proposed: ${out.summary}` : "Couldn't propose that change";
+};
+
+const WRITE_TOOLS: AgentTool[] = [
+  writeTool({
+    name: "propose_reschedule",
+    description:
+      "Propose new due dates/times for one or more tasks (each can differ, e.g. 'push each by a day'). Files an approval " +
+      "card; nothing changes until the user approves. Due must be in the future.",
+    input: z.object({
+      changes: z
+        .array(
+          z.object({
+            taskId: z.string().uuid(),
+            due: z.string().regex(LOCAL_DT_RE).describe("New due, YYYY-MM-DDTHH:mm in the workspace time zone."),
+          }),
+        )
+        .min(1)
+        .max(25),
+      reason: z.string().min(1).max(300).describe("Short reason, recorded in the task history."),
+    }),
+    run: async (ctx, a) => {
+      const now = Date.now();
+      const found = await targets(ctx, a.changes.map((c) => c.taskId), "edit");
+      const skipped: { taskId: string; reason: string }[] = [];
+      const items: NewProposal["items"] = [];
+      const payload: { taskId: string; newDueAt: string }[] = [];
+      for (const c of a.changes) {
+        const t = found.find((x) => x.id === c.taskId);
+        if (!t || !t.ok) {
+          skipped.push({ taskId: c.taskId, reason: t && !t.ok ? t.reason : "not found" });
+          continue;
+        }
+        const due = localToUtc(c.due, ctx.timeZone);
+        if (due.getTime() <= now) {
+          skipped.push({ taskId: c.taskId, reason: "new due date is in the past" });
+          continue;
+        }
+        items.push({ taskId: t.id, title: t.title, from: when(t.dueAt, ctx.timeZone), to: when(due, ctx.timeZone)! });
+        payload.push({ taskId: t.id, newDueAt: due.toISOString() });
+      }
+      return fileProposal(
+        ctx,
+        { kind: "reschedule", summary: items.length === 1 ? "Reschedule 1 task" : `Reschedule ${items.length} tasks`, items, payload: { changes: payload, reason: a.reason } },
+        skipped,
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "propose_assign",
+    description: "Propose giving one or more tasks to a person (replaces the current assignee). Files an approval card.",
+    input: z.object({
+      taskIds: z.array(z.string().uuid()).min(1).max(25),
+      assigneeUserId: z.string().min(1).describe("userId from the context block or list_people."),
+    }),
+    run: async (ctx, a) => {
+      const names = await ctx.names();
+      const to = names.people.get(a.assigneeUserId);
+      if (!to) throw new HttpException("That person isn't a member of this workspace.", 400);
+      const found = await targets(ctx, a.taskIds, "edit");
+      const skipped = found.filter((t) => !t.ok).map((t) => ({ taskId: t.id, reason: (t as { reason: string }).reason }));
+      const ok = found.filter((t): t is Extract<Target, { ok: true }> => t.ok);
+      const current = await Promise.all(
+        ok.map((t) => ctx.services.tasks.getDetail(ctx.userId, t.id).then((d) => d.assigneeUserIds).catch(() => [] as string[])),
+      );
+      const items = ok.map((t, i) => ({
+        taskId: t.id,
+        title: t.title,
+        from: current[i]!.length ? current[i]!.map((id) => names.people.get(id) ?? "Someone").join(", ") : "Unassigned",
+        to,
+      }));
+      return fileProposal(
+        ctx,
+        {
+          kind: "assign",
+          summary: items.length === 1 ? `Assign 1 task to ${to}` : `Assign ${items.length} tasks to ${to}`,
+          items,
+          payload: { taskIds: ok.map((t) => t.id), assigneeUserId: a.assigneeUserId },
+        },
+        skipped,
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "propose_status",
+    description: "Propose moving one or more tasks to a status (pending, in_progress, done, cancelled). Files an approval card.",
+    input: z.object({
+      taskIds: z.array(z.string().uuid()).min(1).max(25),
+      status: z.enum(STATUS_VALUES),
+    }),
+    run: async (ctx, a) => {
+      const found = await targets(ctx, a.taskIds, "participate");
+      const skipped = found.filter((t) => !t.ok).map((t) => ({ taskId: t.id, reason: (t as { reason: string }).reason }));
+      const ok = found.filter((t): t is Extract<Target, { ok: true }> => t.ok && STATUS_NAMES[t.status] !== STATUS_NAMES[a.status]);
+      for (const t of found) if (t.ok && !ok.includes(t)) skipped.push({ taskId: t.id, reason: `already ${STATUS_NAMES[a.status]}` });
+      const items = ok.map((t) => ({ taskId: t.id, title: t.title, from: STATUS_NAMES[t.status] ?? t.status, to: STATUS_NAMES[a.status]! }));
+      const verb = a.status === "done" ? "Complete" : a.status === "cancelled" ? "Cancel" : `Move to ${STATUS_NAMES[a.status]}:`;
+      return fileProposal(
+        ctx,
+        { kind: "status", summary: `${verb} ${items.length === 1 ? "1 task" : `${items.length} tasks`}`, items, payload: { taskIds: ok.map((t) => t.id), status: a.status } },
+        skipped,
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "propose_comment",
+    description: "Propose posting a comment on a task (e.g. a reminder or a summary). Files an approval card; the user sees the exact text first.",
+    input: z.object({ taskId: z.string().uuid(), body: z.string().min(1).max(1500) }),
+    run: async (ctx, a) => {
+      const [t] = await targets(ctx, [a.taskId], "participate");
+      if (!t!.ok) return fileProposal(ctx, { kind: "comment", summary: "", items: [], payload: {} }, [{ taskId: a.taskId, reason: t!.reason }]);
+      return fileProposal(
+        ctx,
+        { kind: "comment", summary: "Post a comment", items: [{ taskId: t!.id, title: t!.title, from: null, to: a.body }], payload: { taskId: t!.id, body: a.body } },
+        [],
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+];
 
 function tool<S extends z.ZodObject<z.ZodRawShape>>(def: {
   name: string;
@@ -342,6 +548,8 @@ export const AGENT_TOOLS: AgentTool[] = [
     label: (_a, r) => `Checked performance for ${plural((r as { members: unknown[] }).members.length, "person", "people")}`,
   }),
 ];
+
+AGENT_TOOLS.push(...WRITE_TOOLS);
 
 export const AGENT_TOOLS_BY_NAME = new Map(AGENT_TOOLS.map((t) => [t.name, t]));
 

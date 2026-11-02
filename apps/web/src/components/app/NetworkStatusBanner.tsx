@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { NETWORK_STATUS_EVENT } from "@/lib/api";
+import { NETWORK_STATUS_EVENT, getApiBaseUrl } from "@/lib/api";
 
 /**
  * Small fixed banner for connectivity problems. Two independent signals:
@@ -41,7 +41,19 @@ export function NetworkStatusBanner() {
         aria-live="polite"
         className="surface-elevated pointer-events-auto flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 shadow-lg dark:text-amber-100"
       >
-        <span>{offline ? "You're offline. Changes can't be saved until you reconnect." : "Can't reach the server."}</span>
+        <span>
+          {offline ? (
+            "You're offline. Changes can't be saved until you reconnect."
+          ) : process.env.NODE_ENV === "development" ? (
+            // Locally this almost always means the API process isn't running (the web dev server alone can't serve data).
+            <>
+              Can&apos;t reach the API at <code className="font-mono text-xs">{getApiBaseUrl()}</code>. Start it with{" "}
+              <code className="font-mono text-xs">npm run dev</code> (API + web), or wait if it&apos;s still starting.
+            </>
+          ) : (
+            "Can't reach the server."
+          )}
+        </span>
         {!offline && (
           <button
             type="button"

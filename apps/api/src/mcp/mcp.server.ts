@@ -11,6 +11,7 @@ import {
 } from "@work-ledger/contracts";
 import { z } from "zod";
 import { AGENT_TOOLS_BY_NAME, MCP_SHARED_TOOL_NAMES, createToolContext, runAgentTool } from "../agent/agent-tools";
+import { AuthorizationService } from "../authorization/authorization.service";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { DiscordIntegrationService } from "../discord/discord-integration.service";
@@ -25,6 +26,7 @@ import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
 
 export interface McpServices {
+  authz: AuthorizationService;
   search: SearchService;
   performance: PerformanceService;
   /** The organization's IANA zone — shared registry tools format dates in it. */

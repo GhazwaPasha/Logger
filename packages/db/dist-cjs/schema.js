@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.agentUsageDaily = exports.agentMessages = exports.agentThreads = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = void 0;
+exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.agentUsageDaily = exports.agentProposals = exports.agentMessages = exports.agentThreads = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -642,6 +642,41 @@ exports.agentMessages = (0, pg_core_1.pgTable)("agent_messages", {
     outputTokens: (0, pg_core_1.integer)("output_tokens"),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [(0, pg_core_1.index)("agent_messages_thread_created_idx").on(t.threadId, t.createdAt)]);
+/**
+ * A change the agent proposed in a conversation. Nothing happens until the user approves it; approval runs the
+ * change through the normal task services *as that user*, so permissions and history work exactly as if they'd
+ * made it by hand.
+ */
+exports.agentProposals = (0, pg_core_1.pgTable)("agent_proposals", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "cascade" }),
+    threadId: (0, pg_core_1.uuid)("thread_id")
+        .notNull()
+        .references(() => exports.agentThreads.id, { onDelete: "cascade" }),
+    /** The assistant message that proposed it; set once that message is saved. */
+    messageId: (0, pg_core_1.uuid)("message_id").references(() => exports.agentMessages.id, { onDelete: "set null" }),
+    /** `reschedule` | `assign` | `status` | `comment`. */
+    kind: (0, pg_core_1.text)("kind").notNull(),
+    summary: (0, pg_core_1.text)("summary").notNull(),
+    /** What the card shows: one row per task, `{ taskId, title, from, to }`. */
+    items: (0, pg_core_1.jsonb)("items").notNull().$type(),
+    /** What approval executes, per task. Shape depends on `kind`. */
+    payload: (0, pg_core_1.jsonb)("payload").notNull().$type(),
+    /** `pending` | `applied` | `partial` | `failed` | `rejected` | `expired`. */
+    status: (0, pg_core_1.text)("status").notNull().default("pending"),
+    /** Per-task outcome once decided: `{ taskId, ok, error? }[]`. */
+    result: (0, pg_core_1.jsonb)("result").$type(),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: (0, pg_core_1.timestamp)("decided_at", { withTimezone: true }),
+}, (t) => [
+    (0, pg_core_1.index)("agent_proposals_thread_idx").on(t.threadId, t.createdAt),
+    (0, pg_core_1.index)("agent_proposals_user_status_idx").on(t.userId, t.status),
+]);
 /** Per-organization daily agent usage; the budget check reads one row instead of summing messages. */
 exports.agentUsageDaily = (0, pg_core_1.pgTable)("agent_usage_daily", {
     organizationId: (0, pg_core_1.uuid)("organization_id")

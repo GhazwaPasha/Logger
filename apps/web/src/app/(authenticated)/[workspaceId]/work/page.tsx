@@ -56,6 +56,8 @@ import {
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
+import { BoardCardFrame, SelectionAskBar } from "@/components/agent/BoardAsk";
+import type { TaskRef } from "@/components/agent/AskPanel";
 import { StatusPillSelect, KANBAN_STATUS_SHELL_LAYOUT } from "@/components/tasks/StatusPillSelect";
 import { TaskMilestoneIconBtn } from "@/components/roadmap/TaskMilestoneIconBtn";
 import { useRoadmap } from "@/hooks/useRoadmap";
@@ -889,6 +891,21 @@ function WorkItemsInner() {
   const isMobile = useIsMobile();
   const [listId, setListId] = useState("");
   const [viewTaskId, setViewTaskId] = useState<string | null>(null);
+  /** Cards picked with Ctrl/⌘/Shift-click, for the "ask about these" bar. */
+  const [selectedTasks, setSelectedTasks] = useState<TaskRef[]>([]);
+  const toggleSelectedTask = useCallback((t: TaskRef) => {
+    setSelectedTasks((prev) => (prev.some((x) => x.id === t.id) ? prev.filter((x) => x.id !== t.id) : [...prev, t]));
+  }, []);
+  const clearSelectedTasks = useCallback(() => setSelectedTasks([]), []);
+  const frameCard = (task: TaskRow, card: ReactNode) => (
+    <BoardCardFrame
+      task={{ id: task.id, title: task.title }}
+      selected={selectedTasks.some((x) => x.id === task.id)}
+      onToggleSelect={toggleSelectedTask}
+    >
+      {card}
+    </BoardCardFrame>
+  );
   /** Set when a `?task=` deep link arrives with no board scope yet; resolved by the scope-resolution effect below. */
   const deepLinkResolutionRef = useRef<{ taskId: string; done: boolean; fetchStarted?: boolean } | null>(null);
   const [taskContextMenu, setTaskContextMenu] = useState<null | { x: number; y: number; task: TaskRow }>(
@@ -2424,6 +2441,8 @@ function WorkItemsInner() {
         </div>
       </header>
 
+      <SelectionAskBar selection={selectedTasks} onClear={clearSelectedTasks} />
+
       {toolbarMenusMounted &&
         createPortal(
           <AnimatePresence>
@@ -2505,7 +2524,7 @@ function WorkItemsInner() {
             prefersReduced={prefersReduced}
             members={members}
             openViewTask={openViewTask}
-            renderTaskCard={(task) => <ListTaskCard task={task} />}
+            renderTaskCard={(task) => frameCard(task, <ListTaskCard task={task} />)}
           />
         ) : (
           <KanbanBoard
@@ -2526,7 +2545,7 @@ function WorkItemsInner() {
             boardFilter={boardFilter}
             prefersReduced={prefersReduced}
             openViewTask={openViewTask}
-            renderTaskCard={(task) => <TaskCard task={task} />}
+            renderTaskCard={(task) => frameCard(task, <TaskCard task={task} />)}
           />
         )}
       </section>
@@ -2535,7 +2554,7 @@ function WorkItemsInner() {
         createPortal(
           <AnimatePresence>
             {viewTaskId && (
-              <div className="fixed bottom-0 left-0 right-0 top-14 z-[60] md:left-72">
+              <div className="fixed bottom-0 left-0 top-14 z-[60] md:left-72" style={{ right: "var(--ask-pane-w, 0px)" }}>
                 <motion.div
                   className="absolute inset-0 backdrop-blur-sm"
                   aria-hidden

@@ -337,6 +337,13 @@
       "when": 1785900009000,
       "tag": "0047_agent_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785900010000,
+      "tag": "0048_agent_proposals",
+      "breakpoints": true
     }
   ]
 }

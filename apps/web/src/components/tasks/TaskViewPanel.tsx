@@ -11,7 +11,7 @@ import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { useDiscordChannels } from "@/hooks/useDiscordChannels";
 import { useAsk } from "@/components/agent/AskPanel";
-import { LogBaseMark } from "@/components/brand/LogBaseMark";
+import { AiIcon } from "@/components/agent/AiIcon";
 import { useRouter } from "next/navigation";
 import { taskEditCaps } from "@/lib/workspace-permissions";
 import { DependencySection } from "@/components/tasks/DependencySection";
@@ -149,7 +149,7 @@ export function TaskViewPanel({
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
               onClick={() => ask.openAsk({ taskId })}
             >
-              <LogBaseMark size={14} decorative />
+              <AiIcon className="size-3.5" />
               Ask
             </button>
           )}

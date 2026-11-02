@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { authClient } from "@/lib/auth-client";
 import { HeaderLiveIsland } from "./live-island";
 import { OnlineMembersAvatars } from "./OnlineMembersAvatars";
+import { AiIcon } from "@/components/agent/AiIcon";
 import { useAsk } from "@/components/agent/AskPanel";
 
 function IconBell({ className }: { className?: string }) {
@@ -140,13 +141,17 @@ export function AppHeader({
           {ask && (
             <button
               type="button"
-              className={`${iconBtn} ${ask.open ? "bg-[var(--surface-hover)]" : ""}`}
-              aria-label="Ask LogBase (Ctrl+K)"
-              title="Ask LogBase (Ctrl+K)"
+              className={`${iconBtn} relative ${ask.open ? "bg-[var(--surface-hover)] text-[var(--fg)]" : ""}`}
+              aria-label={ask.running ? "Ask LogBase (working…)" : "Ask LogBase (Ctrl+K or /)"}
+              title={ask.running ? "LogBase is working on your question" : "Ask LogBase (Ctrl+K or /)"}
               aria-pressed={ask.open}
               onClick={ask.toggleAsk}
             >
-              <LogBaseMark size={20} decorative />
+              <AiIcon className="size-[1.125rem]" />
+              {/* Quiet "working" state: a steady dot, no looping animation. */}
+              {ask.running && (
+                <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-sky-400 ring-2 ring-[var(--bg-header)]" aria-hidden />
+              )}
             </button>
           )}
           {settingsHref && notifications && (

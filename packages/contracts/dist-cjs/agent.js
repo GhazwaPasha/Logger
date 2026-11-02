@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AGENT_TASK_LINK_RE = exports.patchAgentThreadSchema = exports.askAgentSchema = exports.AGENT_MESSAGE_MAX = void 0;
+exports.AGENT_TASK_LINK_RE = exports.AGENT_PROPOSAL_TTL_MS = exports.patchAgentThreadSchema = exports.askAgentSchema = exports.AGENT_MESSAGE_MAX = void 0;
 const zod_1 = require("zod");
 /**
  * LogBase agent ("Ask"): request body, stream events and thread shapes shared by the API, web and mobile.
@@ -15,6 +15,19 @@ exports.askAgentSchema = zod_1.z.object({
     threadId: zod_1.z.string().uuid().optional(),
     /** The task the user is looking at, so "this task" resolves. Only used when starting a thread. */
     taskId: zod_1.z.string().uuid().optional(),
+    /** Where the user is in the app right now; questions default to this scope ("what's late?" = late *here*). */
+    view: zod_1.z
+        .object({
+        label: zod_1.z.string().trim().min(1).max(160),
+        channelId: zod_1.z.string().uuid().optional(),
+        categoryId: zod_1.z.string().uuid().optional(),
+    })
+        .optional(),
+    /** Tasks the user selected on the board before asking ("these"). */
+    selection: zod_1.z
+        .array(zod_1.z.object({ id: zod_1.z.string().uuid(), title: zod_1.z.string().max(300) }))
+        .max(50)
+        .optional(),
 });
 exports.patchAgentThreadSchema = zod_1.z
     .object({
@@ -22,6 +35,8 @@ exports.patchAgentThreadSchema = zod_1.z
     title: zod_1.z.string().trim().min(1).max(120).optional(),
 })
     .refine((v) => v.pinned !== undefined || v.title !== undefined, { message: "Nothing to change" });
+/** Pending proposals stop being approvable after this long — the board has likely moved on. */
+exports.AGENT_PROPOSAL_TTL_MS = 24 * 60 * 60 * 1000;
 /**
  * Agent answers link tasks as `[Title](task:<uuid>)`. Clients turn these into links to the task;
  * anything else in the answer is plain text with light markdown (paragraphs, `- ` bullets, `**bold**`).

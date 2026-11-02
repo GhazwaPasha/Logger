@@ -15,7 +15,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import { LogoMark } from '@/components/logo-mark';
+import { AiIcon } from '@/components/agent/ai-icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
@@ -158,7 +158,7 @@ function TaskScreen() {
           hitSlop={8}
           onPress={() => router.push({ pathname: '/ask', params: { taskId: id } })}
           style={styles.iconBtn}>
-          <LogoMark size={20} />
+          <AiIcon size={19} />
         </PressableScale>
       ) : null}
       {saving ? (

@@ -5,6 +5,7 @@ import type { LedgerRow, MemberRow } from "@/lib/ledger-types";
 import { formatLogTimestamp, memberDisplayName, stripMentionMarkup } from "@/lib/task-activity-log";
 import { normalizeTaskStatus, statusLabelTextClasses, taskStatusDisplayLabel } from "@/lib/task-board";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { AiIcon } from "@/components/agent/AiIcon";
 
 const USER_LOG_CLASS = "font-medium text-blue-600 dark:text-blue-400";
 
@@ -183,8 +184,25 @@ function StatusChangeLine({
   );
 }
 
-/** Rich ledger line: blue person names, status labels use board pill colors. */
-export function LedgerLineDescription({ entry, members, taskDueAt }: Props) {
+/**
+ * Rich ledger line: blue person names, status labels use board pill colors. Entries written by an approved Ask
+ * LogBase proposal (`payload.via === "agent"`) say so, so the history shows what the agent did and for whom.
+ */
+export function LedgerLineDescription(props: Props) {
+  const viaAgent = props.entry.payload?.via === "agent";
+  return (
+    <>
+      <LedgerLineBody {...props} />
+      {viaAgent && (
+        <span className="ml-1 inline-flex items-center gap-0.5 align-baseline text-[var(--muted)]" title="Approved in Ask LogBase">
+          · via <AiIcon className="inline size-3" /> LogBase
+        </span>
+      )}
+    </>
+  );
+}
+
+function LedgerLineBody({ entry, members, taskDueAt }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const actor = memberDisplayName(members, entry.actorId);
 
