@@ -937,21 +937,35 @@ function ProposalCard({
                     aria-hidden
                   />
                 )}
-                <Link
-                  href={taskHref(it.taskId)}
-                  onClick={onNavigate}
-                  className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)] hover:underline"
-                >
-                  {it.title}
-                </Link>
+                {/* A task the card would create doesn't exist until it's approved, so it isn't a link before then. */}
+                {proposal.kind === "create" && proposal.status !== "applied" && !res?.ok ? (
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)]">
+                    <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-sky-500 dark:text-sky-400">New</span>
+                    {it.title}
+                  </span>
+                ) : (
+                  <Link
+                    href={taskHref(it.taskId)}
+                    onClick={onNavigate}
+                    className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)] hover:underline"
+                  >
+                    {it.title}
+                  </Link>
+                )}
               </div>
               {isComment ? (
                 <p className="mt-1 whitespace-pre-wrap rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] leading-relaxed text-[var(--fg)]">
                   {it.to}
                 </p>
+              ) : it.from == null || it.to.includes("\n") ? (
+                // Nothing to cross out (a new task), or a multi-line edit: show what changes, one per line.
+                <div className="mt-0.5 space-y-0.5 text-[11px] text-[var(--muted)]">
+                  {it.from && <p className="truncate line-through decoration-[var(--border)]">{it.from}</p>}
+                  <p className="whitespace-pre-line font-medium text-[var(--fg)]">{it.to}</p>
+                </div>
               ) : (
                 <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
-                  <span className="truncate line-through decoration-[var(--border)]">{it.from ?? "None"}</span>
+                  <span className="truncate line-through decoration-[var(--border)]">{it.from}</span>
                   <span aria-hidden>→</span>
                   <span className="truncate font-medium text-[var(--fg)]">{it.to}</span>
                 </p>

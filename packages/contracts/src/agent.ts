@@ -61,7 +61,7 @@ export type AgentThreadSummary = {
   lastMessageAt: string;
 };
 
-export type AgentProposalKind = "reschedule" | "assign" | "status" | "comment";
+export type AgentProposalKind = "reschedule" | "assign" | "status" | "comment" | "create" | "archive" | "edit";
 export type AgentProposalStatus = "pending" | "applied" | "partial" | "failed" | "rejected" | "expired";
 
 /** A change the agent proposed; it runs (as the user) only when they approve it. */

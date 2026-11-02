@@ -397,23 +397,42 @@ function ProposalCard({ proposal, onDecide }: { proposal: AgentProposal; onDecid
       </View>
       {proposal.items.map((it, i) => {
         const res = outcome.get(it.taskId);
+        // A task the card would create doesn't exist until it's approved, so it isn't openable before then.
+        const notYet = proposal.kind === 'create' && proposal.status !== 'applied' && !res?.ok;
         return (
           <Pressable
             key={it.taskId}
+            disabled={notYet}
             onPress={() => router.push({ pathname: '/task/[id]', params: { id: it.taskId } })}
             style={[styles.proposalRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth * 2, borderTopColor: theme.borderSubtle }]}>
             <Text size="13" numberOfLines={1}>
               {res ? (res.ok ? '✓ ' : '✕ ') : ''}
+              {notYet ? (
+                <Text size="10" weight="bold" color="#38bdf8">
+                  {'NEW  '}
+                </Text>
+              ) : null}
               {it.title}
             </Text>
             {proposal.kind === 'comment' ? (
               <Text size="13" style={[styles.commentPreview, { backgroundColor: theme.surfaceElevated }]}>
                 {it.to}
               </Text>
+            ) : it.from == null || it.to.includes('\n') ? (
+              <View style={{ gap: 2 }}>
+                {it.from ? (
+                  <Text size="11" color="muted" style={{ textDecorationLine: 'line-through' }}>
+                    {it.from}
+                  </Text>
+                ) : null}
+                <Text size="11" weight="semibold">
+                  {it.to}
+                </Text>
+              </View>
             ) : (
               <Text size="11" color="muted" numberOfLines={1}>
                 <Text size="11" color="muted" style={{ textDecorationLine: 'line-through' }}>
-                  {it.from ?? 'None'}
+                  {it.from}
                 </Text>
                 {'  →  '}
                 <Text size="11" weight="semibold">

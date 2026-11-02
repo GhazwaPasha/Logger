@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { HttpException } from "@nestjs/common";
 import { formatInTimeZone, zonedPartsToUtc } from "@work-ledger/contracts";
 import { z } from "zod";
@@ -162,19 +163,24 @@ type ListTasksArgs = z.infer<typeof listTasksInput>;
 type Target = { ok: true; id: string; title: string; dueAt: Date | null; status: string } | { ok: false; id: string; reason: string };
 
 /** Loads each task with the caller's permission for this kind of change. Unknown / forbidden tasks come back as reasons. */
-async function targets(ctx: AgentToolContext, ids: string[], need: "edit" | "participate"): Promise<Target[]> {
+async function targets(ctx: AgentToolContext, ids: string[], need: "edit" | "participate" | "archive"): Promise<Target[]> {
   return Promise.all(
     [...new Set(ids)].map(async (id): Promise<Target> => {
       try {
         const access = await ctx.services.authz.getTaskAccess(ctx.userId, id);
         if (access.task.organizationId !== ctx.organizationId) return { ok: false, id, reason: "not in this workspace" };
         const caps = ctx.services.authz.taskCapabilities(access, ctx.userId);
-        const allowed = need === "edit" ? caps.canEditFields : caps.canParticipate;
+        const allowed = need === "edit" ? caps.canEditFields : need === "archive" ? caps.canArchiveTask : caps.canParticipate;
         if (!allowed) {
           return {
             ok: false,
             id,
-            reason: need === "edit" ? "only the owner, the category's manager or the task's creator can change this" : "task is archived",
+            reason:
+              need === "participate"
+                ? "task is archived"
+                : access.task.deletedAt
+                  ? "task is already archived"
+                  : "only the owner, the category's manager or the task's creator can change this",
           };
         }
         const t = access.task;
@@ -348,6 +354,146 @@ const WRITE_TOOLS: AgentTool[] = [
     },
     label: (_a, r) => proposedLabel(r),
   }),
+
+  writeTool({
+    name: "propose_create_tasks",
+    description:
+      "Propose creating one or more new tasks (e.g. from notes the user pasted). Each needs a title and a channel id from the " +
+      "context block; assignee, due, priority and checklist subtasks are optional. Files an approval card.",
+    input: z.object({
+      tasks: z
+        .array(
+          z.object({
+            title: z.string().min(1).max(200),
+            channelId: z.string().uuid().describe("Channel (list) id from the context block or get_workspace."),
+            assigneeUserId: z.string().optional(),
+            due: z.string().regex(LOCAL_DT_RE).optional().describe("YYYY-MM-DDTHH:mm in the workspace time zone; must be in the future."),
+            priority: z.enum(["high", "medium", "low"]).optional(),
+            subtasks: z.array(z.string().min(1).max(200)).max(20).optional(),
+          }),
+        )
+        .min(1)
+        .max(10),
+    }),
+    run: async (ctx, a) => {
+      const names = await ctx.names();
+      const now = Date.now();
+      const skipped: { taskId: string; reason: string }[] = [];
+      const items: NewProposal["items"] = [];
+      const payload: Record<string, unknown>[] = [];
+      a.tasks.forEach((t, i) => {
+        const channel = names.channels.get(t.channelId);
+        const ref = `new task ${i + 1} (${t.title})`;
+        if (!channel) return void skipped.push({ taskId: ref, reason: "unknown channel" });
+        if (t.assigneeUserId && !names.people.has(t.assigneeUserId)) return void skipped.push({ taskId: ref, reason: "assignee isn't a member" });
+        const due = t.due ? localToUtc(t.due, ctx.timeZone) : null;
+        if (due && due.getTime() <= now) return void skipped.push({ taskId: ref, reason: "due date is in the past" });
+        // The id is chosen now, so after approval the card links straight to the created task.
+        const id = randomUUID();
+        const bits = [
+          `#${channel.name}`,
+          t.assigneeUserId ? names.people.get(t.assigneeUserId)! : "Unassigned",
+          due ? when(due, ctx.timeZone)! : "No due date",
+          t.priority && t.priority !== "medium" ? `${t.priority} priority` : null,
+          t.subtasks?.length ? plural(t.subtasks.length, "subtask") : null,
+        ].filter(Boolean);
+        items.push({ taskId: id, title: t.title, from: null, to: bits.join(" · ") });
+        payload.push({
+          id,
+          title: t.title,
+          listId: t.channelId,
+          assigneeUserIds: t.assigneeUserId ? [t.assigneeUserId] : [],
+          dueAt: due ? due.toISOString() : null,
+          priority: t.priority,
+          initialSubtasks: (t.subtasks ?? []).map((title) => ({ title })),
+        });
+      });
+      return fileProposal(
+        ctx,
+        { kind: "create", summary: items.length === 1 ? "Create 1 task" : `Create ${items.length} tasks`, items, payload: { tasks: payload } },
+        skipped,
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "propose_archive",
+    description:
+      "Propose archiving tasks. This is what deleting a task means in LogBase: it leaves the board and can be restored from " +
+      "Archived. Permanent deletion isn't available from chat. Files an approval card.",
+    input: z.object({ taskIds: z.array(z.string().uuid()).min(1).max(25) }),
+    run: async (ctx, a) => {
+      const found = await targets(ctx, a.taskIds, "archive");
+      const skipped = found.filter((t) => !t.ok).map((t) => ({ taskId: t.id, reason: (t as { reason: string }).reason }));
+      const ok = found.filter((t): t is Extract<Target, { ok: true }> => t.ok);
+      const items = ok.map((t) => ({ taskId: t.id, title: t.title, from: STATUS_NAMES[t.status] ?? t.status, to: "Archived" }));
+      return fileProposal(
+        ctx,
+        { kind: "archive", summary: items.length === 1 ? "Archive 1 task" : `Archive ${items.length} tasks`, items, payload: { taskIds: ok.map((t) => t.id) } },
+        skipped,
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "propose_edit_task",
+    description:
+      "Propose editing one task: its title, priority, and checklist subtasks (add new ones, rename or remove existing ones — " +
+      "get subtask ids from get_task). Files an approval card.",
+    input: z.object({
+      taskId: z.string().uuid(),
+      title: z.string().min(1).max(200).optional(),
+      priority: z.enum(["high", "medium", "low"]).optional(),
+      addSubtasks: z.array(z.string().min(1).max(200)).max(20).optional(),
+      renameSubtasks: z.array(z.object({ subtaskId: z.string().uuid(), title: z.string().min(1).max(200) })).max(20).optional(),
+      removeSubtaskIds: z.array(z.string().uuid()).max(20).optional(),
+    }),
+    run: async (ctx, a) => {
+      const [t] = await targets(ctx, [a.taskId], "edit");
+      if (!t!.ok) return fileProposal(ctx, { kind: "edit", summary: "", items: [], payload: {} }, [{ taskId: a.taskId, reason: t!.reason }]);
+      const detail = await ctx.services.tasks.getDetail(ctx.userId, a.taskId);
+      const subtaskTitle = new Map(detail.subtasks.map((s) => [s.id, s.title]));
+      const unknown = [...(a.renameSubtasks ?? []).map((r) => r.subtaskId), ...(a.removeSubtaskIds ?? [])].filter((id) => !subtaskTitle.has(id));
+      if (unknown.length) throw new HttpException("Some subtask ids don't belong to this task; read it with get_task first.", 400);
+
+      const changes: string[] = [];
+      const before: string[] = [];
+      if (a.title && a.title !== t!.title) {
+        changes.push(`Title: “${a.title}”`);
+        before.push(`Title: “${t!.title}”`);
+      }
+      const currentPriority = (detail.task as { priority?: string }).priority ?? "medium";
+      if (a.priority && a.priority !== currentPriority) {
+        changes.push(`Priority: ${a.priority}`);
+        before.push(`Priority: ${currentPriority}`);
+      }
+      for (const title of a.addSubtasks ?? []) changes.push(`+ ${title}`);
+      for (const r of a.renameSubtasks ?? []) changes.push(`“${subtaskTitle.get(r.subtaskId)}” → “${r.title}”`);
+      for (const id of a.removeSubtaskIds ?? []) changes.push(`− ${subtaskTitle.get(id)}`);
+      if (!changes.length) return fileProposal(ctx, { kind: "edit", summary: "", items: [], payload: {} }, [{ taskId: a.taskId, reason: "nothing would change" }]);
+
+      return fileProposal(
+        ctx,
+        {
+          kind: "edit",
+          summary: `Edit “${t!.title.length > 40 ? `${t!.title.slice(0, 39)}…` : t!.title}”`,
+          items: [{ taskId: t!.id, title: t!.title, from: before.length ? before.join(" · ") : null, to: changes.join("\n") }],
+          payload: {
+            taskId: t!.id,
+            title: a.title && a.title !== t!.title ? a.title : undefined,
+            priority: a.priority && a.priority !== currentPriority ? a.priority : undefined,
+            addSubtasks: a.addSubtasks ?? [],
+            renameSubtasks: a.renameSubtasks ?? [],
+            removeSubtaskIds: a.removeSubtaskIds ?? [],
+          },
+        },
+        [],
+      );
+    },
+    label: (_a, r) => proposedLabel(r),
+  }),
 ];
 
 function tool<S extends z.ZodObject<z.ZodRawShape>>(def: {
@@ -442,7 +588,7 @@ export const AGENT_TOOLS: AgentTool[] = [
         createdBy: names.people.get(t.assignerId),
         created: when(t.createdAt, ctx.timeZone),
         completed: when(t.completedAt, ctx.timeZone),
-        subtasks: d.subtasks.map((s) => ({ title: s.title, done: s.done })),
+        subtasks: d.subtasks.map((s) => ({ id: s.id, title: s.title, done: s.done })),
         history: a.includeHistory
           ? d.ledger.slice(0, 15).map((l) => ({
               type: l.type,
