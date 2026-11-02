@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { HttpException } from "@nestjs/common";
 import { formatInTimeZone, zonedPartsToUtc } from "@work-ledger/contracts";
 import { z } from "zod";
-import type { AgentProposalKind } from "@work-ledger/contracts";
+import type { AgentProposalKind, AgentTaskFormFill } from "@work-ledger/contracts";
 import { AuthorizationService } from "../authorization/authorization.service";
 import { CommentsService } from "../comments/comments.service";
 import { DepartmentsService } from "../departments/departments.service";
@@ -54,6 +54,8 @@ export interface AgentToolContext {
   memo: Map<string, Promise<ToolOutcome>>;
   /** Files a proposal in the current conversation. Absent where approval isn't possible (e.g. MCP). */
   propose?: (p: NewProposal) => Promise<{ id: string }>;
+  /** Sends fields to the task form open on screen. Absent when no form is open. */
+  fillForm?: (fill: AgentTaskFormFill) => void;
 }
 
 export type NameIndex = {
@@ -353,6 +355,72 @@ const WRITE_TOOLS: AgentTool[] = [
       );
     },
     label: (_a, r) => proposedLabel(r),
+  }),
+
+  writeTool({
+    name: "fill_task_form",
+    description:
+      "Fill in the task form the user has open (the context block says when one is). Applies on screen right away, with no " +
+      "approval card, because they can see and edit it. Pass only the fields to change. Use this, not the propose_* tools, for " +
+      "the open task. Only works while a form is open.",
+    input: z.object({
+      title: z.string().min(1).max(200).optional(),
+      subtasks: z.array(z.string().min(1).max(200)).max(20).optional().describe("Checklist lines to add."),
+      assigneeUserIds: z.array(z.string()).max(10).optional().describe("Replaces the assignees; an empty list clears them."),
+      status: z.enum(STATUS_VALUES).optional(),
+      priority: z.enum(["high", "medium", "low"]).optional(),
+      due: z.string().regex(LOCAL_DT_RE).optional().describe("YYYY-MM-DDTHH:mm in the workspace time zone; must be in the future."),
+      clearDue: z.boolean().optional().describe("Remove the due date (and any repeat)."),
+      repeat: z.enum(["daily", "weekly", "monthly", "yearly", "none"]).optional().describe("Needs a due date; none stops repeating."),
+    }),
+    run: async (ctx, a) => {
+      if (!ctx.fillForm) throw new HttpException("No task form is open.", 400);
+      const names = await ctx.names();
+      const unknown = (a.assigneeUserIds ?? []).filter((id) => !names.people.has(id));
+      if (unknown.length) throw new HttpException("Some assignees aren't members of this workspace.", 400);
+
+      const fill: AgentTaskFormFill = {};
+      const filled: string[] = [];
+      if (a.title) {
+        fill.title = a.title;
+        filled.push("title");
+      }
+      if (a.subtasks?.length) {
+        fill.subtasks = a.subtasks;
+        filled.push("subtasks");
+      }
+      if (a.assigneeUserIds) {
+        fill.assigneeUserIds = a.assigneeUserIds;
+        filled.push("assignee");
+      }
+      if (a.status) {
+        fill.status = a.status;
+        filled.push("status");
+      }
+      if (a.priority) {
+        fill.priority = a.priority;
+        filled.push("priority");
+      }
+      if (a.due) {
+        const due = localToUtc(a.due, ctx.timeZone);
+        if (due.getTime() <= Date.now()) throw new HttpException("That due date is in the past.", 400);
+        fill.dueLocal = a.due;
+        fill.dueAt = due.toISOString();
+        filled.push("due date");
+      } else if (a.clearDue) {
+        fill.dueLocal = "";
+        fill.dueAt = null;
+        filled.push("due date");
+      }
+      if (a.repeat) {
+        fill.dueRepeat = a.repeat;
+        filled.push("repeat");
+      }
+      if (!filled.length) throw new HttpException("Nothing to fill in.", 400);
+      ctx.fillForm(fill);
+      return { applied: true, filled, note: "Already on screen in the form, which saves it as usual. Don't ask for approval." };
+    },
+    label: (_a, r) => `Filled in the form: ${(r as { filled: string[] }).filled.join(", ")}`,
   }),
 
   writeTool({

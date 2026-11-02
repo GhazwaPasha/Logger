@@ -37,7 +37,12 @@ async function bootstrap() {
     ],
     exposedHeaders: ["Mcp-Session-Id", "WWW-Authenticate", "ETag", "Retry-After", "X-Request-Id"],
   });
-  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
+  // Hosts like Render assign PORT. Locally API_PORT wins: a PORT inherited from whatever launched the dev servers
+  // usually means the web app's port, and taking it would crash the API on startup.
+  const port =
+    process.env.NODE_ENV === "production"
+      ? Number(process.env.PORT ?? process.env.API_PORT ?? 4000)
+      : Number(process.env.API_PORT ?? process.env.PORT ?? 4000);
   await app.listen(port);
   console.log(`API listening on port ${port}`);
 }

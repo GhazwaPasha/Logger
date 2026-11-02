@@ -32,6 +32,7 @@ import { IconButton } from '@/components/ui';
 import { Fonts, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { agentKeys, streamAsk } from '@/lib/agent';
+import { getAskTaskForm } from '@/lib/agent-task-form';
 import { api } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -56,6 +57,9 @@ export default function AskScreen() {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(params.taskId ?? null);
+  // Opened from a task screen the user can edit: that task's form sits underneath and Ask can fill it in.
+  const [formState] = useState(() => getAskTaskForm(params.taskId)?.getState() ?? null);
+  const canFill = !!formState && taskId === formState.taskId;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
   /** Answer text streamed so far; a later tool step means it was a preamble and is dropped. */
@@ -110,7 +114,12 @@ export default function AskScreen() {
       try {
         await streamAsk(
           orgId,
-          { message, threadId: threadId ?? undefined, taskId: threadId ? undefined : (taskId ?? undefined) },
+          {
+            message,
+            threadId: threadId ?? undefined,
+            taskId: threadId ? undefined : (taskId ?? undefined),
+            taskForm: getAskTaskForm(taskId)?.getState(),
+          },
           (e) => {
             if (ctrl.signal.aborted) return;
             if (e.type === 'thread') {
@@ -122,6 +131,8 @@ export default function AskScreen() {
               setDraft('');
             } else if (e.type === 'delta') {
               setDraft((d) => d + e.text);
+            } else if (e.type === 'form_fill') {
+              getAskTaskForm(e.taskId)?.apply(e.fill);
             } else if (e.type === 'proposal') {
               proposals.push(e.proposal);
               setLiveProposals([...proposals]);
@@ -215,7 +226,7 @@ export default function AskScreen() {
         title={view === 'history' ? 'History' : (title ?? 'Ask LogBase')}
         right={
           <View style={{ flexDirection: 'row' }}>
-            <IconButton icon={faPen} label="New conversation" onPress={() => { reset(); setTaskId(null); }} iconSize={15} />
+            <IconButton icon={faPen} label="New conversation" onPress={() => { reset(); setTaskId(params.taskId ?? null); }} iconSize={15} />
             <IconButton
               icon={faClockRotateLeft}
               label={view === 'history' ? 'Back to conversation' : 'History'}
@@ -242,7 +253,11 @@ export default function AskScreen() {
             {messages.length === 0 && !running ? (
               <View style={{ gap: 12 }}>
                 <Text size="sm" color="muted">
-                  {taskId
+                  {canFill && formState?.isNew
+                    ? "Describe this task: what needs doing, who it's for and when. LogBase fills it in for you to check."
+                    : canFill
+                      ? 'Say what should change and LogBase fills it in. You can also ask anything about this task.'
+                      : taskId
                     ? "Ask anything about this task: what's left, who's on it, what changed."
                     : 'Ask about tasks, people, deadlines or the roadmap. LogBase looks it up for you.'}
                 </Text>
@@ -323,7 +338,7 @@ export default function AskScreen() {
               <TextInput
                 value={input}
                 onChangeText={setInput}
-                placeholder={taskId && !threadId ? 'Ask about this task…' : 'Ask LogBase…'}
+                placeholder={canFill && formState?.isNew ? 'Describe this task…' : taskId && !threadId ? 'Ask about this task…' : 'Ask LogBase…'}
                 placeholderTextColor={theme.muted}
                 multiline
                 maxLength={4000}
@@ -354,7 +369,7 @@ export default function AskScreen() {
               )}
             </View>
             <Text size="10" color="muted" style={{ paddingHorizontal: 4 }}>
-              {taskId && !threadId ? 'About this task · changes need your approval' : 'Changes only happen when you approve them'}
+              {canFill ? 'Fills this task in directly · you can edit anything' : taskId && !threadId ? 'About this task · changes need your approval' : 'Changes only happen when you approve them'}
             </Text>
           </View>
         </KeyboardAvoidingView>

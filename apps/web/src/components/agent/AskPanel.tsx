@@ -22,6 +22,7 @@ import {
   formatZonedDateKey,
   type AgentMessage,
   type AgentProposal,
+  type AgentTaskFormFill,
   type AgentThreadDetail,
   type AgentThreadSummary,
   type AskAgentInput,
@@ -39,6 +40,16 @@ import { AgentText, type TaskCardInfo } from "./AgentText";
 
 type OpenAskOptions = { prompt?: string; taskId?: string; send?: boolean };
 export type TaskRef = { id: string; title: string };
+/** A task form on screen, offered to Ask so the agent can read and fill it. */
+export type AskTaskForm = {
+  taskId: string;
+  /** Shown in the pane: what's being edited. */
+  label: string;
+  isNew: boolean;
+  /** The form as it stands right now, unsaved edits included. */
+  getState: () => NonNullable<AskAgentInput["taskForm"]>;
+  apply: (fill: AgentTaskFormFill) => void;
+};
 /** What the user is looking at, as sent with a question so "what's late?" means late *here*. */
 type BoardView = NonNullable<AskAgentInput["view"]>;
 
@@ -88,6 +99,9 @@ type AskContextValue = AskState & {
   /** Task ids the latest answer mentions, when "Show on board" is on and the pane is open. */
   highlightIds: ReadonlySet<string>;
   setShowOnBoard: (on: boolean) => void;
+  /** The task form on screen, if any. While there is one, Ask works on that task. */
+  taskForm: Pick<AskTaskForm, "taskId" | "label" | "isNew"> | null;
+  registerTaskForm: (form: AskTaskForm) => () => void;
   /** Approve (runs the change as you) or reject a proposal card. */
   decideProposal: (id: string, action: "approve" | "reject") => Promise<void>;
 };
@@ -101,8 +115,34 @@ export function useAsk(): AskContextValue | null {
   return useContext(AskContext);
 }
 
+/**
+ * Offers the task form on this page to Ask for as long as it's mounted, so the sidebar can read it and fill it in.
+ * Pass null while the form isn't ready or the user can't edit it.
+ */
+export function useRegisterAskTaskForm(form: AskTaskForm | null) {
+  const register = useAsk()?.registerTaskForm;
+  const latest = useRef(form);
+  useLayoutEffect(() => {
+    latest.current = form;
+  });
+  const taskId = form?.taskId;
+  const label = form?.label;
+  const isNew = form?.isNew;
+  useEffect(() => {
+    if (!register || !taskId) return;
+    return register({
+      taskId,
+      label: label ?? "",
+      isNew: !!isNew,
+      getState: () => latest.current!.getState(),
+      apply: (fill) => latest.current?.apply(fill),
+    });
+  }, [register, taskId, label, isNew]);
+}
+
 const SUGGESTIONS = ["What's overdue right now?", "What's due for me this week?", "What changed today?"];
 const TASK_SUGGESTIONS = ["Summarize this task", "What's still left to do?", "Who changed what recently?"];
+const FORM_SUGGESTIONS = ["Break this into subtasks", "Make it due tomorrow at 5pm", "Make it high priority"];
 
 const WIDTH_KEY = "logbase.askPaneWidth";
 const DEFAULT_WIDTH = 400;
@@ -174,6 +214,17 @@ export function AskProvider({ children }: { children: ReactNode }) {
   });
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const taskFormRef = useRef<AskTaskForm | null>(null);
+  const [taskForm, setTaskForm] = useState<AskContextValue["taskForm"]>(null);
+  const registerTaskForm = useCallback<AskContextValue["registerTaskForm"]>((form) => {
+    taskFormRef.current = form;
+    setTaskForm({ taskId: form.taskId, label: form.label, isNew: form.isNew });
+    return () => {
+      if (taskFormRef.current !== form) return;
+      taskFormRef.current = null;
+      setTaskForm(null);
+    };
+  }, []);
 
   const patch = useCallback((p: Partial<AskState>) => setState((s) => ({ ...s, ...p })), []);
   const focusInput = useCallback(() => setTimeout(() => inputRef.current?.focus(), 60), []);
@@ -226,7 +277,9 @@ export function AskProvider({ children }: { children: ReactNode }) {
             message,
             threadId: threadId ?? undefined,
             taskId,
-            view: s.scopeOff ? undefined : (boardViewRef.current ?? undefined),
+            // An open form is the context; the board behind it isn't what they're asking about.
+            view: s.scopeOff || taskFormRef.current ? undefined : (boardViewRef.current ?? undefined),
+            taskForm: taskFormRef.current?.getState(),
             selection: s.selection.length ? s.selection : undefined,
           },
           (e) => {
@@ -239,6 +292,8 @@ export function AskProvider({ children }: { children: ReactNode }) {
               setState((prev) => ({ ...prev, liveSteps: [...steps], draft: "" }));
             } else if (e.type === "delta") {
               setState((prev) => ({ ...prev, draft: prev.draft + e.text }));
+            } else if (e.type === "form_fill") {
+              if (taskFormRef.current?.taskId === e.taskId) taskFormRef.current.apply(e.fill);
             } else if (e.type === "proposal") {
               proposals.push(e.proposal);
               setState((prev) => ({ ...prev, liveProposals: [...proposals] }));
@@ -420,6 +475,8 @@ export function AskProvider({ children }: { children: ReactNode }) {
       highlightIds,
       askAboutSelection,
       decideProposal,
+      taskForm,
+      registerTaskForm,
       setScopeOff: (scopeOff) => patch({ scopeOff }),
       clearSelection: () => patch({ selection: [] }),
       setShowOnBoard: (showOnBoard) => patch({ showOnBoard }),
@@ -433,7 +490,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
       stop,
       forgetThread,
     }),
-    [state, boardView, highlightIds, askAboutSelection, decideProposal, openAsk, toggleAsk, close, patch, newChat, loadThread, send, stop, forgetThread],
+    [state, boardView, highlightIds, askAboutSelection, decideProposal, taskForm, registerTaskForm, openAsk, toggleAsk, close, patch, newChat, loadThread, send, stop, forgetThread],
   );
 
   return (
@@ -645,10 +702,10 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
   const hits = useQuery({
     queryKey: ["agent-search", workspaceId, query],
     queryFn: () => apiJson<SearchHit[]>(`/organizations/${workspaceId}/search?q=${encodeURIComponent(query)}`),
-    enabled: isEmpty && query.length >= 2,
+    enabled: isEmpty && !ask.taskForm && query.length >= 2,
     staleTime: 30_000,
   });
-  const hitRows = isEmpty && query.length >= 2 ? (hits.data ?? []).slice(0, 6) : [];
+  const hitRows = isEmpty && !ask.taskForm && query.length >= 2 ? (hits.data ?? []).slice(0, 6) : [];
 
   // Follow new content only while the reader is at (or near) the bottom.
   useEffect(() => {
@@ -688,10 +745,10 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
       >
         {isEmpty ? (
-          hitRows.length > 0 || (query.length >= 2 && hits.isFetching) ? (
+          !ask.taskForm && (hitRows.length > 0 || (query.length >= 2 && hits.isFetching)) ? (
             <TaskMatches rows={hitRows} loading={hits.isFetching} highlight={highlight} taskHref={taskHref} onNavigate={onNavigate} />
           ) : (
-            <EmptyState fromTask={!!ask.taskId} onSuggestion={(s) => void ask.send(s)} />
+            <EmptyState fromTask={!!ask.taskId} form={ask.taskForm} onSuggestion={(s) => void ask.send(s)} />
           )
         ) : (
           <div className="space-y-6">
@@ -772,12 +829,26 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
                 submit();
               }
             }}
-            placeholder={ask.taskId && !ask.threadId ? "Ask about this task…" : ask.threadId ? "Ask a follow-up…" : "Ask or search LogBase…"}
+            placeholder={
+              ask.taskForm?.isNew
+                ? "Describe this task…"
+                : ask.taskForm
+                  ? "Change this task, or ask about it…"
+                  : ask.taskId && !ask.threadId
+                    ? "Ask about this task…"
+                    : ask.threadId
+                      ? "Ask a follow-up…"
+                      : "Ask or search LogBase…"
+            }
             className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm leading-relaxed text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none"
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
             <p className="truncate pl-1 text-[11px] text-[var(--muted)]">
-              {ask.taskId && !ask.threadId ? "About this task · changes need your approval" : "Changes only happen when you approve them"}
+              {ask.taskForm
+                ? "Fills the form on this page · you can edit anything"
+                : ask.taskId && !ask.threadId
+                  ? "About this task · changes need your approval"
+                  : "Changes only happen when you approve them"}
             </p>
             {ask.running ? (
               <button
@@ -815,10 +886,18 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
  */
 function ContextChips() {
   const ask = useAsk()!;
-  const view = ask.scopeOff ? null : ask.boardView;
-  if (!view && !ask.selection.length && !(ask.boardView && ask.scopeOff)) return null;
+  const form = ask.taskForm;
+  const view = form || ask.scopeOff ? null : ask.boardView;
+  if (!form && !view && !ask.selection.length && !(ask.boardView && ask.scopeOff)) return null;
   return (
     <div className="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
+      {form && (
+        <Chip
+          label={form.isNew ? "New task" : `Editing: ${form.label}`}
+          title="LogBase can see this form and fill it in."
+          icon={<path d="M13.5 4.5l2 2L7 15l-3 1 1-3 8.5-8.5Z" />}
+        />
+      )}
       {ask.selection.length > 0 && (
         <Chip
           label={ask.selection.length === 1 ? ask.selection[0]!.title : `${ask.selection.length} selected tasks`}
@@ -834,7 +913,7 @@ function ContextChips() {
           icon={<path d="M3 10s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Zm7 2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />}
           onRemove={() => ask.setScopeOff(true)}
         />
-      ) : ask.boardView && ask.scopeOff ? (
+      ) : !form && ask.boardView && ask.scopeOff ? (
         <button
           type="button"
           onClick={() => ask.setScopeOff(false)}
@@ -847,26 +926,28 @@ function ContextChips() {
   );
 }
 
-function Chip({ label, title, icon, onRemove }: { label: string; title: string; icon: ReactNode; onRemove: () => void }) {
+function Chip({ label, title, icon, onRemove }: { label: string; title: string; icon: ReactNode; onRemove?: () => void }) {
   return (
     <span
       title={title}
-      className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] py-0.5 pl-2 pr-0.5 text-[11px] text-[var(--fg)]"
+      className={`inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] py-0.5 pl-2 text-[11px] text-[var(--fg)] ${onRemove ? "pr-0.5" : "pr-2"}`}
     >
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="size-3 shrink-0 text-[var(--muted)]" aria-hidden>
         {icon}
       </svg>
       <span className="truncate">{label}</span>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${label}`}
-        className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
-      >
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="size-2.5" aria-hidden>
-          <path d="M6 6l8 8m0-8-8 8" />
-        </svg>
-      </button>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${label}`}
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+        >
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="size-2.5" aria-hidden>
+            <path d="M6 6l8 8m0-8-8 8" />
+          </svg>
+        </button>
+      )}
     </span>
   );
 }
@@ -1137,22 +1218,36 @@ function AssistantTurn({
   );
 }
 
-function EmptyState({ fromTask, onSuggestion }: { fromTask: boolean; onSuggestion: (s: string) => void }) {
+function EmptyState({
+  fromTask,
+  form,
+  onSuggestion,
+}: {
+  fromTask: boolean;
+  form: AskContextValue["taskForm"];
+  onSuggestion: (s: string) => void;
+}) {
+  const suggestions = form ? (form.isNew ? [] : FORM_SUGGESTIONS) : fromTask ? TASK_SUGGESTIONS : SUGGESTIONS;
   return (
     <div className="flex h-full flex-col justify-end gap-4 pb-2">
       <div className="space-y-1.5">
         <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-[var(--fg)]">
           <AiIcon className="size-5" />
         </span>
-        <p className="pt-1 text-[15px] font-semibold text-[var(--fg)]">{fromTask ? "Ask about this task" : "Ask LogBase"}</p>
+        <p className="pt-1 text-[15px] font-semibold text-[var(--fg)]">{form?.isNew ? "Describe this task" : form ? "Change this task" : fromTask ? "Ask about this task" : "Ask LogBase"}
+        </p>
         <p className="text-[13px] leading-relaxed text-[var(--muted)]">
-          {fromTask
+          {form?.isNew
+            ? "Say what needs doing, who it's for and when, in your own words. LogBase fills in the form for you to check."
+            : form
+              ? "Say what should change and LogBase fills it into the form. You can also ask anything about the task."
+              : fromTask
             ? "What's left, who's on it, what changed. LogBase reads the task and its history for you."
             : "Questions about tasks, people, deadlines or the roadmap. Type a few words to jump to a task instead."}
         </p>
       </div>
       <div className="flex flex-col items-start gap-1.5">
-        {(fromTask ? TASK_SUGGESTIONS : SUGGESTIONS).map((s) => (
+        {suggestions.map((s) => (
           <button
             key={s}
             type="button"

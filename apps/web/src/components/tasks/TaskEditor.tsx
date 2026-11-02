@@ -20,7 +20,8 @@ import { AssigneeSearchField } from "@/components/tasks/AssigneeSearchField";
 import { DiscordChannelSearchField } from "@/components/tasks/DiscordChannelSearchField";
 import { DueDateTimePopover } from "@/components/tasks/DueDateTimePopover";
 import { DueRepeatPopover } from "@/components/tasks/DueRepeatPopover";
-import { TaskPanelAiFill } from "@/components/tasks/TaskPanelAiFill";
+import { useAsk, useRegisterAskTaskForm } from "@/components/agent/AskPanel";
+import { AiIcon } from "@/components/agent/AiIcon";
 import { DependencySection } from "@/components/tasks/DependencySection";
 import { MilestoneLinkSection } from "@/components/tasks/MilestoneLinkSection";
 import { TimeTracker } from "@/components/tasks/TimeTracker";
@@ -47,7 +48,7 @@ import {
   type TaskPriority,
 } from "@/lib/task-board";
 import { parseTaskDueRepeat, type TaskMutationResult } from "@/lib/ledger-types";
-import type { TaskAiFillResult } from "@/lib/task-ai-fill";
+import type { AgentTaskFormFill } from "@work-ledger/contracts";
 import {
   hasMeaningfulTitle,
   isDefaultTaskTitle,
@@ -222,12 +223,12 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   });
 
   const applyAiFill = useCallback(
-    (r: TaskAiFillResult) => {
-      if (r.title !== null) {
+    (r: AgentTaskFormFill) => {
+      if (r.title !== undefined) {
         form.setTitle(r.title);
         queueMicrotask(() => form.flushSave());
       }
-      if (r.subtasks !== null && detail) {
+      if (r.subtasks !== undefined && detail) {
         const existing = new Set(detail.subtasks.map((s) => s.title));
         for (const line of r.subtasks) {
           if (line.trim() && !existing.has(line.trim())) {
@@ -235,24 +236,49 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
           }
         }
       }
-      if (r.assigneeUserIds !== null) form.setAssigneeIds(r.assigneeUserIds);
-      if (r.status !== null) form.setStatus(r.status);
-      if (r.priority !== null) form.setPriority(r.priority);
-      if (r.dueLocal !== null) {
+      if (r.assigneeUserIds !== undefined) form.setAssigneeIds(r.assigneeUserIds);
+      if (r.status !== undefined) form.setStatus(r.status);
+      if (r.priority !== undefined) form.setPriority(r.priority);
+      if (r.dueLocal !== undefined) {
         form.setDue(r.dueLocal);
         if (!r.dueLocal.trim()) form.setDueRepeat(null);
       }
-      if (r.dueRepeat !== null) {
+      if (r.dueRepeat !== undefined) {
         if (r.dueRepeat === "none") {
           form.setDueRepeat(null);
         } else {
-          const effectiveDue = r.dueLocal !== null ? r.dueLocal : form.due;
+          const effectiveDue = r.dueLocal !== undefined ? r.dueLocal : form.due;
           if (effectiveDue.trim().length > 0) form.setDueRepeat(r.dueRepeat);
           else form.setDueRepeat(null);
         }
       }
     },
     [form, detail, subtaskOps.createSubtask],
+  );
+
+  // The sidebar AI does the form filling: it sees this form as it stands and sends fields back to applyAiFill.
+  const ask = useAsk();
+  const canFill = !!detail && form.initialized && taskEditCaps(detail.task, lists, sessionUserId, members).canEditFields;
+  useRegisterAskTaskForm(
+    canFill
+      ? {
+          taskId,
+          label: form.title,
+          isNew: !hasMeaningfulTitle(form.title),
+          getState: () => ({
+            taskId,
+            isNew: !hasMeaningfulTitle(form.title),
+            title: form.title.slice(0, 512),
+            status: form.status,
+            priority: form.priority,
+            dueLocal: form.due,
+            dueRepeat: form.dueRepeat,
+            assigneeUserIds: form.assigneeIds.slice(0, 50),
+            subtasks: (detail?.subtasks ?? []).slice(0, 100).map((s) => s.title.slice(0, 512)),
+          }),
+          apply: applyAiFill,
+        }
+      : null,
   );
 
   if (isLoading && !detail) {
@@ -294,17 +320,23 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             Task
           </span>
         </div>
-        <TaskFormSyncIndicator status={form.syncStatus} error={form.syncError} />
+        <div className="flex shrink-0 items-center gap-2">
+          {ask && canFill && (
+            <button
+              type="button"
+              onClick={() => ask.openAsk()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+            >
+              <AiIcon className="size-3.5" />
+              Fill with AI
+            </button>
+          )}
+          <TaskFormSyncIndicator status={form.syncStatus} error={form.syncError} />
+        </div>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-1">
-          <TaskPanelAiFill
-            members={members}
-            existingDraft={{ title: form.title, dueLocal: form.due, dueRepeat: form.dueRepeat }}
-            onApply={applyAiFill}
-          />
-
           <div className="space-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Task</h3>
 

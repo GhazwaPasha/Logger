@@ -88,6 +88,7 @@ const SYSTEM_PROMPT = [
   "- Read and write every date in the workspace time zone.",
   "- To change tasks, use the propose_* tools (reschedule, assign, status, comment). They file an approval card; nothing happens until the user approves it. Propose only what was asked, put related tasks in one proposal, then reply in one short sentence pointing at the card. Never say a change is done.",
   "- If a proposal skipped tasks, say which and why in a few words.",
+  "- If a task form is open and the message describes a task or asks to change it, treat it as filling that form: call fill_task_form with everything you can tell, resolving people and dates from the context block (a time without a date means the next time it occurs). Ask only when you truly can't tell. Then confirm what you filled in one short sentence.",
   "- You can also propose creating tasks (propose_create_tasks: pick each task's channel from the context block), archiving them (propose_archive) and editing a task's title, priority or checklist subtasks (propose_edit_task; read the task first to get subtask ids).",
   "- Deleting a task in LogBase means archiving it (it can be restored from Archived). Permanent deletion can't be done from chat: if asked, propose archiving and mention they can delete it for good from Archived.",
   "- If a tool says something isn't allowed, explain that their role doesn't cover it. Never claim to see what the tools didn't return.",
@@ -473,6 +474,8 @@ export class AgentService {
       ]);
       const timeZone = org?.timeZone ?? "UTC";
       const ctx = createToolContext(this.tools, p.userId, p.organizationId, timeZone);
+      const form = p.input.taskForm;
+      if (form) ctx.fillForm = (fill) => p.emit({ type: "form_fill", taskId: form.taskId, fill });
       const proposalIds: string[] = [];
       ctx.propose = async (np) => {
         const [row] = await this.db
@@ -504,6 +507,7 @@ export class AgentService {
         taskId: thread.taskId,
         view: p.input.view,
         selection: p.input.selection,
+        taskForm: p.input.taskForm,
         names: await ctx.names(),
       });
       const contents: GeminiContent[] = [
@@ -646,6 +650,7 @@ export class AgentService {
     taskId: string | null;
     view?: AskAgentInput["view"];
     selection?: AskAgentInput["selection"];
+    taskForm?: AskAgentInput["taskForm"];
     names: NameIndex;
   }): string {
     const now = new Date();
@@ -671,6 +676,16 @@ export class AgentService {
       lines.push("There are many people: use list_people to resolve names.");
     }
     if (p.taskId) lines.push(`Started from task [${p.taskId}]; "this task" means that one. Read it with get_task.`);
+    if (p.taskForm) {
+      const f = p.taskForm;
+      const who = f.assigneeUserIds.map((id) => people.get(id) ?? "Unknown").join(", ") || "nobody";
+      lines.push(
+        `A task form is open on screen${f.isNew ? " for a brand-new task (no title yet)" : ""} [${f.taskId}]; "this task" means it. As it stands now: ` +
+          `title ${f.isNew ? "(none)" : `"${f.title}"`}, status ${f.status}, priority ${f.priority}, due ${f.dueLocal || "(none)"}, repeat ${f.dueRepeat ?? "(none)"}, ` +
+          `assigned to ${who}, subtasks: ${f.subtasks.length ? f.subtasks.map((t) => `"${t}"`).join(", ") : "(none)"}.`,
+      );
+      lines.push("Use fill_task_form for anything about this task's fields; it applies right away with no approval card.");
+    }
     if (p.view) {
       const ids = [p.view.channelId && `channelId ${p.view.channelId}`, p.view.categoryId && `categoryId ${p.view.categoryId}`].filter(Boolean).join(", ");
       lines.push(

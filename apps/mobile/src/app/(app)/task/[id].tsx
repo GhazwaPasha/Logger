@@ -1,6 +1,7 @@
 import { faBoxArchive, faChevronLeft, faEllipsis, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { getZonedParts } from '@work-ledger/contracts';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,7 +20,6 @@ import { AiIcon } from '@/components/agent/ai-icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
-import { AiFillCard } from '@/components/tasks/detail/ai-fill-card';
 import { AttachmentsCard } from '@/components/tasks/detail/attachments-card';
 import { CommentThreadCard } from '@/components/tasks/detail/comment-thread';
 import { DependenciesCard } from '@/components/tasks/detail/dependencies-card';
@@ -48,7 +48,7 @@ import {
   useUpdateSubtask,
   type TaskPatch,
 } from '@/lib/queries';
-import { toDueLocal, type TaskAiFillResult } from '@/lib/task-ai-fill';
+import { registerAskTaskForm, type AskTaskForm } from '@/lib/agent-task-form';
 import {
   dueChipColors,
   normalizeTaskStatus,
@@ -238,39 +238,20 @@ function TaskScreen() {
     else if (!trimmed && !isDefaultTitle(task.title)) setTitle(task.title);
   };
 
-  /** Everything the AI filled goes out as one PATCH — fields and new checklist lines in a single transaction. */
-  const applyAi = (r: TaskAiFillResult) => {
-    const p: TaskPatch = {};
-    if (r.title) {
-      p.title = r.title;
-      setTitle(r.title);
-    }
-    if (r.priority) p.priority = r.priority;
-    if (r.status) p.status = r.status;
-    // One assignee per task.
-    if (r.assigneeUserIds) p.assigneeUserIds = r.assigneeUserIds.slice(0, 1);
-    if (r.dueLocal !== null) {
-      if (r.dueLocal === '') {
-        p.dueAt = null;
-        p.dueRepeat = null;
-      } else {
-        const due = new Date(r.dueLocal);
-        // The API rejects a due date in the past, which would sink the whole save (assignees included).
-        if (!Number.isNaN(due.getTime()) && due.getTime() > Date.now()) p.dueAt = due.toISOString();
-      }
-    }
-    if (r.dueRepeat !== null && p.dueAt !== null && (p.dueAt || task.dueAt)) {
-      p.dueRepeat = r.dueRepeat === 'none' ? null : r.dueRepeat;
-    }
-    const existing = new Set(subtasks.map((st) => st.title.trim()));
-    const lines = (r.subtasks ?? []).map((l) => l.trim()).filter((l) => l && !existing.has(l));
-    if (lines.length > 0) p.subtasksToCreate = lines.map((l) => ({ title: l }));
-    if (Object.keys(p).length > 0) setPatch(p);
-  };
-
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>
       {topBar}
+      {canEdit ? (
+        <AskFormBridge
+          task={task}
+          title={title}
+          timeZone={timeZone}
+          assigneeUserIds={assigneeUserIds}
+          subtaskTitles={subtasks.map((st) => st.title)}
+          setPatch={setPatch}
+          setTitle={setTitle}
+        />
+      ) : null}
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -294,16 +275,6 @@ function TaskScreen() {
               {capabilities.canRestoreTask ? (
                 <Button title="Restore" variant="secondary" compact onPress={() => restore.mutate(task.id)} />
               ) : null}
-            </Animated.View>
-          ) : null}
-
-          {canEdit ? (
-            <Animated.View entering={sequenceEnter(0, 8)}>
-              <AiFillCard
-                members={members}
-                existingDraft={{ title: title.trim() || undefined, dueLocal: toDueLocal(task.dueAt), dueRepeat: task.dueRepeat ?? null }}
-                onApply={applyAi}
-              />
             </Animated.View>
           ) : null}
 
@@ -454,6 +425,77 @@ function TaskScreen() {
       />
     </View>
   );
+}
+
+/**
+ * Offers this task to Ask while it's on screen. Ask reads it as it stands and sends back fields; everything filled in
+ * goes out as one PATCH, fields and new checklist lines in a single transaction.
+ */
+function AskFormBridge(props: {
+  task: { id: string; status: string; priority?: string; dueAt: string | null; dueRepeat?: string | null };
+  title: string;
+  timeZone: string;
+  assigneeUserIds: string[];
+  subtaskTitles: string[];
+  setPatch: (p: TaskPatch) => void;
+  setTitle: (title: string) => void;
+}) {
+  const latest = useRef(props);
+  useEffect(() => {
+    latest.current = props;
+  });
+  const taskId = props.task.id;
+  useEffect(() => {
+    const form: AskTaskForm = {
+      taskId,
+      getState: () => {
+        const { task, title, timeZone, assigneeUserIds, subtaskTitles } = latest.current;
+        return {
+          taskId,
+          isNew: isDefaultTitle(title) || !title.trim(),
+          title: title.slice(0, 512),
+          status: task.status,
+          priority: task.priority ?? 'medium',
+          dueLocal: task.dueAt ? zonedLocal(task.dueAt, timeZone) : '',
+          dueRepeat: task.dueRepeat ?? null,
+          assigneeUserIds: assigneeUserIds.slice(0, 50),
+          subtasks: subtaskTitles.slice(0, 100).map((s) => s.slice(0, 512)),
+        };
+      },
+      apply: (r) => {
+        const { task, subtaskTitles, setPatch, setTitle } = latest.current;
+        const p: TaskPatch = {};
+        if (r.title) {
+          p.title = r.title;
+          setTitle(r.title);
+        }
+        if (r.priority) p.priority = r.priority;
+        if (r.status) p.status = r.status;
+        // One assignee per task.
+        if (r.assigneeUserIds) p.assigneeUserIds = r.assigneeUserIds.slice(0, 1);
+        if (r.dueAt !== undefined) {
+          p.dueAt = r.dueAt;
+          if (r.dueAt === null) p.dueRepeat = null;
+        }
+        if (r.dueRepeat !== undefined && p.dueAt !== null && (p.dueAt || task.dueAt)) {
+          p.dueRepeat = r.dueRepeat === 'none' ? null : r.dueRepeat;
+        }
+        const existing = new Set(subtaskTitles.map((s) => s.trim()));
+        const lines = (r.subtasks ?? []).map((l) => l.trim()).filter((l) => l && !existing.has(l));
+        if (lines.length > 0) p.subtasksToCreate = lines.map((l) => ({ title: l }));
+        if (Object.keys(p).length > 0) setPatch(p);
+      },
+    };
+    return registerAskTaskForm(form);
+  }, [taskId]);
+  return null;
+}
+
+/** An instant as `YYYY-MM-DDTHH:mm` in the workspace time zone, the format the agent reads and writes. */
+function zonedLocal(iso: string, timeZone: string): string {
+  const p = getZonedParts(new Date(iso), timeZone);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`;
 }
 
 const styles = StyleSheet.create({

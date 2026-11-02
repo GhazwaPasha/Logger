@@ -15,6 +15,8 @@ import {
   type TaskAiFillRequestBody,
 } from "@/lib/task-ai-fill";
 
+// Legacy: the web and current mobile code fill task forms through Ask LogBase (fill_task_form) now. Only mobile builds
+// already installed still call this; remove it, with its lib files, once those are replaced.
 const MAX_PROMPT_LEN = 6000;
 const MODEL_LIST_CACHE_MS = 20 * 60 * 1000;
 const GEMINI_URL =

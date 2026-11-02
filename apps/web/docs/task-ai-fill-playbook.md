@@ -1,3 +1,5 @@
+> **Legacy.** Task forms are now filled by Ask LogBase (`fill_task_form` in `apps/api/src/agent`); the `TaskPanelAiFill` box is gone. This route only remains for mobile builds already installed.
+
 # Task AI fill — playbook
 
 Canonical **machine** copy lives in code: `apps/web/src/lib/task-ai-playbook.ts` (`TASK_AI_SYSTEM_INSTRUCTION`, `GEMINI_TASK_FILL_RESPONSE_SCHEMA`, `buildTaskFillUserTurn`). Update that file when product rules change; use this doc for a human-readable overview.

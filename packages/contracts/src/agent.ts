@@ -23,6 +23,22 @@ export const askAgentSchema = z.object({
       categoryId: z.string().uuid().optional(),
     })
     .optional(),
+  /** The task form open on screen, as it stands right now (possibly unsaved). The agent can fill it in directly. */
+  taskForm: z
+    .object({
+      taskId: z.string().uuid(),
+      /** Still the untitled draft from "New task". */
+      isNew: z.boolean(),
+      title: z.string().max(512),
+      status: z.string().max(32),
+      priority: z.string().max(32),
+      /** `YYYY-MM-DDTHH:mm` in the workspace time zone, or "" for none. */
+      dueLocal: z.string().max(32),
+      dueRepeat: z.string().max(32).nullable(),
+      assigneeUserIds: z.array(z.string().max(128)).max(50),
+      subtasks: z.array(z.string().max(512)).max(100),
+    })
+    .optional(),
   /** Tasks the user selected on the board before asking ("these"). */
   selection: z
     .array(z.object({ id: z.string().uuid(), title: z.string().max(300) }))
@@ -47,6 +63,8 @@ export type AgentStreamEvent =
   | { type: "step"; label: string }
   /** Answer text as it's written. Append to a draft; a later `step` means it was a preamble, so clear the draft. */
   | { type: "delta"; text: string }
+  /** Fill these fields into the task form open on screen, right away; the form saves them as usual. */
+  | { type: "form_fill"; taskId: string; fill: AgentTaskFormFill }
   /** The agent proposed a change: show it as an approval card. Nothing has happened yet. */
   | { type: "proposal"; proposal: AgentProposal }
   | { type: "answer"; messageId: string; text: string; title: string }
@@ -59,6 +77,22 @@ export type AgentThreadSummary = {
   pinned: boolean;
   createdAt: string;
   lastMessageAt: string;
+};
+
+/** Fields for the open task form. An absent key means "leave that field as it is". */
+export type AgentTaskFormFill = {
+  title?: string;
+  /** Checklist lines to add; lines the task already has are ignored. */
+  subtasks?: string[];
+  /** Replaces the assignees; `[]` clears them. */
+  assigneeUserIds?: string[];
+  status?: "pending" | "in_progress" | "done" | "cancelled";
+  priority?: "high" | "medium" | "low";
+  /** `YYYY-MM-DDTHH:mm` in the workspace time zone; "" clears the due date (and any repeat). */
+  dueLocal?: string;
+  /** The same due as an instant, for clients that work in instants; `null` clears it. */
+  dueAt?: string | null;
+  dueRepeat?: "daily" | "weekly" | "monthly" | "yearly" | "none";
 };
 
 export type AgentProposalKind = "reschedule" | "assign" | "status" | "comment" | "create" | "archive" | "edit";

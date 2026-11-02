@@ -23,6 +23,22 @@ exports.askAgentSchema = zod_1.z.object({
         categoryId: zod_1.z.string().uuid().optional(),
     })
         .optional(),
+    /** The task form open on screen, as it stands right now (possibly unsaved). The agent can fill it in directly. */
+    taskForm: zod_1.z
+        .object({
+        taskId: zod_1.z.string().uuid(),
+        /** Still the untitled draft from "New task". */
+        isNew: zod_1.z.boolean(),
+        title: zod_1.z.string().max(512),
+        status: zod_1.z.string().max(32),
+        priority: zod_1.z.string().max(32),
+        /** `YYYY-MM-DDTHH:mm` in the workspace time zone, or "" for none. */
+        dueLocal: zod_1.z.string().max(32),
+        dueRepeat: zod_1.z.string().max(32).nullable(),
+        assigneeUserIds: zod_1.z.array(zod_1.z.string().max(128)).max(50),
+        subtasks: zod_1.z.array(zod_1.z.string().max(512)).max(100),
+    })
+        .optional(),
     /** Tasks the user selected on the board before asking ("these"). */
     selection: zod_1.z
         .array(zod_1.z.object({ id: zod_1.z.string().uuid(), title: zod_1.z.string().max(300) }))
