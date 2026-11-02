@@ -1,36 +1,31 @@
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
-import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
-  FadeInDown,
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
-import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Pulse } from '@/components/motion/pulse';
-import { usePresence } from '@/components/motion/use-presence';
 import { useSequenceClock } from '@/components/motion/use-sequence-clock';
 import { Text } from '@/components/text';
-import { Duration, POP_EASE, sequenceEnter, sequenceSettled } from '@/constants/motion';
-import { alpha, Radius } from '@/constants/theme';
-import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { Duration, sequenceEnter, sequenceSettled, stateTransition } from '@/constants/motion';
+import { alpha } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type RingSegment = { key: string; label: string; value: number; color: string };
 type Half = 'top' | 'bottom';
 type Focus = { half: Half; key: string } | null;
 
-/** Arc thickness on the dashboard and in the focused view (viewBox units). */
-const HERO_STROKE = 10;
-const FOCUS_STROKE = 12;
+/** Arc thickness (viewBox units). */
+const STROKE = 10;
+/** Opacity of the pieces a focus isn't on. */
+const DIMMED_OPACITY = 0.16;
 /** Degrees between neighbouring pieces. */
 const GAP_DEG = 4;
 /**
@@ -40,8 +35,9 @@ const GAP_DEG = 4;
 const SEAM_DEG = GAP_DEG / 2;
 /** How long a half takes to fill, piece by piece. */
 const FILL_MS = 900;
-/** In the focused view, the ring starts filling once the stage has mostly sprung in. */
-const FOCUS_FILL_AT = 160;
+/** Largest the ring and its legend get (the web's 17rem and 18rem). */
+const RING_MAX = 272;
+const LEGEND_MAX = 288;
 
 /** Smallest slice of a half a non-zero segment is drawn with, so tiny counts stay visible. */
 const MIN_SHARE = 0.07;
@@ -103,6 +99,17 @@ function directedArc(r: number, fromDeg: number, toDeg: number) {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedG = Animated.createAnimatedComponent(G);
+
+/** Fades a piece of the ring back while the focus is on another one. */
+function DimGroup({ dimmed, children }: { dimmed: boolean; children: ReactNode }) {
+  const opacity = useSharedValue(dimmed ? DIMMED_OPACITY : 1);
+  useEffect(() => {
+    opacity.value = withTiming(dimmed ? DIMMED_OPACITY : 1, { duration: Duration.base });
+  }, [dimmed, opacity]);
+  const animated = useAnimatedProps(() => ({ opacity: opacity.value }));
+  return <AnimatedG animatedProps={animated}>{children}</AnimatedG>;
+}
 
 /**
  * One coloured piece of the ring. Its geometry is fixed; only the dash offset follows `filled`, on the UI
@@ -165,7 +172,7 @@ function FillArc({
 /**
  * The segmented ring, one piece per colour. Both halves fill left → right: the top half (status) over the top, the bottom half
  * (priority) under the bottom. With a `focus`, every other piece dims. The fill starts `fillAt`
- * ms after mount (so it can wait for an entrance to land) and replays whenever the data changes. It stays empty
+ * ms after mount (so it can wait for an entrance to land). It stays empty
  * until `ready`, so numbers trickling in from separate queries don't each kick off a fill.
  */
 function TickRing({
@@ -173,21 +180,17 @@ function TickRing({
   bottom,
   size,
   focus,
-  stroke,
-  fillAt = 0,
-  ready = true,
+  fillAt,
+  ready,
 }: {
   top: RingSegment[];
   bottom: RingSegment[];
   size: number;
   focus: Focus;
-  /** Arc thickness, in the ring's 200-unit viewBox. */
-  stroke: number;
-  fillAt?: number;
-  ready?: boolean;
+  fillAt: number;
+  ready: boolean;
 }) {
   const theme = useTheme();
-  const dark = useIsDark();
   const signature = [...top, ...bottom].map((s) => s.value).join(',');
   const filled = useSharedValue(0);
   const delayUntil = useSequenceClock();
@@ -213,8 +216,8 @@ function TickRing({
   const R = 84;
   const span = 180 - SEAM_DEG * 2;
   // Round caps reach past an arc's ends; pull each piece in by that much so the gaps stay even.
-  const capDeg = ((stroke / 2) / R) * (180 / Math.PI);
-  const track = alpha(theme.fg, dark ? 0.1 : 0.08);
+  const capDeg = ((STROKE / 2) / R) * (180 / Math.PI);
+  const track = alpha(theme.fg, 0.08);
 
   // SVG angles run clockwise from 3 o'clock. Both halves fill left → right: the top half runs 180° → 360°
   // over the top, the bottom half 180° → 0° under the bottom.
@@ -240,7 +243,7 @@ function TickRing({
               key={`${half}-empty`}
               d={arcPath(R, at(SEAM_DEG + capDeg), at(SEAM_DEG + span - capDeg))}
               stroke={track}
-              strokeWidth={stroke}
+              strokeWidth={STROKE}
               strokeLinecap="round"
               fill="none"
             />
@@ -257,8 +260,8 @@ function TickRing({
           const dimmed = focus !== null && !(focus.half === half && focus.key === p.seg.key);
           return (
             <G key={`${half}-${p.seg.key}`}>
-              <Path d={arcPath(R, at(c0), at(c1))} stroke={track} strokeWidth={stroke} strokeLinecap="round" fill="none" />
-              <G opacity={dimmed ? 0.16 : 1}>
+              <Path d={arcPath(R, at(c0), at(c1))} stroke={track} strokeWidth={STROKE} strokeLinecap="round" fill="none" />
+              <DimGroup dimmed={dimmed}>
                 <FillArc
                   filled={filled}
                   from={p.from}
@@ -267,11 +270,11 @@ function TickRing({
                   toDeg={at(c1)}
                   r={R}
                   color={p.seg.color}
-                  stroke={stroke}
+                  stroke={STROKE}
                   startCap={point(at(c0))}
                   endCap={point(at(c1))}
                 />
-              </G>
+              </DimGroup>
             </G>
           );
         });
@@ -290,17 +293,12 @@ function RingCentre({
   topLabel,
   bottomLabel,
   focus,
-  large,
-  hint,
 }: {
   top: RingSegment[];
   bottom: RingSegment[];
   topLabel: string;
   bottomLabel: string;
   focus: Focus;
-  large?: boolean;
-  /** Hero only: a "Tap for more" hint between the two totals, in place of the hairline. */
-  hint?: boolean;
 }) {
   const theme = useTheme();
   const focused = focus ? (focus.half === 'top' ? top : bottom).find((s) => s.key === focus.key) : undefined;
@@ -323,28 +321,19 @@ function RingCentre({
     );
   }
 
-  const numberStyle = { fontSize: large ? 40 : 32 };
   return (
     <View style={styles.centre} pointerEvents="none">
-      <Text size="3xl" weight="bold" tabular tracking={-1} lh={large ? 44 : 36} style={numberStyle}>
+      <Text size="3xl" weight="bold" tabular tracking={-1} lh={38} style={styles.total}>
         {sum(top)}
       </Text>
-      <Text size="11" color="muted" uppercase tracking={0.8}>
+      <Text size="11" color="muted" uppercase tracking={0.55}>
         {topLabel}
       </Text>
-      {hint ? (
-        <View style={[styles.hint, { backgroundColor: alpha(theme.fg, 0.06) }]}>
-          <Text size="10" weight="semibold" color="muted" uppercase tracking={0.6}>
-            Tap for more
-          </Text>
-        </View>
-      ) : (
-        <View style={[styles.centreSplit, { backgroundColor: theme.borderSubtle }]} />
-      )}
-      <Text size="3xl" weight="bold" tabular tracking={-1} lh={large ? 44 : 36} style={numberStyle}>
+      <View style={[styles.centreSplit, { backgroundColor: theme.borderSubtle }]} />
+      <Text size="3xl" weight="bold" tabular tracking={-1} lh={38} style={styles.total}>
         {sum(bottom)}
       </Text>
-      <Text size="11" color="muted" uppercase tracking={0.8}>
+      <Text size="11" color="muted" uppercase tracking={0.55}>
         {bottomLabel}
       </Text>
     </View>
@@ -352,9 +341,9 @@ function RingCentre({
 }
 
 /**
- * Dashboard hero: one big segmented ring — status mix across the top, priority across the bottom — with no
- * legend. Tapping it brings the ring into focus over a dimmed screen and reveals the legend; tapping a legend
- * row highlights that segment's piece.
+ * Dashboard hero: one big segmented ring — status mix across the top, priority across the bottom — with its legend
+ * underneath. Tapping a legend row highlights that segment's piece and puts its number in the centre; tapping the
+ * row again, or the ring, clears it.
  */
 export function StatusPriorityRing({
   top,
@@ -378,113 +367,38 @@ export function StatusPriorityRing({
   loading?: boolean;
 }) {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
-  const [open, setOpen] = useState(false);
+  const { width } = useWindowDimensions();
   const [focus, setFocus] = useState<Focus>(null);
-  const { mounted, progress } = usePresence(open, { spring: true });
 
-  const heroSize = Math.min(width - 56, 300);
-  const focusSize = Math.min(width - 48, height * 0.42, 340);
-
-  const backdrop = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.max(0, progress.value)) }));
-  const stage = useAnimatedStyle(() => {
-    const p = Math.min(1, Math.max(0, progress.value));
-    return { opacity: p, transform: [{ scale: 0.86 + 0.14 * p }, { translateY: (1 - p) * 40 }] };
-  });
-
-  const close = () => {
-    setOpen(false);
-    setFocus(null);
-  };
+  const size = Math.min(width - 56, RING_MAX);
 
   return (
-    <>
-      <Animated.View entering={sequenceEnter(enterIndex, 8)}>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={`${topTitle} and ${bottomTitle}. ${sum(top)} ${topLabel}, ${sum(bottom)} ${bottomLabel}. Show breakdown`}
-          scaleTo={0.985}
-          haptic="tap"
-          onPress={() => setOpen(true)}
-          style={[styles.hero, { width: heroSize, height: heroSize }]}>
-          <TickRing
-            top={top}
-            bottom={bottom}
-            size={heroSize}
-            focus={null}
-            stroke={HERO_STROKE}
-            fillAt={sequenceSettled(enterIndex)}
-            ready={!loading}
-          />
-          <View style={StyleSheet.absoluteFill}>
-            {loading ? (
-              <View style={styles.centre} pointerEvents="none">
-                <Pulse style={{ width: 56, height: 30, borderRadius: 8, backgroundColor: alpha(theme.fg, 0.1) }} />
-              </View>
-            ) : (
-              <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={null} hint />
-            )}
-          </View>
-        </PressableScale>
-      </Animated.View>
-
-      <Modal visible={mounted} transparent animationType="none" statusBarTranslucent onRequestClose={close}>
-        {/* Near-opaque page colour: the dashboard underneath shouldn't read through and compete with the ring. */}
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(theme.surfaceBase, 0.97) }, backdrop]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close breakdown" />
-        </Animated.View>
-
-        <Animated.View
-          pointerEvents="box-none"
-          style={[styles.stage, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 16 }, stage]}>
-          <View style={styles.stageHead}>
-            <Text font="outfit" size="lg" weight="bold">
-              {`${topTitle} & ${bottomTitle}`}
-            </Text>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              scaleTo={0.9}
-              hitSlop={8}
-              onPress={close}
-              style={[styles.closeBtn, { backgroundColor: alpha(theme.fg, 0.08) }]}>
-              <Icon icon={faXmark} size={16} color="fg" />
-            </PressableScale>
-          </View>
-
-          <Pressable
-            onPress={() => setFocus(null)}
-            accessibilityLabel="Clear highlight"
-            style={[styles.focusRing, { width: focusSize, height: focusSize }]}>
-            <TickRing top={top} bottom={bottom} size={focusSize} focus={focus} stroke={FOCUS_STROKE} fillAt={FOCUS_FILL_AT} />
-            <View style={StyleSheet.absoluteFill}>
-              <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={focus} large />
+    <Animated.View entering={sequenceEnter(enterIndex, 8)} style={styles.hero}>
+      <Pressable
+        disabled={!focus}
+        onPress={() => setFocus(null)}
+        accessibilityRole="image"
+        accessibilityLabel={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
+        accessibilityHint={focus ? 'Clears the highlight' : undefined}
+        style={{ width: size, height: size }}>
+        <TickRing top={top} bottom={bottom} size={size} focus={focus} fillAt={sequenceSettled(enterIndex)} ready={!loading} />
+        <View style={StyleSheet.absoluteFill}>
+          {loading ? (
+            <View style={styles.centre} pointerEvents="none">
+              <Pulse style={{ width: 56, height: 32, borderRadius: 8, backgroundColor: theme.surfaceMuted }} />
             </View>
-          </Pressable>
+          ) : (
+            <RingCentre top={top} bottom={bottom} topLabel={topLabel} bottomLabel={bottomLabel} focus={focus} />
+          )}
+        </View>
+      </Pressable>
 
-          <View style={[styles.legendCard, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-            <LegendGroup
-              title={topTitle}
-              half="top"
-              segments={top}
-              focus={focus}
-              onFocus={setFocus}
-              enterFrom={0}
-            />
-            <View style={[styles.legendSplit, { backgroundColor: theme.borderSubtle }]} />
-            <LegendGroup
-              title={bottomTitle}
-              half="bottom"
-              segments={bottom}
-              focus={focus}
-              onFocus={setFocus}
-              enterFrom={top.length + 1}
-            />
-          </View>
-        </Animated.View>
-      </Modal>
-    </>
+      <View style={styles.legend}>
+        <LegendGroup title={topTitle} half="top" segments={top} focus={focus} loading={loading} onFocus={setFocus} />
+        <View style={[styles.legendSplit, { backgroundColor: theme.borderSubtle }]} />
+        <LegendGroup title={bottomTitle} half="bottom" segments={bottom} focus={focus} loading={loading} onFocus={setFocus} />
+      </View>
+    </Animated.View>
   );
 }
 
@@ -493,51 +407,46 @@ function LegendGroup({
   half,
   segments,
   focus,
+  loading,
   onFocus,
-  enterFrom,
 }: {
   title: string;
   half: Half;
   segments: RingSegment[];
   focus: Focus;
+  loading: boolean;
   onFocus: (f: Focus) => void;
-  enterFrom: number;
 }) {
-  const theme = useTheme();
   const total = sum(segments);
   return (
-    <View style={{ gap: 2 }}>
-      <Text size="10" weight="semibold" color="muted" uppercase tracking={0.6} style={styles.legendTitle}>
+    <View>
+      <Text size="10" weight="semibold" color="muted" uppercase tracking={0.5} style={styles.legendTitle}>
         {`${half === 'top' ? '▲' : '▼'} ${title}`}
       </Text>
-      {segments.map((s, i) => {
+      {segments.map((s) => {
         const active = focus?.half === half && focus.key === s.key;
         return (
-          <Animated.View
+          <PressableScale
             key={s.key}
-            entering={FadeInDown.duration(Duration.base)
-              .delay(120 + (enterFrom + i) * 40)
-              .easing(POP_EASE)}>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={`${s.label}: ${s.value}`}
-              scaleTo={0.98}
-              haptic="select"
-              onPress={() => onFocus(active ? null : { half, key: s.key })}
-              style={[styles.legendRow, active && { backgroundColor: alpha(s.color, 0.16) }]}>
-              <View style={[styles.legendDot, { backgroundColor: s.color }]} />
-              <Text size="sm" weight={active ? 'semibold' : 'medium'} numberOfLines={1} style={{ flex: 1 }}>
-                {s.label}
-              </Text>
-              <Text size="xs" color="muted" tabular style={{ width: 40, textAlign: 'right' }}>
-                {`${pct(s.value, total)}%`}
-              </Text>
-              <Text size="sm" weight="semibold" tabular style={{ minWidth: 36, textAlign: 'right', color: theme.fg }}>
-                {s.value}
-              </Text>
-            </PressableScale>
-          </Animated.View>
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active, disabled: loading }}
+            accessibilityLabel={loading ? s.label : `${s.label}: ${s.value}, ${pct(s.value, total)}%`}
+            scaleTo={0.98}
+            haptic="select"
+            onPress={() => onFocus(active ? null : { half, key: s.key })}
+            style={[styles.legendRow, { backgroundColor: active ? alpha(s.color, 0.16) : 'transparent' }, stateTransition]}>
+            <View style={[styles.legendDot, { backgroundColor: s.color }]} />
+            <Text size="sm" weight={active ? 'semibold' : 'medium'} numberOfLines={1} style={{ flex: 1 }}>
+              {s.label}
+            </Text>
+            <Text size="xs" color="muted" tabular style={{ width: 40, textAlign: 'right' }}>
+              {loading ? '' : `${pct(s.value, total)}%`}
+            </Text>
+            <Text size="sm" weight="semibold" tabular style={{ minWidth: 36, textAlign: 'right' }}>
+              {loading ? '…' : s.value}
+            </Text>
+          </PressableScale>
         );
       })}
     </View>
@@ -545,25 +454,14 @@ function LegendGroup({
 }
 
 const styles = StyleSheet.create({
-  // No card: the ring sits straight on the page, centred.
-  hero: { alignSelf: 'center', marginVertical: 6 },
-  hint: { marginVertical: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  // No card: the ring and legend sit straight on the page, centred.
+  hero: { alignItems: 'center', gap: 24, paddingVertical: 8 },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  centreSplit: { width: '30%', height: StyleSheet.hairlineWidth * 2, marginVertical: 6 },
+  total: { fontSize: 34 },
+  centreSplit: { width: '30%', height: StyleSheet.hairlineWidth * 2, marginVertical: 8 },
   focusDot: { width: 10, height: 10, borderRadius: 5, marginBottom: 4 },
-  stage: { flex: 1, alignItems: 'center', paddingHorizontal: 16, gap: 16 },
-  stageHead: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // No background: the ring floats on the dimmed screen, like the hero does on the page.
-  focusRing: { alignItems: 'center', justifyContent: 'center' },
-  legendCard: { alignSelf: 'stretch', borderRadius: Radius.xxxl + 6, borderWidth: 1, padding: 8, gap: 6 },
-  legendTitle: { paddingHorizontal: 10, paddingTop: 4, paddingBottom: 2 },
+  legend: { width: '100%', maxWidth: LEGEND_MAX, gap: 12 },
+  legendTitle: { paddingHorizontal: 10, paddingBottom: 4 },
   legendSplit: { height: StyleSheet.hairlineWidth * 2, marginHorizontal: 10 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 38, paddingHorizontal: 10, borderRadius: 12 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
