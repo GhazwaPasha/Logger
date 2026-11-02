@@ -20,7 +20,8 @@ import { fadeOut, sequenceEnter, stateTransition } from '@/constants/motion';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NODE_LABELS } from '@/lib/labels';
-import { useActiveTasks, useBoardCounts, useOrgActivityFeed, useSeriesSummaries, type BoardFilter, type SeriesSummaryRow } from '@/lib/queries';
+import { DASHBOARD_WINDOW_DAYS } from '@work-ledger/contracts';
+import { useActiveTasks, useBoardCounts, useClosedTaskCount, useOrgActivityFeed, type BoardFilter } from '@/lib/queries';
 import { FLOW_COLUMN_LABELS, PRIORITY_LABELS, taskIsOverdue, taskPriority, TASK_FLOW_ORDER, type TaskPriority } from '@/lib/task-board';
 import { authClient } from '@/lib/auth-client';
 import { useWorkspace } from '@/lib/workspace';
@@ -52,16 +53,6 @@ const PRIORITY_ORDER: TaskPriority[] = ['high', 'medium', 'low'];
 
 // Stable query inputs (they are part of the query keys).
 const WHOLE_WORKSPACE: BoardFilter = {};
-const DONE_ONLY = ['done'] as const;
-const CANCELLED_ONLY = ['cancelled'] as const;
-
-/**
- * Every repeat of a recurring task is its own task row, so the raw done / cancelled totals count a daily task
- * once per day. Count each recurring chain once instead — the same way the board collapses a chain into a
- * single card: drop the chain's occurrences and add one per chain.
- */
-const countChainsOnce = (total: number, chains: SeriesSummaryRow[]) =>
-  Math.max(0, total - chains.reduce((n, c) => n + c.count, 0) + chains.length);
 
 function KpiCard({
   tone,
@@ -224,15 +215,15 @@ export default function DashboardScreen() {
       ? router.navigate({ pathname: '/channels/[listId]', params: { listId: scope.listId } })
       : router.navigate('/channels');
   const counts = useBoardCounts(org?.id, WHOLE_WORKSPACE);
-  const doneChains = useSeriesSummaries(org?.id, WHOLE_WORKSPACE, DONE_ONLY);
-  const cancelledChains = useSeriesSummaries(org?.id, WHOLE_WORKSPACE, CANCELLED_ONLY);
+  const doneCount = useClosedTaskCount(org?.id, 'done');
+  const cancelledCount = useClosedTaskCount(org?.id, 'cancelled');
   const [view, setView] = useState<View_>('overview');
   const activity = useOrgActivityFeed(org?.id, view === 'activity');
 
   // Until the workspace resolves, the task queries sit disabled (not "loading"), so count that wait too —
   // otherwise the overview flashes zeros, then refills and re-animates once the real numbers land.
   const loading =
-    workspaceLoading || active.isLoading || counts.isLoading || doneChains.isLoading || cancelledChains.isLoading;
+    workspaceLoading || active.isLoading || counts.isLoading || doneCount.isLoading || cancelledCount.isLoading;
   const tasks = useMemo(() => active.data ?? [], [active.data]);
 
   const stats = useMemo(() => {
@@ -259,8 +250,8 @@ export default function DashboardScreen() {
   const workflow = {
     pending: counts.data?.pending ?? 0,
     in_progress: counts.data?.in_progress ?? 0,
-    done: countChainsOnce(counts.data?.done ?? 0, doneChains.summaries),
-    cancelled: countChainsOnce(counts.data?.cancelled ?? 0, cancelledChains.summaries),
+    done: doneCount.data ?? 0,
+    cancelled: cancelledCount.data ?? 0,
   };
   const names = useMemo(() => new Map(members.map((m) => [m.userId, m.name || m.email])), [members]);
   const topAssignees = [...stats.byAssignee.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -276,6 +267,8 @@ export default function DashboardScreen() {
       onRefresh={() => {
         void active.refetch();
         void counts.refetch();
+        void doneCount.refetch();
+        void cancelledCount.refetch();
         void activity.refetch();
       }}
       refreshing={active.isRefetching || counts.isRefetching}
@@ -369,7 +362,7 @@ export default function DashboardScreen() {
               loading={loading}
               top={TASK_FLOW_ORDER.map((st) => ({
                 key: st,
-                label: FLOW_COLUMN_LABELS[st],
+                label: st === 'done' || st === 'cancelled' ? `${FLOW_COLUMN_LABELS[st]} · ${DASHBOARD_WINDOW_DAYS}d` : FLOW_COLUMN_LABELS[st],
                 value: workflow[st],
                 color: STATUS_COLOR[st],
               }))}

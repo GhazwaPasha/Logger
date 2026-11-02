@@ -48,6 +48,7 @@ export class TasksController {
       cursor: query.cursor,
       archivedOnly: query.archived,
       excludeRecurringSeries: query.excludeRecurringSeries,
+      closedSince: query.closedSince,
     });
   }
 

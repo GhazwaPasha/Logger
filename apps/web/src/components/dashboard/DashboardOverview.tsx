@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DASHBOARD_WINDOW_DAYS } from "@work-ledger/contracts";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo, type ReactNode } from "react";
 import { HBarChart } from "@/components/dashboard/HBarChart";
@@ -56,9 +57,8 @@ function workHref(base: string, query: Record<string, string | undefined>): stri
 export type DashboardStats = ReturnType<typeof useDashboardStats>;
 
 /**
- * Workspace numbers for the dashboard. Each recurring chain counts once in the done / cancelled totals (every
- * repeat is its own task row, so a daily task would otherwise count once per day) — the same way the board
- * collapses a chain into one card.
+ * Workspace numbers for the dashboard. Done / cancelled come from `closed` (see `useClosedTaskCounts`), not from
+ * `tasks`, whose closed rows only reach as far as the board has been scrolled.
  */
 export function useDashboardStats(
   tasks: TaskRow[],
@@ -66,14 +66,19 @@ export function useDashboardStats(
   lists: ListRow[],
   currentUserId: string | null,
   timeZone: string,
+  closed: { done: number; cancelled: number } | null,
 ) {
   return useMemo(() => {
-    const workflow: Record<ManualTaskStatus, number> = { pending: 0, in_progress: 0, done: 0, cancelled: 0 };
+    const workflow: Record<ManualTaskStatus, number> = {
+      pending: 0,
+      in_progress: 0,
+      done: closed?.done ?? 0,
+      cancelled: closed?.cancelled ?? 0,
+    };
     const priority: Record<TaskPriority, number> = { high: 0, medium: 0, low: 0 };
     const byDept = new Map<string, number>();
     const byAssignee = new Map<string, number>();
     const deptOfList = new Map(lists.map((l) => [l.id, l.departmentId]));
-    const closedChains = { done: new Set<string>(), cancelled: new Set<string>() };
     let open = 0;
     let overdue = 0;
     let dueThisWeek = 0;
@@ -89,14 +94,7 @@ export function useDashboardStats(
         subtasksTotal++;
         if (s.done) subtasksDone++;
       }
-      if (col === "done" || col === "cancelled") {
-        if (t.recurringSeriesId) {
-          if (closedChains[col].has(t.recurringSeriesId)) continue;
-          closedChains[col].add(t.recurringSeriesId);
-        }
-        workflow[col]++;
-        continue;
-      }
+      if (col === "done" || col === "cancelled") continue;
       workflow[col]++;
       open++;
       priority[taskPriority(t)]++;
@@ -125,7 +123,7 @@ export function useDashboardStats(
       subtasksDone,
       empty: depts.length === 0 && lists.length === 0 && tasks.length === 0,
     };
-  }, [tasks, depts, lists, currentUserId, timeZone]);
+  }, [tasks, depts, lists, currentUserId, timeZone, closed]);
 }
 
 /** One step of the page's top-to-bottom entrance: fade up 10px, 60ms after the step before it. */
@@ -281,7 +279,7 @@ export function DashboardOverview({
             fillDelay={sequenceSettled(5)}
             top={STATUS_ORDER.map((st) => ({
               key: st,
-              label: FLOW_COLUMN_LABELS[st],
+              label: st === "done" || st === "cancelled" ? `${FLOW_COLUMN_LABELS[st]} · ${DASHBOARD_WINDOW_DAYS}d` : FLOW_COLUMN_LABELS[st],
               value: stats.workflow[st],
               color: STATUS_COLOR[st],
               href: workHref(basePath, { status: st }),

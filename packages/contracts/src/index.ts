@@ -256,9 +256,23 @@ export const listTasksQuerySchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+  /**
+   * Keeps only tasks closed at or after this instant: done by `completedAt`, cancelled by `updatedAt`
+   * (cancelling records no timestamp of its own). Tasks in any other status are left out.
+   */
+  closedSince: z.string().datetime().optional(),
 });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+
+/** How far back the dashboard counts done / cancelled tasks: it shows recent history, never an all-time total. */
+export const DASHBOARD_WINDOW_DAYS = 30;
+
+/** Start of the dashboard's window, floored to the UTC day so web and mobile send the same instant all day. */
+export function dashboardClosedSince(now = new Date()): string {
+  const day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - DASHBOARD_WINDOW_DAYS);
+  return new Date(day).toISOString();
+}
 
 /**
  * Shared by the pipeline-counts and series-summary queries: the subset of the work board's active

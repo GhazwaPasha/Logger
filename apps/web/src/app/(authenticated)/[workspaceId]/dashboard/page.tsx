@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { DashboardOverview, Seq, useDashboardStats } from "@/components/dashboard/DashboardOverview";
+import { useClosedTaskCounts } from "@/hooks/useWorkTaskStats";
 import { OrgActivityTerminal } from "@/components/dashboard/OrgActivityTerminal";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -71,7 +72,8 @@ export default function WorkspaceDashboardPage() {
   const { depts, tasks, members, lists, error, setError, isLoading: workspaceLoading } = useWorkspaceData();
   const [view, setView] = useState<DashboardView>("overview");
   const currentUserId = session?.user?.id ?? null;
-  const stats = useDashboardStats(tasks, depts, lists, currentUserId, timeZone);
+  const closed = useClosedTaskCounts(token, workspaceId);
+  const stats = useDashboardStats(tasks, depts, lists, currentUserId, timeZone, closed.counts);
 
   const activityQuery = useActivityFeedPages(token, workspaceId, view === "activity");
 
@@ -135,7 +137,7 @@ export default function WorkspaceDashboardPage() {
           depts={depts}
           lists={lists}
           members={members}
-          loading={workspaceLoading}
+          loading={workspaceLoading || closed.isLoading}
           currentUserId={currentUserId}
         />
       ) : (

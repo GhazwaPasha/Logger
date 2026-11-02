@@ -11,6 +11,9 @@ export const workspaceKeys = {
   /** Pipeline card counts — deliberately its own query, not derived from `workspace()`'s paginated tasks. */
   taskCounts: (organizationId: string, filterKey: string) =>
     [...workspaceKeys.all, organizationId, "task-counts", filterKey] as const,
+  /** Done / cancelled totals in the dashboard's window. */
+  closedCounts: (organizationId: string, since: string) =>
+    [...workspaceKeys.all, organizationId, "closed-counts", since] as const,
   /** RecurringSeriesCard header stats, grouped by chain. */
   seriesSummary: (organizationId: string, statuses: readonly string[], filterKey: string) =>
     [...workspaceKeys.all, organizationId, "series-summary", statuses.join(","), filterKey] as const,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { dashboardClosedSince } from "@work-ledger/contracts";
 import { useCallback, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
@@ -61,6 +62,35 @@ export function useTaskCounts(token: string | null, orgId: string | null, opts: 
       return apiJson<Record<string, number>>(`/organizations/${orgId}/tasks/counts${qs ? `?${qs}` : ""}`, {
         token,
       });
+    },
+    enabled: Boolean(token && orgId),
+    staleTime: 30_000,
+  });
+  return { counts: q.data ?? null, isLoading: q.isPending && Boolean(token && orgId) };
+}
+
+/**
+ * Done / cancelled tasks in the dashboard's window, leaving recurring chains out. Only each page's `total` is
+ * needed, so this asks for a single row instead of downloading the tasks.
+ */
+export function useClosedTaskCounts(token: string | null, orgId: string | null) {
+  const since = dashboardClosedSince();
+  const q = useQuery({
+    queryKey: workspaceKeys.closedCounts(orgId ?? "", since),
+    queryFn: async () => {
+      const total = async (status: string) => {
+        const qs = new URLSearchParams({
+          status,
+          limit: "1",
+          includeSubtasks: "false",
+          excludeRecurringSeries: "true",
+          closedSince: since,
+        });
+        const page = await apiJson<{ total: number }>(`/organizations/${orgId}/tasks?${qs}`, { token });
+        return page.total;
+      };
+      const [done, cancelled] = await Promise.all([total("done"), total("cancelled")]);
+      return { done, cancelled };
     },
     enabled: Boolean(token && orgId),
     staleTime: 30_000,

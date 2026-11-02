@@ -14,7 +14,8 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.seriesOccurrencesQuerySchema = exports.seriesSummaryQuerySchema = exports.taskCountsQuerySchema = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.seriesOccurrencesQuerySchema = exports.seriesSummaryQuerySchema = exports.taskCountsQuerySchema = exports.DASHBOARD_WINDOW_DAYS = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.dashboardClosedSince = dashboardClosedSince;
 const zod_1 = require("zod");
 const timezone_js_1 = require("./timezone.js");
 __exportStar(require("./timezone.js"), exports);
@@ -238,7 +239,19 @@ exports.listTasksQuerySchema = zod_1.z.object({
         .enum(["true", "false"])
         .optional()
         .transform((v) => v === "true"),
+    /**
+     * Keeps only tasks closed at or after this instant: done by `completedAt`, cancelled by `updatedAt`
+     * (cancelling records no timestamp of its own). Tasks in any other status are left out.
+     */
+    closedSince: zod_1.z.string().datetime().optional(),
 });
+/** How far back the dashboard counts done / cancelled tasks: it shows recent history, never an all-time total. */
+exports.DASHBOARD_WINDOW_DAYS = 30;
+/** Start of the dashboard's window, floored to the UTC day so web and mobile send the same instant all day. */
+function dashboardClosedSince(now = new Date()) {
+    const day = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - exports.DASHBOARD_WINDOW_DAYS);
+    return new Date(day).toISOString();
+}
 /**
  * Shared by the pipeline-counts and series-summary queries: the subset of the work board's active
  * filters that should narrow those cards too (list/level scope, due-date range, assignee). Status/

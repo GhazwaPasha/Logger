@@ -8,6 +8,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
+import { dashboardClosedSince } from '@work-ledger/contracts';
 
 import { api } from '@/lib/api';
 import { afterCreation } from '@/lib/pending-creation';
@@ -43,6 +44,7 @@ export const qk = {
     ['tasks', orgId, 'series-summary', filter, statuses] as const,
   seriesOccurrences: (orgId: string, seriesId: string) => ['tasks', orgId, 'series', seriesId] as const,
   active: (orgId: string) => ['tasks', orgId, 'active'] as const,
+  closedCount: (orgId: string, status: string, since: string) => ['tasks', orgId, 'closed-count', status, since] as const,
   archived: (orgId: string) => ['tasks', orgId, 'archived'] as const,
   task: (taskId: string) => ['task', taskId] as const,
   activity: (orgId: string) => ['activity', orgId] as const,
@@ -218,6 +220,24 @@ export function useActiveTasks(orgId: string | undefined) {
         cursor = res.nextCursor;
       }
       return out;
+    },
+  });
+}
+
+/**
+ * Done or cancelled tasks in the dashboard's window. Recurring chains are left out, as on the web. Only the page's
+ * `total` is needed, so this asks for a single row instead of downloading the tasks.
+ */
+export function useClosedTaskCount(orgId: string | undefined, status: 'done' | 'cancelled') {
+  const closedSince = dashboardClosedSince();
+  return useQuery({
+    queryKey: qk.closedCount(orgId ?? '', status, closedSince),
+    enabled: !!orgId,
+    queryFn: async () => {
+      const res = await api<TaskPage>(`/organizations/${orgId}/tasks`, {
+        params: { status, limit: 1, includeSubtasks: 'false', excludeRecurringSeries: 'true', closedSince },
+      });
+      return res.total ?? res.tasks.length;
     },
   });
 }

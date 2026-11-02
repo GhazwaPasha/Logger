@@ -56,6 +56,8 @@ export interface ListTasksOpts {
   recurringSeriesId?: string;
   /** Omits tasks with a `recurringSeriesId` set — see `excludeRecurringSeries` on {@link listTasksQuerySchema}. */
   excludeRecurringSeries?: boolean;
+  /** Only tasks closed at or after this instant — see `closedSince` on {@link listTasksQuerySchema}. */
+  closedSince?: string;
   /** "Unassigned" scope — ignored when `assigneeUserId` is also set (specific assignee wins). */
   unassigned?: boolean;
 }
@@ -387,6 +389,16 @@ export class AuthorizationService {
 
     if (opts?.excludeRecurringSeries) {
       filterConditions.push(isNull(tasks.recurringSeriesId));
+    }
+
+    if (opts?.closedSince) {
+      const since = new Date(opts.closedSince);
+      filterConditions.push(
+        or(
+          and(eq(tasks.status, "done"), gte(tasks.completedAt, since)),
+          and(eq(tasks.status, "cancelled"), gte(tasks.updatedAt, since)),
+        ),
+      );
     }
 
     const boardFiltered = await this.boardFilterConditions(organizationId, {
