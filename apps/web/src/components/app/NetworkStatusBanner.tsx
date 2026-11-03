@@ -1,18 +1,29 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NETWORK_STATUS_EVENT, getApiBaseUrl } from "@/lib/api";
+
+/** Requests can still fail for a moment after the app returns, while the network wakes up. */
+const RETURN_GRACE_MS = 5_000;
+
+function isBackgrounded(): boolean {
+  return document.hidden || !document.hasFocus();
+}
 
 /**
  * Small fixed banner for connectivity problems. Two independent signals:
  * - the browser's `online`/`offline` events (instant, but `onLine === true` doesn't prove the API is reachable);
  * - `apiFetch` reporting whether its last request got a response (catches "server down while wifi is fine").
+ *
+ * Failed requests don't count while the app is in the background or just back from it: browsers suspend
+ * network activity there, so they say nothing about the server. A real outage keeps failing after the grace period.
  */
 export function NetworkStatusBanner() {
   const qc = useQueryClient();
   const [offline, setOffline] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
+  const returnedAt = useRef(0);
 
   useEffect(() => {
     setOffline(!navigator.onLine);
@@ -21,14 +32,28 @@ export function NetworkStatusBanner() {
       setUnreachable(false);
     };
     const onOffline = () => setOffline(true);
-    const onStatus = (e: Event) => setUnreachable(!(e as CustomEvent<{ reachable: boolean }>).detail.reachable);
+    const onStatus = (e: Event) => {
+      const { reachable } = (e as CustomEvent<{ reachable: boolean }>).detail;
+      if (!reachable && (isBackgrounded() || Date.now() - returnedAt.current < RETURN_GRACE_MS)) return;
+      setUnreachable(!reachable);
+    };
+    const onForegroundChange = () => {
+      if (isBackgrounded()) setUnreachable(false);
+      else returnedAt.current = Date.now();
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
     window.addEventListener(NETWORK_STATUS_EVENT, onStatus);
+    window.addEventListener("focus", onForegroundChange);
+    window.addEventListener("blur", onForegroundChange);
+    document.addEventListener("visibilitychange", onForegroundChange);
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       window.removeEventListener(NETWORK_STATUS_EVENT, onStatus);
+      window.removeEventListener("focus", onForegroundChange);
+      window.removeEventListener("blur", onForegroundChange);
+      document.removeEventListener("visibilitychange", onForegroundChange);
     };
   }, []);
 
@@ -51,7 +76,7 @@ export function NetworkStatusBanner() {
               <code className="font-mono text-xs">npm run dev</code> (API + web), or wait if it&apos;s still starting.
             </>
           ) : (
-            "Can't reach the server."
+            "Waiting for connection…"
           )}
         </span>
         {!offline && (

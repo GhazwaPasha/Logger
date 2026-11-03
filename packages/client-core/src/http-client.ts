@@ -260,8 +260,8 @@ export class ApiClient {
       this.opts.onReachability?.(false);
       throw new NetworkError(
         controller.signal.aborted
-          ? "The server took too long to respond. Please try again."
-          : "Can't reach the server. Check your connection and try again.",
+          ? "This is taking longer than usual. Please try again."
+          : "Couldn't connect just now. Please try again.",
       );
     } finally {
       clearTimeout(timer);
