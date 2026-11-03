@@ -611,7 +611,7 @@ export function WorkspaceSidebar({
         "ui-sidebar-chrome font-outfit flex min-h-0 shrink-0 flex-col bg-[var(--surface-nav)]",
         "fixed inset-y-0 left-0 z-50 w-72 border-r border-[var(--border-subtle)] transition-transform duration-300 ease-out",
         mobileOpen ? "translate-x-0" : "-translate-x-full",
-        "md:relative md:h-full md:w-72 md:translate-x-0 md:border-r md:border-[var(--border-subtle)] md:transition-none",
+        "md:relative md:h-full md:w-72 md:translate-x-0 md:border-r-0 md:transition-none",
       ].join(" ")}
     >
       <ConfirmDialog

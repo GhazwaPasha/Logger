@@ -83,8 +83,8 @@ export function WorkspaceShell({
         <WorkspaceNotificationsProvider>
         <KeyboardShortcutsProvider>
         <AskProvider>
-          <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)]">
-            <AppHeader workspaceSlug={workspaceSlug} onMenuToggle={() => setMobileSidebarOpen((v) => !v)} />
+          <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)] md:bg-[var(--surface-nav)]">
+            <AppHeader workspaceSlug={workspaceSlug} onMenuToggle={() => setMobileSidebarOpen((v) => !v)} joinedToSidebar />
             <div className="flex min-h-0 w-full flex-1 overflow-hidden md:flex-row md:items-stretch">
               <WorkspaceSidebar
                 workspaceId={workspaceId}
@@ -92,10 +92,13 @@ export function WorkspaceShell({
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={closeMobileSidebar}
               />
-              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
-                {children}
-              </main>
-              <AskPane />
+              {/* The one line between chrome and content, curving where the header meets the sidebar. */}
+              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--surface-base)] md:rounded-tl-3xl md:border-l md:border-t md:border-[var(--border-subtle)]">
+                <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
+                  {children}
+                </main>
+                <AskPane />
+              </div>
             </div>
           </div>
         </AskProvider>

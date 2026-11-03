@@ -76,10 +76,13 @@ const iconBtn =
 export function AppHeader({
   workspaceSlug,
   onMenuToggle,
+  joinedToSidebar = false,
 }: {
   /** When set, profile and settings use this workspace slug in the URL. */
   workspaceSlug?: string;
   onMenuToggle?: () => void;
+  /** Desktop: drop the bottom border so the header flows into the sidebar; the content pane draws the line instead. */
+  joinedToSidebar?: boolean;
 }) {
   const { data: session } = authClient.useSession();
   const user = session?.user;
@@ -112,7 +115,7 @@ export function AppHeader({
   }, [accountMenuOpen]);
 
   return (
-    <header className="ui-app-header safe-top sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150">
+    <header className={`ui-app-header safe-top sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150${joinedToSidebar ? " md:border-b-0" : ""}`}>
       <div className="grid h-14 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-5">
         <div className="flex min-w-0 items-center gap-3 justify-self-start">
           {onMenuToggle && (
