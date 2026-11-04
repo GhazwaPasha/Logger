@@ -1,6 +1,6 @@
 # Production Android build → draft release on the Play closed testing (alpha) track. MANUAL ONLY: pushing to
 # main never builds or submits the app. Run it when you want a store release (from apps/mobile):
-#   npx eas-cli@latest workflow:run .eas/workflows/android-production.yml
+#   npx eas-cli@latest workflow:run .eas/workflows/android-production.yml --ref main
 # Draft because Google only accepts draft releases on non-internal tracks while the app is unpublished;
 # switch eas.json `releaseStatus` to "completed" once the app is live.
 # Requires: GitHub repo linked on expo.dev with base directory `apps/mobile`, Android keystore on EAS,
