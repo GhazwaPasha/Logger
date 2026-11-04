@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
+  FadeInUp,
+  FadeOut,
   useAnimatedProps,
   useSharedValue,
   withDelay,
@@ -17,6 +19,7 @@ import { Text } from '@/components/text';
 import { Duration, sequenceEnter, sequenceSettled, stateTransition } from '@/constants/motion';
 import { alpha } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptics } from '@/lib/haptics';
 
 export type RingSegment = { key: string; label: string; value: number; color: string };
 type Half = 'top' | 'bottom';
@@ -341,9 +344,9 @@ function RingCentre({
 }
 
 /**
- * Dashboard hero: one big segmented ring — status mix across the top, priority across the bottom — with its legend
- * underneath. Tapping a legend row highlights that segment's piece and puts its number in the centre; tapping the
- * row again, or the ring, clears it.
+ * Dashboard hero: one big segmented ring — status mix across the top, priority across the bottom. Tapping the ring
+ * opens its legend underneath. Tapping a legend row highlights that segment's piece and puts its number in the
+ * centre; tapping the row again, or the ring, clears it. Tapping the ring with nothing highlighted closes the legend.
  */
 export function StatusPriorityRing({
   top,
@@ -369,17 +372,23 @@ export function StatusPriorityRing({
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const [focus, setFocus] = useState<Focus>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const size = Math.min(width - 56, RING_MAX);
 
   return (
     <Animated.View entering={sequenceEnter(enterIndex, 8)} style={styles.hero}>
       <Pressable
-        disabled={!focus}
-        onPress={() => setFocus(null)}
-        accessibilityRole="image"
+        disabled={loading}
+        onPress={() => {
+          haptics.select();
+          if (focus) setFocus(null);
+          else setLegendOpen((v) => !v);
+        }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: legendOpen, disabled: loading }}
         accessibilityLabel={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
-        accessibilityHint={focus ? 'Clears the highlight' : undefined}
+        accessibilityHint={focus ? 'Clears the highlight' : legendOpen ? 'Hides the breakdown' : 'Shows the breakdown'}
         style={{ width: size, height: size }}>
         <TickRing top={top} bottom={bottom} size={size} focus={focus} fillAt={sequenceSettled(enterIndex)} ready={!loading} />
         <View style={StyleSheet.absoluteFill}>
@@ -393,11 +402,16 @@ export function StatusPriorityRing({
         </View>
       </Pressable>
 
-      <View style={styles.legend}>
-        <LegendGroup title={topTitle} half="top" segments={top} focus={focus} loading={loading} onFocus={setFocus} />
-        <View style={[styles.legendSplit, { backgroundColor: theme.borderSubtle }]} />
-        <LegendGroup title={bottomTitle} half="bottom" segments={bottom} focus={focus} loading={loading} onFocus={setFocus} />
-      </View>
+      {legendOpen ? (
+        <Animated.View
+          entering={FadeInUp.duration(Duration.base)}
+          exiting={FadeOut.duration(Duration.micro)}
+          style={styles.legend}>
+          <LegendGroup title={topTitle} half="top" segments={top} focus={focus} loading={loading} onFocus={setFocus} />
+          <View style={[styles.legendSplit, { backgroundColor: theme.borderSubtle }]} />
+          <LegendGroup title={bottomTitle} half="bottom" segments={bottom} focus={focus} loading={loading} onFocus={setFocus} />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 }

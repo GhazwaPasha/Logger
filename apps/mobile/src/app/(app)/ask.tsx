@@ -42,13 +42,13 @@ const SUGGESTIONS = ["What's overdue right now?", "What's due for me this week?"
 const TASK_SUGGESTIONS = ['Summarize this task', "What's still left to do?", 'Who changed what recently?'];
 
 /**
- * Ask LogBase. Opened from Search (`q` = the typed question, sent straight away) or from a task (`taskId`).
+ * Ask LogBase. Opened from the bottom bar or from a task (`taskId`).
  * Conversations are kept; the History view lists them.
  */
 export default function AskScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ q?: string; taskId?: string }>();
+  const params = useLocalSearchParams<{ taskId?: string }>();
   const { org } = useWorkspace();
   const orgId = org?.id;
   const queryClient = useQueryClient();
@@ -206,19 +206,6 @@ export default function AskScreen() {
     },
     [queryClient, reset],
   );
-
-  // A question typed in Search is sent once the workspace is known. Deferred a tick so the send's state
-  // updates land outside the effect body (and a Strict Mode re-run cancels the first schedule, not a request).
-  const sendRef = useRef(send);
-  useEffect(() => {
-    sendRef.current = send;
-  });
-  useEffect(() => {
-    if (!orgId || !params.q) return;
-    const q = params.q;
-    const t = setTimeout(() => void sendRef.current(q), 0);
-    return () => clearTimeout(t);
-  }, [orgId, params.q]);
 
   return (
     <View style={[styles.fill, { backgroundColor: theme.surfaceBase }]}>

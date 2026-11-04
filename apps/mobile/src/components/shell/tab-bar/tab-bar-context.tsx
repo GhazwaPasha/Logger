@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Duration, POP_EASE } from '@/constants/motion';
 
-/** Height of the floating bar row (the pill and the search circle). */
+/** Height of the floating bar row (the pill and the Ask circle). */
 export const TAB_BAR_HEIGHT = 60;
 /** Gap between the bar and the bottom safe-area edge. */
 export const TAB_BAR_GAP = 8;

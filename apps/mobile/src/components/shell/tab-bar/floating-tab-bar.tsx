@@ -28,6 +28,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
+import { AiIcon } from '@/components/agent/ai-icon';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { barShadow, BarSurface } from '@/components/shell/tab-bar/bar-surface';
@@ -46,13 +47,14 @@ const MAIN: TabDef[] = [
   { name: 'dashboard', label: 'Home', icon: faHouse },
   { name: 'my-tasks', label: 'My tasks', icon: faListCheck },
   { name: 'channels', label: 'Channels', icon: faHashtag },
+  { name: 'search', label: 'Search', icon: faMagnifyingGlass },
 ];
 /** Revealed when the bar expands. */
 const MORE: TabDef[] = [
   { name: 'calendar', label: 'Calendar', icon: faCalendarDays },
   { name: 'roadmap', label: 'Roadmap', icon: faRoute },
 ];
-const ALL: TabDef[] = [...MAIN, ...MORE, { name: 'search', label: 'Search', icon: faMagnifyingGlass }];
+const ALL: TabDef[] = [...MAIN, ...MORE];
 
 const SIDE = 16;
 const RADIUS = TAB_BAR_HEIGHT / 2;
@@ -65,8 +67,9 @@ const PANEL_H = PANEL_PAD * 2 + PANEL_ROW_H * 2;
 const SPRING = { damping: 22, stiffness: 260, mass: 0.8 };
 
 /**
- * The floating tab bar: Home / My tasks / Channels plus an expand button that grows the bar upward into a
- * Calendar / Roadmap panel, and a separate round Search button that turns the bar into a search field.
+ * The floating tab bar: Home / My tasks / Channels / Search plus an expand button that grows the bar upward into a
+ * Calendar / Roadmap panel, and a separate round button that opens Ask LogBase. The Search tab turns the bar into a
+ * search field.
  * The always-visible tabs are icon-only (labels are for screen readers). Scrolling down shrinks the bar to a
  * pill of the current tab (`useCollapseOnScroll`); scrolling up restores it.
  */
@@ -88,7 +91,7 @@ export function FloatingTabBar() {
   const lastTab = useRef<TabName>('dashboard');
   const inputRef = useRef<TextInput>(null);
 
-  // Geometry: full row = bar + gap + search circle; the bar's own width animates between the states.
+  // Geometry: full row = bar + gap + Ask circle; the bar's own width animates between the states.
   const rowW = screenW - SIDE * 2;
   const barFullW = rowW - TAB_BAR_HEIGHT - 8;
   const itemW = (barFullW - PAD * 2 - EXPAND_W) / MAIN.length;
@@ -359,18 +362,22 @@ export function FloatingTabBar() {
           </Animated.View>
         </Animated.View>
 
-        {/* The separate round search button (iOS 26 style); it merges into the bar in search mode. */}
+        {/* The separate round Ask button (iOS 26 style); it merges into the bar in search mode. */}
         <Animated.View style={[styles.circle, barShadow, circle]}>
           <BarSurface radius={RADIUS} />
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="Search"
+            accessibilityLabel="Ask LogBase"
             scaleTo={0.9}
+            haptic="select"
             disabled={searchMode}
-            onPress={() => go('search')}
+            onPress={() => {
+              setExpanded(false);
+              router.push('/ask');
+            }}
             style={styles.circleBtn}>
             <Animated.View style={circleIcon}>
-              <Icon icon={faMagnifyingGlass} size={18} color={theme.fg} />
+              <AiIcon size={20} />
             </Animated.View>
           </PressableScale>
         </Animated.View>

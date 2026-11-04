@@ -7,7 +7,6 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import { AiIcon } from '@/components/agent/ai-icon';
 import { PageEnter } from '@/components/page';
 import { useCollapseOnScroll, useTabBar, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { Text } from '@/components/text';
@@ -101,27 +100,6 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           onScroll={onScroll}
           scrollEventThrottle={16}>
-          {needle.length >= 2 || !needle ? (
-            <Section title="Ask">
-              <Row
-                first
-                icon={<AiIcon size={20} />}
-                onPress={() => {
-                  if (needle) remember();
-                  router.push(needle ? { pathname: '/ask', params: { q: searchQuery.trim() } } : '/ask');
-                }}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text size="sm" weight="medium" numberOfLines={2}>
-                    {needle ? `Ask LogBase “${searchQuery.trim()}”` : 'Ask LogBase'}
-                  </Text>
-                  <Text size="xs" color="muted" numberOfLines={1}>
-                    {needle ? 'Get an answer from your workspace' : 'Questions about tasks, people and deadlines'}
-                  </Text>
-                </View>
-              </Row>
-            </Section>
-          ) : null}
-
           {!needle ? (
             recent.length > 0 ? (
               <Section title="Recent">
