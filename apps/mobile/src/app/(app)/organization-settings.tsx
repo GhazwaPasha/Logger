@@ -1,5 +1,6 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { MenuSheet } from '@/components/menu-sheet';
@@ -8,7 +9,7 @@ import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Button, ErrorBanner, Input } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
-import { useUpdateOrganization } from '@/lib/queries';
+import { useDeleteOrganization, useUpdateOrganization } from '@/lib/queries';
 import { isWorkspaceOwner } from '@/lib/permissions';
 import { useWorkspace } from '@/lib/workspace';
 
@@ -40,6 +41,8 @@ export default function OrganizationSettingsScreen() {
   const theme = useTheme();
   const { org, members, userId } = useWorkspace();
   const update = useUpdateOrganization(org?.id);
+  const deleteOrg = useDeleteOrganization(org?.id);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
   const isOwner = isWorkspaceOwner(members, userId);
 
   const [draft, setDraft] = useState<string | null>(null);
@@ -48,6 +51,17 @@ export default function OrganizationSettingsScreen() {
 
   const zones = Array.from(new Set([org?.timeZone ?? 'UTC', ...ZONES])).map((z) => ({ value: z, label: z }));
   const dirty = !!org && name.trim() !== org.name && name.trim().length > 0;
+
+  function confirmDelete() {
+    Alert.alert(`Delete “${org?.name}”?`, 'Everything in it is removed for good, for everyone. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete forever',
+        style: 'destructive',
+        onPress: () => deleteOrg.mutate(undefined, { onSuccess: () => router.replace('/') }),
+      },
+    ]);
+  }
 
   return (
     <Page header={<StackHeader title="Organization settings" />} gap={16}>
@@ -86,6 +100,26 @@ export default function OrganizationSettingsScreen() {
           <Text size="sm">{org?.timeZone ?? '—'}</Text>
         </PressableScale>
       </Panel>
+
+      {isOwner && org ? (
+        <Panel style={{ gap: 10 }}>
+          <SectionLabel>Delete organization</SectionLabel>
+          <Text size="sm" color="muted">
+            Permanently deletes this workspace with all its categories, channels, tasks and members. Type its name to confirm.
+          </Text>
+          {deleteOrg.error ? <ErrorBanner message={deleteOrg.error.message} /> : null}
+          <Input value={deleteConfirm} onChangeText={setDeleteConfirm} placeholder={org.name} autoCapitalize="none" autoCorrect={false} />
+          <View style={{ alignSelf: 'flex-start' }}>
+            <Button
+              title="Delete forever"
+              variant="secondary"
+              loading={deleteOrg.isPending}
+              disabled={deleteConfirm.trim() !== org.name.trim()}
+              onPress={confirmDelete}
+            />
+          </View>
+        </Panel>
+      ) : null}
 
       <MenuSheet<string>
         visible={zoneOpen}

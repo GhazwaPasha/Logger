@@ -9,6 +9,7 @@ import {
   faEllipsisVertical,
   faPaperclip,
   faPlus,
+  faRepeat,
   faStopwatch,
   faUserPlus,
 } from '@fortawesome/free-solid-svg-icons';
@@ -244,6 +245,11 @@ function TaskCardImpl({
           </PressableScale>
 
           <View style={styles.headerRight}>
+            {task.dueRepeat ? (
+              <View accessible accessibilityLabel={`Repeats ${task.dueRepeat}`} style={styles.repeatMark}>
+                <Icon icon={faRepeat} size={12} color="muted" />
+              </View>
+            ) : null}
             <StatusPill
               status={task.status}
               options={stageControlDropdownOptions(stored, canEdit)}
@@ -382,6 +388,7 @@ export function TaskCardSkeleton() {
 }
 
 const styles = StyleSheet.create({
+  repeatMark: { marginRight: 2 },
   card: { borderRadius: Radius.xl, borderWidth: 1, overflow: 'hidden' },
   skeleton: { paddingHorizontal: 12, paddingVertical: 16, opacity: 0.7 },
   kanbanBody: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12, gap: 8 },

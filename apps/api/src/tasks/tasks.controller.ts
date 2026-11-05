@@ -61,6 +61,12 @@ export class TasksController {
     return this.tasks.create(user.id, organizationId, body);
   }
 
+  /** "Delete all" on the Archived page: permanently deletes every archived task the viewer is allowed to purge. */
+  @Delete("archived")
+  purgeArchived(@CurrentUser() user: RequestUser, @Param("organizationId") organizationId: string) {
+    return this.tasks.purgeArchived(user.id, organizationId);
+  }
+
   /**
    * Pipeline card counts. Deliberately separate from `list()` — the card needs a total per status
    * (however many done/cancelled tasks exist), not a page of rows, so it can show a real number

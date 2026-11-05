@@ -7,8 +7,8 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import { eq, sql } from "drizzle-orm";
-import { attachmentBlobs } from "@work-ledger/db";
+import { and, eq, notExists, sql } from "drizzle-orm";
+import { attachmentBlobs, taskAttachments } from "@work-ledger/db";
 import type { AppDatabase } from "@work-ledger/db";
 import { prepareUploadBytes } from "./attachment-image.util";
 
@@ -171,8 +171,21 @@ export async function releaseBlobRef(
 
   if (!blob || blob.refCount > 0) return;
 
+  // The row goes first, and only if nothing still points at it (`task_attachments.blob_id` is ON DELETE RESTRICT).
+  // A failed storage delete then just leaves an orphan object for the cleanup job, never a row whose file is gone.
+  const [removed] = await db
+    .delete(attachmentBlobs)
+    .where(
+      and(
+        eq(attachmentBlobs.id, blobId),
+        eq(attachmentBlobs.refCount, 0),
+        notExists(db.select({ id: taskAttachments.id }).from(taskAttachments).where(eq(taskAttachments.blobId, blobId))),
+      ),
+    )
+    .returning({ id: attachmentBlobs.id });
+  if (!removed) return;
+
   await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: blob.storageKey }));
-  await db.delete(attachmentBlobs).where(eq(attachmentBlobs.id, blobId));
 }
 
 const ORPHAN_MIN_AGE_MS = 24 * 60 * 60 * 1000;

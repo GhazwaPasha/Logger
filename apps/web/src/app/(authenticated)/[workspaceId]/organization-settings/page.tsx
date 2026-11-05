@@ -295,7 +295,8 @@ export default function OrganizationSettingsPage() {
     setError(null);
     try {
       await apiVoid(`/organizations/${workspaceId}`, { method: "DELETE", token });
-      await queryClient.invalidateQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
+      // Not an invalidate: refetching the workspace that was just deleted only produces errors on the way out.
+      queryClient.removeQueries({ queryKey: workspaceKeys.workspace(workspaceId) });
       const list = await queryClient.fetchQuery({
         queryKey: orgKeys.all,
         queryFn: () => apiJson<Org[]>("/organizations", { token }),

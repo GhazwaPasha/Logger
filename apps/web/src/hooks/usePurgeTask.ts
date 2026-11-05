@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { apiVoid } from "@/lib/api";
+import { apiJson, apiVoid } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { workspaceKeys, taskKeys } from "@/lib/query-keys";
@@ -37,5 +37,27 @@ export function usePurgeTask() {
     [token, queryClient, workspaceId],
   );
 
-  return { purgeTask, isPurging, purgeError, clearPurgeError: () => setPurgeError(null) };
+  /** Permanently deletes every archived task the viewer may purge (the server applies the same rule as a single purge). */
+  const purgeAllArchived = useCallback(async (): Promise<{ ok: true; deleted: number } | { ok: false; error: string }> => {
+    if (!token) return { ok: false, error: "Not signed in" };
+    setIsPurging(true);
+    setPurgeError(null);
+    try {
+      const { deleted } = await apiJson<{ deleted: number }>(`/organizations/${workspaceId}/tasks/archived`, {
+        method: "DELETE",
+        token,
+      });
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.archivedTasks(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.deletionLog(workspaceId) });
+      return { ok: true, deleted };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Could not delete archived tasks";
+      setPurgeError(message);
+      return { ok: false, error: message };
+    } finally {
+      setIsPurging(false);
+    }
+  }, [token, queryClient, workspaceId]);
+
+  return { purgeTask, purgeAllArchived, isPurging, purgeError, clearPurgeError: () => setPurgeError(null) };
 }

@@ -11,6 +11,22 @@ export function canViewPerformance(members: MemberRow[], userId: string | null |
   return me?.role === 'owner' || me?.role === 'manager';
 }
 
+/** What the viewer may do with an archived task — mirrors the API's `canRestoreTask` / `canPurgeTask`. */
+export function archivedTaskCaps(
+  task: TaskRow,
+  lists: ListRow[],
+  userId: string | null | undefined,
+  members: MemberRow[],
+): { canRestore: boolean; canPurge: boolean } {
+  if (!userId || !task.deletedAt) return { canRestore: false, canPurge: false };
+  const me = members.find((m) => m.userId === userId);
+  const isOwner = me?.role === 'owner';
+  const isAssigner = task.assignerId === userId;
+  const deptId = lists.find((l) => l.id === task.listId)?.departmentId;
+  const isDeptManager = me?.role === 'manager' && !!deptId && (me.managedDepartmentIds ?? []).includes(deptId);
+  return { canRestore: isOwner || isAssigner || isDeptManager, canPurge: isOwner || isAssigner };
+}
+
 /** Owners, department managers, and the task's creator may edit its fields or archive it. */
 export function taskEditCaps(
   task: TaskRow,

@@ -34,6 +34,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { ApiError, apiJson, apiVoid } from "@/lib/api";
 import { agentKeys, streamAsk } from "@/lib/agent";
 import { pathAfterWorkspace } from "@/lib/workspace-url";
+import { NODE_LABELS } from "@/lib/nodes";
 import { WORK_BOARD_SCOPE_EVENT, readWorkBoardScope, type WorkBoardScope } from "@/lib/work-board-scope";
 import { AiIcon } from "./AiIcon";
 import { AgentText, type TaskCardInfo } from "./AgentText";
@@ -168,6 +169,22 @@ const EMPTY: AskState = {
 
 const NO_IDS: ReadonlySet<string> = new Set();
 
+/** What Ask calls each workspace page in its context badge (the board gets its category / channel instead). */
+const PAGE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  overview: "Overview",
+  "my-tasks": "My tasks (assigned to me)",
+  calendar: "Calendar",
+  roadmap: "Roadmap",
+  performance: "Performance",
+  archived: "Archived tasks",
+  people: "People",
+  levels: NODE_LABELS.levelPlural,
+  settings: "Settings",
+  "organization-settings": "Organization settings",
+  webhooks: "Webhooks",
+};
+
 /**
  * Owns the Ask LogBase conversation. The pane itself is rendered by the workspace shell next to `<main>`
  * (see {@link AskPane}), so it docks beside the app instead of covering it.
@@ -195,13 +212,10 @@ export function AskProvider({ children }: { children: ReactNode }) {
       const dept = deptId ? depts.find((d) => d.id === deptId) : undefined;
       if (list) return { label: dept ? `${dept.name} › ${list.name}` : list.name, channelId: list.id, categoryId: dept?.id };
       if (dept) return { label: dept.name, categoryId: dept.id };
-      return null;
+      return { label: "Board" };
     }
-    if (page === "my-tasks") return { label: "My tasks (assigned to me)" };
-    if (page === "calendar") return { label: "Calendar" };
-    if (page === "roadmap") return { label: "Roadmap" };
-    if (page === "performance") return { label: "Performance" };
-    return null;
+    const label = PAGE_LABELS[page];
+    return label ? { label } : null;
   }, [pathname, boardScope, lists, depts]);
   const boardViewRef = useRef(boardView);
   useLayoutEffect(() => {

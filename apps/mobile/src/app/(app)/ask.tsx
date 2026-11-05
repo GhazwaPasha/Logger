@@ -1,4 +1,4 @@
-import { faArrowUp, faClockRotateLeft, faPen, faThumbtack, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { faArrowUp, faClockRotateLeft, faEye, faPen, faThumbtack, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatZonedDateKey,
@@ -6,6 +6,7 @@ import {
   type AgentProposal,
   type AgentThreadDetail,
   type AgentThreadSummary,
+  type AskAgentInput,
 } from '@work-ledger/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,12 +35,94 @@ import { useTheme } from '@/hooks/use-theme';
 import { agentKeys, streamAsk } from '@/lib/agent';
 import { getAskTaskForm } from '@/lib/agent-task-form';
 import { api } from '@/lib/api';
+import { qk } from '@/lib/queries';
+import type { Dept, ListRow, TaskDetail } from '@/lib/types';
 import { useWorkspace } from '@/lib/workspace';
 
 type ChatMessage = Pick<AgentMessage, 'id' | 'role' | 'content' | 'steps' | 'proposals'>;
 
 const SUGGESTIONS = ["What's overdue right now?", "What's due for me this week?", 'What changed today?'];
 const TASK_SUGGESTIONS = ['Summarize this task', "What's still left to do?", 'Who changed what recently?'];
+
+type AskView = NonNullable<AskAgentInput['view']>;
+
+const PAGE_LABELS: Record<string, string> = {
+  '/dashboard': 'Home',
+  '/my-tasks': 'My tasks (assigned to me)',
+  '/channels': 'Channels',
+  '/calendar': 'Calendar',
+  '/roadmap': 'Roadmap',
+  '/search': 'Search',
+};
+
+/** The page Ask was opened from, in the shape the API takes; a channel's board carries its ids so answers default to it. */
+function pageViewFrom(from: string | undefined, lists: ListRow[], depts: Dept[]): AskView | null {
+  if (!from) return null;
+  if (from.startsWith('/channels/')) {
+    const list = lists.find((l) => l.id === from.slice('/channels/'.length));
+    if (list) {
+      const dept = depts.find((d) => d.id === list.departmentId);
+      return { label: dept ? `${dept.name} › ${list.name}` : list.name, channelId: list.id, categoryId: dept?.id };
+    }
+  }
+  const label = PAGE_LABELS[from];
+  return label ? { label } : null;
+}
+
+/** What the next question is about: the task and / or page Ask was opened from. Dismiss the page to ask about the whole workspace. */
+function ContextBadges({
+  taskLabel,
+  view,
+  scopeOff,
+  hideView,
+  onScopeOff,
+}: {
+  taskLabel: string | null;
+  view: AskView | null;
+  scopeOff: boolean;
+  hideView: boolean;
+  onScopeOff: (off: boolean) => void;
+}) {
+  const theme = useTheme();
+  const showView = !!view && !hideView;
+  if (!taskLabel && !showView) return null;
+  const badge = { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle };
+  return (
+    <View style={styles.badges}>
+      {taskLabel ? (
+        <View style={[styles.badge, badge]}>
+          <Icon icon={faPen} size={10} color="muted" />
+          <Text size="11" numberOfLines={1} style={styles.badgeLabel}>
+            {taskLabel}
+          </Text>
+        </View>
+      ) : null}
+      {showView && !scopeOff ? (
+        <View style={[styles.badge, badge]}>
+          <Icon icon={faEye} size={10} color="muted" />
+          <Text size="11" numberOfLines={1} style={styles.badgeLabel}>
+            {view.label}
+          </Text>
+          <PressableScale
+            scaleTo={0.9}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Stop using ${view.label}, ask about the whole workspace`}
+            onPress={() => onScopeOff(true)}>
+            <Icon icon={faXmark} size={11} color="muted" />
+          </PressableScale>
+        </View>
+      ) : null}
+      {showView && scopeOff ? (
+        <PressableScale scaleTo={0.97} accessibilityRole="button" onPress={() => onScopeOff(false)} style={styles.badgeRestore}>
+          <Text size="11" color="muted" numberOfLines={1}>
+            {`Whole workspace · use ${view.label}`}
+          </Text>
+        </PressableScale>
+      ) : null}
+    </View>
+  );
+}
 
 /**
  * Ask LogBase. Opened from the bottom bar or from a task (`taskId`).
@@ -48,8 +131,8 @@ const TASK_SUGGESTIONS = ['Summarize this task', "What's still left to do?", 'Wh
 export default function AskScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ taskId?: string }>();
-  const { org } = useWorkspace();
+  const params = useLocalSearchParams<{ taskId?: string; from?: string }>();
+  const { org, lists, depts } = useWorkspace();
   const orgId = org?.id;
   const queryClient = useQueryClient();
 
@@ -60,6 +143,9 @@ export default function AskScreen() {
   // Opened from a task screen the user can edit: that task's form sits underneath and Ask can fill it in.
   const [formState] = useState(() => getAskTaskForm(params.taskId)?.getState() ?? null);
   const canFill = !!formState && taskId === formState.taskId;
+  const [scopeOff, setScopeOff] = useState(false);
+  const pageView = useMemo(() => pageViewFrom(params.from, lists, depts), [params.from, lists, depts]);
+  const activeView = scopeOff || canFill ? undefined : (pageView ?? undefined);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
   /** Answer text streamed so far; a later tool step means it was a preamble and is dropped. */
@@ -119,6 +205,7 @@ export default function AskScreen() {
             threadId: threadId ?? undefined,
             taskId: threadId ? undefined : (taskId ?? undefined),
             taskForm: getAskTaskForm(taskId)?.getState(),
+            view: activeView,
           },
           (e) => {
             if (ctrl.signal.aborted) return;
@@ -172,7 +259,7 @@ export default function AskScreen() {
         }
       }
     },
-    [running, orgId, threadId, taskId, queryClient],
+    [running, orgId, threadId, taskId, queryClient, activeView],
   );
 
   const decideProposal = useCallback(async (id: string, action: 'approve' | 'reject') => {
@@ -321,6 +408,21 @@ export default function AskScreen() {
           </ScrollView>
 
           <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10), borderTopColor: theme.borderSubtle }]}>
+            <ContextBadges
+              taskLabel={
+                canFill
+                  ? formState?.isNew
+                    ? 'New task'
+                    : `Editing: ${formState?.title || 'this task'}`
+                  : taskId && !threadId
+                    ? (queryClient.getQueryData<TaskDetail>(qk.task(taskId))?.task.title ?? 'This task')
+                    : null
+              }
+              view={pageView}
+              scopeOff={scopeOff}
+              hideView={canFill}
+              onScopeOff={setScopeOff}
+            />
             <View style={[styles.inputWrap, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
               <TextInput
                 value={input}
@@ -625,6 +727,19 @@ const styles = StyleSheet.create({
   commentPreview: { marginTop: 4, borderRadius: Radius.xl, paddingHorizontal: 10, paddingVertical: 7 },
   proposalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth * 2 },
   proposalBtn: { borderRadius: Radius.xl, paddingHorizontal: 14, paddingVertical: 7 },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  badgeLabel: { flexShrink: 1 },
+  badgeRestore: { paddingHorizontal: 4, paddingVertical: 3 },
   composer: { paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2, gap: 6 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderWidth: 1, borderRadius: Radius.xxxl + 4, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
   input: { flex: 1, fontSize: 15, lineHeight: 21, maxHeight: 120, paddingVertical: 6 },

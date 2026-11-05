@@ -10,6 +10,8 @@ import {
   activityLedger,
   deletionLog,
   discordIntegrations,
+  goals,
+  milestones,
   organizationMemberManagedDepartments,
   organizationMembers,
   organizations,
@@ -251,26 +253,31 @@ export class OrganizationsService {
     const org = rows[0];
     if (!org) throw new NotFoundException("Organization not found");
 
-    const cascadedTasks = await this.db
-      .select({ id: tasks.id })
-      .from(tasks)
-      .where(eq(tasks.organizationId, organizationId));
-    await this.attachments.releaseForTaskIds(cascadedTasks.map((t) => t.id));
+    const blobIds = await this.db.transaction(async (tx) => {
+      const cascadedTasks = await tx
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(eq(tasks.organizationId, organizationId));
+      const detached = await this.attachments.detachForTaskIds(tx, cascadedTasks.map((t) => t.id));
 
-    await this.db.insert(deletionLog).values({
-      entityType: "organization",
-      entityId: organizationId,
-      organizationId,
-      actorId: userId,
-      snapshot: {
-        name: org.name,
-        cascadedTaskCount: cascadedTasks.length,
-        cascadedTaskIds: cascadedTasks.map((t) => t.id),
-      },
+      await tx.insert(deletionLog).values({
+        entityType: "organization",
+        entityId: organizationId,
+        organizationId,
+        actorId: userId,
+        snapshot: {
+          name: org.name,
+          cascadedTaskCount: cascadedTasks.length,
+          cascadedTaskIds: cascadedTasks.map((t) => t.id),
+        },
+      });
+
+      await tx.delete(organizations).where(eq(organizations.id, organizationId));
+      return detached;
     });
 
     this.collaboration.notifyOrgChanged(organizationId, null);
-    await this.db.delete(organizations).where(eq(organizations.id, organizationId));
+    await this.attachments.releaseBlobs(blobIds);
   }
 
   /** Owner only. Permanent tombstone record for anything hard-deleted in this org (survives independent of activity_ledger). */
@@ -367,40 +374,52 @@ export class OrganizationsService {
       .innerJoin(tasks, eq(tasks.id, taskAssignees.taskId))
       .where(and(eq(tasks.organizationId, organizationId), eq(taskAssignees.userId, targetUserId)));
 
-    await this.db
-      .delete(organizationMemberManagedDepartments)
-      .where(eq(organizationMemberManagedDepartments.organizationMemberId, member.id));
-    await this.db.delete(organizationMembers).where(eq(organizationMembers.id, member.id));
+    await this.db.transaction(async (tx) => {
+      await tx
+        .delete(organizationMemberManagedDepartments)
+        .where(eq(organizationMemberManagedDepartments.organizationMemberId, member.id));
+      await tx.delete(organizationMembers).where(eq(organizationMembers.id, member.id));
+
+      // Same reasoning as the assignees below: an owner id that no longer resolves would show as "Unknown" forever.
+      await tx
+        .update(goals)
+        .set({ ownerId: null })
+        .where(and(eq(goals.organizationId, organizationId), eq(goals.ownerId, targetUserId)));
+      await tx
+        .update(milestones)
+        .set({ ownerId: null })
+        .where(and(eq(milestones.organizationId, organizationId), eq(milestones.ownerId, targetUserId)));
+
+      if (affected.length > 0) {
+        const taskIds = [...new Set(affected.map((r) => r.taskId))];
+
+        const remainingRows = await tx
+          .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+          .from(taskAssignees)
+          .where(inArray(taskAssignees.taskId, taskIds));
+        const remainingByTask = new Map<string, string[]>();
+        for (const r of remainingRows) {
+          remainingByTask.set(r.taskId, [...(remainingByTask.get(r.taskId) ?? []), r.userId]);
+        }
+
+        await tx
+          .delete(taskAssignees)
+          .where(and(inArray(taskAssignees.taskId, taskIds), eq(taskAssignees.userId, targetUserId)));
+
+        for (const taskId of taskIds) {
+          const previousAssigneeUserIds = [...(remainingByTask.get(taskId) ?? [])].sort();
+          const assigneeUserIds = previousAssigneeUserIds.filter((id) => id !== targetUserId);
+          await tx.insert(activityLedger).values({
+            taskId,
+            actorId: requesterId,
+            type: "assignee_change",
+            payload: { previousAssigneeUserIds, assigneeUserIds },
+          });
+        }
+      }
+    });
+
     this.collaboration.revokeMembership(organizationId, targetUserId);
-
-    if (affected.length > 0) {
-      const taskIds = [...new Set(affected.map((r) => r.taskId))];
-
-      const remainingRows = await this.db
-        .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
-        .from(taskAssignees)
-        .where(inArray(taskAssignees.taskId, taskIds));
-      const remainingByTask = new Map<string, string[]>();
-      for (const r of remainingRows) {
-        remainingByTask.set(r.taskId, [...(remainingByTask.get(r.taskId) ?? []), r.userId]);
-      }
-
-      await this.db
-        .delete(taskAssignees)
-        .where(and(inArray(taskAssignees.taskId, taskIds), eq(taskAssignees.userId, targetUserId)));
-
-      for (const taskId of taskIds) {
-        const previousAssigneeUserIds = [...(remainingByTask.get(taskId) ?? [])].sort();
-        const assigneeUserIds = previousAssigneeUserIds.filter((id) => id !== targetUserId);
-        await this.db.insert(activityLedger).values({
-          taskId,
-          actorId: requesterId,
-          type: "assignee_change",
-          payload: { previousAssigneeUserIds, assigneeUserIds },
-        });
-      }
-    }
-
     this.collaboration.notifyOrgChanged(organizationId, null);
   }
 

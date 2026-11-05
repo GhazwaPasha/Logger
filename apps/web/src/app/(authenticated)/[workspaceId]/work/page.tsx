@@ -53,6 +53,7 @@ import {
   type BoardFilterOpts,
   type SeriesSummaryRow,
 } from "@/hooks/useWorkTaskStats";
+import { RecurringTaskMark } from "@/components/tasks/RecurringTaskMark";
 import { TaskCardLastActivity } from "@/components/tasks/TaskCardLastActivity";
 import { RecurringSeriesCard } from "@/components/tasks/RecurringSeriesCard";
 import { TaskViewPanel } from "@/components/tasks/TaskViewPanel";
@@ -1719,6 +1720,7 @@ function WorkItemsInner() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+            <RecurringTaskMark repeat={task.dueRepeat} />
             <KanbanStatusPill task={task} />
             <button
               type="button"
@@ -2057,6 +2059,7 @@ function WorkItemsInner() {
               {task.title}
             </button>
             <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+              <RecurringTaskMark repeat={task.dueRepeat} />
               <KanbanStatusPill task={task} />
               <button
                 type="button"

@@ -1,4 +1,4 @@
-import { faBoxArchive, faChevronLeft, faEllipsis, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { faBoxArchive, faChevronLeft, faEllipsis, faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getZonedParts } from '@work-ledger/contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +41,7 @@ import {
   useArchiveTask,
   useComments,
   useDeleteSubtask,
+  usePurgeTask,
   usePatchTask,
   useRestoreTask,
   useSetSubtaskDone,
@@ -98,6 +99,7 @@ function TaskScreen() {
   const addSubtask = useAddSubtask(id);
   const updateSubtask = useUpdateSubtask(id);
   const deleteSubtask = useDeleteSubtask(id);
+  const purge = usePurgeTask(org?.id);
   const deleteAttachment = useDeleteAttachment(id);
   const archive = useArchiveTask();
   const restore = useRestoreTask();
@@ -143,6 +145,7 @@ function TaskScreen() {
     patch.isPending || addSubtask.isPending || updateSubtask.isPending || deleteSubtask.isPending || setSubtaskDone.isPending;
   const canArchive = !!detail.data?.capabilities.canArchiveTask && !task?.deletedAt;
   const canRestore = !!detail.data?.capabilities.canRestoreTask && !!task?.deletedAt;
+  const canPurge = !!detail.data?.capabilities.canPurgeTask && !!task?.deletedAt;
 
   const topBar = (
     <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
@@ -403,16 +406,30 @@ function TaskScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <MenuSheet<'archive' | 'restore'>
+      <MenuSheet<'archive' | 'restore' | 'purge'>
         visible={menuOpen}
         title="Task"
         options={[
           ...(canArchive ? [{ value: 'archive' as const, label: 'Archive task', icon: faBoxArchive }] : []),
           ...(canRestore ? [{ value: 'restore' as const, label: 'Restore task', icon: faRotateLeft }] : []),
+          ...(canPurge ? [{ value: 'purge' as const, label: 'Delete permanently', icon: faTrash }] : []),
         ]}
         onSelect={(action) => {
           setMenuOpen(false);
           if (action === 'restore') restore.mutate(task.id);
+          else if (action === 'purge')
+            Alert.alert('Delete this task permanently?', 'It and all its data will be removed for good.', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () =>
+                  purge.mutate(task.id, {
+                    onSuccess: () => router.back(),
+                    onError: (e) => Alert.alert('Could not delete task', e.message),
+                  }),
+              },
+            ]);
           else
             Alert.alert('Archive this task?', 'It leaves the boards straight away. You can restore it from here or from Archived.', [
               { text: 'Cancel', style: 'cancel' },

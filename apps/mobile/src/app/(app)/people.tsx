@@ -1,24 +1,37 @@
-import { StyleSheet, View } from 'react-native';
+import { faUserMinus } from '@fortawesome/free-solid-svg-icons';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { Page, Panel } from '@/components/page';
 import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
-import { Avatar } from '@/components/ui';
+import { Avatar, ErrorBanner, IconButton } from '@/components/ui';
 import { alpha, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { isWorkspaceOwner } from '@/lib/permissions';
+import { useRemoveMember } from '@/lib/queries';
 import { useWorkspace } from '@/lib/workspace';
 
 const ROLE_TONE = { owner: Tone.violet500, manager: Tone.sky500, member: Tone.slate500 } as const;
 
-/** Team — everyone in the workspace with their role. */
+/** Team — everyone in the workspace with their role. Owners can remove anyone but themselves. */
 export default function PeopleScreen() {
   const theme = useTheme();
   const dark = useIsDark();
-  const { members, depts } = useWorkspace();
+  const { org, members, depts, userId } = useWorkspace();
+  const remove = useRemoveMember(org?.id);
+  const isOwner = isWorkspaceOwner(members, userId);
   const deptName = (id: string | null) => depts.find((d) => d.id === id)?.name;
+
+  function confirmRemove(memberId: string, name: string) {
+    Alert.alert(`Remove ${name}?`, 'They lose access to this workspace and their tasks go back to unassigned. Their comments and history stay.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(memberId) },
+    ]);
+  }
 
   return (
     <Page header={<StackHeader title="Team" />} gap={12}>
+      {remove.error ? <ErrorBanner message={remove.error.message} /> : null}
       <Panel style={{ padding: 0 }}>
         {members.map((m, i) => {
           const tone = ROLE_TONE[m.role as keyof typeof ROLE_TONE] ?? Tone.slate500;
@@ -46,6 +59,15 @@ export default function PeopleScreen() {
                   {m.role.charAt(0).toUpperCase() + m.role.slice(1)}
                 </Text>
               </View>
+              {isOwner && m.userId !== userId ? (
+                <IconButton
+                  icon={faUserMinus}
+                  label={`Remove ${m.name || m.email}`}
+                  iconSize={14}
+                  size={36}
+                  onPress={() => confirmRemove(m.userId, m.name || m.email)}
+                />
+              ) : null}
             </View>
           );
         })}

@@ -252,7 +252,7 @@ export function StatusPriorityRing({
     <div className="@container">
     <div className="flex flex-col items-center gap-6 @[30rem]:flex-row @[30rem]:items-center @[30rem]:justify-center @[44rem]:gap-8">
       <div
-        className="relative aspect-square w-full max-w-[17rem] shrink-0 @[30rem]:w-[45%]"
+        className="relative aspect-square w-full max-w-[17rem] shrink-0 @[30rem]:w-[48%] @[30rem]:max-w-[20rem]"
         role="img"
         aria-label={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
       >
@@ -282,7 +282,8 @@ export function StatusPriorityRing({
         </div>
       </div>
 
-      <div className="w-full min-w-[12rem] max-w-[18rem] space-y-3" onMouseLeave={() => setHover(null)}>
+      {/* Beside the ring the rows tighten so the legend's height stays close to the ring's. */}
+      <div className="w-full min-w-[12rem] max-w-[18rem] space-y-3 @[30rem]:space-y-1.5" onMouseLeave={() => setHover(null)}>
         <LegendGroup
           title={topTitle}
           half="top"
@@ -347,7 +348,7 @@ function LegendGroup({
             </>
           );
           const className =
-            "flex min-h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left no-underline transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]";
+            "flex min-h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left @[30rem]:min-h-7 no-underline transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]";
           const style = active ? { backgroundColor: `color-mix(in srgb, ${s.color} 16%, transparent)` } : undefined;
           const handlers = {
             onMouseEnter: () => onHover({ half, key: s.key }),

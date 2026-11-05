@@ -863,6 +863,29 @@ function useArchiveToggle(mode: 'archive' | 'restore') {
   });
 }
 
+/** Permanently deletes one archived task. Owners and the task's creator only (enforced server-side). */
+export function usePurgeTask(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (taskId: string) => api(`/tasks/${taskId}`, { method: 'DELETE' }),
+    onSuccess: (_r, taskId) => {
+      qc.removeQueries({ queryKey: qk.task(taskId) });
+      if (orgId) void qc.invalidateQueries({ queryKey: qk.archived(orgId) });
+    },
+  });
+}
+
+/** "Delete all" on Archived: every archived task the viewer may purge (the server applies the same rule). */
+export function usePurgeArchived(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ deleted: number }>(`/organizations/${orgId}/tasks/archived`, { method: 'DELETE' }),
+    onSuccess: () => {
+      if (orgId) void qc.invalidateQueries({ queryKey: qk.archived(orgId) });
+    },
+  });
+}
+
 export const useArchiveTask = () => useArchiveToggle('archive');
 export const useRestoreTask = () => useArchiveToggle('restore');
 
@@ -1030,6 +1053,32 @@ export function useRenameDepartment(orgId: string | undefined) {
         ...old,
         departments: old.departments.map((d) => (d.id === updated.id ? updated : d)),
       })),
+  });
+}
+
+/** Removes someone from the workspace; the server sends their tasks back to unassigned. Owners only. */
+export function useRemoveMember(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api(`/organizations/${orgId}/members/${userId}`, { method: 'DELETE' }),
+    onSuccess: (_r, userId) => {
+      if (!orgId) return;
+      appendToBootstrap(qc, orgId, (old) => ({ ...old, members: old.members.filter((m) => m.userId !== userId) }));
+      void invalidateTasks(qc);
+    },
+  });
+}
+
+/** Deletes the whole workspace. The workspace context falls back to another one once the list refreshes. */
+export function useDeleteOrganization(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api(`/organizations/${orgId}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: qk.orgs });
+      if (orgId) qc.removeQueries({ queryKey: qk.bootstrap(orgId) });
+      void invalidateTasks(qc);
+    },
   });
 }
 

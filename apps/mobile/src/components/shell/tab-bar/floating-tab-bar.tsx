@@ -11,7 +11,7 @@ import {
   faMagnifyingGlass,
   faRoute,
 } from '@fortawesome/free-solid-svg-icons';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useTabTrigger } from 'expo-router/ui';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Keyboard, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
@@ -78,6 +78,7 @@ export function FloatingTabBar() {
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const { collapse, collapseTarget, collapseLocked, searchQuery, setSearchQuery } = useTabBar();
+  const pathname = usePathname();
   const { getTrigger, switchTab } = useTabTrigger({ name: 'dashboard' });
 
   const focused: TabName = ALL.find((t) => getTrigger(t.name)?.isFocused)?.name ?? 'dashboard';
@@ -373,7 +374,8 @@ export function FloatingTabBar() {
             disabled={searchMode}
             onPress={() => {
               setExpanded(false);
-              router.push('/ask');
+              // Ask sits above the tabs, so it's told which page it was opened from (its context badge).
+              router.push({ pathname: '/ask', params: { from: pathname } });
             }}
             style={styles.circleBtn}>
             <Animated.View style={circleIcon}>

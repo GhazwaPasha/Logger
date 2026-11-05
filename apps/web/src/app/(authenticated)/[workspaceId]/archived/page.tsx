@@ -87,9 +87,23 @@ export default function ArchivedPage() {
   const { data: archivedData, isLoading: tasksLoading } = useArchivedTasks(token, workspaceId);
   const { data: logEntries = [], isLoading: logLoading } = useDeletionLog(token, workspaceId, amOwner && tab === "log");
   const { restoreTask } = useRestoreTask();
-  const { purgeTask } = usePurgeTask();
+  const { purgeTask, purgeAllArchived } = usePurgeTask();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const archivedTasks = archivedData?.tasks ?? [];
+  const archivedTotal = archivedData?.total ?? archivedTasks.length;
+  const canPurgeAny = archivedTasks.some((t) => archivedTaskCaps(t, lists, sessionUserId, members).canPurge);
+  const workItemLower = NODE_LABELS.workItem.toLowerCase();
+
+  /** The dialog stays open when its action fails and leaves the message to us. */
+  async function runAction(action: () => Promise<{ ok: true } | { ok: false; error: string }>) {
+    setActionError(null);
+    const result = await action();
+    if (!result.ok) {
+      setActionError(result.error);
+      throw new Error(result.error);
+    }
+  }
 
   useEffect(() => {
     setLastWorkspaceId(workspaceId);
@@ -136,6 +150,37 @@ export default function ArchivedPage() {
 
       {tab === "tasks" && (
         <section className="space-y-2">
+          {actionError && (
+            <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              {actionError}
+            </p>
+          )}
+          {canPurgeAny && (
+            <div className="flex items-center justify-between gap-3 pb-1">
+              <p className="text-xs tabular-nums text-[var(--muted)]">
+                {archivedTotal} archived {workItemLower}
+                {archivedTotal === 1 ? "" : "s"}
+              </p>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10"
+                onClick={() =>
+                  setConfirm({
+                    title: amOwner
+                      ? `Permanently delete all ${archivedTotal} archived ${workItemLower}${archivedTotal === 1 ? "" : "s"}?`
+                      : `Permanently delete every archived ${workItemLower} you created?`,
+                    description:
+                      "This removes them and all their data for good and cannot be undone. A record of each deletion stays in the Deletion log.",
+                    confirmLabel: "Delete all",
+                    variant: "danger",
+                    onConfirm: () => runAction(purgeAllArchived),
+                  })
+                }
+              >
+                Delete all
+              </button>
+            </div>
+          )}
           {tasksLoading && <p className="text-sm text-[var(--muted)]">Loading…</p>}
           {!tasksLoading && archivedTasks.length === 0 && (
             <EmptyState icon={faBoxArchive} title={`No archived ${NODE_LABELS.workItem.toLowerCase()}s`} size="compact" />
@@ -153,10 +198,7 @@ export default function ArchivedPage() {
                     description: "It will reappear on the board.",
                     confirmLabel: "Restore",
                     variant: "default",
-                    onConfirm: async () => {
-                      const result = await restoreTask(task.id);
-                      if (!result.ok) throw new Error(result.error);
-                    },
+                    onConfirm: () => runAction(() => restoreTask(task.id)),
                   })
                 }
                 onPurge={() =>
@@ -166,10 +208,7 @@ export default function ArchivedPage() {
                       "This removes it and all its data for good. A record of the deletion stays in the Deletion log.",
                     confirmLabel: "Delete permanently",
                     variant: "danger",
-                    onConfirm: async () => {
-                      const result = await purgeTask(task.id);
-                      if (!result.ok) throw new Error(result.error);
-                    },
+                    onConfirm: () => runAction(() => purgeTask(task.id)),
                   })
                 }
               />

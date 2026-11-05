@@ -1,5 +1,18 @@
 # Chat inbox
 
+### 2026-11-05 — Deletion flows fixed, delete all, repeat icon, donut legend, Ask page badge
+
+- **Context:** Five UI/flow complaints; deletion sometimes answered "Something went wrong".
+- **What we did:**
+  - **Root cause of the 500:** `releaseForTaskIds` removed `attachment_blobs` rows (and the R2 object) while `task_attachments` still pointed at them; that FK is ON DELETE RESTRICT. Any purge or list/category/workspace delete touching a file with no other references failed, after already deleting the file from R2.
+  - Replaced it with `detachForTaskIds` (in the caller's transaction) + `releaseBlobs` (after commit, never throws). `releaseBlobRef` now removes the row first, guarded by "nothing references it". List, department, organization, task and member deletes are transactional and notify clients after commit, not before.
+  - Removing a member also clears their goal/milestone ownership.
+  - New `DELETE /organizations/:id/tasks/archived` (owners: all; others: tasks they created), batched per 100, each logged in the deletion log. "Delete all" on web and mobile Archived.
+  - Mobile gained what only web had: purge a task, remove a member, delete the workspace.
+  - Repeat icon on task cards, tighter web donut legend, full-width mobile legend, Ask context badge on every page (mobile passes `from` when opening Ask).
+- **Takeaway / follow-ups:** Local `DATABASE_URL` points at production Supabase, so never exercise deletes locally. Attachments stuck by the old bug have `ref_count = 0` with their R2 file already gone. Deletes were not run end to end before shipping; check on a throwaway workspace after deploy.
+- **Code / repo:** `apps/api/src/attachments/`, `apps/api/src/tasks/tasks.service.ts`, `apps/web/src/components/agent/AskPanel.tsx`, `apps/mobile/src/app/(app)/ask.tsx`, `apps/mobile/src/app/(app)/archived.tsx`
+
 Cursor Agent turns append **here** when something is worth keeping beyond this chat (newest first). See **`second-memory/README.md`** and rule **`second-memory`**.
 
 ---

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { count, eq, inArray } from "drizzle-orm";
 import { S3Client } from "@aws-sdk/client-s3";
 import { activityLedger, attachmentBlobs, taskAssignees, taskAttachments, tasks } from "@work-ledger/db";
@@ -54,6 +54,7 @@ export type AttachmentUploadFile = {
 
 @Injectable()
 export class AttachmentsService {
+  private readonly log = new Logger(AttachmentsService.name);
   private readonly s3 = buildR2Client();
   private readonly bucket = process.env.R2_BUCKET_NAME ?? "";
   private readonly publicUrl = (process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
@@ -302,31 +303,34 @@ export class AttachmentsService {
   }
 
   /**
-   * Releases blob refs (and deletes the attachment rows) for every attachment under the given tasks,
-   * before those tasks are hard-deleted. Cascading FK deletes bypass `releaseBlobRef` entirely, which
-   * otherwise leaks `attachment_blobs` rows and their R2 objects forever — callers that are about to
-   * hard-delete a task (or a list/department/organization that cascades through tasks) must call this
-   * first so ref-counts and storage stay accurate.
+   * Hard-deleting a task (or a list/department/organization that cascades through tasks) has two steps, because
+   * cascading FK deletes bypass `releaseBlobRef` and would leak `attachment_blobs` rows and R2 objects forever:
+   *
+   * 1. `detachForTaskIds`, inside the caller's transaction, removes the attachment rows and returns their blob refs.
+   * 2. `releaseBlobs`, after that transaction commits, drops the refs and the stored files.
+   *
+   * The rows must go first: `task_attachments.blob_id` is ON DELETE RESTRICT, so a blob can't be removed while a row
+   * still points at it. Storage isn't transactional, so it only ever runs once the delete is certain.
    */
-  async releaseForTaskIds(taskIds: string[]): Promise<void> {
-    if (taskIds.length === 0) return;
-    const rows = await this.db
-      .select({ id: taskAttachments.id, blobId: taskAttachments.blobId })
-      .from(taskAttachments)
-      .where(inArray(taskAttachments.taskId, taskIds));
-    if (rows.length === 0) return;
+  async detachForTaskIds(tx: Pick<AppDatabase, "delete">, taskIds: string[]): Promise<string[]> {
+    if (taskIds.length === 0) return [];
+    const rows = await tx
+      .delete(taskAttachments)
+      .where(inArray(taskAttachments.taskId, taskIds))
+      .returning({ blobId: taskAttachments.blobId });
+    return rows.flatMap((r) => (r.blobId ? [r.blobId] : []));
+  }
 
-    if (this.isR2Configured()) {
-      const s3 = this.assertR2();
-      for (const row of rows) {
-        if (row.blobId) await releaseBlobRef(this.db, s3, this.bucket, row.blobId);
+  /** Never throws: the delete has already committed, and the cleanup job catches any stored file left behind. */
+  async releaseBlobs(blobIds: string[]): Promise<void> {
+    if (blobIds.length === 0 || !this.isR2Configured()) return;
+    const s3 = this.assertR2();
+    for (const blobId of blobIds) {
+      try {
+        await releaseBlobRef(this.db, s3, this.bucket, blobId);
+      } catch (e) {
+        this.log.error(`Could not release attachment blob ${blobId}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
-    await this.db.delete(taskAttachments).where(
-      inArray(
-        taskAttachments.id,
-        rows.map((r) => r.id),
-      ),
-    );
   }
 }

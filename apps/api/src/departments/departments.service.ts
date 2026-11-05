@@ -106,33 +106,38 @@ export class DepartmentsService {
     const department = rows[0];
     if (!department) throw new NotFoundException("Level not found");
 
-    const deptLists = await this.db.select({ id: lists.id }).from(lists).where(eq(lists.departmentId, departmentId));
-    const cascadedTasks =
-      deptLists.length === 0
-        ? []
-        : await this.db
-            .select({ id: tasks.id })
-            .from(tasks)
-            .where(inArray(tasks.listId, deptLists.map((l) => l.id)));
-    await this.attachments.releaseForTaskIds(cascadedTasks.map((t) => t.id));
+    const blobIds = await this.db.transaction(async (tx) => {
+      const deptLists = await tx.select({ id: lists.id }).from(lists).where(eq(lists.departmentId, departmentId));
+      const cascadedTasks =
+        deptLists.length === 0
+          ? []
+          : await tx
+              .select({ id: tasks.id })
+              .from(tasks)
+              .where(inArray(tasks.listId, deptLists.map((l) => l.id)));
+      const detached = await this.attachments.detachForTaskIds(tx, cascadedTasks.map((t) => t.id));
 
-    await this.db.insert(deletionLog).values({
-      entityType: "department",
-      entityId: departmentId,
-      organizationId,
-      actorId: userId,
-      snapshot: {
-        name: department.name,
-        cascadedListCount: deptLists.length,
-        cascadedTaskCount: cascadedTasks.length,
-        cascadedTaskIds: cascadedTasks.map((t) => t.id),
-      },
+      await tx.insert(deletionLog).values({
+        entityType: "department",
+        entityId: departmentId,
+        organizationId,
+        actorId: userId,
+        snapshot: {
+          name: department.name,
+          cascadedListCount: deptLists.length,
+          cascadedTaskCount: cascadedTasks.length,
+          cascadedTaskIds: cascadedTasks.map((t) => t.id),
+        },
+      });
+
+      await tx
+        .delete(departments)
+        .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)));
+      return detached;
     });
 
     this.collaboration.notifyOrgChanged(organizationId, null);
-    await this.db
-      .delete(departments)
-      .where(and(eq(departments.id, departmentId), eq(departments.organizationId, organizationId)));
+    await this.attachments.releaseBlobs(blobIds);
   }
 
   async assertDeptInOrg(organizationId: string, departmentId: string) {

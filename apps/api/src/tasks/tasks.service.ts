@@ -36,6 +36,8 @@ import { computeNextDue, isDueRepeat } from "./compute-next-due";
 import { coerceLegacyTaskStatus } from "./task-status-automation";
 
 const RECURRING_EARLY_COMPLETION_WINDOW_MS = 12 * 60 * 60 * 1000;
+/** Tasks permanently deleted per transaction by "Delete all" on the Archived page. */
+const PURGE_BATCH_SIZE = 100;
 
 @Injectable()
 export class TasksService {
@@ -443,32 +445,81 @@ export class TasksService {
       throw new ForbiddenException("Only owners and task creators can permanently delete tasks");
     }
     const orgId = access.task.organizationId;
-
-    const [ledgerRows, subtaskCount, attachmentCount, commentCount] = await Promise.all([
-      this.db.select().from(activityLedger).where(eq(activityLedger.taskId, taskId)),
-      this.db.select({ value: count() }).from(subtasks).where(eq(subtasks.taskId, taskId)),
-      this.db.select({ value: count() }).from(taskAttachments).where(eq(taskAttachments.taskId, taskId)),
-      this.db.select({ value: count() }).from(comments).where(eq(comments.taskId, taskId)),
-    ]);
-
-    await this.attachments.releaseForTaskIds([taskId]);
-
-    await this.db.insert(deletionLog).values({
-      entityType: "task",
-      entityId: taskId,
-      organizationId: orgId,
-      actorId: userId,
-      snapshot: {
-        title: access.task.title,
-        subtaskCount: subtaskCount[0]?.value ?? 0,
-        attachmentCount: attachmentCount[0]?.value ?? 0,
-        commentCount: commentCount[0]?.value ?? 0,
-        ledger: ledgerRows,
-      },
-    });
-
-    await this.db.delete(tasks).where(eq(tasks.id, taskId));
+    await this.hardDeleteTasks(userId, orgId, [{ id: taskId, title: access.task.title }]);
     this.collaboration.notifyOrgChanged(orgId, taskId);
+  }
+
+  /**
+   * "Delete all" on the Archived page. Same rule as {@link purge}, applied in bulk: an owner clears every archived
+   * task in the workspace, anyone else only the ones they created.
+   */
+  async purgeArchived(userId: string, organizationId: string): Promise<{ deleted: number }> {
+    const member = await this.authz.assertOrgMember(userId, organizationId);
+    const rows = await this.db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.organizationId, organizationId),
+          isNotNull(tasks.deletedAt),
+          member.role === "owner" ? undefined : eq(tasks.assignerId, userId),
+        ),
+      );
+    if (rows.length === 0) return { deleted: 0 };
+
+    // In batches, so a huge archive can't hold one long transaction; every batch is complete on its own.
+    for (let i = 0; i < rows.length; i += PURGE_BATCH_SIZE) {
+      await this.hardDeleteTasks(userId, organizationId, rows.slice(i, i + PURGE_BATCH_SIZE));
+    }
+    this.collaboration.notifyOrgChanged(organizationId, null);
+    return { deleted: rows.length };
+  }
+
+  /** Deletes the tasks and records them in the deletion log as one transaction, then frees their stored files. */
+  private async hardDeleteTasks(actorId: string, organizationId: string, rows: { id: string; title: string }[]) {
+    const taskIds = rows.map((r) => r.id);
+    const blobIds = await this.db.transaction(async (tx) => {
+      const ledgerRows = await tx.select().from(activityLedger).where(inArray(activityLedger.taskId, taskIds));
+      const subtaskCounts = await tx
+        .select({ taskId: subtasks.taskId, value: count() })
+        .from(subtasks)
+        .where(inArray(subtasks.taskId, taskIds))
+        .groupBy(subtasks.taskId);
+      const attachmentCounts = await tx
+        .select({ taskId: taskAttachments.taskId, value: count() })
+        .from(taskAttachments)
+        .where(inArray(taskAttachments.taskId, taskIds))
+        .groupBy(taskAttachments.taskId);
+      const commentCounts = await tx
+        .select({ taskId: comments.taskId, value: count() })
+        .from(comments)
+        .where(inArray(comments.taskId, taskIds))
+        .groupBy(comments.taskId);
+      const countFor = (counts: { taskId: string; value: number }[], taskId: string) =>
+        counts.find((c) => c.taskId === taskId)?.value ?? 0;
+
+      const detached = await this.attachments.detachForTaskIds(tx, taskIds);
+
+      await tx.insert(deletionLog).values(
+        rows.map((r) => ({
+          entityType: "task" as const,
+          entityId: r.id,
+          organizationId,
+          actorId,
+          snapshot: {
+            title: r.title,
+            subtaskCount: countFor(subtaskCounts, r.id),
+            attachmentCount: countFor(attachmentCounts, r.id),
+            commentCount: countFor(commentCounts, r.id),
+            ledger: ledgerRows.filter((l) => l.taskId === r.id),
+          },
+        })),
+      );
+
+      await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+      return detached;
+    });
+    await this.attachments.releaseBlobs(blobIds);
   }
 
   async updateStatus(userId: string, taskId: string, body: unknown) {

@@ -121,26 +121,31 @@ export class ListsService {
     const list = rows[0];
     if (!list) throw new NotFoundException("List not found");
 
-    const cascadedTasks = await this.db
-      .select({ id: tasks.id, title: tasks.title })
-      .from(tasks)
-      .where(eq(tasks.listId, listId));
-    await this.attachments.releaseForTaskIds(cascadedTasks.map((t) => t.id));
+    const blobIds = await this.db.transaction(async (tx) => {
+      const cascadedTasks = await tx
+        .select({ id: tasks.id, title: tasks.title })
+        .from(tasks)
+        .where(eq(tasks.listId, listId));
+      const detached = await this.attachments.detachForTaskIds(tx, cascadedTasks.map((t) => t.id));
 
-    await this.db.insert(deletionLog).values({
-      entityType: "list",
-      entityId: listId,
-      organizationId,
-      actorId: userId,
-      snapshot: {
-        name: list.name,
-        cascadedTaskCount: cascadedTasks.length,
-        cascadedTaskIds: cascadedTasks.map((t) => t.id),
-      },
+      await tx.insert(deletionLog).values({
+        entityType: "list",
+        entityId: listId,
+        organizationId,
+        actorId: userId,
+        snapshot: {
+          name: list.name,
+          cascadedTaskCount: cascadedTasks.length,
+          cascadedTaskIds: cascadedTasks.map((t) => t.id),
+        },
+      });
+
+      await tx.delete(lists).where(and(eq(lists.id, listId), eq(lists.organizationId, organizationId)));
+      return detached;
     });
 
     this.collaboration.notifyOrgChanged(organizationId, null);
-    await this.db.delete(lists).where(and(eq(lists.id, listId), eq(lists.organizationId, organizationId)));
+    await this.attachments.releaseBlobs(blobIds);
   }
 
   async assertListInOrg(organizationId: string, listId: string) {

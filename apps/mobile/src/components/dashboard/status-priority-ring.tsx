@@ -38,9 +38,10 @@ const GAP_DEG = 4;
 const SEAM_DEG = GAP_DEG / 2;
 /** How long a half takes to fill, piece by piece. */
 const FILL_MS = 900;
-/** Largest the ring and its legend get (the web's 17rem and 18rem). */
+/** Largest the ring gets (the web's 17rem). */
 const RING_MAX = 272;
-const LEGEND_MAX = 288;
+/** The legend fills the page on a phone; this only keeps its rows readable on a tablet. */
+const LEGEND_MAX = 520;
 
 /** Smallest slice of a half a non-zero segment is drawn with, so tiny counts stay visible. */
 const MIN_SHARE = 0.07;
