@@ -1,4 +1,13 @@
-import { faArrowUp, faClockRotateLeft, faEye, faPen, faThumbtack, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowRight,
+  faArrowUp,
+  faClockRotateLeft,
+  faEye,
+  faPen,
+  faThumbtack,
+  faTrashCan,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatZonedDateKey,
@@ -10,23 +19,15 @@ import {
 } from '@work-ledger/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown, useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AgentText } from '@/components/agent/agent-text';
 import { Icon } from '@/components/icon';
 import { AiIcon } from '@/components/agent/ai-icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
+import { Pulse } from '@/components/motion/pulse';
 import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { IconButton } from '@/components/ui';
@@ -159,6 +160,12 @@ export default function AskScreen() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // The composer rides on the keyboard. The app draws edge to edge, so Android no longer shrinks the window for the
+  // keyboard (and KeyboardAvoidingView did nothing there): the keyboard's live height lifts the whole chat instead,
+  // frame by frame with the keyboard's own animation. Closed, it's the home-indicator inset.
+  const keyboard = useAnimatedKeyboard();
+  const liftStyle = useAnimatedStyle(() => ({ paddingBottom: Math.max(keyboard.height.value, insets.bottom) }), [insets.bottom]);
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
@@ -315,79 +322,93 @@ export default function AskScreen() {
       {view === 'history' ? (
         <History orgId={orgId} timeZone={org?.timeZone ?? 'UTC'} activeId={threadId} onOpen={loadThread} onDeleted={(id) => id === threadId && reset()} />
       ) : (
-        <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Animated.View style={[styles.fill, liftStyle]}>
           <ScrollView
             ref={scrollRef}
             style={styles.fill}
-            contentContainerStyle={[styles.chat, messages.length === 0 && !running && { flexGrow: 1, justifyContent: 'flex-end' }]}
+            contentContainerStyle={[styles.chat, messages.length === 0 && !running && styles.chatEmpty]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            // The keyboard shrinks the view: keep the latest message in sight above it.
+            onLayout={() => scrollRef.current?.scrollToEnd({ animated: false })}>
             {messages.length === 0 && !running ? (
-              <View style={{ gap: 12 }}>
-                <Text size="sm" color="muted">
-                  {canFill && formState?.isNew
-                    ? "Describe this task: what needs doing, who it's for and when. LogBase fills it in for you to check."
-                    : canFill
-                      ? 'Say what should change and LogBase fills it in. You can also ask anything about this task.'
-                      : taskId
-                    ? "Ask anything about this task: what's left, who's on it, what changed."
-                    : 'Ask about tasks, people, deadlines or the roadmap. LogBase looks it up for you.'}
-                </Text>
-                <View style={styles.chips}>
-                  {(taskId ? TASK_SUGGESTIONS : SUGGESTIONS).map((s) => (
-                    <PressableScale
-                      key={s}
-                      scaleTo={0.97}
-                      onPress={() => void send(s)}
-                      style={[styles.chip, { borderColor: theme.borderSubtle }]}>
-                      <Text size="13">{s}</Text>
-                    </PressableScale>
+              <View style={styles.empty}>
+                <View style={{ gap: 6 }}>
+                  <Text size="2xl" weight="semibold" tracking={-0.6}>
+                    {canFill && formState?.isNew
+                      ? "What's this task?"
+                      : canFill
+                        ? 'What should change?'
+                        : taskId
+                          ? 'Ask about this task'
+                          : 'What can I help with?'}
+                  </Text>
+                  <Text size="sm" color="muted">
+                    {canFill && formState?.isNew
+                      ? "Say what needs doing, who it's for and when. LogBase fills it in for you to check."
+                      : canFill
+                        ? 'Describe the change and LogBase fills it in. You can also ask anything about this task.'
+                        : taskId
+                          ? "What's left, who's on it, what changed. LogBase looks it up."
+                          : 'Tasks, people, deadlines or the roadmap. LogBase looks it up for you.'}
+                  </Text>
+                </View>
+                <View style={styles.suggestions}>
+                  {(taskId ? TASK_SUGGESTIONS : SUGGESTIONS).map((s, i) => (
+                    <Animated.View key={s} entering={FadeInDown.delay(60 + i * 40).duration(220)}>
+                      <PressableScale
+                        scaleTo={0.98}
+                        haptic="select"
+                        accessibilityRole="button"
+                        onPress={() => void send(s)}
+                        style={[styles.suggestion, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+                        <Text size="sm" weight="medium" numberOfLines={1} style={{ flex: 1 }}>
+                          {s}
+                        </Text>
+                        <Icon icon={faArrowRight} size={12} color="muted" />
+                      </PressableScale>
+                    </Animated.View>
                   ))}
                 </View>
               </View>
             ) : (
               messages.map((m) =>
                 m.role === 'user' ? (
-                  <View key={m.id} style={[styles.bubble, { backgroundColor: theme.surfaceElevated }]}>
-                    <Text size="15">{m.content}</Text>
-                  </View>
+                  <Animated.View
+                    key={m.id}
+                    entering={FadeInDown.duration(200)}
+                    style={[styles.bubble, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+                    <Text size="15" lh={22} selectable>
+                      {m.content}
+                    </Text>
+                  </Animated.View>
                 ) : (
                   <Animated.View key={m.id} entering={FadeIn.duration(180)} style={styles.answer}>
-                    <View style={{ paddingTop: 2 }}>
-                      <AiIcon size={16} />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
-                      {m.steps?.length ? <StepsToggle steps={m.steps.map((s) => s.label)} /> : null}
-                      <AgentText text={m.content} />
-                      {m.proposals?.map((pr) => <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />)}
-                    </View>
+                    {m.steps?.length ? <StepsToggle steps={m.steps.map((s) => s.label)} /> : null}
+                    <AgentText text={m.content} />
+                    {m.proposals?.map((pr) => <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />)}
                   </Animated.View>
                 ),
               )
             )}
             {running ? (
               <View style={styles.answer}>
-                <View style={{ paddingTop: 2 }}>
-                  <AiIcon size={16} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
-                  {liveSteps.length > 0 ? <Steps steps={liveSteps} /> : null}
-                  {liveProposals.map((pr) => (
-                    <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />
-                  ))}
-                  {draft ? (
-                    <AgentText text={draft} />
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.7 }] }} />
-                      <Text size="xs" color="muted" numberOfLines={1} style={{ flex: 1 }}>
-                        {liveSteps.length ? 'Reading the results' : 'Looking into it'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                {liveSteps.length > 0 ? <Steps steps={liveSteps} /> : null}
+                {liveProposals.map((pr) => (
+                  <ProposalCard key={pr.id} proposal={pr} onDecide={decideProposal} />
+                ))}
+                {draft ? (
+                  <AgentText text={draft} />
+                ) : (
+                  <View style={styles.thinking}>
+                    <Pulse style={[styles.thinkingDot, { backgroundColor: theme.muted }]} />
+                    <Text size="13" color="muted" numberOfLines={1} style={{ flex: 1 }}>
+                      {liveSteps.length ? 'Reading the results' : 'Looking into it'}
+                    </Text>
+                  </View>
+                )}
               </View>
             ) : null}
             {error ? (
@@ -407,7 +428,7 @@ export default function AskScreen() {
             ) : null}
           </ScrollView>
 
-          <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 10), borderTopColor: theme.borderSubtle }]}>
+          <View style={[styles.composer, { backgroundColor: theme.surfaceBase }]}>
             <ContextBadges
               taskLabel={
                 canFill
@@ -423,7 +444,7 @@ export default function AskScreen() {
               hideView={canFill}
               onScopeOff={setScopeOff}
             />
-            <View style={[styles.inputWrap, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+            <View style={[styles.inputWrap, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
               <TextInput
                 value={input}
                 onChangeText={setInput}
@@ -450,18 +471,22 @@ export default function AskScreen() {
                   scaleTo={0.92}
                   accessibilityRole="button"
                   accessibilityLabel="Ask"
+                  haptic="tap"
                   disabled={!input.trim()}
                   onPress={() => void send(input)}
-                  style={[styles.sendBtn, { backgroundColor: theme.accent, opacity: input.trim() ? 1 : 0.3 }]}>
-                  <Icon icon={faArrowUp} size={14} color={theme.onAccent} />
+                  style={[
+                    styles.sendBtn,
+                    input.trim() ? { backgroundColor: theme.fg } : { backgroundColor: theme.surfaceMuted },
+                  ]}>
+                  <Icon icon={faArrowUp} size={14} color={input.trim() ? theme.surfaceBase : theme.muted} />
                 </PressableScale>
               )}
             </View>
-            <Text size="10" color="muted" style={{ paddingHorizontal: 4 }}>
+            <Text size="10" color="muted" style={styles.footnote}>
               {canFill ? 'Fills this task in directly · you can edit anything' : taskId && !threadId ? 'About this task · changes need your approval' : 'Changes only happen when you approve them'}
             </Text>
           </View>
-        </KeyboardAvoidingView>
+        </Animated.View>
       )}
     </View>
   );
@@ -713,11 +738,34 @@ function groupThreads(threads: AgentThreadSummary[], timeZone: string) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  chat: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16, gap: 18 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 7 },
-  answer: { flexDirection: 'row', gap: 10 },
-  bubble: { alignSelf: 'flex-end', maxWidth: '85%', borderRadius: 18, borderBottomRightRadius: 6, paddingHorizontal: 14, paddingVertical: 9 },
+  chat: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 20, gap: 22 },
+  // Empty: the greeting sits low, near the thumb and the composer, not stranded at the top.
+  chatEmpty: { flexGrow: 1, justifyContent: 'flex-end' },
+  empty: { gap: 20, paddingBottom: 4 },
+  suggestions: { gap: 8 },
+  suggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+  },
+  // Answers read full width, like a document; only the user's own turns are bubbles.
+  answer: { gap: 10 },
+  bubble: {
+    alignSelf: 'flex-end',
+    maxWidth: '82%',
+    borderRadius: 20,
+    borderBottomRightRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  thinking: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 22 },
+  thinkingDot: { width: 8, height: 8, borderRadius: 4 },
+  footnote: { textAlign: 'center', paddingHorizontal: 4 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Radius.xxxl, paddingHorizontal: 12, paddingVertical: 10 },
   errorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' },
   stopGlyph: { width: 10, height: 10, borderRadius: 2 },
@@ -740,10 +788,19 @@ const styles = StyleSheet.create({
   },
   badgeLabel: { flexShrink: 1 },
   badgeRestore: { paddingHorizontal: 4, paddingVertical: 3 },
-  composer: { paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth * 2, gap: 6 },
-  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderWidth: 1, borderRadius: Radius.xxxl + 4, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
-  input: { flex: 1, fontSize: 15, lineHeight: 21, maxHeight: 120, paddingVertical: 6 },
-  sendBtn: { width: 32, height: 32, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  composer: { paddingHorizontal: 12, paddingTop: 6, paddingBottom: 8, gap: 8 },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderRadius: 26,
+    paddingLeft: 16,
+    paddingRight: 7,
+    paddingVertical: 7,
+  },
+  input: { flex: 1, fontSize: 16, lineHeight: 22, maxHeight: 140, paddingTop: 7, paddingBottom: 7 },
+  sendBtn: { width: 36, height: 36, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   group: { borderRadius: Radius.xxxl + 4, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4 },
 });

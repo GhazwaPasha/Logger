@@ -1,5 +1,12 @@
 # Chat inbox
 
+### 2026-11-07 — Mobile Ask: composer above keyboard, chat polish
+
+- **Context:** On Android the Ask composer stayed under the keyboard.
+- **What we did:** KeyboardAvoidingView had no Android behaviour, and the app draws edge to edge, so the window no longer resizes for the keyboard. The chat now lifts by `useAnimatedKeyboard` height (same approach as the floating tab bar). Removed the AI avatar from answers, made answers full width, added a greeting and suggestion rows to the empty state, a calmer thinking row, and a larger composer.
+- **Takeaway / follow-ups:** `useAnimatedKeyboard` is deprecated in Reanimated 4 in favour of react-native-keyboard-controller; worth moving both screens if it breaks. The task detail screen still uses KeyboardAvoidingView with no Android behaviour.
+- **Code / repo:** `apps/mobile/src/app/(app)/ask.tsx`
+
 ### 2026-11-05 — Deletion flows fixed, delete all, repeat icon, donut legend, Ask page badge
 
 - **Context:** Five UI/flow complaints; deletion sometimes answered "Something went wrong".
