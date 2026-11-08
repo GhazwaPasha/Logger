@@ -124,11 +124,30 @@ import {
   taskShowsLateFooter,
 } from "@/lib/task-board";
 
-/** Docked task-details pane width on desktop (matches the old overlay's max-w-xl). */
+/** Docked task-details pane: default width (the old overlay's max-w-xl), drag limits, and remembered width. */
 const TASK_DETAIL_PANE_W = 576;
-/** The pane narrows (to this floor) before the board gets squeezed below TASK_DETAIL_MIN_BOARD_W. */
 const TASK_DETAIL_PANE_MIN_W = 360;
+const TASK_DETAIL_PANE_MAX_W = 960;
+const TASK_DETAIL_WIDTH_KEY = "logbase.taskPaneWidth";
+/** The pane gives way (down to its floor) before the board gets squeezed below this. */
 const TASK_DETAIL_MIN_BOARD_W = 420;
+
+function readTaskPaneWidth(): number {
+  try {
+    const n = Number(localStorage.getItem(TASK_DETAIL_WIDTH_KEY));
+    return Number.isFinite(n) && n >= TASK_DETAIL_PANE_MIN_W ? Math.min(n, TASK_DETAIL_PANE_MAX_W) : TASK_DETAIL_PANE_W;
+  } catch {
+    return TASK_DETAIL_PANE_W;
+  }
+}
+
+function saveTaskPaneWidth(w: number) {
+  try {
+    localStorage.setItem(TASK_DETAIL_WIDTH_KEY, String(w));
+  } catch {
+    /* per-browser convenience only */
+  }
+}
 
 type ViewMode = "list" | "kanban";
 
@@ -952,15 +971,27 @@ function WorkItemsInner() {
     setDetailSlot(document.getElementById(WORKSPACE_DETAIL_SLOT_ID));
   }, []);
 
-  // Fit the docked pane to the room left beside the board and the Ask pane (which publishes --ask-pane-w).
-  const [detailPaneW, setDetailPaneW] = useState(TASK_DETAIL_PANE_W);
+  // The width the user chose (dragged), capped by the room left beside the board and the Ask pane
+  // (which publishes --ask-pane-w).
+  const [detailPaneUserW, setDetailPaneUserW] = useState(TASK_DETAIL_PANE_W);
+  const [detailPaneRoom, setDetailPaneRoom] = useState(TASK_DETAIL_PANE_MAX_W);
+  const [detailPaneDragging, setDetailPaneDragging] = useState(false);
+  const detailPaneW = Math.round(
+    Math.max(TASK_DETAIL_PANE_MIN_W, Math.min(detailPaneUserW, detailPaneRoom, TASK_DETAIL_PANE_MAX_W)),
+  );
+  const clampDetailPaneW = (w: number) =>
+    Math.round(Math.max(TASK_DETAIL_PANE_MIN_W, Math.min(w, detailPaneRoom, TASK_DETAIL_PANE_MAX_W)));
+
+  useEffect(() => {
+    setDetailPaneUserW(readTaskPaneWidth());
+  }, []);
+
   useEffect(() => {
     const host = detailSlot?.parentElement;
     if (!host) return;
     const update = () => {
       const askW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ask-pane-w")) || 0;
-      const room = host.clientWidth - askW - TASK_DETAIL_MIN_BOARD_W;
-      setDetailPaneW(Math.max(TASK_DETAIL_PANE_MIN_W, Math.min(TASK_DETAIL_PANE_W, room)));
+      setDetailPaneRoom(host.clientWidth - askW - TASK_DETAIL_MIN_BOARD_W);
     };
     update();
     const ro = new ResizeObserver(update);
@@ -2595,7 +2626,7 @@ function WorkItemsInner() {
                 initial={{ width: 0 }}
                 animate={{ width: detailPaneW }}
                 exit={{ width: 0 }}
-                transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
+                transition={{ duration: detailPaneDragging ? 0 : motionDuration(0.22, prefersReduced), ease: POP_EASE }}
                 className="relative h-full shrink-0 overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--surface-base)]"
               >
                 {/* Fixed-width inner box so content doesn't reflow while the pane animates. */}
@@ -2604,6 +2635,49 @@ function WorkItemsInner() {
                     taskId={viewTaskId}
                     onClose={() => setViewTaskId(null)}
                     onOpenTask={(id: string) => setViewTaskId(id)}
+                  />
+                </div>
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize task details"
+                  aria-valuenow={detailPaneW}
+                  aria-valuemin={TASK_DETAIL_PANE_MIN_W}
+                  aria-valuemax={TASK_DETAIL_PANE_MAX_W}
+                  tabIndex={0}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setDetailPaneDragging(true);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!detailPaneDragging) return;
+                    const right = e.currentTarget.parentElement!.getBoundingClientRect().right;
+                    setDetailPaneUserW(clampDetailPaneW(right - e.clientX));
+                  }}
+                  onPointerUp={() => {
+                    if (!detailPaneDragging) return;
+                    setDetailPaneDragging(false);
+                    setDetailPaneUserW(detailPaneW);
+                    saveTaskPaneWidth(detailPaneW);
+                  }}
+                  onPointerCancel={() => setDetailPaneDragging(false)}
+                  onDoubleClick={() => {
+                    setDetailPaneUserW(TASK_DETAIL_PANE_W);
+                    saveTaskPaneWidth(TASK_DETAIL_PANE_W);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+                    e.preventDefault();
+                    const step = e.shiftKey ? 64 : 16;
+                    const next = clampDetailPaneW(detailPaneW + (e.key === "ArrowLeft" ? step : -step));
+                    setDetailPaneUserW(next);
+                    saveTaskPaneWidth(next);
+                  }}
+                  className="group absolute inset-y-0 left-0 z-10 w-1.5 -translate-x-0.5 cursor-col-resize touch-none outline-none"
+                >
+                  <span
+                    className={`absolute inset-y-0 left-0.5 w-px transition-colors duration-150 group-hover:bg-[var(--muted)] group-focus-visible:bg-[var(--accent)] ${detailPaneDragging ? "bg-[var(--accent)]" : "bg-transparent"}`}
                   />
                 </div>
               </motion.aside>

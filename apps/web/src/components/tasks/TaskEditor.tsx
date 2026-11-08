@@ -407,7 +407,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
           )}
 
           {detail && (
-            <TaskPanelHistoryCard task={detail.task} ledger={detail.ledger} members={members} />
+            <TaskPanelHistoryCard task={detail.task} ledger={detail.ledger} members={members} className="mt-6" />
           )}
         </div>
 

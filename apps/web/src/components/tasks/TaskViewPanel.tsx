@@ -91,7 +91,12 @@ function PanelHeader({ title, onClose, children }: { title: string; onClose: () 
   );
 }
 
-const PANEL_BODY = "scrollbar-hide flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5";
+/**
+ * Scrolling body. Children must not shrink: in a fixed-height flex column they'd otherwise collapse
+ * (the auto-sized title textarea went to 0px). Text steps down to the Ask pane's scale: 14px → 13px.
+ */
+const PANEL_BODY =
+  "scrollbar-hide flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 text-[13px] [&>*]:shrink-0 [&_.text-sm]:text-[13px]";
 
 export function TaskViewPanel({
   taskId,
@@ -201,10 +206,10 @@ export function TaskViewPanel({
           }}
           placeholder={TASK_TITLE_PLACEHOLDER}
           aria-label="Task title"
-          className="w-full resize-none overflow-hidden bg-transparent p-0 text-base font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
+          className="w-full resize-none overflow-hidden bg-transparent p-0 [field-sizing:content] text-[15px] font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
         />
       ) : (
-        <h3 className="text-base font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
+        <h3 className="text-[15px] font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
       )}
 
       {/* Subtasks — always shown, right below title */}

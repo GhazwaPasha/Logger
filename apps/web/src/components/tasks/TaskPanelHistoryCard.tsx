@@ -35,9 +35,11 @@ type Props = {
   task: TaskRow;
   ledger: LedgerRow[];
   members: MemberRow[];
+  /** Extra classes for the card's outer box (e.g. top margin where the parent has no gap). */
+  className?: string;
 };
 
-export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
+export function TaskPanelHistoryCard({ task, ledger, members, className }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const [expanded, setExpanded] = useState(false);
   const headingId = useId();
@@ -55,7 +57,7 @@ export function TaskPanelHistoryCard({ task, ledger, members }: Props) {
   }, [expanded, ledger.length]);
 
   return (
-    <div className="mt-6 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/40 px-4 py-3">
+    <div className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)]/40 px-4 py-3 ${className ?? ""}`}>
       <button
         type="button"
         id={headingId}
