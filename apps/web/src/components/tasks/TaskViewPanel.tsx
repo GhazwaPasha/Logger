@@ -10,7 +10,7 @@ import { useTaskDetail } from "@/hooks/useTaskDetail";
 import { useTaskEditorForm } from "@/hooks/useTaskEditorForm";
 import { useTaskSubtasks } from "@/hooks/useTaskSubtasks";
 import { useDiscordChannels } from "@/hooks/useDiscordChannels";
-import { useAsk } from "@/components/agent/AskPanel";
+import { PaneButton, useAsk } from "@/components/agent/AskPanel";
 import { AiIcon } from "@/components/agent/AiIcon";
 import { useRouter } from "next/navigation";
 import { taskEditCaps } from "@/lib/workspace-permissions";
@@ -36,7 +36,8 @@ import {
   type TaskPriority,
 } from "@/lib/task-board";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
+import { faAnglesUp, faAnglesDown, faArrowUp, faCheck, faCircleExclamation, faCircleNotch } from "@fortawesome/free-solid-svg-icons";
+import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
@@ -53,6 +54,44 @@ function formatDueDate(iso: string | null | undefined, timeZone: string): string
   if (!iso) return null;
   return formatInTimeZone(new Date(iso), timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
+
+/** Quiet autosave state for the panel header: an icon plus one word, in muted text. */
+function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: string | null }) {
+  const cfg =
+    status === "error"
+      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-red-600 dark:text-red-400", icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3" aria-hidden /> }
+      : status === "saving" || status === "pending"
+        ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCircleNotch} className="size-3 animate-spin motion-reduce:animate-none" aria-hidden /> }
+        : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCheck} className="size-3" aria-hidden /> };
+  return (
+    <span
+      role="status"
+      aria-live="polite"
+      title={cfg.title}
+      className={`mr-1 inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${cfg.cls}`}
+    >
+      {cfg.icon}
+      {cfg.label}
+    </span>
+  );
+}
+
+/** Matches the Ask pane header: h-11, 13px semibold title, 32px icon buttons. */
+function PanelHeader({ title, onClose, children }: { title: string; onClose: () => void; children?: React.ReactNode }) {
+  return (
+    <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] pl-3.5 pr-1.5">
+      <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={title}>
+        {title}
+      </p>
+      {children}
+      <PaneButton label="Close (Esc)" onClick={onClose}>
+        <path d="M5.5 5.5l9 9m0-9l-9 9" />
+      </PaneButton>
+    </header>
+  );
+}
+
+const PANEL_BODY = "scrollbar-hide flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5";
 
 export function TaskViewPanel({
   taskId,
@@ -100,28 +139,22 @@ export function TaskViewPanel({
 
   if (isLoading && !detail) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="-mx-6 flex items-center justify-between border-b border-[var(--border-subtle)] px-6 pb-3">
-          <h2 className="text-sm font-semibold text-[var(--fg)]">Task</h2>
-          <button type="button" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]" onClick={onClose}>
-            Close
-          </button>
+      <div className="flex h-full min-h-0 flex-col">
+        <PanelHeader title="Task details" onClose={onClose} />
+        <div className={PANEL_BODY}>
+          <p className="text-sm text-[var(--muted)]">Loading…</p>
         </div>
-        <p className="text-sm text-[var(--muted)]">Loading…</p>
       </div>
     );
   }
 
   if (!detail) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="-mx-6 flex items-center justify-between border-b border-[var(--border-subtle)] px-6 pb-3">
-          <h2 className="text-sm font-semibold text-[var(--fg)]">Task</h2>
-          <button type="button" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]" onClick={onClose}>
-            Close
-          </button>
+      <div className="flex h-full min-h-0 flex-col">
+        <PanelHeader title="Task details" onClose={onClose} />
+        <div className={PANEL_BODY}>
+          <p className="text-sm text-[var(--muted)]">Could not load task.</p>
         </div>
-        <p className="text-sm text-[var(--muted)]">Could not load task.</p>
       </div>
     );
   }
@@ -137,39 +170,25 @@ export function TaskViewPanel({
   const dueColorClass = dueIndicatorColorClass(task);
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Header */}
-      <div className="-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--fg)]">Task details</h2>
-        <div className="flex items-center gap-2">
-          {ask && (
-            <button
-              type="button"
-              title="Ask LogBase about this task"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-              onClick={() => ask.openAsk({ taskId })}
-            >
-              <AiIcon className="size-3.5" />
-              Ask
-            </button>
-          )}
+    <div className="flex h-full min-h-0 flex-col">
+      <PanelHeader title="Task details" onClose={onClose}>
+        <AutosaveIndicator status={form.syncStatus} error={form.syncError ?? null} />
+        {ask && (
           <button
             type="button"
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)]"
-            onClick={navigateToEdit}
+            aria-label="Ask LogBase about this task"
+            title="Ask LogBase about this task"
+            onClick={() => ask.openAsk({ taskId })}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-[background-color,color,transform] duration-150 hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.94]"
           >
-            Edit
+            <AiIcon className="size-[18px]" />
           </button>
-          <button
-            type="button"
-            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-
+        )}
+        <PaneButton label="Open full editor" onClick={navigateToEdit}>
+          <path d="M13.5 4.5l2 2L8 14l-2.75.75L6 12l7.5-7.5z" />
+        </PaneButton>
+      </PanelHeader>
+      <div className={PANEL_BODY}>
       {/* Title */}
       {caps.canEditFields ? (
         <textarea
@@ -455,6 +474,7 @@ export function TaskViewPanel({
 
       {/* Activity history — always shown */}
       <TaskPanelHistoryCard task={task} ledger={ledger} members={members} />
+      </div>
     </div>
   );
 }

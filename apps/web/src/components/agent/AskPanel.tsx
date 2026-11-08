@@ -660,7 +660,7 @@ function AskChrome({ compact }: { compact?: boolean }) {
   return (
     <>
       <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] pl-3.5 pr-1.5">
-        <AiIcon className="size-4 text-[var(--fg)]" />
+        <AiIcon className="size-[18px] text-[var(--fg)]" />
         <p className="ml-1 min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={heading}>
           {heading}
         </p>
@@ -1316,7 +1316,7 @@ function TaskMatches({
   );
 }
 
-function PaneButton({
+export function PaneButton({
   label,
   onClick,
   active,
@@ -1333,9 +1333,9 @@ function PaneButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md transition-[background-color,color,transform] duration-150 hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.94] ${active ? "bg-[var(--surface-hover)] text-[var(--fg)]" : "text-[var(--muted)]"}`}
+      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-md transition-[background-color,color,transform] duration-150 hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.94] ${active ? "bg-[var(--surface-hover)] text-[var(--fg)]" : "text-[var(--muted)]"}`}
     >
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="size-[15px]" aria-hidden>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="size-[18px]" aria-hidden>
         {children}
       </svg>
     </button>

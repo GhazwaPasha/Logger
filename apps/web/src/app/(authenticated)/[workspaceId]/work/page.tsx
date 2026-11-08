@@ -2599,7 +2599,7 @@ function WorkItemsInner() {
                 className="relative h-full shrink-0 overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--surface-base)]"
               >
                 {/* Fixed-width inner box so content doesn't reflow while the pane animates. */}
-                <div className="scrollbar-hide flex h-full flex-col overflow-y-auto p-6" style={{ width: detailPaneW }}>
+                <div className="flex h-full flex-col" style={{ width: detailPaneW }}>
                   <TaskViewPanel
                     taskId={viewTaskId}
                     onClose={() => setViewTaskId(null)}
@@ -2632,7 +2632,7 @@ function WorkItemsInner() {
                   role="dialog"
                   aria-modal="true"
                   aria-label="Task details"
-                  className="surface-elevated scrollbar-hide absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-[var(--border-subtle)] p-6"
+                  className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--border-subtle)]"
                   onClick={(e) => e.stopPropagation()}
                   initial={{ x: "100%" }}
                   animate={{ x: 0 }}
