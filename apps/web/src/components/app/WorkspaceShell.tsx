@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "./AppHeader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
-import { WorkspaceRouteContext } from "./workspace-route-context";
+import { WorkspaceRouteContext, WORKSPACE_DETAIL_SLOT_ID } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
 import { WorkspaceRealtimeSubscriber } from "@/components/app/WorkspaceRealtimeSubscriber";
 import { WorkspaceNotificationsProvider } from "@/components/notifications/WorkspaceNotificationsProvider";
@@ -97,6 +97,8 @@ export function WorkspaceShell({
                 <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
                   {children}
                 </main>
+                {/* Pages portal docked detail panes (e.g. task details) here so they push content like the Ask pane. */}
+                <div id={WORKSPACE_DETAIL_SLOT_ID} className="contents" />
                 <AskPane />
               </div>
             </div>

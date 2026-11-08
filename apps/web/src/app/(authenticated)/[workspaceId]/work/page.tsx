@@ -85,7 +85,7 @@ import {
   WORK_BOARD_SCOPE_EVENT,
 } from "@/lib/work-board-scope";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
-import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { useWorkspaceRoute, WORKSPACE_DETAIL_SLOT_ID } from "@/components/app/workspace-route-context";
 import { useArchiveTask } from "@/hooks/useArchiveTask";
 import { useOpenNewTask } from "@/hooks/useOpenNewTask";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -123,6 +123,12 @@ import {
   taskPriority,
   taskShowsLateFooter,
 } from "@/lib/task-board";
+
+/** Docked task-details pane width on desktop (matches the old overlay's max-w-xl). */
+const TASK_DETAIL_PANE_W = 576;
+/** The pane narrows (to this floor) before the board gets squeezed below TASK_DETAIL_MIN_BOARD_W. */
+const TASK_DETAIL_PANE_MIN_W = 360;
+const TASK_DETAIL_MIN_BOARD_W = 420;
 
 type ViewMode = "list" | "kanban";
 
@@ -939,9 +945,33 @@ function WorkItemsInner() {
     setLastWorkspaceId(workspaceId);
   }, [workspaceId]);
 
+  const [detailSlot, setDetailSlot] = useState<HTMLElement | null>(null);
+
   useEffect(() => {
     setToolbarMenusMounted(true);
+    setDetailSlot(document.getElementById(WORKSPACE_DETAIL_SLOT_ID));
   }, []);
+
+  // Fit the docked pane to the room left beside the board and the Ask pane (which publishes --ask-pane-w).
+  const [detailPaneW, setDetailPaneW] = useState(TASK_DETAIL_PANE_W);
+  useEffect(() => {
+    const host = detailSlot?.parentElement;
+    if (!host) return;
+    const update = () => {
+      const askW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ask-pane-w")) || 0;
+      const room = host.clientWidth - askW - TASK_DETAIL_MIN_BOARD_W;
+      setDetailPaneW(Math.max(TASK_DETAIL_PANE_MIN_W, Math.min(TASK_DETAIL_PANE_W, room)));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(host);
+    const mo = new MutationObserver(update);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [detailSlot]);
 
   function computePopoverStyle(trigger: HTMLElement, panelWidth: number, maxPanelHeight: number): CSSProperties {
     const r = trigger.getBoundingClientRect();
@@ -2553,7 +2583,37 @@ function WorkItemsInner() {
         )}
       </section>
 
+      {/* Desktop: dock the task details beside the board (like the Ask pane) so the board shrinks instead of being covered. */}
+      {!isMobile &&
+        detailSlot &&
+        createPortal(
+          <AnimatePresence initial={false}>
+            {viewTaskId && (
+              <motion.aside
+                key="task-details-docked"
+                aria-label="Task details"
+                initial={{ width: 0 }}
+                animate={{ width: detailPaneW }}
+                exit={{ width: 0 }}
+                transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
+                className="relative h-full shrink-0 overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--surface-base)]"
+              >
+                {/* Fixed-width inner box so content doesn't reflow while the pane animates. */}
+                <div className="scrollbar-hide flex h-full flex-col overflow-y-auto p-6" style={{ width: detailPaneW }}>
+                  <TaskViewPanel
+                    taskId={viewTaskId}
+                    onClose={() => setViewTaskId(null)}
+                    onOpenTask={(id: string) => setViewTaskId(id)}
+                  />
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>,
+          detailSlot,
+        )}
+
       {toolbarMenusMounted &&
+        isMobile &&
         createPortal(
           <AnimatePresence>
             {viewTaskId && (
