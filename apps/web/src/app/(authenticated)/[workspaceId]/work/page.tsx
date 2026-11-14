@@ -2632,6 +2632,7 @@ function WorkItemsInner() {
                 {/* Fixed-width inner box so content doesn't reflow while the pane animates. */}
                 <div className="flex h-full flex-col" style={{ width: detailPaneW }}>
                   <TaskViewPanel
+                    key={viewTaskId}
                     taskId={viewTaskId}
                     onClose={() => setViewTaskId(null)}
                     onOpenTask={(id: string) => setViewTaskId(id)}
@@ -2714,6 +2715,7 @@ function WorkItemsInner() {
                   transition={{ duration: motionDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
                 >
                   <TaskViewPanel
+                    key={viewTaskId}
                     taskId={viewTaskId}
                     onClose={() => setViewTaskId(null)}
                     onOpenTask={(id: string) => setViewTaskId(id)}

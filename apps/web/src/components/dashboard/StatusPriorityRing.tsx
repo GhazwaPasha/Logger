@@ -326,7 +326,6 @@ function LegendGroup({
   onHover: (f: Focus) => void;
   onPin: (update: (f: Focus) => Focus) => void;
 }) {
-  const total = sum(segments);
   return (
     <div>
       <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -340,9 +339,6 @@ function LegendGroup({
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
               <span className={`min-w-0 flex-1 truncate text-sm ${active ? "font-semibold" : "font-medium"}`}>
                 {s.label}
-              </span>
-              <span className="w-10 text-right text-xs tabular-nums text-[var(--muted)]">
-                {loading ? "" : `${pct(s.value, total)}%`}
               </span>
               <span className="min-w-[2.25rem] text-right text-sm font-semibold tabular-nums">{loading ? "…" : s.value}</span>
             </>
