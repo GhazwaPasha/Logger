@@ -96,12 +96,12 @@ export async function unregisterPush() {
   await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => undefined);
 }
 
-/** The task a notification is about: in `content.data`, or on Android the FCM message's own data. */
-function taskIdOf(response: Notifications.NotificationResponse): string | null {
+/** A field of a notification's data: in `content.data`, or on Android the FCM message's own data. */
+function dataField(response: Notifications.NotificationResponse, key: 'taskId' | 'trackerId'): string | null {
   const { content, trigger } = response.notification.request;
-  const fromContent = (content.data as Record<string, unknown> | null)?.taskId;
+  const fromContent = (content.data as Record<string, unknown> | null)?.[key];
   const remote = (trigger as { remoteMessage?: { data?: Record<string, string> } } | null)?.remoteMessage;
-  const id = fromContent ?? remote?.data?.taskId;
+  const id = fromContent ?? remote?.data?.[key];
   return typeof id === 'string' && id ? id : null;
 }
 
@@ -130,7 +130,9 @@ export function usePushNotifications(userId: string | null) {
     handled.current = id;
     // Consumed: otherwise a later remount (e.g. signing out and back in) would reopen the same task.
     Notifications.clearLastNotificationResponse();
-    const taskId = taskIdOf(response);
+    const taskId = dataField(response, 'taskId');
     if (taskId) router.push({ pathname: '/task/[id]', params: { id: taskId } });
+    // Tracker reminders open the Trackers screen, where today's log is already open.
+    else if (dataField(response, 'trackerId')) router.push('/trackers');
   }, [response, userId]);
 }

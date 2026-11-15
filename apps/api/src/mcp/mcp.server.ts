@@ -24,6 +24,8 @@ import { PerformanceService } from "../performance/performance.service";
 import { SearchService } from "../search/search.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
+import { TrackersService } from "../trackers/trackers.service";
+import { registerTrackerTools } from "./tracker-tools";
 
 export interface McpServices {
   authz: AuthorizationService;
@@ -41,6 +43,7 @@ export interface McpServices {
   roadmap: RoadmapService;
   goals: GoalsService;
   milestones: MilestonesService;
+  trackers: TrackersService;
 }
 
 /** Runs a service call and translates thrown Nest HTTP exceptions into an MCP tool error result instead of a transport-level 500. */
@@ -301,6 +304,8 @@ export function createMcpServer(userId: string, services: McpServices): McpServe
     },
     async ({ organizationId, ...body }) => runTool(() => services.milestones.create(userId, organizationId, body)),
   );
+
+  registerTrackerTools(server, userId, services, { registerTool, runTool });
 
   // Read tools shared with the in-app agent (see agent/agent-tools.ts) — one implementation for both.
   for (const name of MCP_SHARED_TOOL_NAMES) {

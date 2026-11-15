@@ -1,4 +1,4 @@
-import { faChartPie, faTerminal } from '@fortawesome/free-solid-svg-icons';
+import { faBullseye, faChartPie, faChevronRight, faTerminal } from '@fortawesome/free-solid-svg-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -24,6 +24,7 @@ import { DASHBOARD_WINDOW_DAYS } from '@work-ledger/contracts';
 import { useActiveTasks, useBoardCounts, useClosedTaskCount, useOrgActivityFeed, type BoardFilter } from '@/lib/queries';
 import { FLOW_COLUMN_LABELS, PRIORITY_LABELS, taskIsOverdue, taskPriority, TASK_FLOW_ORDER, type TaskPriority } from '@/lib/task-board';
 import { authClient } from '@/lib/auth-client';
+import { useDueLogCount } from '@/lib/trackers';
 import { useWorkspace } from '@/lib/workspace';
 
 type View_ = 'overview' | 'activity';
@@ -291,6 +292,8 @@ export default function DashboardScreen() {
         <ViewChip value={view} onChange={setView} />
       </Animated.View>
 
+      <TrackersDue orgId={org?.id} />
+
       {active.error || counts.error ? (
         <ErrorBanner message={((active.error ?? counts.error) as Error).message} />
       ) : null}
@@ -408,6 +411,14 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  trackersDue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   viewChip: {
     height: 44,
     flexDirection: 'row',
@@ -437,3 +448,26 @@ const styles = StyleSheet.create({
   wave: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 76, overflow: 'hidden' },
   workspaceRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
 });
+
+/** A quiet line on Home when a tracker is waiting for today's numbers; hidden otherwise. */
+function TrackersDue({ orgId }: { orgId: string | undefined }) {
+  const theme = useTheme();
+  const { userId } = useWorkspace();
+  const due = useDueLogCount(orgId, userId);
+  if (!due) return null;
+  return (
+    <Animated.View entering={FadeIn}>
+      <PressableScale
+        haptic="select"
+        scaleTo={0.99}
+        onPress={() => router.push('/trackers')}
+        style={[styles.trackersDue, { borderColor: theme.borderSubtle }]}>
+        <Icon icon={faBullseye} size={14} color="muted" />
+        <Text size="13" style={{ flex: 1 }}>
+          {`${due} tracker${due === 1 ? '' : 's'} to update today`}
+        </Text>
+        <Icon icon={faChevronRight} size={11} color="muted" />
+      </PressableScale>
+    </Animated.View>
+  );
+}

@@ -1,0 +1,31 @@
+/* Shared tokens for the Nov 2026 redesign mockups (standalone stand-ins for the app's zinc theme). */
+:root {
+  --surface-0: #fafafa; --surface-1: #f4f4f5; --surface-2: #ffffff;
+  --text-primary: #0c0c0d; --text-secondary: #737373; --text-muted: #a1a1aa;
+  --text-success: #15803d; --text-danger: #dc2626; --text-warning: #b45309;
+  --bg-success: #dcfce7; --bg-danger: #fee2e2; --bg-warning: #fef3c7;
+  --border: rgba(0,0,0,0.09); --border-strong: rgba(0,0,0,0.16); --border-stronger: rgba(0,0,0,0.4);
+  --radius: 8px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-0: #09090b; --surface-1: #18181b; --surface-2: #121214;
+    --text-primary: #fafafa; --text-secondary: #a1a1aa; --text-muted: #71717a;
+    --text-success: #4ade80; --text-danger: #f87171; --text-warning: #fbbf24;
+    --bg-success: #052e16; --bg-danger: #450a0a; --bg-warning: #451a03;
+    --border: rgba(255,255,255,0.09); --border-strong: rgba(255,255,255,0.16); --border-stronger: rgba(255,255,255,0.4);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px 16px; background: var(--surface-2); color: var(--text-primary);
+  font: 15px/1.5 "DM Sans", system-ui, sans-serif; }
+main { max-width: 980px; margin: 0 auto; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.page-note { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px; }
+button { font: inherit; font-size: 13px; color: var(--text-primary); background: transparent;
+  border: 0.5px solid var(--border-strong); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; }
+button:hover { background: var(--surface-1); }
+input { font: inherit; color: var(--text-primary); background: transparent; border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius); height: 34px; padding: 0 10px; outline: none; }

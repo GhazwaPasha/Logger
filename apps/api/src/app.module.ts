@@ -28,6 +28,7 @@ import { McpModule } from "./mcp/mcp.module";
 import { WellKnownModule } from "./well-known/well-known.module";
 import { AgentModule } from "./agent/agent.module";
 import { PerformanceModule } from "./performance/performance.module";
+import { TrackersModule } from "./trackers/trackers.module";
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { PerformanceModule } from "./performance/performance.module";
     SearchModule,
     ReportsModule,
     PerformanceModule,
+    TrackersModule,
     DependenciesModule,
     TimeModule,
     RealtimeModule,

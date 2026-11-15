@@ -195,6 +195,45 @@ export class PushNotificationsService implements OnModuleInit {
     ]);
   }
 
+  /**
+   * A plain notification to specific people on every device they registered (web push + mobile).
+   * `url` is a path on the web app; `data` reaches the mobile app's tap handler.
+   */
+  async notifyUsers(
+    userIds: string[],
+    msg: { title: string; body: string; url: string; data: Record<string, string> },
+  ) {
+    if ((!this.vapidConfigured && !this.fcm) || userIds.length === 0) return;
+    const [subs, devices] = await Promise.all([
+      this.vapidConfigured
+        ? this.db.select().from(pushSubscriptions).where(inArray(pushSubscriptions.userId, userIds))
+        : Promise.resolve([]),
+      this.fcm
+        ? this.db.select().from(mobilePushTokens).where(inArray(mobilePushTokens.userId, userIds))
+        : Promise.resolve([]),
+    ]);
+    const payload = JSON.stringify({ title: msg.title, body: msg.body, url: msg.url });
+    await Promise.all([
+      this.sendToDevices(devices, () => ({ title: msg.title, body: msg.body, data: msg.data })),
+      ...subs.map(async (row) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
+            payload,
+            { TTL: 3600, urgency: "normal" },
+          );
+        } catch (e: unknown) {
+          const status = typeof e === "object" && e !== null && "statusCode" in e ? (e as { statusCode?: number }).statusCode : undefined;
+          if (status === 404 || status === 410) {
+            await this.db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, row.endpoint));
+          } else {
+            this.log.debug(`Push send failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }),
+    ]);
+  }
+
   // -------------------------------------------------------------------------------------------
   // Mobile app push (Firebase Cloud Messaging)
   // -------------------------------------------------------------------------------------------
@@ -246,10 +285,10 @@ export class PushNotificationsService implements OnModuleInit {
             data,
             android: {
               priority: "high",
-              // One notification per task: a newer update replaces the older one instead of stacking.
-              notification: { channelId: "activity", tag: data.taskId },
+              // One notification per task (or tracker): a newer update replaces the older one instead of stacking.
+              notification: { channelId: "activity", tag: data.taskId ?? data.trackerId },
             },
-            apns: { payload: { aps: { threadId: data.taskId, sound: "default" } } },
+            apns: { payload: { aps: { threadId: data.taskId ?? data.trackerId, sound: "default" } } },
           });
           res.responses.forEach((r, i) => {
             const code = r.error?.code;

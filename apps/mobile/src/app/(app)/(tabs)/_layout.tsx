@@ -24,6 +24,7 @@ export default function TabsLayout() {
           <TabList style={styles.hidden}>
             <TabTrigger name="dashboard" href="/dashboard" />
             <TabTrigger name="my-tasks" href="/my-tasks" />
+            <TabTrigger name="trackers" href="/trackers" />
             <TabTrigger name="channels" href="/channels" />
             <TabTrigger name="calendar" href="/calendar" />
             <TabTrigger name="roadmap" href="/roadmap" />

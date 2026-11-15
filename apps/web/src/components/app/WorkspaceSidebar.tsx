@@ -255,6 +255,7 @@ export function WorkspaceSidebar({
   const activeDashboard = pathname === `${base}/dashboard`;
   const activePerformance = pathname.startsWith(`${base}/performance`);
   const activeRoadmap = pathname.startsWith(`${base}/roadmap`);
+  const activeTrackers = pathname.startsWith(`${base}/trackers`);
   const activeCalendar = pathname.startsWith(`${base}/calendar`);
   const activeMyTasks = pathname.startsWith(`${base}/my-tasks`);
   const activePeople = pathname.startsWith(`${base}/people`);
@@ -680,6 +681,7 @@ export function WorkspaceSidebar({
                 ? [{ href: `${base}/performance`, active: activePerformance, label: "Performance" }]
                 : []),
               { href: `${base}/roadmap`, active: activeRoadmap, label: "Roadmap" },
+              { href: `${base}/trackers`, active: activeTrackers, label: "Trackers" },
               { href: `${base}/calendar`, active: activeCalendar, label: "Calendar" },
               { href: `${base}/my-tasks`, active: activeMyTasks, label: "My tasks" },
             ].map((item) => (

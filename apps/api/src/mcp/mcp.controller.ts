@@ -20,6 +20,7 @@ import { PerformanceService } from "../performance/performance.service";
 import { SearchService } from "../search/search.service";
 import { TasksService } from "../tasks/tasks.service";
 import { TimeService } from "../time/time.service";
+import { TrackersService } from "../trackers/trackers.service";
 import { createMcpServer } from "./mcp.server";
 
 @Controller("mcp")
@@ -41,6 +42,7 @@ export class McpController {
     private readonly roadmap: RoadmapService,
     private readonly goals: GoalsService,
     private readonly milestones: MilestonesService,
+    private readonly trackers: TrackersService,
   ) {}
 
   @Post()
@@ -60,6 +62,7 @@ export class McpController {
       roadmap: this.roadmap,
       goals: this.goals,
       milestones: this.milestones,
+      trackers: this.trackers,
     });
     try {
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

@@ -10,6 +10,7 @@ import { TasksModule } from "../tasks/tasks.module";
 import { AgentController } from "./agent.controller";
 import { AgentService } from "./agent.service";
 import { GeminiClient } from "./gemini.client";
+import { TrackersModule } from "../trackers/trackers.module";
 
 /** "Ask LogBase": the in-app agent. Read-only tools for now — see agent-tools.ts. */
 @Module({
@@ -22,6 +23,7 @@ import { GeminiClient } from "./gemini.client";
     CommentsModule,
     RoadmapModule,
     PerformanceModule,
+    TrackersModule,
   ],
   controllers: [AgentController],
   providers: [AgentService, GeminiClient],

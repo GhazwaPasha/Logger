@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tracker check-in and create</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="base.css">
+<style>
+.wrap{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;padding:4px 0}
+.phone{width:270px;border:0.5px solid var(--border-strong);border-radius:30px;padding:16px 16px 20px;flex-shrink:0}
+.cap{font-size:12px;color:var(--text-secondary);margin:0}
+.sec{font-size:11px;letter-spacing:0.04em;color:var(--text-muted);margin:16px 0 6px}
+.line{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:0.5px solid var(--border);font-size:14px}
+.roll{display:inline-flex;overflow:hidden;height:20px;line-height:20px;font-variant-numeric:tabular-nums;font-weight:500}
+.dig{display:flex;flex-direction:column;will-change:transform}
+.dig span{height:20px}
+.stp{width:28px;height:28px;border-radius:50%;border:0.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 100ms ease-out,background 100ms}
+.stp:active{transform:scale(0.9);background:var(--surface-1)}
+.save{width:100%;margin-top:12px;height:38px;border-radius:12px;border:none;background:var(--text-primary);color:var(--surface-2);font-size:14px;transition:transform 100ms ease-out}
+.save:active{transform:scale(0.97)}
+.save:hover{background:var(--text-primary)}
+.collapse{overflow:hidden;will-change:height}
+.seg{position:relative;display:inline-flex;padding:2px;border-radius:9px;background:var(--surface-1)}
+.seg span{position:relative;z-index:1;font-size:12px;padding:4px 11px;cursor:pointer;color:var(--text-secondary);transition:color 150ms}
+.seg span.on{color:var(--text-primary)}
+.segp{position:absolute;top:2px;bottom:2px;left:0;border-radius:7px;background:var(--surface-2);border:0.5px solid var(--border)}
+.fl{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:center;padding:10px 0;border-top:0.5px solid var(--border);font-size:14px}
+.fl label{font-size:13px;color:var(--text-secondary)}
+.mrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 20px;gap:8px;align-items:center;padding:8px 0;border-top:0.5px solid var(--border);font-size:13px}
+.ghost{border:none;background:none;padding:0;color:var(--text-muted);cursor:pointer}
+</style></head>
+<body><main>
+<p class="page-note">Trackers · mobile "Today" check-in screen and web "New tracker" form · design mockup (Nov 2026).</p>
+<div class="wrap">
+  <div class="phone">
+    <p style="margin:0;font-size:24px;font-weight:500;letter-spacing:-0.02em;line-height:1.1">Today</p>
+    <p class="cap" style="margin-top:2px" id="due">Mon 16 Nov · 1 check-in due</p>
+    <p class="sec">DUE NOW</p>
+    <div id="card">
+      <div class="collapse" id="form">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:16px;font-weight:500">Q4 Sales</span><span style="font-size:12px;color:var(--text-danger)">Behind</span></div>
+        <p class="cap">Today's share: 9.3k revenue · 1 order</p>
+        <div class="line" style="margin-top:8px"><span style="color:var(--text-secondary)">Orders</span>
+          <span style="display:flex;align-items:center;gap:12px"><span class="stp" id="minus" aria-label="Fewer orders"><i class="ti ti-minus" aria-hidden="true"></i></span><span class="roll" id="r-orders"></span><span class="stp" id="plus" aria-label="More orders"><i class="ti ti-plus" aria-hidden="true"></i></span></span></div>
+        <div class="line"><span style="color:var(--text-secondary)">Revenue</span><input id="rev" inputmode="numeric" value="18,400" style="width:100px;text-align:right;border:none;background:none;padding:0;height:auto;font-size:14px;font-weight:500"></div>
+        <div class="line"><span style="color:var(--text-secondary)">Avg order size</span><span class="roll" id="r-aos" style="color:var(--text-secondary);font-weight:400"></span></div>
+        <div class="line" style="color:var(--text-muted)">Add a note</div>
+        <button class="save" id="save">Save check-in</button>
+      </div>
+      <div id="done" style="display:none;align-items:center;gap:10px;padding:4px 0">
+        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="12" fill="none" stroke="var(--text-success)" stroke-width="1.5" id="dc"/><path d="M8 13.5l3.4 3.4L18.5 9.6" fill="none" stroke="var(--text-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="dp"/></svg>
+        <div style="flex:1"><p style="margin:0;font-size:15px;font-weight:500">Q4 Sales</p><p class="cap" id="sum"></p></div>
+        <button class="ghost" id="undo" style="font-size:13px">Edit</button>
+      </div>
+    </div>
+    <p class="sec">DONE</p>
+    <div class="line" style="border-top:none;padding-top:0"><span><span style="font-weight:500">Lead gen Nov</span><br><span class="cap">Weekly · logged Fri</span></span><i class="ti ti-circle-check" style="font-size:22px;color:var(--text-success)" aria-hidden="true"></i></div>
+    <div class="line"><span style="color:var(--text-secondary);font-size:13px"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Fill a missed day</span><i class="ti ti-chevron-right" style="color:var(--text-muted)" aria-hidden="true"></i></div>
+  </div>
+
+  <div style="flex:1;min-width:290px">
+    <p style="margin:0 0 4px;font-size:20px;font-weight:500;letter-spacing:-0.015em">New tracker</p>
+    <p class="cap" style="margin-bottom:12px">One person, one set of targets.</p>
+    <div class="fl"><label for="nm">Name</label><input id="nm" value="Q4 Sales"></div>
+    <div class="fl"><label>Assignee</label><span style="display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:50%;border:0.5px solid var(--border-strong);font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary)">AK</span>Ali Khan<i class="ti ti-selector" style="margin-left:auto;color:var(--text-muted)" aria-hidden="true"></i></span></div>
+    <div class="fl"><label>Period</label><span style="display:flex;align-items:center">1 Oct – 31 Dec<i class="ti ti-calendar" style="margin-left:auto;color:var(--text-muted)" aria-hidden="true"></i></span></div>
+    <p class="sec" style="margin-top:20px">METRICS AND TARGETS</p>
+    <div class="mrow" style="border-top:none"><span>Orders</span><span class="cap">Count</span><span>≥ 60</span><i class="ti ti-x" style="color:var(--text-muted)" aria-hidden="true"></i></div>
+    <div class="mrow"><span>Revenue</span><span class="cap">PKR</span><span>≥ 600,000</span><i class="ti ti-x" style="color:var(--text-muted)" aria-hidden="true"></i></div>
+    <div class="mrow"><span>Avg order size</span><span class="cap">Revenue ÷ Orders</span><span>≥ 10,000</span><i class="ti ti-x" style="color:var(--text-muted)" aria-hidden="true"></i></div>
+    <div class="mrow" style="grid-template-columns:auto auto 1fr"><button class="ghost"><i class="ti ti-plus" aria-hidden="true"></i> Metric</button><button class="ghost" style="margin-left:14px"><i class="ti ti-math-function" aria-hidden="true"></i> Calculated</button><span></span></div>
+    <p class="sec" style="margin-top:20px">RHYTHM</p>
+    <div class="fl"><label>Split target</label><div><div class="seg" data-k="split"><div class="segp"></div><span class="on">Per working day</span><span>Per week</span></div></div></div>
+    <div class="fl"><label>Check-in</label><div><div class="seg" data-k="ci"><div class="segp"></div><span class="on">Daily</span><span>Weekly</span></div></div></div>
+    <div class="fl"><label>Reminder</label><span>6:00 pm <span class="cap" style="display:inline">· Mon–Fri, skips holidays</span></span></div>
+    <p class="cap" style="margin-top:14px">78 working days → <b style="font-weight:500;color:var(--text-primary)" id="pv1">7,692</b> revenue and <b style="font-weight:500;color:var(--text-primary)" id="pv2">0.8</b> orders <span id="pv3">a day</span></p>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button>Cancel</button><button style="background:var(--text-primary);color:var(--surface-2);border:none">Create tracker</button></div>
+  </div>
+</div>
+</main>
+<script>
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const live=new Map();
+function spring(key,to,apply,response=0.35,from){const p=live.get(key);if(p)cancelAnimationFrame(p.raf);const f=from!==undefined?from:(p?p.cur:to);if(RM||(f===to&&!p)){live.set(key,{cur:to});apply(to);return;}
+ const w=2*Math.PI/response,t0=performance.now(),st={cur:f};live.set(key,st);
+ const step=n=>{const t=(n-t0)/1000,v=to+(f-to)*(1+w*t)*Math.exp(-w*t);st.cur=v;apply(v);if(Math.abs(v-to)>0.002)st.raf=requestAnimationFrame(step);else{st.cur=to;apply(to);}};st.raf=requestAnimationFrame(step);}
+function rollTo(el,text,key){
+  const chars=[...text], order='0123456789,.k';
+  while(el.children.length<chars.length){const d=document.createElement('span');d.className='dig';d.innerHTML=order.split('').map(c=>`<span>${c}</span>`).join('');el.appendChild(d);}
+  while(el.children.length>chars.length)el.removeChild(el.firstChild);
+  chars.forEach((c,i)=>{const d=el.children[i];const idx=Math.max(0,order.indexOf(c));spring(key+(chars.length-i),idx,v=>d.style.transform=`translateY(${-v*20}px)`,0.4,live.has(key+(chars.length-i))?undefined:0);});
+}
+let orders=2;
+const rev=document.getElementById('rev');
+const parse=()=>+(rev.value.replace(/[^0-9]/g,''))||0;
+function upd(){rollTo(document.getElementById('r-orders'),String(orders),'o');
+ const a=orders?parse()/orders:0;rollTo(document.getElementById('r-aos'),a>=1000?(a/1000).toFixed(1)+'k':String(Math.round(a)),'a');}
+document.getElementById('plus').addEventListener('pointerdown',()=>{orders=Math.min(99,orders+1);upd();});
+document.getElementById('minus').addEventListener('pointerdown',()=>{orders=Math.max(0,orders-1);upd();});
+rev.addEventListener('input',()=>{const n=parse();rev.value=n?n.toLocaleString():'';upd();});
+upd();
+const form=document.getElementById('form'),done=document.getElementById('done');
+document.getElementById('save').addEventListener('click',()=>{
+  const h=form.offsetHeight;
+  spring('col',0,v=>{form.style.height=(v*h)+'px';form.style.opacity=v;if(v<0.02)form.style.display='none';},0.35,1);
+  done.style.display='flex';document.getElementById('sum').textContent=`${orders} orders · ${parse().toLocaleString()}`;
+  document.getElementById('due').textContent='Mon 16 Nov · all done';
+  ['dc','dp'].forEach((id,i)=>{const p=document.getElementById(id),L=p.getTotalLength();p.style.transition='none';p.style.strokeDasharray=L;p.style.strokeDashoffset=RM?0:L;p.getBoundingClientRect();p.style.transition=`stroke-dashoffset ${i?260:380}ms cubic-bezier(.22,1,.36,1) ${i?220:0}ms`;p.style.strokeDashoffset=0;});
+});
+document.getElementById('undo').addEventListener('click',()=>{done.style.display='none';form.style.display='block';form.style.height='auto';const H=form.offsetHeight;form.style.height='0px';
+ spring('col',1,v=>{form.style.height=(v*H)+'px';form.style.opacity=v;if(v>0.998)form.style.height='auto';},0.35,0);document.getElementById('due').textContent='Mon 16 Nov · 1 check-in due';});
+document.querySelectorAll('.seg').forEach(seg=>{const p=seg.querySelector('.segp'),s=[...seg.querySelectorAll('span')];
+ const go=i=>{s.forEach((x,j)=>x.classList.toggle('on',j===i));p.style.width=s[i].offsetWidth+'px';spring('seg'+seg.dataset.k,s[i].offsetLeft,v=>p.style.transform=`translateX(${v}px)`,0.3,live.has('seg'+seg.dataset.k)?undefined:0);
+  if(seg.dataset.k==='split'){const week=i===1;const a=week?600000/13:600000/78,b=week?60/13:60/78;
+   spring('pv1',a,v=>document.getElementById('pv1').textContent=Math.round(v).toLocaleString(),0.5);
+   spring('pv2',b,v=>document.getElementById('pv2').textContent=v.toFixed(1),0.5);
+   document.getElementById('pv3').textContent=week?'a week':'a day';}};
+ s.forEach((x,i)=>x.addEventListener('pointerdown',()=>go(i)));requestAnimationFrame(()=>go(0));});
+</script>
+</body></html>

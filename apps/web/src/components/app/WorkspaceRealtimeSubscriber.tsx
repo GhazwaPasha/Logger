@@ -6,7 +6,7 @@ import { REALTIME_EVENTS, type WorkspaceChangedEvent } from "@work-ledger/contra
 import { useEffect } from "react";
 import { io } from "socket.io-client";
 import { useApiSession } from "@/hooks/useApiSession";
-import { orgKeys, performanceKeys, roadmapKeys, taskKeys, workspaceKeys } from "@/lib/query-keys";
+import { orgKeys, performanceKeys, roadmapKeys, taskKeys, trackerKeys, workspaceKeys } from "@/lib/query-keys";
 import { getApiBaseUrl, tokenManager } from "@/lib/session";
 import { useOnlinePresence } from "./OnlinePresenceProvider";
 
@@ -43,6 +43,7 @@ export function WorkspaceRealtimeSubscriber({ workspaceId }: { workspaceId: stri
       void queryClient.invalidateQueries({ queryKey: [...ws, "series-summary"] });
       void queryClient.invalidateQueries({ queryKey: [...ws, "series-occurrences"] });
       void queryClient.invalidateQueries({ queryKey: roadmapKeys.tree(workspaceId) });
+      void queryClient.invalidateQueries({ queryKey: trackerKeys.org(workspaceId) });
       void queryClient.invalidateQueries({ queryKey: [...performanceKeys.all, workspaceId] });
       for (const id of taskIds) void queryClient.invalidateQueries({ queryKey: taskKeys.detail(id) });
       if (workspace) {

@@ -1,5 +1,6 @@
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
+  faBullseye,
   faCalendarDays,
   faChevronLeft,
   faChevronRight,
@@ -39,7 +40,7 @@ import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
 
-export type TabName = 'dashboard' | 'my-tasks' | 'channels' | 'calendar' | 'roadmap' | 'search';
+export type TabName = 'dashboard' | 'my-tasks' | 'trackers' | 'channels' | 'calendar' | 'roadmap' | 'search';
 type TabDef = { name: TabName; label: string; icon: IconDefinition };
 
 /** Always in the bar. */
@@ -53,6 +54,7 @@ const MAIN: TabDef[] = [
 const MORE: TabDef[] = [
   { name: 'calendar', label: 'Calendar', icon: faCalendarDays },
   { name: 'roadmap', label: 'Roadmap', icon: faRoute },
+  { name: 'trackers', label: 'Trackers', icon: faBullseye },
 ];
 const ALL: TabDef[] = [...MAIN, ...MORE];
 
@@ -63,12 +65,12 @@ const EXPAND_W = 52;
 const COMPACT_W = 92;
 const PANEL_ROW_H = 48;
 const PANEL_PAD = 8;
-const PANEL_H = PANEL_PAD * 2 + PANEL_ROW_H * 2;
+const PANEL_H = PANEL_PAD * 2 + PANEL_ROW_H * MORE.length;
 const SPRING = { damping: 22, stiffness: 260, mass: 0.8 };
 
 /**
  * The floating tab bar: Home / My tasks / Channels / Search plus an expand button that grows the bar upward into a
- * Calendar / Roadmap panel, and a separate round button that opens Ask LogBase. The Search tab turns the bar into a
+ * Calendar / Roadmap / Trackers panel, and a separate round button that opens Ask LogBase. The Search tab turns the bar into a
  * search field.
  * The always-visible tabs are icon-only (labels are for screen readers). Scrolling down shrinks the bar to a
  * pill of the current tab (`useCollapseOnScroll`); scrolling up restores it.

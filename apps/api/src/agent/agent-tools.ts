@@ -12,6 +12,8 @@ import { PerformanceService } from "../performance/performance.service";
 import { RoadmapService } from "../roadmap/roadmap.service";
 import { SearchService } from "../search/search.service";
 import { TasksService } from "../tasks/tasks.service";
+import type { TrackersService } from "../trackers/trackers.service";
+import { digestTracker } from "../trackers/tracker-digest";
 
 /**
  * The agent's tool registry. Every tool runs through the existing services *as the asking user*, so the
@@ -33,6 +35,7 @@ export interface AgentToolServices {
   roadmap: RoadmapService;
   performance: PerformanceService;
   authz: AuthorizationService;
+  trackers: TrackersService;
 }
 
 /** What a write tool files for approval. `payload` is what approval executes; `items` is what the card shows. */
@@ -761,6 +764,30 @@ export const AGENT_TOOLS: AgentTool[] = [
     },
     label: (_a, r) => `Checked performance for ${plural((r as { members: unknown[] }).members.length, "person", "people")}`,
   }),
+
+  tool({
+    name: "get_trackers",
+    description:
+      "Number trackers (e.g. 'Q4 Sales': orders, revenue, average order size) — one person each, with targets for a " +
+      "period and daily or weekly logs. Returns each tracker's status (ahead / on_pace / behind / met / missed), " +
+      "every metric's value vs target, where it should be by now, and what's needed per remaining day or week. " +
+      "Owners and managers see every tracker; members see their own. Use it for 'how is Ali doing on sales?' or " +
+      "'who is behind on their targets?'.",
+    input: z.object({
+      assigneeUserId: z.string().optional().describe("Only this person's trackers (userId from the context block)."),
+      includeArchived: z.boolean().optional(),
+    }),
+    run: async (ctx, a) => {
+      const res = await ctx.services.trackers.list(ctx.userId, ctx.organizationId, {
+        scope: "all",
+        archived: a.includeArchived,
+      });
+      const names = (await ctx.names()).people;
+      const rows = res.trackers.filter((t) => !a.assigneeUserId || t.assigneeId === a.assigneeUserId);
+      return { today: res.today, trackers: rows.map((t) => digestTracker(t, names)) };
+    },
+    label: (_a, r) => `Checked ${plural((r as { trackers: unknown[] }).trackers.length, "tracker", "trackers")}`,
+  }),
 ];
 
 AGENT_TOOLS.push(...WRITE_TOOLS);
@@ -771,7 +798,13 @@ export const AGENT_TOOLS_BY_NAME = new Map(AGENT_TOOLS.map((t) => [t.name, t]));
  * Registry tools the MCP server exposes too (with an `organizationId` argument). The rest overlap MCP's own
  * older tools (`list_tasks`, `get_task`…), whose names and output shapes external clients already rely on.
  */
-export const MCP_SHARED_TOOL_NAMES = ["search_tasks", "get_status_counts", "get_recent_activity", "get_team_performance"];
+export const MCP_SHARED_TOOL_NAMES = [
+  "search_tasks",
+  "get_status_counts",
+  "get_recent_activity",
+  "get_team_performance",
+  "get_trackers",
+];
 
 /** Builds the per-run context: name lookups load lazily on first use and are then shared by every call. */
 export function createToolContext(

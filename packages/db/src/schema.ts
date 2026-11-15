@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -866,6 +867,118 @@ export const agentUsageDaily = pgTable(
     outputTokens: integer("output_tokens").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.organizationId, t.day] })],
+);
+
+/**
+ * A number target owned by exactly one person (e.g. "Q4 Sales" for Ali). Targets live on the
+ * tracker's metrics; the assignee logs check-ins (daily or weekly) and pace is derived from them.
+ * Dates are workspace-local `YYYY-MM-DD` keys (see `organizations.time_zone`).
+ */
+export const trackers = pgTable(
+  "trackers",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** The one person who logs check-ins. */
+    assigneeId: text("assignee_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    periodStart: text("period_start").notNull(),
+    periodEnd: text("period_end").notNull(),
+    /** How the period target is sliced for pace: `day` (per working day) | `week`. */
+    split: text("split").notNull().default("day"),
+    /** How often the assignee logs: `daily` (each working day) | `weekly` (one entry per week). */
+    checkIn: text("check_in").notNull().default("daily"),
+    /** ISO weekdays that count as working days (1 = Monday … 7 = Sunday). */
+    workingDays: jsonb("working_days").notNull().$type<number[]>().default([1, 2, 3, 4, 5]),
+    /** Local `HH:mm` for the check-in reminder; null = no reminder. */
+    reminderTime: text("reminder_time"),
+    /** Local `YYYY-MM-DD` of the last reminder push, so each slot is nudged at most once. */
+    lastRemindedOn: text("last_reminded_on"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("trackers_org_idx").on(t.organizationId),
+    index("trackers_assignee_idx").on(t.assigneeId),
+  ],
+);
+
+/** What a tracker measures. `input` metrics are logged; `formula` metrics are computed from two others. */
+export const trackerMetrics = pgTable(
+  "tracker_metrics",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    trackerId: uuid("tracker_id")
+      .notNull()
+      .references(() => trackers.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** `input` | `formula`. */
+    kind: text("kind").notNull().default("input"),
+    /** `count` | `number` | `currency` | `percent`. */
+    unit: text("unit").notNull().default("count"),
+    /** ISO currency code when `unit` is `currency` (e.g. `PKR`). */
+    currency: text("currency"),
+    /** For `formula` metrics: `{ op, a, b }` where a/b are sibling metric ids. */
+    formula: jsonb("formula").$type<{ op: "div" | "mul" | "add" | "sub"; a: string; b: string; percent?: boolean }>(),
+    /** Whole-period target; null = tracked without a target. */
+    target: doublePrecision("target"),
+    /** `at_least` (more is better) | `at_most` (less is better). */
+    direction: text("direction").notNull().default("at_least"),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("tracker_metrics_tracker_idx").on(t.trackerId)],
+);
+
+/** One check-in. `entryDate` is the day (daily) or the Monday of the week (weekly). */
+export const trackerEntries = pgTable(
+  "tracker_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    trackerId: uuid("tracker_id")
+      .notNull()
+      .references(() => trackers.id, { onDelete: "cascade" }),
+    /** Who logged it (kept when a tracker is reassigned). */
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    entryDate: text("entry_date").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("tracker_entries_tracker_date_idx").on(t.trackerId, t.entryDate)],
+);
+
+export const trackerEntryValues = pgTable(
+  "tracker_entry_values",
+  {
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => trackerEntries.id, { onDelete: "cascade" }),
+    metricId: uuid("metric_id")
+      .notNull()
+      .references(() => trackerMetrics.id, { onDelete: "cascade" }),
+    value: doublePrecision("value").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.entryId, t.metricId] }),
+    index("tracker_entry_values_metric_idx").on(t.metricId),
+  ],
 );
 
 export const usersRelations = relations(user, ({ many }) => ({

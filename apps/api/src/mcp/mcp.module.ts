@@ -12,6 +12,7 @@ import { PerformanceModule } from "../performance/performance.module";
 import { SearchModule } from "../search/search.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { TimeModule } from "../time/time.module";
+import { TrackersModule } from "../trackers/trackers.module";
 import { McpController } from "./mcp.controller";
 
 @Module({
@@ -29,6 +30,7 @@ import { McpController } from "./mcp.controller";
     RoadmapModule,
     SearchModule,
     PerformanceModule,
+    TrackersModule,
   ],
   controllers: [McpController],
 })

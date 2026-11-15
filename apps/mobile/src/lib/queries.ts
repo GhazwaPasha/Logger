@@ -510,6 +510,7 @@ export function invalidateWorkspace(qc: QueryClient, orgId: string, taskIds: Ite
     qc.invalidateQueries({ queryKey: qk.bootstrap(orgId) }),
     qc.invalidateQueries({ queryKey: qk.activity(orgId) }),
     qc.invalidateQueries({ queryKey: ['roadmap', orgId] }),
+    qc.invalidateQueries({ queryKey: ['trackers', orgId] }),
     qc.invalidateQueries({ queryKey: ['search', orgId] }),
     ...ids.map((id) => qc.invalidateQueries({ queryKey: qk.task(id) })),
     ...ids.map((id) => qc.invalidateQueries({ queryKey: ['comments', id] })),

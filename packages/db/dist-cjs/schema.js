@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.agentUsageDaily = exports.agentProposals = exports.agentMessages = exports.agentThreads = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
-exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = void 0;
+exports.accountsRelations = exports.sessionsRelations = exports.usersRelations = exports.trackerEntryValues = exports.trackerEntries = exports.trackerMetrics = exports.trackers = exports.agentUsageDaily = exports.agentProposals = exports.agentMessages = exports.agentThreads = exports.mobilePushTokens = exports.pushSubscriptions = exports.timeEntries = exports.deletionLog = exports.apiKeys = exports.discordIntegrations = exports.webhookDeliveries = exports.webhookEndpoints = exports.commentMentions = exports.comments = exports.taskAttachments = exports.attachmentBlobs = exports.milestoneTasks = exports.milestones = exports.goals = exports.taskDependencies = exports.activityLedger = exports.deletionEntityTypeEnum = exports.ledgerTypeEnum = exports.taskAssignees = exports.subtasks = exports.tasks = exports.lists = exports.organizationMemberManagedDepartments = exports.organizationMembers = exports.departments = exports.organizations = exports.taskPriorityEnum = exports.taskStatusEnum = exports.roadmapStatusEnum = exports.orgRoleEnum = exports.oauthConsent = exports.oauthAccessToken = exports.oauthApplication = exports.jwks = exports.verification = exports.account = exports.session = exports.user = void 0;
+exports.appSchema = exports.authSchema = exports.subtasksRelations = exports.discordIntegrationsRelations = exports.webhookDeliveriesRelations = exports.webhookEndpointsRelations = exports.timeEntriesRelations = exports.commentMentionsRelations = exports.commentsRelations = exports.taskAttachmentsRelations = exports.attachmentBlobsRelations = exports.milestoneTasksRelations = exports.milestonesRelations = exports.goalsRelations = exports.taskDependenciesRelations = exports.apiKeysRelations = exports.pushSubscriptionsRelations = exports.activityLedgerRelations = exports.taskAssigneesRelations = exports.tasksRelations = exports.listsRelations = exports.departmentsRelations = exports.organizationMemberManagedDepartmentsRelations = exports.organizationMembersRelations = exports.organizationsRelations = exports.oauthConsentsRelations = exports.oauthAccessTokensRelations = exports.oauthApplicationsRelations = void 0;
 const drizzle_orm_1 = require("drizzle-orm");
 const pg_core_1 = require("drizzle-orm/pg-core");
 /** Better Auth — core user */
@@ -688,6 +688,98 @@ exports.agentUsageDaily = (0, pg_core_1.pgTable)("agent_usage_daily", {
     inputTokens: (0, pg_core_1.integer)("input_tokens").notNull().default(0),
     outputTokens: (0, pg_core_1.integer)("output_tokens").notNull().default(0),
 }, (t) => [(0, pg_core_1.primaryKey)({ columns: [t.organizationId, t.day] })]);
+/**
+ * A number target owned by exactly one person (e.g. "Q4 Sales" for Ali). Targets live on the
+ * tracker's metrics; the assignee logs check-ins (daily or weekly) and pace is derived from them.
+ * Dates are workspace-local `YYYY-MM-DD` keys (see `organizations.time_zone`).
+ */
+exports.trackers = (0, pg_core_1.pgTable)("trackers", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    organizationId: (0, pg_core_1.uuid)("organization_id")
+        .notNull()
+        .references(() => exports.organizations.id, { onDelete: "cascade" }),
+    name: (0, pg_core_1.text)("name").notNull(),
+    /** The one person who logs check-ins. */
+    assigneeId: (0, pg_core_1.text)("assignee_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    createdBy: (0, pg_core_1.text)("created_by")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    periodStart: (0, pg_core_1.text)("period_start").notNull(),
+    periodEnd: (0, pg_core_1.text)("period_end").notNull(),
+    /** How the period target is sliced for pace: `day` (per working day) | `week`. */
+    split: (0, pg_core_1.text)("split").notNull().default("day"),
+    /** How often the assignee logs: `daily` (each working day) | `weekly` (one entry per week). */
+    checkIn: (0, pg_core_1.text)("check_in").notNull().default("daily"),
+    /** ISO weekdays that count as working days (1 = Monday … 7 = Sunday). */
+    workingDays: (0, pg_core_1.jsonb)("working_days").notNull().$type().default([1, 2, 3, 4, 5]),
+    /** Local `HH:mm` for the check-in reminder; null = no reminder. */
+    reminderTime: (0, pg_core_1.text)("reminder_time"),
+    /** Local `YYYY-MM-DD` of the last reminder push, so each slot is nudged at most once. */
+    lastRemindedOn: (0, pg_core_1.text)("last_reminded_on"),
+    archivedAt: (0, pg_core_1.timestamp)("archived_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [
+    (0, pg_core_1.index)("trackers_org_idx").on(t.organizationId),
+    (0, pg_core_1.index)("trackers_assignee_idx").on(t.assigneeId),
+]);
+/** What a tracker measures. `input` metrics are logged; `formula` metrics are computed from two others. */
+exports.trackerMetrics = (0, pg_core_1.pgTable)("tracker_metrics", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    trackerId: (0, pg_core_1.uuid)("tracker_id")
+        .notNull()
+        .references(() => exports.trackers.id, { onDelete: "cascade" }),
+    name: (0, pg_core_1.text)("name").notNull(),
+    /** `input` | `formula`. */
+    kind: (0, pg_core_1.text)("kind").notNull().default("input"),
+    /** `count` | `number` | `currency` | `percent`. */
+    unit: (0, pg_core_1.text)("unit").notNull().default("count"),
+    /** ISO currency code when `unit` is `currency` (e.g. `PKR`). */
+    currency: (0, pg_core_1.text)("currency"),
+    /** For `formula` metrics: `{ op, a, b }` where a/b are sibling metric ids. */
+    formula: (0, pg_core_1.jsonb)("formula").$type(),
+    /** Whole-period target; null = tracked without a target. */
+    target: (0, pg_core_1.doublePrecision)("target"),
+    /** `at_least` (more is better) | `at_most` (less is better). */
+    direction: (0, pg_core_1.text)("direction").notNull().default("at_least"),
+    orderIndex: (0, pg_core_1.integer)("order_index").notNull().default(0),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [(0, pg_core_1.index)("tracker_metrics_tracker_idx").on(t.trackerId)]);
+/** One check-in. `entryDate` is the day (daily) or the Monday of the week (weekly). */
+exports.trackerEntries = (0, pg_core_1.pgTable)("tracker_entries", {
+    id: (0, pg_core_1.uuid)("id").defaultRandom().primaryKey(),
+    trackerId: (0, pg_core_1.uuid)("tracker_id")
+        .notNull()
+        .references(() => exports.trackers.id, { onDelete: "cascade" }),
+    /** Who logged it (kept when a tracker is reassigned). */
+    userId: (0, pg_core_1.text)("user_id")
+        .notNull()
+        .references(() => exports.user.id, { onDelete: "restrict" }),
+    entryDate: (0, pg_core_1.text)("entry_date").notNull(),
+    note: (0, pg_core_1.text)("note"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (t) => [(0, pg_core_1.uniqueIndex)("tracker_entries_tracker_date_idx").on(t.trackerId, t.entryDate)]);
+exports.trackerEntryValues = (0, pg_core_1.pgTable)("tracker_entry_values", {
+    entryId: (0, pg_core_1.uuid)("entry_id")
+        .notNull()
+        .references(() => exports.trackerEntries.id, { onDelete: "cascade" }),
+    metricId: (0, pg_core_1.uuid)("metric_id")
+        .notNull()
+        .references(() => exports.trackerMetrics.id, { onDelete: "cascade" }),
+    value: (0, pg_core_1.doublePrecision)("value").notNull(),
+}, (t) => [
+    (0, pg_core_1.primaryKey)({ columns: [t.entryId, t.metricId] }),
+    (0, pg_core_1.index)("tracker_entry_values_metric_idx").on(t.metricId),
+]);
 exports.usersRelations = (0, drizzle_orm_1.relations)(exports.user, ({ many }) => ({
     sessions: many(exports.session),
     accounts: many(exports.account),

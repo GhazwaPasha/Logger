@@ -49,6 +49,7 @@ import {
   type NameIndex,
 } from "./agent-tools";
 import { GeminiClient, GeminiError, type GeminiContent, type GeminiFunctionDeclaration } from "./gemini.client";
+import { TrackersService } from "../trackers/trackers.service";
 
 /** Hard ceilings for one run — a loop can never spin (or spend) unbounded. */
 const MAX_TOOL_ROUNDS = 6;
@@ -171,8 +172,9 @@ export class AgentService {
     comments: CommentsService,
     roadmap: RoadmapService,
     performance: PerformanceService,
+    trackers: TrackersService,
   ) {
-    this.tools = { tasks, search, organizations: organizationsService, departments, lists, comments, roadmap, performance, authz };
+    this.tools = { tasks, search, organizations: organizationsService, departments, lists, comments, roadmap, performance, authz, trackers };
   }
 
   private get enabled(): boolean {

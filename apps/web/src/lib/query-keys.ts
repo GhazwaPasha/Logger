@@ -32,6 +32,13 @@ export const roadmapKeys = {
   tree: (organizationId: string) => [...roadmapKeys.all, organizationId] as const,
 };
 
+export const trackerKeys = {
+  all: ["trackers"] as const,
+  org: (organizationId: string) => [...trackerKeys.all, organizationId] as const,
+  list: (organizationId: string, scope: "all" | "mine") => [...trackerKeys.org(organizationId), "list", scope] as const,
+  detail: (organizationId: string, trackerId: string) => [...trackerKeys.org(organizationId), "detail", trackerId] as const,
+};
+
 export const discordKeys = {
   all: ["discord"] as const,
   integration: (organizationId: string) => [...discordKeys.all, organizationId, "integration"] as const,
