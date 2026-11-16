@@ -77,12 +77,13 @@ function validateMetrics(
 export const createTrackerSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
-    assigneeId: z.string().min(1),
+    /** Optional: a tracker can be set up first and given to someone later. */
+    assigneeId: z.string().min(1).nullable().optional(),
     periodStart: dateKey,
     periodEnd: dateKey,
     split: trackerSplitSchema.default("day"),
     checkIn: trackerCheckInSchema.default("daily"),
-    workingDays: workingDaysSchema.default([1, 2, 3, 4, 5]),
+    workingDays: workingDaysSchema.default([1, 2, 3, 4, 5, 6, 7]),
     reminderTime: reminderSchema,
     metrics: z.array(trackerMetricInputSchema).min(1).max(12),
   })
@@ -96,7 +97,8 @@ export const createTrackerSchema = z
 export const updateTrackerSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
-    assigneeId: z.string().min(1).optional(),
+    /** null unassigns. */
+    assigneeId: z.string().min(1).nullable().optional(),
     periodStart: dateKey.optional(),
     periodEnd: dateKey.optional(),
     split: trackerSplitSchema.optional(),
@@ -159,7 +161,8 @@ export type TrackerRow = TrackerConfig & {
   id: string;
   organizationId: string;
   name: string;
-  assigneeId: string;
+  /** null while nobody is assigned yet. */
+  assigneeId: string | null;
   createdBy: string;
   reminderTime: string | null;
   archivedAt: string | null;

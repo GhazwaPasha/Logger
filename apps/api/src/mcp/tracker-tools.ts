@@ -144,7 +144,7 @@ export function registerTrackerTools(server: McpServer, userId: string, services
   h.registerTool<{
     organizationId: string;
     name: string;
-    assigneeUserId: string;
+    assigneeUserId?: string;
     periodStart: string;
     periodEnd: string;
     template?: "sales" | "leads" | "clients";
@@ -163,11 +163,11 @@ export function registerTrackerTools(server: McpServer, userId: string, services
         "managers only. Either pass `metrics` (by name; calculated ones via `formula`), or a `template` " +
         "(sales = Orders, Revenue, Avg order size; leads = Leads, Qualified, Qualify rate; clients = Clients signed, " +
         "Contract value, Avg contract) plus `targets` by metric name, e.g. { \"Revenue\": 600000, \"Orders\": 60 }. " +
-        "Use list_members for assigneeUserId.",
+        "Use list_members for assigneeUserId; leave it out to set the tracker up unassigned and assign it later.",
       inputSchema: {
         organizationId: z.string().uuid(),
         name: z.string().min(1).max(120),
-        assigneeUserId: z.string().min(1),
+        assigneeUserId: z.string().min(1).optional(),
         periodStart: dateKey,
         periodEnd: dateKey,
         template: z.enum(["sales", "leads", "clients"]).optional(),
@@ -175,7 +175,7 @@ export function registerTrackerTools(server: McpServer, userId: string, services
         targets: z.record(z.string(), z.number().nonnegative()).optional().describe("Targets by metric name; fills or overrides."),
         split: z.enum(["day", "week"]).optional().describe("Slice the target per working day (default) or per week."),
         logs: z.enum(["daily", "weekly"]).optional().describe("How often the person logs. Default daily."),
-        workingDays: z.array(z.number().int().min(1).max(7)).optional().describe("ISO weekdays, 1 = Monday. Default Mon–Fri."),
+        workingDays: z.array(z.number().int().min(1).max(7)).optional().describe("ISO weekdays, 1 = Monday. Default every day (1–7)."),
         reminderTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional().describe("HH:mm local, or null for none. Default 18:00."),
       },
     },
@@ -202,7 +202,7 @@ export function registerTrackerTools(server: McpServer, userId: string, services
         }
         const input: CreateTrackerInput = {
           name: a.name,
-          assigneeId: a.assigneeUserId,
+          assigneeId: a.assigneeUserId ?? null,
           periodStart: a.periodStart,
           periodEnd: a.periodEnd,
           split: a.split,
@@ -220,7 +220,7 @@ export function registerTrackerTools(server: McpServer, userId: string, services
     organizationId: string;
     trackerId: string;
     name?: string;
-    assigneeUserId?: string;
+    assigneeUserId?: string | null;
     periodStart?: string;
     periodEnd?: string;
     split?: "day" | "week";
@@ -242,7 +242,7 @@ export function registerTrackerTools(server: McpServer, userId: string, services
         organizationId: z.string().uuid(),
         trackerId: z.string().uuid(),
         name: z.string().min(1).max(120).optional(),
-        assigneeUserId: z.string().min(1).optional(),
+        assigneeUserId: z.string().min(1).nullable().optional().describe("null unassigns."),
         periodStart: dateKey.optional(),
         periodEnd: dateKey.optional(),
         split: z.enum(["day", "week"]).optional(),

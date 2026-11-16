@@ -699,10 +699,8 @@ exports.trackers = (0, pg_core_1.pgTable)("trackers", {
         .notNull()
         .references(() => exports.organizations.id, { onDelete: "cascade" }),
     name: (0, pg_core_1.text)("name").notNull(),
-    /** The one person who logs check-ins. */
-    assigneeId: (0, pg_core_1.text)("assignee_id")
-        .notNull()
-        .references(() => exports.user.id, { onDelete: "restrict" }),
+    /** The one person who logs progress; null until someone is assigned. */
+    assigneeId: (0, pg_core_1.text)("assignee_id").references(() => exports.user.id, { onDelete: "restrict" }),
     createdBy: (0, pg_core_1.text)("created_by")
         .notNull()
         .references(() => exports.user.id, { onDelete: "restrict" }),
@@ -713,7 +711,7 @@ exports.trackers = (0, pg_core_1.pgTable)("trackers", {
     /** How often the assignee logs: `daily` (each working day) | `weekly` (one entry per week). */
     checkIn: (0, pg_core_1.text)("check_in").notNull().default("daily"),
     /** ISO weekdays that count as working days (1 = Monday … 7 = Sunday). */
-    workingDays: (0, pg_core_1.jsonb)("working_days").notNull().$type().default([1, 2, 3, 4, 5]),
+    workingDays: (0, pg_core_1.jsonb)("working_days").notNull().$type().default([1, 2, 3, 4, 5, 6, 7]),
     /** Local `HH:mm` for the check-in reminder; null = no reminder. */
     reminderTime: (0, pg_core_1.text)("reminder_time"),
     /** Local `YYYY-MM-DD` of the last reminder push, so each slot is nudged at most once. */

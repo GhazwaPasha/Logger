@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBullseye, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
@@ -64,8 +64,9 @@ export default function TrackersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, editor, rows]);
 
-  const person = (id: string) => members.find((x) => x.userId === id);
-  const personName = (id: string) => {
+  const person = (id: string | null) => (id ? members.find((x) => x.userId === id) : undefined);
+  const personName = (id: string | null) => {
+    if (!id) return "Unassigned";
     const m = person(id);
     return (m?.name ?? "").trim() || m?.email || "Someone";
   };
@@ -264,32 +265,33 @@ export default function TrackersPage() {
           </div>
 
           <section className="min-w-0 flex-1">
-            <AnimatePresence mode="wait" initial={false}>
-              {detail.data ? (
-                <motion.div
-                  key={detail.data.id}
-                  initial={reduced ? false : { opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  transition={{ duration: reduced ? 0 : 0.18 }}
-                >
-                  <TrackerDetail
-                    detail={detail.data}
-                    members={members}
-                    currentUserId={userId}
-                    onEdit={() => go({ edit: "1" })}
-                    onLog={(date, values, note) =>
-                      mutations.logEntry(detail.data!.id, date, { values, note }).catch((e) => {
-                        setError(e instanceof Error ? e.message : "Couldn't save the log");
-                        throw e;
-                      })
-                    }
-                  />
-                </motion.div>
-              ) : detail.isError ? (
-                <p className="text-sm text-[var(--muted)]">This tracker isn&apos;t available.</p>
-              ) : null}
-            </AnimatePresence>
+            {/* No exit animation to wait on: a "wait" presence could stall a newly created tracker
+                until a reload. The view just fades in whenever the selection changes. */}
+            {detail.data && detail.data.id === selectedId ? (
+              <motion.div
+                key={detail.data.id}
+                initial={reduced ? false : { opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: reduced ? 0 : 0.18, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <TrackerDetail
+                  detail={detail.data}
+                  members={members}
+                  currentUserId={userId}
+                  onEdit={() => go({ edit: "1" })}
+                  onLog={(date, values, note) =>
+                    mutations.logEntry(detail.data!.id, date, { values, note }).catch((e) => {
+                      setError(e instanceof Error ? e.message : "Couldn't save the log");
+                      throw e;
+                    })
+                  }
+                />
+              </motion.div>
+            ) : detail.isError ? (
+              <p className="text-sm text-[var(--muted)]">This tracker isn&apos;t available.</p>
+            ) : selectedId ? (
+              <p className="text-sm text-[var(--muted)]">Loading…</p>
+            ) : null}
           </section>
         </div>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   applyTrackerFormula,
   type TrackerEntry,
@@ -31,7 +31,8 @@ const CARD_SIDE = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--su
 const CARD_TITLE = "text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
 const SECTION_LABEL = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
 
-function memberName(members: MemberRow[], id: string) {
+function memberName(members: MemberRow[], id: string | null) {
+  if (!id) return "Unassigned";
   const m = members.find((x) => x.userId === id);
   return (m?.name ?? "").trim() || (m?.email ?? "").trim() || "Someone";
 }
@@ -72,71 +73,105 @@ export function TrackerDetail({
 }) {
   const reduced = useReducedMotion();
   const { stats, metrics } = detail;
-  const [formDate, setFormDate] = useState<string | null>(null);
+  // The day the Log progress panel is on. Clicking a square or a past log moves it there.
+  const [picked, setPicked] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<"cumulative" | "per">("cumulative");
 
-  const canLog = !detail.archivedAt && (detail.canManage || detail.assigneeId === currentUserId);
+  // Logging needs someone to log for: an unassigned tracker shows its targets but takes no logs yet.
+  const canLog =
+    !detail.archivedAt && Boolean(detail.assigneeId) && (detail.canManage || detail.assigneeId === currentUserId);
   const unitWord = detail.split === "week" ? "week" : "day";
   const entriesByKey = useMemo(() => new Map(detail.entries.map((e) => [e.entryDate, e])), [detail.entries]);
-  const firstOpen = stats.dueKey && !stats.dueLogged ? stats.dueKey : ([...stats.slots].reverse().find((s) => s.state === "missed")?.key ?? stats.dueKey);
+  const firstOpen =
+    stats.dueKey && !stats.dueLogged
+      ? stats.dueKey
+      : ([...stats.slots].reverse().find((s) => s.state === "missed")?.key ?? stats.dueKey);
+  const logDate = picked ?? firstOpen ?? null;
 
-  const meta = [
-    memberName(members, detail.assigneeId),
-    periodLabel(detail.periodStart, detail.periodEnd),
-    stats.phase === "active"
-      ? `${unitWord} ${Math.min(stats.totalUnits, stats.elapsedUnits + 1)} of ${stats.totalUnits}`
-      : stats.phase === "ended"
-        ? "Ended"
-        : "Not started",
-    detail.checkIn === "weekly" ? "logged weekly" : "logged daily",
-  ].join(" · ");
-
-  const assignee = members.find((x) => x.userId === detail.assigneeId);
+  const assignee = detail.assigneeId ? members.find((x) => x.userId === detail.assigneeId) : undefined;
   const phaseLabel =
     stats.phase === "active"
       ? `${unitWord === "week" ? "Week" : "Day"} ${Math.min(stats.totalUnits, stats.elapsedUnits + 1)} of ${stats.totalUnits}`
       : stats.phase === "ended"
         ? "Ended"
         : "Not started";
+  const missedFirst = stats.missedCount > 0 && stats.pace !== "behind";
+
+  const cannotLogReason = detail.archivedAt
+    ? "This tracker is archived."
+    : !detail.assigneeId
+      ? "Assign someone to this tracker to start logging."
+      : stats.phase === "upcoming"
+        ? `Logging opens on ${periodLabel(detail.periodStart, detail.periodStart).split(" – ")[0]}.`
+        : `Only ${memberName(members, detail.assigneeId)} or a manager can log here.`;
 
   return (
     <div className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-start">
-      {/* ───────────── Main column: cards, as on the task page ───────────── */}
+      {/* ───────────── Main column ───────────── */}
       <div className="min-w-0 flex-1 space-y-4">
-        <div className={`${CARD_MAIN} space-y-3`}>
-          <h3 className={CARD_TITLE}>Tracker</h3>
-          <div>
-            <h1 className="border-b border-[var(--border-subtle)] pb-1.5 text-2xl font-semibold leading-snug text-[var(--fg)]">
-              {detail.name}
-            </h1>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">{meta}</p>
-          </div>
-          <AnimatePresence initial={false}>
-            {formDate && (
-              <motion.div
-                key="form"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={reduced ? { duration: 0 } : { type: "spring", bounce: 0, duration: 0.35 }}
-                className="overflow-hidden"
+        <div className={`${CARD_MAIN} space-y-4`}>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className={CARD_TITLE}>Tracker</h3>
+            {detail.canManage && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--muted)] transition-[color,transform] duration-150 hover:text-[var(--fg)] active:scale-[0.97]"
               >
-                <CheckInForm
-                  key={formDate}
-                  detail={detail}
-                  date={formDate}
-                  entry={entriesByKey.get(formDate) ?? null}
-                  onDateChange={setFormDate}
-                  onSave={async (values, note) => {
-                    // The log is applied optimistically, so close straight away; a failure is
-                    // reported by the page and the numbers roll back.
-                    setFormDate(null);
-                    void onLog(formDate, values, note).catch(() => undefined);
-                  }}
-                />
-              </motion.div>
+                Edit tracker
+              </button>
             )}
-          </AnimatePresence>
+          </div>
+          <h1 className="border-b border-[var(--border-subtle)] pb-1.5 text-2xl font-semibold leading-snug text-[var(--fg)]">
+            {detail.name}
+          </h1>
+
+          {/* The details, merged into the tracker card as one row. */}
+          <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4">
+            <div className="min-w-0">
+              <span className={SECTION_LABEL}>Status</span>
+              <span
+                className={`inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm font-semibold ${
+                  missedFirst ? "text-amber-600 dark:text-amber-400" : PACE_TEXT[stats.pace]
+                }`}
+              >
+                <span className={`size-2 rounded-full ${missedFirst ? "bg-amber-500" : PACE_DOT[stats.pace]}`} />
+                {missedFirst ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className={SECTION_LABEL}>Assigned to</span>
+              <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2.5 text-sm font-semibold text-[var(--fg)]">
+                {assignee ? (
+                  <Avatar
+                    name={assignee.name}
+                    email={assignee.email}
+                    image={assignee.image}
+                    size="size-5"
+                    className="bg-[var(--accent-muted)] text-[9px] font-semibold text-[var(--fg)]"
+                  />
+                ) : (
+                  <span className="size-5 shrink-0 rounded-full border border-dashed border-[var(--border)]" />
+                )}
+                <span className={`truncate ${detail.assigneeId ? "" : "text-[var(--muted)]"}`}>
+                  {memberName(members, detail.assigneeId)}
+                </span>
+              </span>
+            </div>
+            <div className="min-w-0">
+              <span className={SECTION_LABEL}>Period</span>
+              <p className="truncate text-sm font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</p>
+              <p className="mt-0.5 text-xs text-[var(--muted)]">{phaseLabel}</p>
+            </div>
+            <div className="min-w-0">
+              <span className={SECTION_LABEL}>Rhythm</span>
+              <p className="text-sm font-semibold text-[var(--fg)]">{detail.checkIn === "weekly" ? "Logged weekly" : "Logged daily"}</p>
+              <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                Split {detail.split === "week" ? "per week" : "per working day"}
+                {detail.reminderTime ? ` · reminder ${detail.reminderTime}` : ""}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className={`${CARD_MAIN} space-y-4`}>
@@ -202,7 +237,7 @@ export function TrackerDetail({
             <h3 className={CARD_TITLE}>Logs</h3>
             <span className="text-xs text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
           </div>
-          <CheckInStrip detail={detail} onPick={canLog ? (key) => setFormDate(key) : undefined} selected={formDate} />
+          <CheckInStrip detail={detail} onPick={canLog ? (key) => setPicked(key) : undefined} selected={canLog ? logDate : null} />
           <div className="text-[13px]">
             {stats.dueKey && !stats.dueLogged && (
               <Row label={dayLabel(stats.dueKey, stats.today)} value="Not logged yet" tone="muted" />
@@ -213,7 +248,7 @@ export function TrackerDetail({
                 label={dayLabel(e.entryDate, stats.today)}
                 value={entrySummary(e, metrics)}
                 sub={e.userId !== detail.assigneeId ? `by ${memberName(members, e.userId)}` : (e.note ?? undefined)}
-                onClick={canLog ? () => setFormDate(e.entryDate) : undefined}
+                onClick={canLog ? () => setPicked(e.entryDate) : undefined}
               />
             ))}
             {detail.entries.length === 0 && !(stats.dueKey && !stats.dueLogged) && (
@@ -223,73 +258,24 @@ export function TrackerDetail({
         </div>
       </div>
 
-      {/* ───────────── Sidebar: details card + actions, as on the task page ───────────── */}
-      <div className="w-full space-y-4 xl:w-72 xl:shrink-0">
-        <div className={`${CARD_SIDE} space-y-4`}>
-          <div>
-            <span className={SECTION_LABEL}>Status</span>
-            <span
-              className={`inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-sm font-semibold ${
-                stats.missedCount > 0 && stats.pace !== "behind" ? "text-amber-600 dark:text-amber-400" : PACE_TEXT[stats.pace]
-              }`}
-            >
-              <span
-                className={`size-2 rounded-full ${stats.missedCount > 0 && stats.pace !== "behind" ? "bg-amber-500" : PACE_DOT[stats.pace]}`}
-              />
-              {stats.missedCount > 0 && stats.pace !== "behind" ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
-            </span>
-          </div>
-          <div>
-            <span className={SECTION_LABEL}>Assigned to</span>
-            <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-semibold text-[var(--fg)]">
-              <Avatar
-                name={assignee?.name}
-                email={assignee?.email}
-                image={assignee?.image}
-                size="size-5"
-                className="bg-[var(--accent-muted)] text-[9px] font-semibold text-[var(--fg)]"
-              />
-              <span className="truncate">{memberName(members, detail.assigneeId)}</span>
-            </span>
-          </div>
-          <div>
-            <span className={SECTION_LABEL}>Period</span>
-            <p className="text-sm font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</p>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{phaseLabel}</p>
-          </div>
-          <div>
-            <span className={SECTION_LABEL}>Rhythm</span>
-            <p className="text-sm font-semibold text-[var(--fg)]">
-              {detail.checkIn === "weekly" ? "Logged weekly" : "Logged daily"}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
-              Target split {detail.split === "week" ? "per week" : "per working day"}
-              {detail.reminderTime ? ` · reminder ${detail.reminderTime}` : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          {canLog && stats.phase !== "upcoming" && (
-            <button
-              type="button"
-              onClick={() => setFormDate((d) => (d ? null : (firstOpen ?? stats.today)))}
-              className="btn-primary w-full rounded-lg px-3 py-1.5 text-sm font-medium transition-transform duration-150 active:scale-[0.97]"
-            >
-              {formDate ? "Close" : "Log progress"}
-            </button>
-          )}
-          {detail.canManage && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-[color,transform] duration-150 hover:text-[var(--fg)] active:scale-[0.97]"
-            >
-              Edit tracker
-            </button>
+      {/* ───────────── Right: Log progress, always open and in view while scrolling ───────────── */}
+      <aside className="w-full xl:sticky xl:top-4 xl:w-80 xl:shrink-0">
+        <div className={`${CARD_SIDE} space-y-3`}>
+          <h3 className={CARD_TITLE}>Log progress</h3>
+          {canLog && stats.phase !== "upcoming" && logDate ? (
+            <CheckInForm
+              key={logDate}
+              detail={detail}
+              date={logDate}
+              entry={entriesByKey.get(logDate) ?? null}
+              onDateChange={setPicked}
+              onSave={(values, note) => onLog(logDate, values, note)}
+            />
+          ) : (
+            <p className="text-sm text-[var(--muted)]">{canLog && !logDate ? "Nothing to log right now." : cannotLogReason}</p>
           )}
         </div>
-      </div>
+      </aside>
     </div>
   );
 }
@@ -497,7 +483,7 @@ function CheckInForm({
   date: string;
   entry: TrackerEntry | null;
   onDateChange: (d: string) => void;
-  onSave: (values: Record<string, number>, note: string | null) => Promise<void>;
+  onSave: (values: Record<string, number>, note: string | null) => Promise<unknown>;
 }) {
   const inputs = detail.metrics.filter((m) => m.kind === "input");
   const formulas = detail.metrics.filter((m) => m.kind === "formula");
@@ -506,6 +492,7 @@ function CheckInForm({
   );
   const [note, setNote] = useState(entry?.note ?? "");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const parsed = Object.fromEntries(
@@ -526,18 +513,21 @@ function CheckInForm({
       return;
     }
     setSaving(true);
+    setSaved(false);
     setError(null);
     try {
       await onSave(parsed, note.trim() || null);
+      setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save the log");
+    } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="border-t border-[var(--border-subtle)] pt-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             {detail.checkIn === "weekly" ? "Week of" : "Day"}
@@ -568,9 +558,10 @@ function CheckInForm({
             onChange={(e) => {
               setRaw((r) => ({ ...r, [m.id]: e.target.value }));
               setError(null);
+              setSaved(false);
             }}
             placeholder="0"
-            className="w-36 border-none bg-transparent p-0 text-right text-sm font-medium text-[var(--fg)] outline-none placeholder:text-[var(--muted)]"
+            className="w-28 border-none bg-transparent p-0 text-right text-sm font-medium text-[var(--fg)] outline-none placeholder:text-[var(--muted)]"
           />
         </label>
       ))}
@@ -594,7 +585,11 @@ function CheckInForm({
         className="w-full border-t border-[var(--border-subtle)] bg-transparent py-2.5 text-sm text-[var(--fg)] outline-none placeholder:text-[var(--muted)]"
       />
       <div className="flex items-center justify-end gap-3 pt-1">
-        {error && <span className="mr-auto text-[13px] text-red-600 dark:text-red-400">{error}</span>}
+        {error ? (
+          <span className="mr-auto text-[13px] text-red-600 dark:text-red-400">{error}</span>
+        ) : saved ? (
+          <span className="mr-auto text-[13px] text-emerald-600 dark:text-emerald-400">Saved</span>
+        ) : null}
         <button
           type="button"
           onClick={submit}

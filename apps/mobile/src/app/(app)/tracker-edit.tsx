@@ -181,7 +181,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
   const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd ?? defEnd);
   const [split, setSplit] = useState<'day' | 'week'>(editing?.split ?? 'day');
   const [checkIn, setCheckIn] = useState<'daily' | 'weekly'>(editing?.checkIn ?? 'daily');
-  const [workingDays, setWorkingDays] = useState<number[]>(editing?.workingDays ?? [1, 2, 3, 4, 5]);
+  const [workingDays, setWorkingDays] = useState<number[]>(editing?.workingDays ?? [1, 2, 3, 4, 5, 6, 7]);
   const [reminderTime, setReminderTime] = useState(editing ? (editing.reminderTime ?? '') : '18:00');
   const [metrics, setMetrics] = useState<MetricDraft[]>(() =>
     editing
@@ -255,9 +255,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
 
   const problem = !name.trim()
     ? 'Name it to start saving'
-    : !assigneeId
-      ? 'Choose a person to start saving'
-      : periodEnd < periodStart
+    : periodEnd < periodStart
         ? 'The period ends before it starts'
         : metrics.some((m) => !m.name.trim())
           ? 'Every metric needs a name'
@@ -269,7 +267,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
     ? null
     : JSON.stringify({
         name: name.trim(),
-        assigneeId,
+        // Optional: the tracker saves before anyone is assigned.
+        assigneeId: assigneeId || null,
         periodStart,
         periodEnd,
         split,
@@ -447,7 +446,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
               <Row icon={faUser} label="Assigned to" onPress={() => setSheet({ kind: 'assignee' })}>
                 {assignee ? <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size={20} /> : null}
                 <Text size="sm" weight="medium" color={assignee ? 'fg' : 'muted'} numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {assignee ? (assignee.name ?? '').trim() || assignee.email : 'Choose a person'}
+                  {assignee ? (assignee.name ?? '').trim() || assignee.email : 'Unassigned'}
                 </Text>
               </Row>
               <Divider color={divider} />
@@ -712,7 +711,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
         members={members}
         onToggle={(uid) => {
           setSheet(null);
-          setAssigneeId(uid);
+          // Tapping the current person unassigns, as on the task screen.
+          setAssigneeId((cur) => (cur === uid ? '' : uid));
         }}
         onClose={() => setSheet(null)}
       />

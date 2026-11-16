@@ -99,7 +99,7 @@ export function useLogProgress(orgId: string | undefined) {
             const entry: TrackerEntry = {
               id: t.dueEntry?.entryDate === slot ? t.dueEntry.id : `pending-${slot}`,
               entryDate: slot,
-              userId: t.assigneeId,
+              userId: t.assigneeId ?? '',
               note: v.input.note ?? null,
               values: v.input.values,
               updatedAt: new Date().toISOString(),
@@ -114,9 +114,9 @@ export function useLogProgress(orgId: string | undefined) {
               const sum = t.stats.metrics[i]?.value ?? 0;
               totals[m.id] = sum - (old?.values[m.id] ?? 0);
             });
-            base.push({ id: 'totals', entryDate: '0000-00-00', userId: t.assigneeId, note: null, values: totals, updatedAt: '' });
+            base.push({ id: 'totals', entryDate: '0000-00-00', userId: t.assigneeId ?? '', note: null, values: totals, updatedAt: '' });
             const loggedKeys = t.stats.slots.filter((s) => s.state === 'logged' && s.key !== slot).map((s) => s.key);
-            for (const k of loggedKeys) base.push({ id: `l-${k}`, entryDate: k, userId: t.assigneeId, note: null, values: {}, updatedAt: '' });
+            for (const k of loggedKeys) base.push({ id: `l-${k}`, entryDate: k, userId: t.assigneeId ?? '', note: null, values: {}, updatedAt: '' });
             const stats = computeTrackerStats(t, t.metrics, [...base, entry], prev.today);
             return { ...t, stats, dueEntry: stats.dueKey === slot ? entry : t.dueEntry };
           }),

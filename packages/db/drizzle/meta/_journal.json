@@ -351,6 +351,13 @@
       "when": 1785900011000,
       "tag": "0049_trackers",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1785900012000,
+      "tag": "0050_tracker_optional_assignee",
+      "breakpoints": true
     }
   ]
 }

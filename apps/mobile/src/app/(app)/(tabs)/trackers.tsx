@@ -6,7 +6,6 @@ import {
   faChevronRight,
   faCircleCheck,
   faHashtag,
-  faMinus,
   faNoteSticky,
   faPen,
   faPlus,
@@ -201,12 +200,13 @@ function TrackerCard({
   const dark = useIsDark();
   const divider = alpha(theme.fg, dark ? 0.08 : 0.07);
   const missed = t.stats.slots.filter((s) => s.state === 'missed').map((s) => s.key);
-  const dates = [...(t.stats.dueKey ? [t.stats.dueKey] : []), ...missed.slice(-4).reverse()];
+  // An unassigned tracker takes no logs yet, so it never opens a log form.
+  const dates = !t.assigneeId ? [] : [...(t.stats.dueKey ? [t.stats.dueKey] : []), ...missed.slice(-4).reverse()];
   const openDate = openKey?.startsWith(`${t.id}:`) ? openKey.slice(t.id.length + 1) : null;
   const pace = paceLine(t);
   const { members } = useWorkspace();
   const who = members.find((m) => m.userId === t.assigneeId);
-  const assigneeLabel = who ? (who.name ?? '').trim() || who.email : 'Someone';
+  const assigneeLabel = !t.assigneeId ? 'Unassigned' : who ? (who.name ?? '').trim() || who.email : 'Someone';
   const toneColor = pace.tone === 'bad' ? Tone.red500 : pace.tone === 'good' ? Tone.emerald500 : theme.muted;
 
   return (
@@ -361,12 +361,6 @@ function LogRows({
   return (
     <View>
       {inputs.map((m) => {
-        const n = Number(raw[m.id] || 0);
-        const step = (d: number) => {
-          haptics.select();
-          setRaw((r) => ({ ...r, [m.id]: String(Math.max(0, (Number.isFinite(n) ? n : 0) + d)) }));
-          setError(null);
-        };
         const s = share(m);
         return (
           <View key={m.id}>
@@ -377,42 +371,21 @@ function LogRows({
                   {`share ${s}`}
                 </Text>
               ) : null}
-              {m.unit === 'count' ? (
-                <View style={styles.stepper}>
-                  <PressableScale
-                    scaleTo={0.9}
-                    onPress={() => step(-1)}
-                    accessibilityLabel={`Fewer ${m.name}`}
-                    style={[styles.stepBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle }]}>
-                    <Icon icon={faMinus} size={11} />
-                  </PressableScale>
-                  <Animated.View key={raw[m.id]} entering={FadeIn.duration(Duration.micro)} style={{ minWidth: 26, alignItems: 'center' }}>
-                    <Text size="15" weight="semibold" tabular>
-                      {raw[m.id] || '0'}
-                    </Text>
-                  </Animated.View>
-                  <PressableScale
-                    scaleTo={0.9}
-                    onPress={() => step(1)}
-                    accessibilityLabel={`More ${m.name}`}
-                    style={[styles.stepBtn, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle }]}>
-                    <Icon icon={faPlus} size={11} />
-                  </PressableScale>
-                </View>
-              ) : (
                 <TextInput
                   value={raw[m.id]}
                   onChangeText={(v) => {
                     setRaw((r) => ({ ...r, [m.id]: v }));
                     setError(null);
                   }}
-                  keyboardType="decimal-pad"
+                  // Whole numbers for counts, decimals for money and the rest.
+                  keyboardType={m.unit === 'count' ? 'number-pad' : 'decimal-pad'}
+                  returnKeyType="done"
+                  selectTextOnFocus
                   placeholder="0"
                   placeholderTextColor={alpha(theme.muted, 0.7)}
                   style={[styles.numInput, { color: theme.fg }]}
                   accessibilityLabel={m.name}
                 />
-              )}
             </PropRow>
           </View>
         );
@@ -468,8 +441,6 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth * 2, marginLeft: 40 },
   dates: { gap: 6, justifyContent: 'flex-end', flexGrow: 1 },
   dateChip: { borderWidth: 1, borderRadius: Radius.lg, paddingHorizontal: 10, paddingVertical: 5 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepBtn: { width: 30, height: 30, borderRadius: Radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   numInput: { minWidth: 96, textAlign: 'right', fontSize: 15, fontFamily: Fonts.sans.semibold, padding: 0 },
   noteInput: { flex: 1, textAlign: 'right', fontSize: 14, fontFamily: Fonts.sans.regular, padding: 0 },
   saveWrap: { gap: 8, padding: 14, paddingTop: 6 },

@@ -10,7 +10,7 @@ export function digestTracker(t: TrackerSummary, names?: Map<string, string>) {
     id: t.id,
     name: t.name,
     assigneeId: t.assigneeId,
-    ...(names ? { assignee: names.get(t.assigneeId) ?? "Unknown" } : {}),
+    ...(names ? { assignee: t.assigneeId ? (names.get(t.assigneeId) ?? "Unknown") : "Unassigned" } : {}),
     period: { start: t.periodStart, end: t.periodEnd, phase: t.stats.phase },
     logs: t.checkIn,
     targetSplit: per,

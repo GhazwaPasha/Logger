@@ -57,7 +57,7 @@ export class TrackerRemindersService {
       })
       .from(trackers)
       .innerJoin(organizations, eq(organizations.id, trackers.organizationId))
-      .where(and(isNotNull(trackers.reminderTime), isNull(trackers.archivedAt)));
+      .where(and(isNotNull(trackers.reminderTime), isNotNull(trackers.assigneeId), isNull(trackers.archivedAt)));
 
     for (const t of rows) {
       const p = getZonedParts(now, t.timeZone);
@@ -89,7 +89,7 @@ export class TrackerRemindersService {
         .returning({ id: trackers.id });
       if (claimed.length === 0) continue;
 
-      await this.push.notifyUsers([t.assigneeId], {
+      await this.push.notifyUsers([t.assigneeId!], {
         title: t.name,
         body: weekly ? "This week's numbers aren't logged yet." : "Today's numbers aren't logged yet.",
         url: `/${t.slug}/trackers?t=${encodeURIComponent(t.id)}`,

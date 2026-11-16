@@ -882,10 +882,8 @@ export const trackers = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    /** The one person who logs check-ins. */
-    assigneeId: text("assignee_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "restrict" }),
+    /** The one person who logs progress; null until someone is assigned. */
+    assigneeId: text("assignee_id").references(() => user.id, { onDelete: "restrict" }),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
@@ -896,7 +894,7 @@ export const trackers = pgTable(
     /** How often the assignee logs: `daily` (each working day) | `weekly` (one entry per week). */
     checkIn: text("check_in").notNull().default("daily"),
     /** ISO weekdays that count as working days (1 = Monday … 7 = Sunday). */
-    workingDays: jsonb("working_days").notNull().$type<number[]>().default([1, 2, 3, 4, 5]),
+    workingDays: jsonb("working_days").notNull().$type<number[]>().default([1, 2, 3, 4, 5, 6, 7]),
     /** Local `HH:mm` for the check-in reminder; null = no reminder. */
     reminderTime: text("reminder_time"),
     /** Local `YYYY-MM-DD` of the last reminder push, so each slot is nudged at most once. */

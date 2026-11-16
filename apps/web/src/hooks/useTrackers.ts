@@ -110,7 +110,7 @@ export function useTrackerMutations(token: string | null, orgId: string | null) 
         const entry: TrackerEntry = {
           id: existing?.id ?? `pending-${slot}`,
           entryDate: slot,
-          userId: existing?.userId ?? prev.assigneeId,
+          userId: existing?.userId ?? prev.assigneeId ?? "",
           note: input.note ?? null,
           values,
           updatedAt: new Date().toISOString(),

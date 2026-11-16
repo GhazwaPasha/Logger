@@ -73,12 +73,13 @@ function validateMetrics(metrics, ctx) {
 exports.createTrackerSchema = zod_1.z
     .object({
     name: zod_1.z.string().trim().min(1).max(120),
-    assigneeId: zod_1.z.string().min(1),
+    /** Optional: a tracker can be set up first and given to someone later. */
+    assigneeId: zod_1.z.string().min(1).nullable().optional(),
     periodStart: dateKey,
     periodEnd: dateKey,
     split: exports.trackerSplitSchema.default("day"),
     checkIn: exports.trackerCheckInSchema.default("daily"),
-    workingDays: workingDaysSchema.default([1, 2, 3, 4, 5]),
+    workingDays: workingDaysSchema.default([1, 2, 3, 4, 5, 6, 7]),
     reminderTime: reminderSchema,
     metrics: zod_1.z.array(exports.trackerMetricInputSchema).min(1).max(12),
 })
@@ -91,7 +92,8 @@ exports.createTrackerSchema = zod_1.z
 exports.updateTrackerSchema = zod_1.z
     .object({
     name: zod_1.z.string().trim().min(1).max(120).optional(),
-    assigneeId: zod_1.z.string().min(1).optional(),
+    /** null unassigns. */
+    assigneeId: zod_1.z.string().min(1).nullable().optional(),
     periodStart: dateKey.optional(),
     periodEnd: dateKey.optional(),
     split: exports.trackerSplitSchema.optional(),

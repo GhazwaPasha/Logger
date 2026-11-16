@@ -23,12 +23,12 @@ import {
 } from "@work-ledger/contracts";
 import type { TrackerDetailResponse } from "@/hooks/useTrackers";
 import type { MemberRow } from "@/lib/ledger-types";
-import { Avatar } from "@/components/ui/Avatar";
 import { SelectPopover, type SelectOption } from "@/components/ui/SelectPopover";
 import { Toggle } from "@/components/ui/Toggle";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { TaskFormSyncIndicator } from "@/components/tasks/TaskFormSyncIndicator";
 import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
+import { PersonSearchField } from "./PersonSearchField";
 import { Segmented } from "./Segmented";
 import { compactNumber } from "./tracker-format";
 import { TRACKER_TEMPLATES, templateById, type TrackerTemplate } from "./tracker-templates";
@@ -257,7 +257,7 @@ export function TrackerEditor({
   const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd ?? defEnd);
   const [split, setSplit] = useState<"day" | "week">(editing?.split ?? "day");
   const [checkIn, setCheckIn] = useState<"daily" | "weekly">(editing?.checkIn ?? "daily");
-  const [workingDays, setWorkingDays] = useState<number[]>(editing?.workingDays ?? [1, 2, 3, 4, 5]);
+  const [workingDays, setWorkingDays] = useState<number[]>(editing?.workingDays ?? [1, 2, 3, 4, 5, 6, 7]);
   const [reminderTime, setReminderTime] = useState<string>(editing ? (editing.reminderTime ?? "") : "18:00");
   const [lastReminder, setLastReminder] = useState<string>(editing?.reminderTime ?? "18:00");
   const [metrics, setMetrics] = useState<MetricDraft[]>(() =>
@@ -281,15 +281,6 @@ export function TrackerEditor({
 
   const inputs = metrics.filter((m) => m.kind === "input");
   const preset = presetOf(periodStart, periodEnd, today);
-  const assignee = members.find((m) => m.userId === assigneeId);
-  const assigneeName = assignee ? (assignee.name ?? "").trim() || assignee.email : null;
-  const memberOptions = useMemo(
-    () =>
-      members
-        .map((m) => ({ value: m.userId, label: (m.name ?? "").trim() || m.email }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    [members],
-  );
 
   const units = useMemo(() => {
     if (!periodStart || !periodEnd || periodEnd < periodStart) return 0;
@@ -340,9 +331,7 @@ export function TrackerEditor({
   // What still blocks saving; shown as the indicator's hint rather than as an error.
   const problem = !name.trim()
     ? "Name the tracker to start saving"
-    : !assigneeId
-      ? "Choose a person to start saving"
-      : periodEnd < periodStart
+    : periodEnd < periodStart
         ? "The period ends before it starts"
         : metrics.some((m) => !m.name.trim())
           ? "Every metric needs a name"
@@ -354,7 +343,8 @@ export function TrackerEditor({
     ? null
     : JSON.stringify({
         name: name.trim(),
-        assigneeId,
+        // Optional: the tracker saves (and shows on the Trackers page) before anyone is assigned.
+        assigneeId: assigneeId || null,
         periodStart,
         periodEnd,
         split,
@@ -672,33 +662,16 @@ export function TrackerEditor({
           <div className={`${CARD_SIDE} space-y-4`}>
             <div>
               <span className={SECTION_LABEL}>Assigned to</span>
-              <SelectPopover
+              <PersonSearchField
+                members={members}
+                allowNone
                 value={assigneeId}
                 onChange={(v) => {
                   setAssigneeId(v);
                   setError(null);
                 }}
-                options={memberOptions}
-                aria-label="Assigned to"
-                showChevron={false}
-                triggerClassName={`${CHIP} max-w-full ${assignee ? "pl-1.5" : "!text-[var(--muted)]"}`}
-                triggerContent={
-                  <>
-                    {assignee ? (
-                      <Avatar
-                        name={assignee.name}
-                        email={assignee.email}
-                        image={assignee.image}
-                        size="size-5"
-                        className="bg-[var(--accent-muted)] text-[9px] font-semibold text-[var(--fg)]"
-                      />
-                    ) : null}
-                    <span className="truncate">{assigneeName ?? "Choose a person"}</span>
-                    <Chevron />
-                  </>
-                }
               />
-              <p className="mt-1.5 text-xs text-[var(--muted)]">One person per tracker.</p>
+              <p className="mt-1.5 text-xs text-[var(--muted)]">One person per tracker. You can assign it later.</p>
             </div>
 
             <div>

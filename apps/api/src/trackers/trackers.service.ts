@@ -236,7 +236,7 @@ export class TrackersService {
     const p = createTrackerSchema.parse(body);
     const [, , today] = await Promise.all([
       this.assertCanManage(userId, organizationId),
-      this.assertAssigneeIsMember(organizationId, p.assigneeId),
+      p.assigneeId ? this.assertAssigneeIsMember(organizationId, p.assigneeId) : Promise.resolve(),
       this.todayKey(organizationId),
     ]);
 
@@ -246,7 +246,7 @@ export class TrackersService {
         .values({
           organizationId,
           name: p.name,
-          assigneeId: p.assigneeId,
+          assigneeId: p.assigneeId ?? null,
           createdBy: userId,
           periodStart: p.periodStart,
           periodEnd: p.periodEnd,
@@ -351,6 +351,8 @@ export class TrackersService {
     ]);
     this.assertCanView(canManage, userId, t);
     if (!canManage && t.assigneeId !== userId) throw new ForbiddenException("Only the assignee can log progress");
+    // Nobody to log for yet — a manager could log, but the numbers would belong to no one.
+    if (!t.assigneeId) throw new BadRequestException("Assign this tracker to someone before logging progress");
     if (t.archivedAt) throw new BadRequestException("This tracker is archived");
     if (date > today) throw new BadRequestException("You can't log a future date");
     const checkIn = t.checkIn === "weekly" ? "weekly" : "daily";
