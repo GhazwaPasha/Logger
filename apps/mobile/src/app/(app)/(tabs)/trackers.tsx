@@ -11,13 +11,14 @@ import {
   faPlus,
   type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
-import { applyTrackerFormula, type TrackerMetric, type TrackerSummary } from '@work-ledger/contracts';
+import { applyTrackerFormula, type TrackerEntry, type TrackerMetric, type TrackerSummary } from '@work-ledger/contracts';
 import { router } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition, ZoomIn } from 'react-native-reanimated';
 
 import { Icon } from '@/components/icon';
+import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Page } from '@/components/page';
 import { TabHeader } from '@/components/shell/screen-header';
@@ -27,7 +28,7 @@ import { Duration, POP_EASE, sequenceEnter } from '@/constants/motion';
 import { alpha, Fonts, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
-import { useLogProgress, useMyTrackers } from '@/lib/trackers';
+import { useLogProgress, useMyTrackers, useTrackerDetail } from '@/lib/trackers';
 import { useWorkspace } from '@/lib/workspace';
 
 /** Settles without bounce, matching the rest of the app's list reflow. */
@@ -200,9 +201,15 @@ function TrackerCard({
   const dark = useIsDark();
   const divider = alpha(theme.fg, dark ? 0.08 : 0.07);
   const missed = t.stats.slots.filter((s) => s.state === 'missed').map((s) => s.key);
+  // Every day (or week) of the period up to today, newest first — any of them can be logged or corrected.
+  const pastSlots = useMemo(() => t.stats.slots.filter((s) => s.state !== 'upcoming').reverse(), [t.stats.slots]);
   // An unassigned tracker takes no logs yet, so it never opens a log form.
-  const dates = !t.assigneeId ? [] : [...(t.stats.dueKey ? [t.stats.dueKey] : []), ...missed.slice(-4).reverse()];
+  const firstDate = !t.assigneeId ? null : (t.stats.dueKey ?? missed[missed.length - 1] ?? pastSlots[0]?.key ?? null);
   const openDate = openKey?.startsWith(`${t.id}:`) ? openKey.slice(t.id.length + 1) : null;
+  const [dayPicker, setDayPicker] = useState(false);
+  const { org } = useWorkspace();
+  // The list only carries today's log; past days need the full history to prefill a correction.
+  const history = useTrackerDetail(openDate ? org?.id : undefined, openDate ? t.id : undefined);
   const pace = paceLine(t);
   const { members } = useWorkspace();
   const who = members.find((m) => m.userId === t.assigneeId);
@@ -214,8 +221,8 @@ function TrackerCard({
       <PressableScale
         scaleTo={0.99}
         haptic="select"
-        disabled={dates.length === 0}
-        onPress={() => onToggle(openDate ? null : `${t.id}:${dates[0]}`)}
+        disabled={!firstDate}
+        onPress={() => onToggle(openDate ? null : `${t.id}:${firstDate}`)}
         accessibilityRole="button"
         accessibilityLabel={t.name}
         style={({ pressed }) => [styles.headRow, pressed && { backgroundColor: theme.surfaceHover }]}>
@@ -252,46 +259,74 @@ function TrackerCard({
             <Icon icon={faPen} size={10} color="muted" />
           </PressableScale>
         ) : null}
-        {dates.length > 0 ? (
+        {firstDate ? (
           <Icon icon={openDate ? faChevronDown : faChevronRight} size={10} color="muted" style={{ opacity: 0.6 }} />
         ) : null}
       </PressableScale>
 
       {openDate ? (
         <Animated.View entering={FadeIn.duration(Duration.base)} exiting={FadeOut.duration(Duration.micro)}>
-          {dates.length > 1 ? (
-            <>
-              <Divider color={divider} />
-              <PropRow icon={faCalendarDays} label="Day">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dates}>
-                  {dates.map((d) => {
-                    const on = d === openDate;
-                    return (
-                      <PressableScale
-                        key={d}
-                        haptic="select"
-                        onPress={() => onToggle(`${t.id}:${d}`)}
-                        style={[
-                          styles.dateChip,
-                          on
-                            ? { backgroundColor: theme.accent, borderColor: theme.accent }
-                            : { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle },
-                        ]}>
-                        <Text size="xs" weight="semibold" color={on ? theme.onAccent : d === t.stats.dueKey ? 'fg' : Tone.amber500}>
-                          {dayLabel(d, today)}
-                        </Text>
-                      </PressableScale>
-                    );
-                  })}
-                </ScrollView>
-              </PropRow>
-            </>
-          ) : null}
-          <LogRows key={openDate} t={t} date={openDate} divider={divider} onDone={() => onToggle(null)} />
+          <Divider color={divider} />
+          <PressableScale
+            scaleTo={0.99}
+            haptic="select"
+            onPress={() => setDayPicker(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${t.checkIn === 'weekly' ? 'Week' : 'Day'}: ${dayLabel(openDate, today)}`}
+            style={({ pressed }) => [styles.row, pressed && { backgroundColor: theme.surfaceHover }]}>
+            <Icon icon={faCalendarDays} size={13} color="muted" style={{ width: 16 }} />
+            <Text size="sm" color="muted" style={styles.label}>
+              {t.checkIn === 'weekly' ? 'Week of' : 'Day'}
+            </Text>
+            <View style={styles.value}>
+              <Text size="sm" weight="semibold" numberOfLines={1}>
+                {dayLabel(openDate, today)}
+              </Text>
+              <Text size="11" color={slotTone(t, openDate)}>
+                {slotStateLabel(t, openDate)}
+              </Text>
+            </View>
+            <Icon icon={faChevronRight} size={10} color="muted" style={{ opacity: 0.6 }} />
+          </PressableScale>
+          <LogRows
+            // Remount once history arrives, so a past day's saved numbers fill the fields.
+            key={`${openDate}:${history.data ? 'h' : '-'}`}
+            t={t}
+            date={openDate}
+            saved={history.data?.entries.find((e) => e.entryDate === openDate) ?? null}
+            divider={divider}
+            onDone={() => onToggle(null)}
+          />
         </Animated.View>
       ) : null}
+
+      <MenuSheet<string>
+        visible={dayPicker}
+        title={t.checkIn === 'weekly' ? 'Week to log' : 'Day to log'}
+        value={openDate ?? undefined}
+        options={pastSlots.map((sl) => ({
+          value: sl.key,
+          label: `${dayLabel(sl.key, today)}${sl.state === 'logged' ? ' · logged' : sl.state === 'missed' ? ' · missed' : sl.state === 'due' ? ' · to log' : ''}`,
+          icon: sl.state === 'logged' ? faCircleCheck : faCalendarDays,
+          iconColor: sl.state === 'logged' ? Tone.emerald500 : sl.state === 'missed' ? Tone.amber500 : undefined,
+        }))}
+        onSelect={(key) => {
+          setDayPicker(false);
+          onToggle(`${t.id}:${key}`);
+        }}
+        onClose={() => setDayPicker(false)}
+      />
     </Animated.View>
   );
+}
+
+function slotStateLabel(t: TrackerSummary, key: string) {
+  const st = t.stats.slots.find((s) => s.key === key)?.state;
+  return st === 'logged' ? 'Logged' : st === 'missed' ? 'Missed' : st === 'due' ? 'To log' : '';
+}
+function slotTone(t: TrackerSummary, key: string) {
+  const st = t.stats.slots.find((s) => s.key === key)?.state;
+  return st === 'logged' ? Tone.emerald500 : st === 'missed' ? Tone.amber500 : 'muted';
 }
 
 function PropRow({ icon, label, children }: { icon: IconDefinition; label: string; children: ReactNode }) {
@@ -311,18 +346,21 @@ const Divider = ({ color }: { color: string }) => <View style={[styles.divider, 
 function LogRows({
   t,
   date,
+  saved,
   divider,
   onDone,
 }: {
   t: TrackerSummary;
   date: string;
+  /** The log already saved for `date`, from the tracker's full history (null when none or not loaded yet). */
+  saved: TrackerEntry | null;
   divider: string;
   onDone: () => void;
 }) {
   const theme = useTheme();
   const { org } = useWorkspace();
   const log = useLogProgress(org?.id);
-  const prefill = t.dueEntry && t.dueEntry.entryDate === date ? t.dueEntry : null;
+  const prefill = saved ?? (t.dueEntry && t.dueEntry.entryDate === date ? t.dueEntry : null);
   const inputs = t.metrics.filter((m) => m.kind === 'input');
   const formulas = t.metrics.filter((m) => m.kind === 'formula');
   const [raw, setRaw] = useState<Record<string, string>>(() =>
@@ -439,8 +477,6 @@ const styles = StyleSheet.create({
   label: { width: 96 },
   value: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   divider: { height: StyleSheet.hairlineWidth * 2, marginLeft: 40 },
-  dates: { gap: 6, justifyContent: 'flex-end', flexGrow: 1 },
-  dateChip: { borderWidth: 1, borderRadius: Radius.lg, paddingHorizontal: 10, paddingVertical: 5 },
   numInput: { minWidth: 96, textAlign: 'right', fontSize: 15, fontFamily: Fonts.sans.semibold, padding: 0 },
   noteInput: { flex: 1, textAlign: 'right', fontSize: 14, fontFamily: Fonts.sans.regular, padding: 0 },
   saveWrap: { gap: 8, padding: 14, paddingTop: 6 },

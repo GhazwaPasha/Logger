@@ -363,102 +363,183 @@ function TrackerChart({
   onModeChange: (m: "cumulative" | "per") => void;
 }) {
   const reduced = useReducedMotion();
-  const metric =
-    detail.metrics.find((m) => m.kind === "input" && m.target != null) ?? detail.metrics.find((m) => m.kind === "input");
+  const defaultId =
+    (detail.metrics.find((m) => m.kind === "input" && m.target != null) ?? detail.metrics[0])?.id ?? "";
+  const [metricId, setMetricId] = useState(defaultId);
+  const metric = detail.metrics.find((m) => m.id === metricId) ?? detail.metrics.find((m) => m.id === defaultId);
   const slots = detail.stats.slots;
   const W = 640;
-  const H = 120;
-  const PAD = 12;
+  const H = 130;
+  const PAD = 14;
 
   const data = useMemo(() => {
     if (!metric) return null;
-    const byKey = new Map(detail.entries.map((e) => [e.entryDate, e.values[metric.id] ?? 0]));
     const n = Math.max(1, slots.length);
+    const valuesAt = new Map(detail.entries.map((e) => [e.entryDate, e.values]));
+    const f = metric.kind === "formula" ? metric.formula : null;
+    // Per slot: the metric's own value (input), or the formula applied to that slot's inputs.
+    const slotValue = (vals: Record<string, number> | undefined): number | null => {
+      if (!vals) return null;
+      if (!f) return vals[metric.id] ?? null;
+      const a = vals[f.a];
+      const b = vals[f.b];
+      return a == null || b == null ? null : applyTrackerFormula(f, a, b);
+    };
+    let runA = 0;
+    let runB = 0;
     let run = 0;
-    const cumulative: { x: number; v: number }[] = [{ x: 0, v: 0 }];
-    const per: { x: number; v: number }[] = [];
-    slots.forEach((s, i) => {
-      if (s.state === "upcoming") return;
-      const v = byKey.get(s.key) ?? 0;
-      run += v;
-      cumulative.push({ x: (i + 1) / n, v: run });
-      per.push({ x: (i + 0.5) / n, v });
+    const cumulative: { x: number; v: number }[] = f ? [] : [{ x: 0, v: 0 }];
+    const per: { x: number; v: number | null }[] = [];
+    slots.forEach((sl, i) => {
+      if (sl.state === "upcoming") return;
+      const vals = valuesAt.get(sl.key);
+      if (f) {
+        runA += vals?.[f.a] ?? 0;
+        runB += vals?.[f.b] ?? 0;
+        const v = applyTrackerFormula(f, runA, runB);
+        if (v != null && Number.isFinite(v)) cumulative.push({ x: (i + 1) / n, v });
+      } else {
+        run += vals?.[metric.id] ?? 0;
+        cumulative.push({ x: (i + 1) / n, v: run });
+      }
+      per.push({ x: (i + 0.5) / n, v: slotValue(vals) });
     });
-    return { cumulative, per, n, byKey };
+    return { cumulative, per, n };
   }, [metric, detail.entries, slots]);
 
   if (!metric || !data) return null;
+
+  const isFormula = metric.kind === "formula";
   const target = metric.target;
-  const perSlice = target != null ? target / data.n : null;
-  const maxC = Math.max(target ?? 0, ...data.cumulative.map((p) => p.v), 1);
-  const maxP = Math.max(perSlice ?? 0, ...data.per.map((p) => p.v), 1) * 1.15;
-  const x = (f: number) => f * W;
+  const atMost = metric.direction === "at_most";
+  const stat = detail.stats.metrics.find((x) => x.metricId === metric.id);
+  // A logged metric is paced against a line rising to the target; a calculated one against the target itself.
+  const perTarget = target == null ? null : isFormula ? target : target / data.n;
+  const meets = (v: number, goal: number) => (atMost ? v <= goal : v >= goal);
+
+  const cumValues = data.cumulative.map((pt) => pt.v);
+  const maxC = Math.max(target ?? 0, ...cumValues, 1) * 1.08;
+  const perValues = data.per.map((pt) => pt.v ?? 0);
+  const maxP = Math.max(perTarget ?? 0, ...perValues, 1) * 1.15;
+  const x = (fr: number) => fr * W;
   const yC = (v: number) => H - PAD - (v / maxC) * (H - PAD * 2);
   const yP = (v: number) => H - (v / maxP) * (H - PAD);
-  const path = data.cumulative.map((p, i) => `${i ? "L" : "M"}${x(p.x).toFixed(1)},${yC(p.v).toFixed(1)}`).join(" ");
-  const last = data.cumulative[data.cumulative.length - 1]!;
+  const path = data.cumulative.map((pt, i) => `${i ? "L" : "M"}${x(pt.x).toFixed(1)},${yC(pt.v).toFixed(1)}`).join(" ");
+  const last = data.cumulative[data.cumulative.length - 1];
   const barW = Math.max(2, Math.min(18, (W / data.n) * 0.6));
+
+  // Variance at the latest point: vs the pace line for logged metrics, vs the target for calculated ones.
+  const goalNow =
+    target == null || !last ? null : isFormula ? target : target * last.x;
+  const variance = goalNow == null || !last ? null : atMost ? goalNow - last.v : last.v - goalNow;
+  const good = variance != null && variance >= 0;
+  const varianceText =
+    variance == null
+      ? null
+      : isFormula
+        ? `${metricValue(metric, Math.abs(variance))} ${good ? (atMost ? "under" : "above") : atMost ? "over" : "below"} target`
+        : `${metricValue(metric, Math.abs(variance))} ${good ? "ahead of" : "behind"} pace`;
+  const tone = good ? "var(--chart-good, #10b981)" : "var(--chart-bad, #ef4444)";
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-          {metric.name} {target != null ? "vs target" : ""}
-        </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Segmented
+            value={metric.id}
+            onChange={setMetricId}
+            aria-label="Metric to chart"
+            options={detail.metrics.map((m) => ({ value: m.id, label: m.name }))}
+          />
+        </div>
         <Segmented
           value={mode}
           onChange={onModeChange}
           aria-label="Chart view"
           options={[
-            { value: "cumulative", label: "Cumulative" },
+            { value: "cumulative", label: isFormula ? "Running" : "Cumulative" },
             { value: "per", label: detail.checkIn === "weekly" ? "Weekly" : "Daily" },
           ]}
         />
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-[120px] w-full overflow-visible" role="img" aria-label={`${metric.name} over time`}>
+
+      <p className="mt-2 text-xs text-[var(--muted)]">
+        <span className="font-semibold text-[var(--fg)]">{metricValue(metric, stat?.value ?? last?.v ?? null)}</span>
+        {target != null ? ` of ${atMost ? "≤ " : isFormula ? "≥ " : ""}${metricValue(metric, target)}` : " · no target"}
+        {mode === "cumulative" && varianceText ? (
+          <span className={good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}> · {varianceText}</span>
+        ) : null}
+        {isFormula && metric.formula ? <span> · {formulaText(metric, detail.metrics)}</span> : null}
+      </p>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-[130px] w-full overflow-visible" role="img" aria-label={`${metric.name} over time`}>
         <line x1={0} y1={H - (mode === "cumulative" ? PAD : 0)} x2={W} y2={H - (mode === "cumulative" ? PAD : 0)} stroke="var(--border)" strokeWidth={0.5} />
         {mode === "cumulative" ? (
-          <g key={`c-${detail.id}`}>
+          <g key={`c-${detail.id}-${metric.id}`}>
             {target != null && (
               <>
-                <line x1={0} y1={yC(0)} x2={W} y2={yC(target)} stroke="var(--muted)" strokeWidth={1} strokeDasharray="3 4" opacity={0.7} />
+                <line
+                  x1={0}
+                  y1={isFormula ? yC(target) : yC(0)}
+                  x2={W}
+                  y2={yC(target)}
+                  stroke="var(--muted)"
+                  strokeWidth={1}
+                  strokeDasharray="3 4"
+                  opacity={0.7}
+                />
                 <text x={W} y={yC(target) - 6} textAnchor="end" className="fill-[var(--muted)] text-[11px]">
                   target {compactNumber(target)}
                 </text>
               </>
             )}
-            <motion.path
-              d={path}
-              fill="none"
-              stroke="var(--fg)"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              initial={reduced ? false : { pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: reduced ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <circle cx={x(last.x)} cy={yC(last.v)} r={3.5} fill="var(--fg)" />
+            {path && (
+              <motion.path
+                d={path}
+                fill="none"
+                stroke="var(--fg)"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                initial={reduced ? false : { pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: reduced ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+            {last && goalNow != null && (
+              // The variance itself: a bracket from where you are to where the target says you should be.
+              <line x1={x(last.x)} y1={yC(last.v)} x2={x(last.x)} y2={yC(goalNow)} stroke={tone} strokeWidth={1.5} strokeDasharray="2 2" />
+            )}
+            {last && <circle cx={x(last.x)} cy={yC(last.v)} r={3.5} fill={goalNow == null ? "var(--fg)" : tone} />}
+            {!last && (
+              <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-[var(--muted)] text-[12px]">
+                Nothing logged yet
+              </text>
+            )}
           </g>
         ) : (
-          <g key={`p-${detail.id}`}>
-            {perSlice != null && (
+          <g key={`p-${detail.id}-${metric.id}`}>
+            {perTarget != null && (
               <>
-                <line x1={0} y1={yP(perSlice)} x2={W} y2={yP(perSlice)} stroke="var(--muted)" strokeDasharray="3 4" opacity={0.7} />
-                <text x={W} y={yP(perSlice) - 6} textAnchor="end" className="fill-[var(--muted)] text-[11px]">
-                  {detail.checkIn === "weekly" ? "weekly" : "daily"} share {compactNumber(perSlice)}
+                <line x1={0} y1={yP(perTarget)} x2={W} y2={yP(perTarget)} stroke="var(--muted)" strokeDasharray="3 4" opacity={0.7} />
+                <text x={W} y={yP(perTarget) - 6} textAnchor="end" className="fill-[var(--muted)] text-[11px]">
+                  {isFormula ? "target" : detail.checkIn === "weekly" ? "weekly share" : "daily share"} {compactNumber(perTarget)}
                 </text>
               </>
             )}
-            {data.per.map((p, i) => {
-              const h = Math.max(p.v > 0 ? 2 : 0, H - yP(p.v));
+            {data.per.map((pt, i) => {
+              if (pt.v == null) return null;
+              const h = Math.max(pt.v > 0 ? 2 : 0, H - yP(pt.v));
+              // Bars that met their share (or the target) are solid; the ones that fell short are faded.
+              const ok = perTarget == null || meets(pt.v, perTarget);
               return (
                 <motion.rect
                   key={i}
-                  x={x(p.x) - barW / 2}
+                  x={x(pt.x) - barW / 2}
                   width={barW}
                   rx={2}
                   fill="var(--fg)"
+                  opacity={ok ? 1 : 0.35}
                   initial={reduced ? false : { height: 0, y: H }}
                   animate={{ height: h, y: H - h }}
                   transition={reduced ? { duration: 0 } : { type: "spring", bounce: 0, duration: 0.45, delay: i * 0.01 }}
@@ -470,6 +551,14 @@ function TrackerChart({
       </svg>
     </div>
   );
+}
+
+function formulaText(m: TrackerMetric, all: TrackerMetric[]) {
+  if (!m.formula) return "";
+  const a = all.find((x) => x.id === m.formula!.a)?.name ?? "?";
+  const b = all.find((x) => x.id === m.formula!.b)?.name ?? "?";
+  const sym = { div: "÷", mul: "×", add: "+", sub: "−" }[m.formula.op];
+  return `${a} ${sym} ${b}`;
 }
 
 function CheckInForm({
