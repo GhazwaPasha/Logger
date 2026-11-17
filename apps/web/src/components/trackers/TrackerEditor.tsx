@@ -311,7 +311,11 @@ export function TrackerEditor({
       ...ms,
       {
         id: uuid(),
-        name: "",
+        // Calculated metrics start named after their formula, so adding one never blocks autosave.
+        name:
+          kind === "formula"
+            ? `${inputs[inputs.length - 1]!.name.trim() || "First"} ÷ ${inputs[0]!.name.trim() || "Second"}`
+            : "",
         kind,
         unit: kind === "formula" ? "number" : "count",
         currency: "",
@@ -450,6 +454,10 @@ export function TrackerEditor({
               </motion.span>
             )}
           </AnimatePresence>
+          {/* Say what blocks saving in words, not only in the indicator's tooltip. */}
+          {problem && sync !== "saving" ? (
+            <span className="hidden text-xs font-medium text-amber-600 sm:inline dark:text-amber-400">{problem}</span>
+          ) : null}
           <TaskFormSyncIndicator status={sync} error={syncError} hint={problem && sync !== "saving" ? problem : null} />
           <button
             type="button"
@@ -558,7 +566,8 @@ export function TrackerEditor({
                             placeholder={m.kind === "formula" ? "Calculated metric" : "Metric name"}
                             maxLength={80}
                             aria-label="Metric name"
-                            className={`${FIELD} font-semibold`}
+                            aria-invalid={!m.name.trim()}
+                            className={`${FIELD} font-semibold ${m.name.trim() ? "" : "!border-amber-500/60"}`}
                           />
                           {m.kind === "formula" && m.formula ? (
                             <div className="flex items-center gap-0.5 pl-2.5 text-xs text-[var(--muted)]">
