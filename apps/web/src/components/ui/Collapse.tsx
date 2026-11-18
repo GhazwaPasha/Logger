@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Children, isValidElement, useState, type ReactNode } from "react";
+import { Children, isValidElement, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -56,9 +56,17 @@ export function CollapseItem({
 }: CollapseProps) {
   const reduce = useReducedMotion();
   const [settled, setSettled] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  // Already open on first render (AnimatePresence initial={false}): no opening animation runs, so
+  // onAnimationComplete never fires — without this the box stayed clipped forever (it hid the
+  // sidebar's selected-channel markers, and would clip dropdowns). An opening box starts at 0px.
+  useLayoutEffect(() => {
+    if (boxRef.current && boxRef.current.style.height !== "0px") setSettled(true);
+  }, []);
   const M = motion[as] as typeof motion.div;
   return (
     <M
+      ref={boxRef}
       id={id}
       role={role}
       aria-labelledby={labelledBy}
