@@ -8,7 +8,7 @@ import { memberDisplayName } from "@/lib/task-activity-log";
 import type { MemberRow } from "@/lib/ledger-types";
 
 const ACTOR_FILTER_TRIGGER_CLASS =
-  "flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]";
+  "flex w-full items-center justify-between gap-2 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]";
 
 /** Team activity, filterable down to one person at a time (filtered server-side, paginated). */
 export function PerformanceActivityFeed({

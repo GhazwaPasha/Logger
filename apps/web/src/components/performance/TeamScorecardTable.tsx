@@ -21,7 +21,7 @@ function lateTotal(m: PerformanceScorecardRow): number {
 }
 
 function LateCount({ value }: { value: number }) {
-  return <span className={value > 0 ? "text-rose-600 dark:text-rose-400" : "text-[var(--muted)]"}>{value}</span>;
+  return <span className={value > 0 ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--muted)]"}>{value}</span>;
 }
 
 function formatDuration(seconds: number): string {
@@ -66,7 +66,7 @@ export function TeamScorecardTable({ members, loading }: { members: PerformanceS
     <div className="mt-2 overflow-x-auto">
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--muted)]">
+          <tr className="text-left text-[12px] text-[var(--muted)]">
             <th className="pb-1.5 pr-2 font-medium">Person</th>
             {COLUMNS.map((col) => (
               <th key={col.key} className="pb-1.5 pl-2 font-medium">
@@ -115,10 +115,10 @@ export function TeamScorecardTable({ members, loading }: { members: PerformanceS
                   <span
                     className={
                       m.onTimeRate >= 0.8
-                        ? "text-emerald-600 dark:text-emerald-400"
+                        ? "text-[var(--success)] dark:text-[var(--success)]"
                         : m.onTimeRate >= 0.5
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-rose-600 dark:text-rose-400"
+                          ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
+                          : "text-[var(--danger)] dark:text-[var(--danger)]"
                     }
                   >
                     {Math.round(m.onTimeRate * 100)}%

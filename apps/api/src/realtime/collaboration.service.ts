@@ -56,6 +56,7 @@ export class CollaborationService {
     this.cache.invalidatePrefix(`perf:scorecards:${organizationId}`);
     this.cache.invalidatePrefix(`tasks:${organizationId}`);
     this.cache.invalidatePrefix(`taskcounts:${organizationId}`);
+    this.cache.invalidatePrefix(`completionsbyday:${organizationId}`);
     this.cache.invalidatePrefix(`seriessummary:${organizationId}`);
     this.cache.invalidatePrefix(`activity:${organizationId}`);
     this.cache.invalidatePrefix(membershipCacheKey(organizationId));

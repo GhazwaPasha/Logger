@@ -1,17 +1,13 @@
 "use client";
 
 import { useId, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+
 import type { LedgerRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { LedgerLineDescription, ledgerLogUserClassName } from "@/components/tasks/LedgerLineDescription";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
-import {
-  formatCreatorDisplay,
-  formatLogTimestamp,
-  isTaskCreatedNote,
-  memberDisplayName,
-} from "@/lib/task-activity-log";
+
+import { formatCreatorDisplay, formatLogTimestamp, isTaskCreatedNote, memberDisplayName } from "@/lib/task-activity-log";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { Collapse } from "@/components/ui/Collapse";
 
 /** Collapsed → right; expanded → down (same affordance as list rows on the work board). */
 function IconChevronDisclosure({ className, open }: { className?: string; open: boolean }) {
@@ -45,7 +41,6 @@ export function TaskPanelHistoryCard({ task, ledger, members, className }: Props
   const headingId = useId();
   const regionId = useId();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const prefersReduced = useReducedMotion();
 
   const creatorName = formatCreatorDisplay(memberDisplayName(members, task.assignerId));
   const entriesOldestFirst = ledger.filter((e) => !isTaskCreatedNote(e)).slice().reverse();
@@ -61,26 +56,15 @@ export function TaskPanelHistoryCard({ task, ledger, members, className }: Props
       <button
         type="button"
         id={headingId}
-        className="flex w-full items-center justify-between gap-2 rounded-lg py-0.5 text-left outline-none ring-[var(--accent)] ring-offset-2 ring-offset-[var(--surface-elevated)] focus-visible:ring-2"
+        className="flex w-full items-center justify-between gap-2 rounded-lg py-0.5 text-left outline-none ring-[var(--focus-ring)] ring-offset-2 ring-offset-[var(--surface-elevated)] focus-visible:ring-2"
         aria-expanded={expanded}
         aria-controls={regionId}
         onClick={() => setExpanded((v) => !v)}
       >
-        <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">History</span>
+        <span className="text-xs font-semibold text-[var(--muted)]">History</span>
         <IconChevronDisclosure open={expanded} className="text-[var(--muted)]" />
       </button>
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            id={regionId}
-            role="region"
-            aria-labelledby={headingId}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-            transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
-            style={{ overflow: "hidden" }}
-          >
+      <Collapse open={expanded} id={regionId} role="region" aria-labelledby={headingId}>
             <div
               className="mt-3 space-y-2 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
               aria-label="Task activity log"
@@ -101,9 +85,7 @@ export function TaskPanelHistoryCard({ task, ledger, members, className }: Props
               ))}
               <div ref={bottomRef} />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Collapse>
     </div>
   );
 }

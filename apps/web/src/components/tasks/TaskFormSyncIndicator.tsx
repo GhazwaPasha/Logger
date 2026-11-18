@@ -18,7 +18,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Save failed",
       title: error ?? "Could not save",
       className:
-        "border-red-200/80 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400",
+        "border-[color-mix(in_srgb,var(--danger)_80%,transparent)] bg-[var(--danger)] text-[var(--danger)] dark:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] dark:bg-[color-mix(in_srgb,var(--danger)_40%,transparent)] dark:text-[var(--danger)]",
       icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3.5 shrink-0" aria-hidden />,
     };
   }
@@ -50,7 +50,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Saved",
       title: "All changes saved",
       className:
-        "border-green-200/80 bg-green-50 text-green-700 dark:border-green-900/50 dark:bg-green-950/35 dark:text-green-400",
+        "border-[color-mix(in_srgb,var(--success)_80%,transparent)] bg-[var(--success)] text-[var(--success)] dark:border-[color-mix(in_srgb,var(--success)_50%,transparent)] dark:bg-[color-mix(in_srgb,var(--success)_35%,transparent)] dark:text-[var(--success)]",
       icon: <FontAwesomeIcon icon={faCheck} className="size-3.5 shrink-0" aria-hidden />,
     };
   }
@@ -91,13 +91,13 @@ export function TaskFormSyncIndicator({
     >
       <span
         title={cfg.title}
-        className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold uppercase tracking-wide transition-colors duration-200 ${cfg.className} ${cfg.pulse ? "animate-pulse motion-reduce:animate-none" : ""}`}
+        className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center gap-1.5 rounded-full border px-2.5 text-[12px] font-semibold transition-colors duration-200 ${cfg.className} ${cfg.pulse ? "animate-pulse motion-reduce:animate-none" : ""}`}
       >
         {cfg.icon}
         <span className="tabular-nums">{cfg.label}</span>
       </span>
       {showDetail && (
-        <span className="max-w-[12rem] truncate text-right text-[10px] font-medium text-red-600 dark:text-red-400">
+        <span className="max-w-[12rem] truncate text-right text-[10px] font-medium text-[var(--danger)] dark:text-[var(--danger)]">
           {error}
         </span>
       )}

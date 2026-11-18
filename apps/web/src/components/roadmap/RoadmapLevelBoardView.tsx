@@ -30,7 +30,7 @@ function MilestoneCard({
     >
       <div className="flex items-center gap-1.5">
         {goalTitle && (
-          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--muted)]">
             {goalTitle}
           </span>
         )}
@@ -109,7 +109,7 @@ export function RoadmapLevelBoardView({
           className="surface-elevated ui-elevated-panel w-72 shrink-0 rounded-2xl border border-[var(--border-subtle)] p-3.5"
         >
           <div className="mb-3 flex items-center justify-between px-0.5">
-            <h3 className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{col.name}</h3>
+            <h3 className="truncate text-xs font-semibold text-[var(--muted)]">{col.name}</h3>
             <span className="shrink-0 rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs tabular-nums text-[var(--muted)]">
               {col.items.length}
             </span>

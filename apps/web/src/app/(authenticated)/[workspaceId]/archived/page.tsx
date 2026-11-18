@@ -63,7 +63,7 @@ function ArchivedTaskRow({
         {caps.canPurge && (
           <button
             type="button"
-            className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10"
+            className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]"
             onClick={onPurge}
           >
             Delete permanently
@@ -151,7 +151,7 @@ export default function ArchivedPage() {
       {tab === "tasks" && (
         <section className="space-y-2">
           {actionError && (
-            <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+            <p role="alert" className="rounded-lg bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
               {actionError}
             </p>
           )}
@@ -163,7 +163,7 @@ export default function ArchivedPage() {
               </p>
               <button
                 type="button"
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-500/10"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]"
                 onClick={() =>
                   setConfirm({
                     title: amOwner

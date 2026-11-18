@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "./AppHeader";
+import { RouteTransition } from "./RouteTransition";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceRouteContext, WORKSPACE_DETAIL_SLOT_ID } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
@@ -92,10 +93,11 @@ export function WorkspaceShell({
                 mobileOpen={mobileSidebarOpen}
                 onMobileClose={closeMobileSidebar}
               />
-              {/* The one line between chrome and content, curving where the header meets the sidebar. */}
-              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--surface-base)] md:rounded-tl-3xl md:border-l md:border-t md:border-[var(--border-subtle)]">
-                <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
-                  {children}
+              {/* The content sheet: a soft hairline + shadow (no hard border), curving where the header meets the sidebar. */}
+              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--surface-base)] md:rounded-tl-3xl md:shadow-sheet">
+                <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
+                  {/* Pages fly in and out here (see RouteTransition); `relative` anchors the exiting page. */}
+                  <RouteTransition>{children}</RouteTransition>
                 </main>
                 {/* Pages portal docked detail panes (e.g. task details) here so they push content like the Ask pane. */}
                 <div id={WORKSPACE_DETAIL_SLOT_ID} className="contents" />

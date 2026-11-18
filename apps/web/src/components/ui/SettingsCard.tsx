@@ -22,7 +22,7 @@ export function SettingsCard({
     <section
       className={
         isDanger
-          ? "rounded-2xl border border-red-500/40 bg-red-500/[0.04] p-6 dark:bg-red-500/[0.06] sm:p-7"
+          ? "rounded-2xl border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_4%,transparent)] p-6 dark:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] sm:p-7"
           : "surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-6 sm:p-7"
       }
     >
@@ -30,18 +30,18 @@ export function SettingsCard({
         <span
           className={
             isDanger
-              ? "flex size-9 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400"
+              ? "flex size-9 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] dark:text-[var(--danger)]"
               : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)]"
           }
         >
           <FontAwesomeIcon icon={icon} className="size-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1 pt-0.5">
-          <h2 className={isDanger ? "text-sm font-semibold text-red-700 dark:text-red-300" : "text-sm font-semibold"}>
+          <h2 className={isDanger ? "text-sm font-semibold text-[var(--danger)] dark:text-[var(--danger)]" : "text-sm font-semibold"}>
             {title}
           </h2>
           {description && (
-            <p className={isDanger ? "mt-0.5 text-xs text-red-700/80 dark:text-red-300/75" : "mt-0.5 text-xs text-[var(--muted)]"}>
+            <p className={isDanger ? "mt-0.5 text-xs text-[color-mix(in_srgb,var(--danger)_80%,transparent)] dark:text-[color-mix(in_srgb,var(--danger)_75%,transparent)]" : "mt-0.5 text-xs text-[var(--muted)]"}>
               {description}
             </p>
           )}

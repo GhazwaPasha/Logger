@@ -236,9 +236,9 @@ export function DiscordSubmissionZone({
               aria-hidden
             />
           ) : item.status === "success" ? (
-            <FontAwesomeIcon icon={faCheck} className="size-3 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+            <FontAwesomeIcon icon={faCheck} className="size-3 shrink-0 text-[var(--success)] dark:text-[var(--success)]" aria-hidden />
           ) : (
-            <FontAwesomeIcon icon={faCircleExclamation} className="size-3 shrink-0 text-red-600 dark:text-red-400" aria-hidden />
+            <FontAwesomeIcon icon={faCircleExclamation} className="size-3 shrink-0 text-[var(--danger)] dark:text-[var(--danger)]" aria-hidden />
           )}
           <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg)]" title={item.file.name}>
             {item.file.name}
@@ -246,9 +246,9 @@ export function DiscordSubmissionZone({
           <span
             className={`shrink-0 ${
               item.status === "error"
-                ? "text-red-600 dark:text-red-400"
+                ? "text-[var(--danger)] dark:text-[var(--danger)]"
                 : item.status === "success"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-[var(--success)] dark:text-[var(--success)]"
                   : "text-[var(--muted)]"
             }`}
           >

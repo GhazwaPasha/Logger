@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCaretRight, faFlag, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_DOT_CLASS, STATUS_LABELS, formatDate, formatRange } from "@/lib/roadmap-format";
 import type { GoalRow, MemberRow, MilestoneRow } from "@/lib/ledger-types";
+import { Collapse } from "@/components/ui/Collapse";
 
 function MilestoneRowItem({
   milestone,
@@ -87,8 +88,8 @@ function MilestoneRowItem({
         </button>
       </div>
 
-      {isOpen &&
-        children
+      <Collapse open={isOpen}>
+        {children
           .slice()
           .sort((a, b) => a.periodStart.localeCompare(b.periodStart) || a.orderIndex - b.orderIndex)
           .map((child) => (
@@ -103,6 +104,7 @@ function MilestoneRowItem({
               onAddChild={onAddChild}
             />
           ))}
+      </Collapse>
     </div>
   );
 }
@@ -196,8 +198,7 @@ function GoalSection({
         </button>
       </div>
 
-      {showBody && (
-        <div className="border-t border-[var(--border-subtle)] px-2 py-2">
+      <Collapse open={showBody} className="border-t border-[var(--border-subtle)] px-2 py-2">
           {hasMilestones ? (
             rootMilestones
               .slice()
@@ -226,8 +227,7 @@ function GoalSection({
               </button>
             </div>
           )}
-        </div>
-      )}
+      </Collapse>
     </div>
   );
 }

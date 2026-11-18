@@ -462,9 +462,9 @@ export default function OrganizationSettingsPage() {
                       statusCheckBusy
                         ? "text-[var(--muted)]"
                         : connectionStatus?.ok
-                          ? "text-emerald-600 dark:text-emerald-400"
+                          ? "text-[var(--success)] dark:text-[var(--success)]"
                           : connectionStatus && !connectionStatus.ok
-                            ? "text-red-600 dark:text-red-400"
+                            ? "text-[var(--danger)] dark:text-[var(--danger)]"
                             : "text-[var(--muted)]"
                     }`}
                   >
@@ -473,9 +473,9 @@ export default function OrganizationSettingsPage() {
                         statusCheckBusy
                           ? "animate-pulse bg-[var(--muted)]"
                           : connectionStatus?.ok
-                            ? "bg-emerald-500"
+                            ? "bg-[var(--success)]"
                             : connectionStatus && !connectionStatus.ok
-                              ? "bg-red-500"
+                              ? "bg-[var(--danger)]"
                               : "bg-[var(--muted)]"
                       }`}
                       aria-hidden
@@ -490,7 +490,7 @@ export default function OrganizationSettingsPage() {
                   </span>
                   {connectionStatus?.ok && <span className="text-[var(--fg)]">{connectionStatus.guildName}</span>}
                   {connectionStatus && !connectionStatus.ok && (
-                    <span className="text-red-600 dark:text-red-400">{connectionStatus.reason}</span>
+                    <span className="text-[var(--danger)] dark:text-[var(--danger)]">{connectionStatus.reason}</span>
                   )}
                   <span className="text-[var(--muted)]">
                     Connected since {formatInTimeZone(new Date(discordConfig.updatedAt), org.timeZone, { month: "short", day: "numeric", year: "numeric" })}
@@ -574,7 +574,7 @@ export default function OrganizationSettingsPage() {
           </label>
           <input
             id="org-delete-confirm-input"
-            className="input mt-1.5 w-full max-w-md rounded-xl focus:!border-red-500 focus-visible:!outline-red-400"
+            className="input mt-1.5 w-full max-w-md rounded-xl focus:!border-[var(--danger)] focus-visible:!outline-[var(--danger)]"
             value={deleteConfirm}
             disabled={deleteBusy}
             onChange={(e) => setDeleteConfirm(e.target.value)}
@@ -583,7 +583,7 @@ export default function OrganizationSettingsPage() {
           />
           <button
             type="button"
-            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-red-500 px-5 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
+            className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--danger)] px-5 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[var(--danger)]"
             disabled={deleteBusy || deleteConfirm.trim() !== org.name.trim()}
             aria-busy={deleteBusy || undefined}
             onClick={() => openOrgDeleteDialog()}

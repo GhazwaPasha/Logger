@@ -7,7 +7,8 @@ import { faLink } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "@/lib/api";
 import type { TaskRow } from "@/lib/ledger-types";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
+import { CollapseItem } from "@/components/ui/Collapse";
 
 type DependencyTask = { id: string; title: string; status: string };
 
@@ -28,16 +29,16 @@ async function fetchBlocking(token: string, taskId: string): Promise<DependencyT
 }
 
 const STATUS_CHIP: Record<string, string> = {
-  pending: "bg-slate-500/15 text-slate-600 dark:text-slate-300",
-  in_progress: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
-  done: "bg-green-500/15 text-green-700 dark:text-green-300",
-  cancelled: "bg-neutral-500/15 text-neutral-500 dark:text-neutral-400",
+  pending: "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] text-[var(--ink-2)] dark:text-[var(--ink-2)]",
+  in_progress: "bg-[color-mix(in_srgb,var(--info-ink)_15%,transparent)] text-[var(--info-ink)] dark:text-[var(--info-ink)]",
+  done: "bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)] dark:text-[var(--success)]",
+  cancelled: "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] text-[var(--ink-2)] dark:text-[var(--ink-2)]",
 };
 
 function StatusChip({ status }: { status: string }) {
   const label = status === "in_progress" ? "In Progress" : status.charAt(0).toUpperCase() + status.slice(1);
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_CHIP[status] ?? "bg-slate-500/15 text-slate-500"}`}>
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_CHIP[status] ?? "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] text-[var(--ink-2)]"}`}>
       {label}
     </span>
   );
@@ -80,11 +81,11 @@ function DependencyPicker({
     <motion.div
       className="absolute left-0 top-full z-50 mt-1 w-full min-w-[240px] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] shadow-xl"
       style={{ transformOrigin: "top" }}
-      variants={panelPopVariants}
+      variants={variants.panelPop}
       initial="hidden"
       animate="visible"
       exit="hidden"
-      transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+      transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
     >
       <div className="border-b border-[var(--border-subtle)] p-2">
         <input
@@ -132,7 +133,6 @@ export function DependencySection({
   const queryClient = useQueryClient();
   const [showBlockerPicker, setShowBlockerPicker] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const prefersReduced = useReducedMotion();
 
   const blockersKey = ["dependencies", "blockers", taskId];
   const blockingKey = ["dependencies", "blocking", taskId];
@@ -197,7 +197,7 @@ export function DependencySection({
 
   return (
     <div className="space-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Dependencies</h3>
+      <h3 className="text-xs font-semibold text-[var(--muted)]">Dependencies</h3>
 
       {/* Blocked by */}
       <div>
@@ -229,18 +229,10 @@ export function DependencySection({
         {blockers.length === 0 ? (
           <EmptyState icon={faLink} title="No blockers" size="compact" />
         ) : (
-          <ul className="space-y-1">
+          <ul>
             <AnimatePresence initial={false}>
               {blockers.map((b) => (
-                <motion.li
-                  key={b.id}
-                  layout
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-                  className="flex items-center gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5"
-                >
+                <CollapseItem as="li" key={b.id} reorder className="pb-1"><div className="flex items-center gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5">
                   <button
                     type="button"
                     onClick={() => onOpenTask?.(b.id)}
@@ -253,13 +245,13 @@ export function DependencySection({
                     <button
                       type="button"
                       onClick={() => removeMutation.mutate(b.id)}
-                      className="ml-1 text-[var(--muted)] hover:text-red-500"
+                      className="ml-1 text-[var(--muted)] hover:text-[var(--danger)]"
                       aria-label="Remove blocker"
                     >
                       ×
                     </button>
                   )}
-                </motion.li>
+                </div></CollapseItem>
               ))}
             </AnimatePresence>
           </ul>
@@ -270,18 +262,10 @@ export function DependencySection({
       {blocking.length > 0 && (
         <div>
           <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">Blocking</p>
-          <ul className="space-y-1">
+          <ul>
             <AnimatePresence initial={false}>
               {blocking.map((b) => (
-                <motion.li
-                  key={b.id}
-                  layout
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-                  className="flex items-center gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5"
-                >
+                <CollapseItem as="li" key={b.id} reorder className="pb-1"><div className="flex items-center gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-1.5">
                   <button
                     type="button"
                     onClick={() => onOpenTask?.(b.id)}
@@ -290,7 +274,7 @@ export function DependencySection({
                     {b.title}
                   </button>
                   <StatusChip status={b.status} />
-                </motion.li>
+                </div></CollapseItem>
               ))}
             </AnimatePresence>
           </ul>
@@ -298,7 +282,7 @@ export function DependencySection({
       )}
 
       {addMutation.isError && (
-        <p className="text-xs text-red-500">{(addMutation.error as Error).message}</p>
+        <p className="text-xs text-[var(--danger)]">{(addMutation.error as Error).message}</p>
       )}
     </div>
   );

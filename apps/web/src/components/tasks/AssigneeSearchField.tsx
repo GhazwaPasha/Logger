@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { MemberRow } from "@/lib/ledger-types";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
 
 function primaryLabel(m: MemberRow): string {
   return (m.name?.trim() || m.email || "").trim() || "Unknown";
@@ -78,7 +78,7 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
                   initial={{ opacity: 0, scale: 0.85 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.85 }}
-                  transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+                  transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
                   className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm text-[var(--fg)]"
                 >
                   <span className="min-w-0 truncate" title={sub ?? main}>
@@ -129,13 +129,13 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
               id={optionsId}
               role="listbox"
               aria-label="Team members"
-              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl bg-[var(--card)] shadow-card py-1"
               style={{ transformOrigin: "top" }}
-              variants={panelPopVariants}
+              variants={variants.panelPop}
               initial="hidden"
               animate="visible"
               exit="hidden"
-              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+              transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
             >
               {available.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-[var(--muted)]">{emptyListMessage}</li>

@@ -33,7 +33,7 @@ export function MemberChipRow({
             aria-selected={active}
             onClick={() => onSelect(m.userId)}
             onMouseEnter={() => onHover?.(m.userId)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
               active
                 ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--fg)]"
                 : "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--fg)] hover:bg-[var(--surface-hover)]"
@@ -41,7 +41,7 @@ export function MemberChipRow({
           >
             {needsAttention && (
               <span
-                className="size-1.5 shrink-0 rounded-full bg-rose-500"
+                className="size-1.5 shrink-0 rounded-full bg-[var(--danger)]"
                 title="Late completion or unmet compliance in this range"
                 aria-hidden
               />

@@ -16,15 +16,15 @@ function formatDuration(seconds: number): string {
 
 function complianceSegments(fulfilled: number, required: number) {
   return [
-    { key: "fulfilled", count: fulfilled, className: "bg-emerald-500/60", title: "Fulfilled" },
-    { key: "missing", count: Math.max(0, required - fulfilled), className: "bg-rose-500/55", title: "Missing" },
+    { key: "fulfilled", count: fulfilled, className: "bg-[color-mix(in_srgb,var(--success)_60%,transparent)]", title: "Fulfilled" },
+    { key: "missing", count: Math.max(0, required - fulfilled), className: "bg-[color-mix(in_srgb,var(--danger)_55%,transparent)]", title: "Missing" },
   ];
 }
 
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-[var(--surface-muted)] px-2.5 py-1.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">{label}</p>
+      <p className="text-[11.5px] font-medium text-[var(--muted)]">{label}</p>
       <p className="text-lg font-semibold tabular-nums leading-tight text-[var(--fg)]">{value}</p>
     </div>
   );
@@ -81,14 +81,14 @@ export function MemberDetailPanel({
 
       <div className="space-y-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Current workload</p>
+          <p className="text-[12px] font-semibold text-[var(--muted)]">Current workload</p>
           {hasWorkload ? (
             <>
               <div className="mt-1.5">
                 <SegmentedBar
                   segments={[
-                    { key: "pending", count: member.pending, className: "bg-slate-500/55", title: "Pending" },
-                    { key: "in_progress", count: member.inProgress, className: "bg-violet-500/55", title: "In progress" },
+                    { key: "pending", count: member.pending, className: "bg-[color-mix(in_srgb,var(--ink-2)_55%,transparent)]", title: "Pending" },
+                    { key: "in_progress", count: member.inProgress, className: "bg-[color-mix(in_srgb,var(--dept-3)_55%,transparent)]", title: "In progress" },
                   ]}
                   emptyLabel="Nothing open"
                 />
@@ -103,7 +103,7 @@ export function MemberDetailPanel({
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Compliance</p>
+          <p className="text-[12px] font-semibold text-[var(--muted)]">Compliance</p>
           {hasCompliance ? (
             <div className="mt-1.5 space-y-2">
               {member.submissionsRequired > 0 && (
@@ -130,7 +130,7 @@ export function MemberDetailPanel({
                   </div>
                   <SegmentedBar
                     segments={[
-                      { key: "done", count: member.submissionsOptionalFulfilled, className: "bg-sky-500/55", title: "Submitted" },
+                      { key: "done", count: member.submissionsOptionalFulfilled, className: "bg-[color-mix(in_srgb,var(--info-ink)_55%,transparent)]", title: "Submitted" },
                       {
                         key: "skipped",
                         count: Math.max(0, member.submissionsOptional - member.submissionsOptionalFulfilled),
@@ -164,7 +164,7 @@ export function MemberDetailPanel({
       </div>
 
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">Tasks</p>
+        <p className="text-[12px] font-semibold text-[var(--muted)]">Tasks</p>
         <div className="mt-1.5">
           <MemberTaskTable tasks={tasksQuery.data ?? []} loading={tasksQuery.isPending} workHrefBase={workHrefBase} />
         </div>

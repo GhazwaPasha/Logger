@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
 import type { DiscordChannelOption } from "@/lib/ledger-types";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
 
 function matchesQuery(c: DiscordChannelOption, q: string): boolean {
   const s = q.trim().toLowerCase();
@@ -96,13 +96,13 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
               id={optionsId}
               role="listbox"
               aria-label="Discord channels"
-              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl bg-[var(--card)] shadow-card py-1"
               style={{ transformOrigin: "top" }}
-              variants={panelPopVariants}
+              variants={variants.panelPop}
               initial="hidden"
               animate="visible"
               exit="hidden"
-              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+              transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
             >
               {available.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-[var(--muted)]">No matches · try another channel name.</li>

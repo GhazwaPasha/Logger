@@ -1,37 +1,36 @@
 "use client";
 
+import { Switch } from "@/components/primitives/switch";
+import { cn } from "@/lib/utils";
+
+/**
+ * App toggle, now an animate-ui Switch (thumb springs across and stretches while pressed).
+ * Same props as before, so every caller keeps working.
+ */
 export function Toggle({
   checked,
   onChange,
   disabled,
   "aria-label": ariaLabel,
-  activeClassName = "bg-[var(--accent)]",
+  activeClassName,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   disabled?: boolean;
   "aria-label"?: string;
-  /** Background class applied when checked; defaults to the app accent color. */
+  /**
+   * Checked-state track classes for a brand color, written out literally so Tailwind generates them:
+   * `"data-[state=checked]:bg-[#5865F2]"`. Defaults to the primary graphite.
+   */
   activeClassName?: string;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? activeClassName : "border border-[var(--border-subtle)] bg-[var(--surface-muted)]"
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`inline-block size-5 transform rounded-full shadow-sm transition-transform duration-200 ${
-          checked ? "translate-x-[18px] bg-[var(--on-accent)]" : "translate-x-0.5 bg-white"
-        }`}
-      />
-    </button>
+      aria-label={ariaLabel}
+      className={cn(activeClassName, activeClassName && "[&_[data-slot=switch-thumb]]:bg-white!")}
+    />
   );
 }

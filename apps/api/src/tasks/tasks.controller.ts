@@ -13,6 +13,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import {
+  completionsByDayQuerySchema,
   listTasksQuerySchema,
   seriesOccurrencesQuerySchema,
   seriesSummaryQuerySchema,
@@ -80,6 +81,18 @@ export class TasksController {
     @Query() rawQuery: Record<string, string>,
   ) {
     return this.tasks.counts(user.id, organizationId, taskCountsQuerySchema.parse(rawQuery));
+  }
+
+  /** Done tasks per day (workspace time zone) for the dashboard's completions chart. */
+  @Get("completions-by-day")
+  // Short TTL: the day buckets roll over at midnight even when no task changes.
+  @OrgVersioned({ namespace: "completionsbyday", ttlSeconds: 120 })
+  completionsByDay(
+    @CurrentUser() user: RequestUser,
+    @Param("organizationId") organizationId: string,
+    @Query() rawQuery: Record<string, string>,
+  ) {
+    return this.tasks.completionsByDay(user.id, organizationId, completionsByDayQuerySchema.parse(rawQuery));
   }
 
   /** Collapsed-card stats (count + latest + last completion) per recurring chain — see {@link counts} for why this is separate from `list()`. */

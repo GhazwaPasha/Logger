@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   applyTrackerFormula,
@@ -11,25 +11,32 @@ import {
 import type { TrackerDetailResponse } from "@/hooks/useTrackers";
 import type { MemberRow } from "@/lib/ledger-types";
 import { SpringNumber } from "./SpringNumber";
-import { Segmented } from "./Segmented";
+import { Calculator, ChevronDown } from "lucide-react";
+import { Collapse } from "@/components/ui/Collapse";
+import { SmoothLineChart } from "@/components/dashboard/SmoothLineChart";
+import { Segmented } from "@/components/ui/Segmented";
 import { Avatar } from "@/components/ui/Avatar";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import {
-  PACE_DOT,
   PACE_LABEL,
   PACE_TEXT,
-  compactNumber,
   dayLabel,
   fullNumber,
   metricValue,
   periodLabel,
 } from "./tracker-format";
 
-const SPRING = { type: "spring", bounce: 0, duration: 0.5 } as const;
-const CARD_MAIN = "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4";
-const CARD_SIDE = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5";
-const CARD_TITLE = "text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
-const SECTION_LABEL = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
+/** Pace pill fill + ink. Missed check-ins are amber (needs attention), behind is red. */
+const PACE_PILL: Record<string, string> = {
+  behind: "bg-[color-mix(in_srgb,var(--danger)_13%,transparent)] text-[var(--danger)]",
+  missed: "bg-[var(--status-progress-bg)] text-[var(--status-progress-ink)]",
+  on_pace: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
+  ahead: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
+  met: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
+  none: "bg-[var(--fill-2)] text-[var(--muted)]",
+};
+/** Metric tiles take the department tints in a fixed order (input metrics only). */
+const TILE_TINTS = ["var(--dept-1-tint)", "var(--dept-3-tint)", "var(--dept-4-tint)", "var(--dept-2-tint)"];
 
 function memberName(members: MemberRow[], id: string | null) {
   if (!id) return "Unassigned";
@@ -38,7 +45,11 @@ function memberName(members: MemberRow[], id: string | null) {
 }
 
 /** One line under each metric telling the assignee what to do next. */
-function metricNote(m: TrackerMetric, s: TrackerMetricStats, metrics: TrackerMetric[], unitWord: string): string {
+/**
+ * A metric tile's status line. `short` is what the tile shows — a few words that fit one line
+ * ("267 behind · 104/day"); the long form is the tooltip, spelled out.
+ */
+function metricNote(m: TrackerMetric, s: TrackerMetricStats, metrics: TrackerMetric[], unitWord: string, short = true): string {
   if (m.kind === "formula" && m.formula) {
     const a = metrics.find((x) => x.id === m.formula!.a)?.name ?? "?";
     const b = metrics.find((x) => x.id === m.formula!.b)?.name ?? "?";
@@ -47,14 +58,17 @@ function metricNote(m: TrackerMetric, s: TrackerMetricStats, metrics: TrackerMet
   }
   if (s.target == null) return "No target";
   if (s.pace === "met") return "Target met";
-  if (s.pace === "missed") return m.direction === "at_most" ? "Over the limit" : "Target missed";
+  if (s.pace === "missed") return m.direction === "at_most" ? (short ? "Over limit" : "Over the limit") : short ? "Missed" : "Target missed";
   const d = Math.abs(s.delta ?? 0);
   const fmt = (v: number) => metricValue(m, v);
+  // Per-day needs read better whole once they're big enough to count ("104", not "104.3").
+  const perUnit = (v: number) => metricValue(m, v >= 10 ? Math.ceil(v) : Math.round(v * 10) / 10);
   if (s.pace === "behind") {
-    const need = s.neededPerUnit != null ? ` · need ${fmt(s.neededPerUnit)} a ${unitWord}` : "";
-    return `${fmt(d)} behind${need}`;
+    if (short) return s.neededPerUnit != null ? `${fmt(d)} behind · ${perUnit(s.neededPerUnit)}/${unitWord === "week" ? "wk" : "day"}` : `${fmt(d)} behind`;
+    const need = s.neededPerUnit != null ? ` · need ${fmt(s.neededPerUnit)} a ${unitWord} to catch up` : "";
+    return `${fmt(d)} behind pace${need}`;
   }
-  if (s.pace === "ahead") return `${fmt(d)} ahead of pace`;
+  if (s.pace === "ahead") return short ? `${fmt(d)} ahead` : `${fmt(d)} ahead of pace`;
   return "On pace";
 }
 
@@ -71,7 +85,6 @@ export function TrackerDetail({
   onEdit: () => void;
   onLog: (date: string, values: Record<string, number>, note: string | null) => Promise<unknown>;
 }) {
-  const reduced = useReducedMotion();
   const { stats, metrics } = detail;
   // The day the Log progress panel is on. Clicking a square or a past log moves it there.
   const [picked, setPicked] = useState<string | null>(null);
@@ -105,163 +118,122 @@ export function TrackerDetail({
         ? `Logging opens on ${periodLabel(detail.periodStart, detail.periodStart).split(" – ")[0]}.`
         : `Only ${memberName(members, detail.assigneeId)} or a manager can log here.`;
 
+  const paceKey = missedFirst ? "missed" : stats.pace;
+  const unitsLeft = Math.max(0, stats.totalUnits - stats.elapsedUnits);
+
   return (
-    <div className="flex min-w-0 flex-col gap-5 xl:flex-row xl:items-start">
-      {/* ───────────── Main column ───────────── */}
-      <div className="min-w-0 flex-1 space-y-4">
-        <div className={`${CARD_MAIN} space-y-4`}>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className={CARD_TITLE}>Tracker</h3>
-            {detail.canManage && (
-              <button
-                type="button"
-                onClick={onEdit}
-                className="inline-flex items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-medium text-[var(--muted)] transition-[color,transform] duration-150 hover:text-[var(--fg)] active:scale-[0.97]"
-              >
-                Edit tracker
-              </button>
-            )}
-          </div>
-          <h1 className="border-b border-[var(--border-subtle)] pb-1.5 text-2xl font-semibold leading-snug text-[var(--fg)]">
-            {detail.name}
-          </h1>
-
-          {/* The details, merged into the tracker card as one row. */}
-          <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4">
-            <div className="min-w-0">
-              <span className={SECTION_LABEL}>Status</span>
-              <span
-                className={`inline-flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm font-semibold ${
-                  missedFirst ? "text-amber-600 dark:text-amber-400" : PACE_TEXT[stats.pace]
-                }`}
-              >
-                <span className={`size-2 rounded-full ${missedFirst ? "bg-amber-500" : PACE_DOT[stats.pace]}`} />
-                {missedFirst ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
-              </span>
-            </div>
-            <div className="min-w-0">
-              <span className={SECTION_LABEL}>Assigned to</span>
-              <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2.5 text-sm font-semibold text-[var(--fg)]">
-                {assignee ? (
-                  <Avatar
-                    name={assignee.name}
-                    email={assignee.email}
-                    image={assignee.image}
-                    size="size-5"
-                    className="bg-[var(--accent-muted)] text-[9px] font-semibold text-[var(--fg)]"
-                  />
-                ) : (
-                  <span className="size-5 shrink-0 rounded-full border border-dashed border-[var(--border)]" />
-                )}
-                <span className={`truncate ${detail.assigneeId ? "" : "text-[var(--muted)]"}`}>
-                  {memberName(members, detail.assigneeId)}
-                </span>
-              </span>
-            </div>
-            <div className="min-w-0">
-              <span className={SECTION_LABEL}>Period</span>
-              <p className="truncate text-sm font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</p>
-              <p className="mt-0.5 text-xs text-[var(--muted)]">{phaseLabel}</p>
-            </div>
-            <div className="min-w-0">
-              <span className={SECTION_LABEL}>Rhythm</span>
-              <p className="text-sm font-semibold text-[var(--fg)]">{detail.checkIn === "weekly" ? "Logged weekly" : "Logged daily"}</p>
-              <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
-                Split {detail.split === "week" ? "per week" : "per working day"}
+    <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start">
+      {/* ───────────── Middle: the tracker's numbers ───────────── */}
+      <div className="min-w-0 flex-1 space-y-5 rounded-[20px] bg-[var(--card)] p-5 shadow-card sm:p-6">
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+              {assignee ? (
+                <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size="size-5" className="bg-[var(--fill-2)] text-[9px] font-semibold text-[var(--fg)]" />
+              ) : (
+                <span className="size-5 shrink-0 rounded-full shadow-[inset_0_0_0_1px_var(--line-strong)]" />
+              )}
+              <span className="truncate">
+                {memberName(members, detail.assigneeId)} · {detail.checkIn === "weekly" ? "logs weekly" : "logs daily"}
                 {detail.reminderTime ? ` · reminder ${detail.reminderTime}` : ""}
-              </p>
-            </div>
+              </span>
+            </p>
+            <h1 className="font-outfit mt-1 text-[26px] font-bold leading-tight tracking-[-0.025em] text-[var(--fg)]">{detail.name}</h1>
           </div>
+          <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold ${PACE_PILL[paceKey]}`}>
+            {missedFirst ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
+          </span>
+          {detail.canManage && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="pressable inline-flex h-7 shrink-0 items-center rounded-[9px] bg-[var(--fill-2)] px-3 text-[12.5px] font-semibold text-[var(--fg)] hover:bg-[var(--fill-3)]"
+            >
+              Edit
+            </button>
+          )}
         </div>
 
-        <div className={`${CARD_MAIN} space-y-4`}>
-          <h3 className={CARD_TITLE}>Progress</h3>
-          <div
-            className="grid grid-cols-1 gap-y-4 sm:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
-            style={{ "--cols": Math.min(4, metrics.length) } as CSSProperties}
-          >
-            {metrics.map((m, i) => {
-              const s = stats.metrics[i]!;
-              const pct = s.target ? Math.min(1, Math.max(0, (s.value ?? 0) / s.target)) : 0;
-              return (
-                <div key={m.id} className={`min-w-0 sm:px-5 ${i === 0 ? "sm:pl-0" : "sm:border-l sm:border-[var(--border-subtle)]"}`}>
-                  <p className={SECTION_LABEL}>
-                    {m.name}
-                    {m.kind === "formula" && <span className="font-normal normal-case tracking-normal opacity-70"> · calculated</span>}
-                  </p>
-                  <p className="flex items-baseline gap-1.5">
-                    <SpringNumber
-                      value={s.value}
-                      format={(v) => metricValue(m, v)}
-                      className="text-[28px] font-semibold leading-none tracking-[-0.02em] text-[var(--fg)]"
-                    />
-                    {s.target != null && (
-                      <span className="text-[13px] text-[var(--muted)]">
-                        / {m.direction === "at_most" ? "≤ " : m.kind === "formula" ? "≥ " : ""}
-                        {metricValue(m, s.target)}
-                      </span>
-                    )}
-                  </p>
-                  {m.kind === "input" && s.target != null ? (
-                    <div className="relative mt-3 h-[3px] rounded-full bg-[var(--border)]">
-                      <motion.div
-                        className="absolute inset-y-0 left-0 rounded-full bg-[var(--fg)]"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${pct * 100}%` }}
-                        transition={reduced ? { duration: 0 } : SPRING}
-                      />
-                      <div
-                        className={`absolute -top-1 h-[11px] w-[1.5px] rounded-full ${s.pace === "behind" || s.pace === "missed" ? "bg-red-500" : "bg-emerald-500"}`}
-                        style={{ left: `${stats.progress * 100}%` }}
-                        title="Where you should be by now"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-[15px]" />
+        {/* The line chart leads: its readout is the headline number (so far vs target, ahead/behind). */}
+        <TrackerChart detail={detail} mode={chartMode} onModeChange={setChartMode} />
+
+        {/* Period: one quiet line under the chart. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
+          <span className="font-semibold text-[var(--muted)]">Period</span>
+          <span className="font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</span>
+          <div className="h-1.5 min-w-[80px] flex-1 overflow-hidden rounded-full bg-[var(--fill-2)]">
+            <div className="h-full rounded-r-[3px] bg-[var(--ink-2)]" style={{ width: `${Math.min(100, stats.progress * 100)}%` }} />
+          </div>
+          <span className="text-[var(--muted)]">
+            {phaseLabel}
+            {stats.phase === "active" ? ` · ${unitsLeft} ${unitWord}${unitsLeft === 1 ? "" : "s"} left` : ""}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-2.5">
+          {metrics.map((m, i) => {
+            const st = stats.metrics[i]!;
+            return (
+              <div
+                key={m.id}
+                className="min-w-0 rounded-2xl px-4 py-3.5"
+                style={{ background: m.kind === "formula" ? "var(--fill)" : TILE_TINTS[i % TILE_TINTS.length] }}
+              >
+                <p className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--muted)]">
+                  <span className="truncate" title={m.name}>{m.name}</span>
+                  {m.kind === "formula" && (
+                    <Calculator className="ml-auto size-3.5 shrink-0 opacity-70" aria-label="Calculated" role="img">
+                      <title>Calculated</title>
+                    </Calculator>
                   )}
-                  <p className={`mt-2 text-xs ${m.kind === "formula" && s.pace === "none" ? "text-[var(--muted)]" : PACE_TEXT[s.pace]}`}>
-                    {metricNote(m, s, metrics, unitWord)}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+                </p>
+                <p className="mt-1.5 flex items-baseline gap-1.5">
+                  <SpringNumber
+                    value={st.value}
+                    format={(v) => metricValue(m, v)}
+                    className="font-outfit text-[26px] font-bold leading-none tracking-[-0.03em] text-[var(--fg)]"
+                  />
+                  {st.target != null && (
+                    <span className="text-[12.5px] text-[var(--muted)]">
+                      / {m.direction === "at_most" ? "≤ " : m.kind === "formula" ? "≥ " : ""}
+                      {metricValue(m, st.target)}
+                    </span>
+                  )}
+                </p>
+                <p
+                  className={`mt-1.5 truncate text-xs ${m.kind === "formula" && st.pace === "none" ? "text-[var(--muted)]" : PACE_TEXT[st.pace]}`}
+                  title={metricNote(m, st, metrics, unitWord, false)}
+                >
+                  {metricNote(m, st, metrics, unitWord)}
+                </p>
+              </div>
+            );
+          })}
         </div>
 
-        <div className={CARD_MAIN}>
-          <TrackerChart detail={detail} mode={chartMode} onModeChange={setChartMode} />
-        </div>
-
-        <div className={CARD_MAIN}>
-          <div className="flex items-center justify-between">
-            <h3 className={CARD_TITLE}>Logs</h3>
-            <span className="text-xs text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
+        <div className="space-y-2.5">
+          <div className="flex items-baseline justify-between">
+            <h3 className="font-outfit text-base font-semibold text-[var(--fg)]">Check-ins</h3>
+            <span className="text-[12.5px] text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
           </div>
           <CheckInStrip detail={detail} onPick={canLog ? (key) => setPicked(key) : undefined} selected={canLog ? logDate : null} />
-          <div className="text-[13px]">
-            {stats.dueKey && !stats.dueLogged && (
-              <Row label={dayLabel(stats.dueKey, stats.today)} value="Not logged yet" tone="muted" />
-            )}
-            {detail.entries.slice(0, 8).map((e) => (
-              <Row
-                key={e.id}
-                label={dayLabel(e.entryDate, stats.today)}
-                value={entrySummary(e, metrics)}
-                sub={e.userId !== detail.assigneeId ? `by ${memberName(members, e.userId)}` : (e.note ?? undefined)}
-                onClick={canLog ? () => setPicked(e.entryDate) : undefined}
-              />
-            ))}
-            {detail.entries.length === 0 && !(stats.dueKey && !stats.dueLogged) && (
-              <p className="border-t border-[var(--border-subtle)] py-2 text-[var(--muted)]">Nothing logged yet.</p>
-            )}
-          </div>
+          <p className="flex gap-4 text-xs text-[var(--muted)]">
+            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--status-done)]" />Logged</span>
+            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--danger)]" />Missed</span>
+            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--status-progress)]" />Due</span>
+          </p>
         </div>
       </div>
 
-      {/* ───────────── Right: Log progress, always open and in view while scrolling ───────────── */}
-      <aside className="w-full xl:sticky xl:top-4 xl:w-80 xl:shrink-0">
-        <div className={`${CARD_SIDE} space-y-3`}>
-          <h3 className={CARD_TITLE}>Log progress</h3>
+      {/* ───────────── Right: Log progress + recent logs, always in view ───────────── */}
+      <aside className="w-full space-y-4 xl:sticky xl:top-4 xl:w-80 xl:shrink-0">
+        <div className="space-y-4 rounded-[20px] bg-[var(--card)] p-5 shadow-card">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-outfit text-[17px] font-semibold text-[var(--fg)]">Log progress</h3>
+            {stats.dueKey && !stats.dueLogged && canLog ? (
+              <span className="inline-flex h-6 items-center rounded-full bg-[var(--status-progress-bg)] px-2.5 text-xs font-semibold text-[var(--status-progress-ink)]">Due</span>
+            ) : null}
+          </div>
           {canLog && stats.phase !== "upcoming" && logDate ? (
             <CheckInForm
               key={logDate}
@@ -275,7 +247,52 @@ export function TrackerDetail({
             <p className="text-sm text-[var(--muted)]">{canLog && !logDate ? "Nothing to log right now." : cannotLogReason}</p>
           )}
         </div>
+
+        <RecentLogs count={detail.entries.length}>
+            <div className="text-[13px]">
+              {stats.dueKey && !stats.dueLogged && (
+                <Row label={dayLabel(stats.dueKey, stats.today)} value="Not logged yet" tone="muted" />
+              )}
+              {detail.entries.slice(0, 8).map((e) => (
+                <Row
+                  key={e.id}
+                  label={dayLabel(e.entryDate, stats.today)}
+                  value={entrySummary(e, metrics)}
+                  sub={e.userId !== detail.assigneeId ? `by ${memberName(members, e.userId)}` : (e.note ?? undefined)}
+                  onClick={canLog ? () => setPicked(e.entryDate) : undefined}
+                />
+              ))}
+              {detail.entries.length === 0 && !(stats.dueKey && !stats.dueLogged) && (
+                <p className="py-2 text-[var(--muted)]">Nothing logged yet.</p>
+              )}
+            </div>
+        </RecentLogs>
       </aside>
+    </div>
+  );
+}
+
+/** Recent logs in their own card, collapsed until you want them. */
+function RecentLogs({ count, children }: { count: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-[20px] bg-[var(--card)] shadow-card">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="pressable flex w-full items-center gap-2 rounded-[20px] px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+      >
+        <span className="font-outfit text-[15px] font-semibold text-[var(--fg)]">Recent logs</span>
+        <span className="text-[12.5px] tabular-nums text-[var(--muted)]">{count}</span>
+        <ChevronDown
+          className={`ml-auto size-4 text-[var(--muted)] transition-transform duration-300 ease-[var(--motion-respond)] ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      <Collapse open={open} className="px-5 pb-4">
+        {children}
+      </Collapse>
     </div>
   );
 }
@@ -303,7 +320,7 @@ function Row({
   return (
     <div
       onClick={onClick}
-      className={`flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] py-2 ${onClick ? "cursor-pointer hover:text-[var(--fg)]" : ""}`}
+      className={`flex items-baseline justify-between gap-3 rounded-lg px-1 py-2 ${onClick ? "cursor-pointer hover:bg-[var(--fill)]" : ""}`}
     >
       <span className="shrink-0 text-[var(--fg)]">{label}</span>
       <span className="min-w-0 truncate text-right">
@@ -328,7 +345,7 @@ function CheckInStrip({
   const upTo = detail.stats.slots.filter((s) => s.state !== "upcoming");
   const shown = upTo.slice(-42);
   return (
-    <div className="my-2.5 flex flex-wrap gap-1" aria-label="Recent logs">
+    <div className="flex flex-wrap gap-[5px]" aria-label="Check-ins">
       {shown.map((s, i) => (
         <motion.button
           key={`${detail.id}-${s.key}`}
@@ -336,23 +353,28 @@ function CheckInStrip({
           title={`${dayLabel(s.key)} · ${s.state}`}
           disabled={!onPick}
           onClick={() => onPick?.(s.key)}
-          initial={reduced ? false : { scale: 0 }}
-          animate={{ scale: 1 }}
+          initial={reduced ? false : { opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
           // The one place with a little bounce: each square "lands".
           transition={{ type: "spring", bounce: 0.35, duration: 0.4, delay: reduced ? 0 : i * 0.012 }}
-          className={`size-3 rounded-[3px] ${
+          className={`size-4 rounded-[5px] ${
             s.state === "logged"
-              ? "bg-[var(--fg)]"
+              ? "bg-[var(--status-done)]"
               : s.state === "missed"
-                ? "border border-dashed border-red-500"
-                : "border border-[var(--muted)]"
-          } ${selected === s.key ? "ring-2 ring-[var(--fg)] ring-offset-2 ring-offset-[var(--bg)]" : ""}`}
+                ? "bg-[var(--danger)]"
+                : "bg-[var(--status-progress)]"
+          } ${selected === s.key ? "ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--card)]" : ""}`}
         />
       ))}
     </div>
   );
 }
 
+/**
+ * The tracker's chart, on the same Apple principle as the dashboard's: a readout above (value so far,
+ * or the scrubbed check-in), then a clean line with a soft wash — no grid, no axis, no captions. The
+ * target pace is one quiet line; Daily/Weekly swaps the line for rounded bars, short days faded.
+ */
 function TrackerChart({
   detail,
   mode,
@@ -366,18 +388,15 @@ function TrackerChart({
   const defaultId =
     (detail.metrics.find((m) => m.kind === "input" && m.target != null) ?? detail.metrics[0])?.id ?? "";
   const [metricId, setMetricId] = useState(defaultId);
+  const [hover, setHover] = useState<number | null>(null);
   const metric = detail.metrics.find((m) => m.id === metricId) ?? detail.metrics.find((m) => m.id === defaultId);
   const slots = detail.stats.slots;
-  const W = 640;
-  const H = 130;
-  const PAD = 14;
 
   const data = useMemo(() => {
     if (!metric) return null;
     const n = Math.max(1, slots.length);
     const valuesAt = new Map(detail.entries.map((e) => [e.entryDate, e.values]));
     const f = metric.kind === "formula" ? metric.formula : null;
-    // Per slot: the metric's own value (input), or the formula applied to that slot's inputs.
     const slotValue = (vals: Record<string, number> | undefined): number | null => {
       if (!vals) return null;
       if (!f) return vals[metric.id] ?? null;
@@ -388,23 +407,30 @@ function TrackerChart({
     let runA = 0;
     let runB = 0;
     let run = 0;
-    const cumulative: { x: number; v: number }[] = f ? [] : [{ x: 0, v: 0 }];
-    const per: { x: number; v: number | null }[] = [];
+    let lastIndex = -1;
+    // One value per check-in slot; upcoming slots stay null so the axis spans the whole period.
+    const cumulative: (number | null)[] = [];
+    const per: (number | null)[] = [];
     slots.forEach((sl, i) => {
-      if (sl.state === "upcoming") return;
+      if (sl.state === "upcoming") {
+        cumulative.push(null);
+        per.push(null);
+        return;
+      }
+      lastIndex = i;
       const vals = valuesAt.get(sl.key);
       if (f) {
         runA += vals?.[f.a] ?? 0;
         runB += vals?.[f.b] ?? 0;
         const v = applyTrackerFormula(f, runA, runB);
-        if (v != null && Number.isFinite(v)) cumulative.push({ x: (i + 1) / n, v });
+        cumulative.push(v != null && Number.isFinite(v) ? v : (cumulative[i - 1] ?? 0));
       } else {
         run += vals?.[metric.id] ?? 0;
-        cumulative.push({ x: (i + 1) / n, v: run });
+        cumulative.push(run);
       }
-      per.push({ x: (i + 0.5) / n, v: slotValue(vals) });
+      per.push(slotValue(vals));
     });
-    return { cumulative, per, n };
+    return { cumulative, per, n, lastIndex };
   }, [metric, detail.entries, slots]);
 
   if (!metric || !data) return null;
@@ -413,48 +439,68 @@ function TrackerChart({
   const target = metric.target;
   const atMost = metric.direction === "at_most";
   const stat = detail.stats.metrics.find((x) => x.metricId === metric.id);
-  // A logged metric is paced against a line rising to the target; a calculated one against the target itself.
   const perTarget = target == null ? null : isFormula ? target : target / data.n;
   const meets = (v: number, goal: number) => (atMost ? v <= goal : v >= goal);
+  const hasData = data.lastIndex >= 0;
 
-  const cumValues = data.cumulative.map((pt) => pt.v);
-  const maxC = Math.max(target ?? 0, ...cumValues, 1) * 1.08;
-  const perValues = data.per.map((pt) => pt.v ?? 0);
-  const maxP = Math.max(perTarget ?? 0, ...perValues, 1) * 1.15;
-  const x = (fr: number) => fr * W;
-  const yC = (v: number) => H - PAD - (v / maxC) * (H - PAD * 2);
-  const yP = (v: number) => H - (v / maxP) * (H - PAD);
-  const path = data.cumulative.map((pt, i) => `${i ? "L" : "M"}${x(pt.x).toFixed(1)},${yC(pt.v).toFixed(1)}`).join(" ");
-  const last = data.cumulative[data.cumulative.length - 1];
-  const barW = Math.max(2, Math.min(18, (W / data.n) * 0.6));
+  // Where the target says you should be at slot i: a rising pace line, or the flat target for a ratio.
+  const goalAt = (i: number) => (target == null ? null : isFormula ? target : (target * (i + 1)) / data.n);
+  const series = mode === "cumulative" ? data.cumulative : data.per;
+  const guide =
+    mode === "cumulative" ? (target == null ? null : data.cumulative.map((_, i) => goalAt(i))) : perTarget;
 
-  // Variance at the latest point: vs the pace line for logged metrics, vs the target for calculated ones.
-  const goalNow =
-    target == null || !last ? null : isFormula ? target : target * last.x;
-  const variance = goalNow == null || !last ? null : atMost ? goalNow - last.v : last.v - goalNow;
+  const at = hover ?? data.lastIndex;
+  const shownValue = !hasData
+    ? null
+    : hover == null && mode === "cumulative"
+      ? (stat?.value ?? data.cumulative[at])
+      : series[at];
+  const goalNow = mode === "cumulative" ? (hasData ? goalAt(at) : null) : perTarget;
+  const variance = goalNow == null || shownValue == null ? null : atMost ? goalNow - shownValue : shownValue - goalNow;
   const good = variance != null && variance >= 0;
   const varianceText =
     variance == null
       ? null
-      : isFormula
-        ? `${metricValue(metric, Math.abs(variance))} ${good ? (atMost ? "under" : "above") : atMost ? "over" : "below"} target`
-        : `${metricValue(metric, Math.abs(variance))} ${good ? "ahead of" : "behind"} pace`;
-  const tone = good ? "var(--chart-good, #10b981)" : "var(--chart-bad, #ef4444)";
+      : mode === "per" || isFormula
+        ? `${metricValue(metric, Math.abs(variance))} ${good ? (atMost ? "under" : "over") : atMost ? "over" : "short"}`
+        : `${metricValue(metric, Math.abs(variance))} ${good ? "ahead" : "behind"}`;
+
+  const slotName = (i: number) => {
+    const key = slots[i]?.key;
+    if (!key) return "";
+    return detail.checkIn === "weekly" ? `Week of ${dayLabel(key)}` : dayLabel(key, detail.stats.today);
+  };
+  const caption =
+    hover != null
+      ? slotName(hover)
+      : mode === "cumulative"
+        ? isFormula
+          ? "Running so far"
+          : "So far"
+        : hasData
+          ? slotName(data.lastIndex)
+          : "No check-ins yet";
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Segmented
-            value={metric.id}
-            onChange={setMetricId}
-            aria-label="Metric to chart"
-            options={detail.metrics.map((m) => ({ value: m.id, label: m.name }))}
-          />
-        </div>
         <Segmented
+          size="sm"
+          value={metric.id}
+          onChange={(v) => {
+            setMetricId(v);
+            setHover(null);
+          }}
+          aria-label="Metric to chart"
+          options={detail.metrics.map((m) => ({ value: m.id, label: m.name }))}
+        />
+        <Segmented
+          size="sm"
           value={mode}
-          onChange={onModeChange}
+          onChange={(v) => {
+            onModeChange(v);
+            setHover(null);
+          }}
           aria-label="Chart view"
           options={[
             { value: "cumulative", label: isFormula ? "Running" : "Cumulative" },
@@ -463,92 +509,60 @@ function TrackerChart({
         />
       </div>
 
-      <p className="mt-2 text-xs text-[var(--muted)]">
-        <span className="font-semibold text-[var(--fg)]">{metricValue(metric, stat?.value ?? last?.v ?? null)}</span>
-        {target != null ? ` of ${atMost ? "≤ " : isFormula ? "≥ " : ""}${metricValue(metric, target)}` : " · no target"}
-        {mode === "cumulative" && varianceText ? (
-          <span className={good ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}> · {varianceText}</span>
-        ) : null}
-        {isFormula && metric.formula ? <span> · {formulaText(metric, detail.metrics)}</span> : null}
-      </p>
+      {/* Readout: follows the scrub, like the dashboard chart. */}
+      <div className="mt-3 min-h-[58px]" aria-live="polite">
+        <p className="text-[12px] font-semibold text-[var(--muted)]">{caption}</p>
+        <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="font-outfit text-[34px] font-bold leading-none tracking-[-0.035em] tabular-nums">
+            {shownValue == null ? "—" : metricValue(metric, shownValue)}
+          </span>
+          {goalNow != null ? (
+            <span className="text-sm tabular-nums text-[var(--muted)]">
+              of {atMost ? "≤ " : ""}
+              {metricValue(metric, goalNow)}
+            </span>
+          ) : (
+            <span className="text-sm text-[var(--muted)]">no target</span>
+          )}
+          {varianceText ? (
+            <span
+              className={
+                "ml-1 inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold tabular-nums " +
+                (good
+                  ? "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]"
+                  : "bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)]")
+              }
+            >
+              {good ? "↑" : "↓"} {varianceText}
+            </span>
+          ) : null}
+        </p>
+      </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-[130px] w-full overflow-visible" role="img" aria-label={`${metric.name} over time`}>
-        <line x1={0} y1={H - (mode === "cumulative" ? PAD : 0)} x2={W} y2={H - (mode === "cumulative" ? PAD : 0)} stroke="var(--border)" strokeWidth={0.5} />
-        {mode === "cumulative" ? (
-          <g key={`c-${detail.id}-${metric.id}`}>
-            {target != null && (
-              <>
-                <line
-                  x1={0}
-                  y1={isFormula ? yC(target) : yC(0)}
-                  x2={W}
-                  y2={yC(target)}
-                  stroke="var(--muted)"
-                  strokeWidth={1}
-                  strokeDasharray="3 4"
-                  opacity={0.7}
-                />
-                <text x={W} y={yC(target) - 6} textAnchor="end" className="fill-[var(--muted)] text-[11px]">
-                  target {compactNumber(target)}
-                </text>
-              </>
-            )}
-            {path && (
-              <motion.path
-                d={path}
-                fill="none"
-                stroke="var(--fg)"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                initial={reduced ? false : { pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: reduced ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
-              />
-            )}
-            {last && goalNow != null && (
-              // The variance itself: a bracket from where you are to where the target says you should be.
-              <line x1={x(last.x)} y1={yC(last.v)} x2={x(last.x)} y2={yC(goalNow)} stroke={tone} strokeWidth={1.5} strokeDasharray="2 2" />
-            )}
-            {last && <circle cx={x(last.x)} cy={yC(last.v)} r={3.5} fill={goalNow == null ? "var(--fg)" : tone} />}
-            {!last && (
-              <text x={W / 2} y={H / 2} textAnchor="middle" className="fill-[var(--muted)] text-[12px]">
-                Nothing logged yet
-              </text>
-            )}
-          </g>
+      <div className="relative mt-1 h-[180px]">
+        {hasData ? (
+          <SmoothLineChart
+            key={`${detail.id}-${metric.id}-${mode}`}
+            values={series}
+            lastIndex={data.lastIndex}
+            variant={mode === "cumulative" ? "line" : "bars"}
+            guide={guide}
+            muted={mode === "per" && perTarget != null ? data.per.map((v) => v != null && !meets(v, perTarget)) : undefined}
+            color="var(--dept-1)"
+            hover={hover}
+            onHover={setHover}
+            reduce={!!reduced}
+            ariaLabel={`${metric.name} over time`}
+            startLabel={slots[0] ? dayLabel(slots[0].key) : ""}
+            endLabel={slots.length ? dayLabel(slots[slots.length - 1].key, detail.stats.today) : ""}
+          />
         ) : (
-          <g key={`p-${detail.id}-${metric.id}`}>
-            {perTarget != null && (
-              <>
-                <line x1={0} y1={yP(perTarget)} x2={W} y2={yP(perTarget)} stroke="var(--muted)" strokeDasharray="3 4" opacity={0.7} />
-                <text x={W} y={yP(perTarget) - 6} textAnchor="end" className="fill-[var(--muted)] text-[11px]">
-                  {isFormula ? "target" : detail.checkIn === "weekly" ? "weekly share" : "daily share"} {compactNumber(perTarget)}
-                </text>
-              </>
-            )}
-            {data.per.map((pt, i) => {
-              if (pt.v == null) return null;
-              const h = Math.max(pt.v > 0 ? 2 : 0, H - yP(pt.v));
-              // Bars that met their share (or the target) are solid; the ones that fell short are faded.
-              const ok = perTarget == null || meets(pt.v, perTarget);
-              return (
-                <motion.rect
-                  key={i}
-                  x={x(pt.x) - barW / 2}
-                  width={barW}
-                  rx={2}
-                  fill="var(--fg)"
-                  opacity={ok ? 1 : 0.35}
-                  initial={reduced ? false : { height: 0, y: H }}
-                  animate={{ height: h, y: H - h }}
-                  transition={reduced ? { duration: 0 } : { type: "spring", bounce: 0, duration: 0.45, delay: i * 0.01 }}
-                />
-              );
-            })}
-          </g>
+          <p className="grid h-full place-items-center text-sm text-[var(--muted)]">Nothing logged yet</p>
         )}
-      </svg>
+      </div>
+      {isFormula && metric.formula ? (
+        <p className="mt-2 text-[12px] text-[var(--muted)]">{formulaText(metric, detail.metrics)}</p>
+      ) : null}
     </div>
   );
 }
@@ -618,7 +632,7 @@ function CheckInForm({
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <span className="text-xs font-semibold text-[var(--muted)]">
             {detail.checkIn === "weekly" ? "Week of" : "Day"}
           </span>
           {/* The app's own dropdown, styled like the task page's pickers. */}
@@ -675,9 +689,9 @@ function CheckInForm({
       />
       <div className="flex items-center justify-end gap-3 pt-1">
         {error ? (
-          <span className="mr-auto text-[13px] text-red-600 dark:text-red-400">{error}</span>
+          <span className="mr-auto text-[13px] text-[var(--danger)] dark:text-[var(--danger)]">{error}</span>
         ) : saved ? (
-          <span className="mr-auto text-[13px] text-emerald-600 dark:text-emerald-400">Saved</span>
+          <span className="mr-auto text-[13px] text-[var(--success)] dark:text-[var(--success)]">Saved</span>
         ) : null}
         <button
           type="button"

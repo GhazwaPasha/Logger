@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Dept, ListRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
 
 /** Level / department chip — quieter label color than the list chip. */
 const LEVEL_CHIP_CLASS =
@@ -203,13 +203,13 @@ export function TaskLevelListField({
               id={optionsId}
               role="listbox"
               aria-label={mode === "picking-level" ? `${NODE_LABELS.level}s` : `${NODE_LABELS.list}s`}
-              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+              className="absolute z-[60] mt-1 max-h-52 w-full overflow-auto rounded-xl bg-[var(--card)] shadow-card py-1"
               style={{ transformOrigin: "top" }}
-              variants={panelPopVariants}
+              variants={variants.panelPop}
               initial="hidden"
               animate="visible"
               exit="hidden"
-              transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
+              transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
             >
               {mode === "picking-level" ? (
                 deptOptions.length === 0 ? (

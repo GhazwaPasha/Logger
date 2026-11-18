@@ -66,6 +66,11 @@ export class TasksService {
     return this.authz.listRecurringSeriesSummaries(userId, organizationId, opts);
   }
 
+  /** Done tasks per day for the dashboard chart — see {@link AuthorizationService.countCompletionsByDay}. */
+  async completionsByDay(userId: string, organizationId: string, opts: { days: number; timeZone?: string }) {
+    return { days: await this.authz.countCompletionsByDay(userId, organizationId, opts) };
+  }
+
   /** Full occurrence list for one recurring chain — fetched only when its card is expanded. */
   async seriesOccurrences(
     userId: string,

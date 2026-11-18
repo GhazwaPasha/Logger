@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/ServiceWorkerRegister";
 import { BootProvider } from "@/components/app/BootProvider";
+import { MotionProvider } from "@/components/app/MotionProvider";
 import { getPublicSiteOrigin } from "@/lib/public-site-url";
 import "@/lib/fontawesome-config";
 import "./globals.css";
@@ -54,7 +55,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#27272a",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ECECEF" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+  ],
   viewportFit: "cover",
 };
 
@@ -75,7 +79,9 @@ export default function RootLayout({
       </head>
       <body className={`${dmSans.variable} ${jetbrains.variable} ${outfit.variable} antialiased`}>
         <ServiceWorkerRegister />
-        <BootProvider>{children}</BootProvider>
+        <MotionProvider>
+          <BootProvider>{children}</BootProvider>
+        </MotionProvider>
       </body>
     </html>
   );

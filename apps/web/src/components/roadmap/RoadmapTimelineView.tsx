@@ -8,6 +8,7 @@ import { STATUS_BAR_CLASS, formatRange, milestoneDepthStyle } from "@/lib/roadma
 import { buildTicks, clampZoomLevel, computeNaturalRange, fitZoomToRange, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
 import { ZoomLevelSwitch } from "@/components/roadmap/ZoomLevelSwitch";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
+import { Collapse, CollapseRows } from "@/components/ui/Collapse";
 
 type TimelineRow = { milestone: MilestoneRow; depth: number };
 
@@ -206,7 +207,7 @@ function GoalTimelineCard({
           </button>
           <button
             type="button"
-            className="min-w-0 truncate text-left text-xs font-semibold uppercase tracking-wide text-[var(--fg)] hover:underline"
+            className="min-w-0 truncate text-left text-xs font-semibold text-[var(--fg)] hover:underline"
             onClick={() => onEditGoal(goal)}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -264,11 +265,12 @@ function GoalTimelineCard({
         </div>
       </div>
 
-      {!isExpanded ? (
+      <Collapse open={!isExpanded}>
         <p className="px-1 text-xs text-[var(--muted)]">
           {allRows.length} milestone{allRows.length === 1 ? "" : "s"} — click the arrow to show them.
         </p>
-      ) : (
+      </Collapse>
+      <Collapse open={isExpanded}>
         <div className="overflow-x-auto">
           <div
             ref={trackRef}
@@ -283,7 +285,7 @@ function GoalTimelineCard({
                 {ticks.map((t) => (
                   <span
                     key={t.pos}
-                    className="absolute top-0 whitespace-nowrap text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]"
+                    className="absolute top-0 whitespace-nowrap text-[12px] font-medium text-[var(--muted)]"
                     style={{ left: `${t.pos}%` }}
                   >
                     {t.label}
@@ -297,7 +299,8 @@ function GoalTimelineCard({
             {rows.length === 0 ? (
               <p className="px-1 py-6 text-center text-sm text-[var(--muted)]">Nothing in this window — drag, zoom out, or Reset.</p>
             ) : (
-              <div className="space-y-1.5">
+              <div>
+                <CollapseRows rowClassName="pb-1.5">
                 {rows.map(({ milestone, depth }) => {
                   const start = new Date(milestone.periodStart).getTime();
                   const end = new Date(milestone.periodEnd).getTime();
@@ -374,11 +377,12 @@ function GoalTimelineCard({
                     </div>
                   );
                 })}
+                </CollapseRows>
               </div>
             )}
           </div>
         </div>
-      )}
+      </Collapse>
     </div>
   );
 

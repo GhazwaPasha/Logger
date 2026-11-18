@@ -4,11 +4,14 @@ import Link from "next/link";
 import { DASHBOARD_WINDOW_DAYS } from "@work-ledger/contracts";
 import { motion, useReducedMotion } from "motion/react";
 import { useMemo, type ReactNode } from "react";
-import { HBarChart } from "@/components/dashboard/HBarChart";
+import { AssigneeBubbles } from "@/components/dashboard/AssigneeBubbles";
+import { CompletionsChart } from "@/components/dashboard/CompletionsChart";
+import { DepartmentTreemap } from "@/components/dashboard/DepartmentTreemap";
+import { Building2, CircleUserRound, Clock4, UserRoundX, type LucideIcon } from "lucide-react";
 import { RoadmapDashboardPanel } from "@/components/dashboard/RoadmapDashboardPanel";
 import { StatusPriorityRing } from "@/components/dashboard/StatusPriorityRing";
 import { DashboardKpiWave, HOME_KPI_TONES, type KpiTone } from "@/components/dashboard/kpi-primitives";
-import { POP_EASE } from "@/components/ui/motion-presets";
+import { SpringNumber } from "@/components/trackers/SpringNumber";
 import type { Dept, ListRow, MemberRow, TaskRow } from "@/lib/ledger-types";
 import { NODE_LABELS } from "@/lib/nodes";
 import {
@@ -26,17 +29,17 @@ import {
 const STATUS_ORDER: ManualTaskStatus[] = ["pending", "in_progress", "done", "cancelled"];
 const PRIORITY_ORDER: TaskPriority[] = ["high", "medium", "low"];
 
-/** Ring colours: the same full-strength hues as the mobile dashboard, so the meter reads at a glance. */
+/** Ring colours come from the theme tokens, so light and dark each get their own validated steps. */
 const STATUS_COLOR: Record<ManualTaskStatus, string> = {
-  pending: "#94a3b8",
-  in_progress: "#8b5cf6",
-  done: "#10b981",
-  cancelled: "#737373",
+  pending: "var(--status-pending)",
+  in_progress: "var(--status-progress)",
+  done: "var(--status-done)",
+  cancelled: "var(--status-cancelled)",
 };
 const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  high: "#f43f5e",
-  medium: "#f59e0b",
-  low: "#94a3b8",
+  high: "var(--priority-high)",
+  medium: "var(--priority-medium)",
+  low: "var(--priority-low)",
 };
 
 /** Entrance rhythm shared with mobile: each panel lands 60ms after the last. */
@@ -126,15 +129,15 @@ export function useDashboardStats(
   }, [tasks, depts, lists, currentUserId, timeZone, closed]);
 }
 
-/** One step of the page's top-to-bottom entrance: fade up 10px, 60ms after the step before it. */
+/** One step of the page's top-to-bottom entrance: flies up 24px on a spring, 60ms after the step before it. */
 export function Seq({ index, className, children }: { index: number; className?: string; children: ReactNode }) {
   const reduced = useReducedMotion();
   return (
     <motion.div
       className={className}
-      initial={reduced ? false : { opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: SEQUENCE_ENTER_S, delay: index * SEQUENCE_STEP_S, ease: POP_EASE }}
+      initial={reduced ? false : { opacity: 0, transform: "translateY(24px)" }}
+      animate={{ opacity: 1, transform: "translateY(0px)" }}
+      transition={{ type: "spring", duration: 0.55, bounce: 0.1, delay: index * SEQUENCE_STEP_S }}
     >
       {children}
     </motion.div>
@@ -152,7 +155,7 @@ function KpiCard({
   href?: string;
   children: ReactNode;
 }) {
-  const className = `dashboard-kpi-card ${tone.toneClass} flex h-full min-h-[7.5rem] flex-col rounded-2xl p-3 no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] sm:p-3.5`;
+  const className = `dashboard-kpi-card pressable ${tone.toneClass} flex h-full min-h-[8.25rem] flex-col rounded-[18px] p-4 no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sheet)]`;
   const body = (
     <>
       <DashboardKpiWave back={tone.waveBack} front={tone.waveFront} />
@@ -172,18 +175,24 @@ function KpiCard({
   );
 }
 
-const KpiLabel = ({ children }: { children: ReactNode }) => (
-  <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">{children}</p>
+const KpiLabel = ({ icon: Icon, tint, children }: { icon: LucideIcon; tint: string; children: ReactNode }) => (
+  <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--muted)]">
+    <Icon aria-hidden className="size-3.5" strokeWidth={2.4} style={{ color: tint }} />
+    {children}
+  </p>
 );
 const KpiNote = ({ children }: { children: ReactNode }) => (
-  <p className="mt-1 truncate text-[11px] text-[var(--muted)]">{children}</p>
+  <p className="mt-auto truncate pt-2 text-[12px] text-[var(--muted)]">{children}</p>
 );
-function KpiValue({ loading, className, children }: { loading: boolean; className?: string; children: ReactNode }) {
+const wholeNumber = (v: number | null) => String(Math.round(v ?? 0));
+
+/** KPI number: counts up from 0 with a spring when the data lands (same as the tracker numbers). */
+function KpiValue({ loading, className, value }: { loading: boolean; className?: string; value: number }) {
   return loading ? (
-    <span className="mt-1.5 mb-0.5 block h-8 w-11 animate-pulse rounded-lg bg-[var(--surface-muted)] motion-reduce:animate-none" />
+    <span className="mt-2.5 mb-0.5 block h-9 w-12 animate-pulse rounded-lg bg-[var(--fill-2)] motion-reduce:animate-none" />
   ) : (
-    <p className={`mt-0.5 text-[2.5rem] font-semibold leading-none tracking-tight tabular-nums ${className ?? ""}`}>
-      {children}
+    <p className={`mt-2.5 font-outfit text-[2.6rem] font-semibold leading-none tracking-[-0.03em] tabular-nums ${className ?? ""}`}>
+      <SpringNumber value={value} format={wholeNumber} />
     </p>
   );
 }
@@ -209,7 +218,7 @@ export function DashboardOverview({
 
   if (!loading && stats.empty) {
     return (
-      <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-5 text-center">
+      <div className="rounded-[18px] bg-[var(--card)] p-6 text-center shadow-card">
         <p className="text-sm font-medium text-[var(--fg)]">This workspace is empty</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
           Add {NODE_LABELS.level}s and {NODE_LABELS.list.toLowerCase()}s under Work, then create your first{" "}
@@ -226,28 +235,26 @@ export function DashboardOverview({
   const subtaskPct = stats.subtasksTotal > 0 ? Math.round((stats.subtasksDone / stats.subtasksTotal) * 100) : 0;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+    <div className="space-y-3.5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard tone={rose} index={1} href={workHref(basePath, { status: "late" })}>
-          <KpiLabel>Overdue</KpiLabel>
-          <KpiValue loading={loading} className={stats.overdue > 0 ? "text-red-600 dark:text-red-400" : undefined}>
-            {stats.overdue}
-          </KpiValue>
+          <KpiLabel icon={Clock4} tint="var(--danger)">Overdue</KpiLabel>
+          <KpiValue loading={loading} className={stats.overdue > 0 ? "text-[var(--danger)]" : undefined} value={stats.overdue} />
           <KpiNote>Past their due date</KpiNote>
         </KpiCard>
         <KpiCard tone={gold} index={2} href={workHref(basePath, { unassigned: "1" })}>
-          <KpiLabel>Unassigned</KpiLabel>
-          <KpiValue loading={loading}>{stats.unassigned}</KpiValue>
+          <KpiLabel icon={UserRoundX} tint="var(--status-progress)">Unassigned</KpiLabel>
+          <KpiValue loading={loading} value={stats.unassigned} />
           <KpiNote>Waiting for an owner</KpiNote>
         </KpiCard>
         <KpiCard tone={periwinkle} index={3} href={currentUserId ? workHref(basePath, { mine: "1" }) : undefined}>
-          <KpiLabel>Assigned to me</KpiLabel>
-          <KpiValue loading={loading}>{stats.mine}</KpiValue>
+          <KpiLabel icon={CircleUserRound} tint="var(--dept-1)">Assigned to me</KpiLabel>
+          <KpiValue loading={loading} value={stats.mine} />
           <KpiNote>On your plate</KpiNote>
         </KpiCard>
         <KpiCard tone={peach} index={4}>
-          <KpiLabel>Workspace</KpiLabel>
-          <dl className="mt-1.5 grid grid-cols-3 gap-2">
+          <KpiLabel icon={Building2} tint="var(--dept-2)">Workspace</KpiLabel>
+          <dl className="mt-2.5 grid grid-cols-3 gap-2">
             {[
               { label: "Members", value: members.length },
               { label: NODE_LABELS.levelPlural, value: depts.length },
@@ -255,11 +262,11 @@ export function DashboardOverview({
             ].map(({ label, value }) => (
               <div key={label} className="flex min-w-0 flex-col-reverse">
                 <dt className="truncate text-[11px] text-[var(--muted)]">{label}</dt>
-                <dd className="text-2xl font-semibold leading-tight tabular-nums">
+                <dd className="font-outfit text-[1.65rem] font-semibold leading-tight tracking-[-0.02em] tabular-nums">
                   {loading ? (
                     <span className="my-0.5 block h-5 w-6 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
                   ) : (
-                    value
+                    <SpringNumber value={value} format={wholeNumber} />
                   )}
                 </dd>
               </div>
@@ -268,82 +275,90 @@ export function DashboardOverview({
         </KpiCard>
       </div>
 
-      <div className="grid items-center gap-x-10 gap-y-6 py-2 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        <Seq index={5}>
-          <StatusPriorityRing
-            topTitle="Status"
-            bottomTitle="Priority"
-            topLabel="tasks"
-            bottomLabel="open"
+      <div className="grid gap-3.5 lg:grid-cols-2">
+        <Seq index={5} className="min-w-0">
+          <CompletionsChart />
+        </Seq>
+        <Seq index={6} className="min-w-0">
+          <section className="flex h-full flex-col rounded-[18px] bg-[var(--card)] p-5 shadow-card">
+            <StatusPriorityRing
+              // Done / cancelled only count the last N days; said once in the heading so row labels stay short.
+            topTitle={`Status · closed ${DASHBOARD_WINDOW_DAYS}d`}
+              bottomTitle="Priority"
+              topLabel="tasks"
+              bottomLabel="open"
+              loading={loading}
+              fillDelay={sequenceSettled(6)}
+              top={STATUS_ORDER.map((st) => ({
+                key: st,
+                label: FLOW_COLUMN_LABELS[st],
+                value: stats.workflow[st],
+                color: STATUS_COLOR[st],
+                href: workHref(basePath, { status: st }),
+              }))}
+              bottom={PRIORITY_ORDER.map((p) => ({
+                key: p,
+                label: PRIORITY_LABELS[p],
+                value: stats.priority[p],
+                color: PRIORITY_COLOR[p],
+              }))}
+            />
+          </section>
+        </Seq>
+      </div>
+
+      <div className="grid gap-3.5 lg:grid-cols-2">
+        <Seq index={7} className="min-w-0">
+          <DepartmentTreemap
+            title={`Open by ${NODE_LABELS.level.toLowerCase()}`}
+            total={`${stats.open} open`}
+            emptyLabel={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet.`}
             loading={loading}
-            fillDelay={sequenceSettled(5)}
-            top={STATUS_ORDER.map((st) => ({
-              key: st,
-              label: st === "done" || st === "cancelled" ? `${FLOW_COLUMN_LABELS[st]} · ${DASHBOARD_WINDOW_DAYS}d` : FLOW_COLUMN_LABELS[st],
-              value: stats.workflow[st],
-              color: STATUS_COLOR[st],
-              href: workHref(basePath, { status: st }),
-            }))}
-            bottom={PRIORITY_ORDER.map((p) => ({
-              key: p,
-              label: PRIORITY_LABELS[p],
-              value: stats.priority[p],
-              color: PRIORITY_COLOR[p],
+            items={depts.map((d, i) => ({
+              key: d.id,
+              label: d.name,
+              value: stats.byDept.get(d.id) ?? 0,
+              href: workHref(basePath, { level: d.id }),
+              colorIndex: i,
             }))}
           />
         </Seq>
-
-        <div className="space-y-5">
-          <Seq index={6}>
-            <HBarChart
-              title={`By ${NODE_LABELS.level.toLowerCase()}`}
-              total={`${stats.open} open`}
-              color="#8b5cf6"
-              emptyLabel={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet.`}
-              loading={loading}
-              growDelay={sequenceSettled(6) * 1000}
-              rows={depts.map((d) => ({
-                key: d.id,
-                label: d.name,
-                value: stats.byDept.get(d.id) ?? 0,
-                href: workHref(basePath, { level: d.id }),
-              }))}
-            />
-          </Seq>
-          <Seq index={7}>
-            <HBarChart
-              title="Assignee load"
-              total="open tasks"
-              color="#0ea5e9"
-              emptyLabel="Nobody is assigned yet."
-              loading={loading}
-              growDelay={sequenceSettled(7) * 1000}
-              rows={stats.topAssignees.map(([id, n]) => {
-                const m = memberById.get(id);
-                return {
-                  key: id,
-                  label: m?.name?.trim() || m?.email || "Someone",
-                  value: n,
-                  href: workHref(basePath, { assignee: id }),
-                  avatar: { name: m?.name, email: m?.email, image: m?.image },
-                };
-              })}
-            />
-          </Seq>
-        </div>
+        <Seq index={8} className="min-w-0">
+          <AssigneeBubbles
+            title="Assignee load"
+            total="open tasks"
+            emptyLabel="Nobody is assigned yet."
+            loading={loading}
+            items={stats.topAssignees.map(([id, n]) => {
+              const m = memberById.get(id);
+              return {
+                key: id,
+                label: m?.name?.trim() || m?.email || "Someone",
+                value: n,
+                href: workHref(basePath, { assignee: id }),
+                avatar: { name: m?.name, email: m?.email, image: m?.image },
+              };
+            })}
+          />
+        </Seq>
       </div>
 
-      <Seq index={8} className="space-y-2.5">
+      <Seq index={9} className="space-y-2.5">
         {stats.subtasksTotal > 0 ? (
-          <div className="px-1">
+          <div className="rounded-[18px] bg-[var(--card)] p-5 shadow-card">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="font-outfit text-base font-semibold tracking-tight">Checklist progress</h2>
               <span className="text-xs tabular-nums text-[var(--muted)]">
-                {stats.subtasksDone}/{stats.subtasksTotal} · {subtaskPct}%
+                {stats.subtasksDone} of {stats.subtasksTotal} subtasks · {subtaskPct}%
               </span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
-              <div className="h-full rounded-full bg-emerald-500 transition-[width]" style={{ width: `${subtaskPct}%` }} />
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[var(--fill)]">
+              <motion.div
+                className="h-full rounded-r-[4px] bg-[var(--status-done)]"
+                initial={{ width: 0 }}
+                animate={{ width: `${subtaskPct}%` }}
+                transition={{ type: "spring", bounce: 0, duration: 0.7, delay: sequenceSettled(9) }}
+              />
             </div>
           </div>
         ) : null}

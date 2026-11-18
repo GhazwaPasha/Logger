@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { POP_EASE } from "@/components/ui/motion-presets";
+import { curve } from "@/lib/motion";
 import { AiIcon } from "./AiIcon";
 import { useAsk, type TaskRef } from "./AskPanel";
 
@@ -56,7 +56,7 @@ export function BoardCardFrame({
       {children}
       {highlighted && !selected && (
         <span
-          className="pointer-events-none absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-sky-400 text-[var(--surface-base)] shadow-sm"
+          className="pointer-events-none absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--info-ink)] text-[var(--surface-base)] shadow-sm"
           title="Mentioned in Ask LogBase"
           aria-hidden
         >
@@ -105,7 +105,7 @@ export function SelectionAskBar({ selection, onClear }: { selection: TaskRef[]; 
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          transition={{ duration: reduceMotion ? 0 : 0.18, ease: POP_EASE }}
+          transition={{ duration: reduceMotion ? 0 : 0.18, ease: curve.respond }}
           className="pointer-events-none fixed bottom-5 left-0 z-50 flex justify-center px-4 md:left-72"
           style={{ right: "var(--ask-pane-w, 0px)" }}
         >

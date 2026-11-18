@@ -12,7 +12,7 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { LedgerLineDescription } from "@/components/tasks/LedgerLineDescription";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { backdropVariants, motionDuration } from "@/components/ui/motion-presets";
+import { reducedDuration, variants } from "@/lib/motion";
 import type { OrgActivityLedgerRow } from "@/lib/ledger-types";
 import { isLedgerEntryNotifiableToUser } from "@work-ledger/contracts";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
@@ -281,11 +281,11 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                   className="absolute inset-0 backdrop-blur-sm"
                   aria-hidden
                   onClick={() => setPanelOpen(false)}
-                  variants={backdropVariants}
+                  variants={variants.backdrop}
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  transition={{ duration: motionDuration(0.2, prefersReduced) }}
+                  transition={{ duration: reducedDuration(0.2, prefersReduced) }}
                 />
                 <motion.section
                   role="dialog"
@@ -296,7 +296,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                   initial={{ x: "100%" }}
                   animate={{ x: 0 }}
                   exit={{ x: "100%" }}
-                  transition={{ duration: motionDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: reducedDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
                 >
               <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-6">
                 <div className={NOTIF_PANEL_HEADER_ROW}>
@@ -319,7 +319,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                 {activityQuery.isPending ? (
                   <p className="text-sm text-[var(--muted)]">Loading…</p>
                 ) : activityQuery.error ? (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-sm text-[var(--danger)] dark:text-[var(--danger)]">
                     {(activityQuery.error as Error).message || "Could not load notifications"}
                   </p>
                 ) : panelEntries.length === 0 ? (

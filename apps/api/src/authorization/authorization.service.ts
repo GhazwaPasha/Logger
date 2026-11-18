@@ -477,6 +477,46 @@ export class AuthorizationService {
   }
 
   /**
+   * Done tasks per calendar day (oldest first, zero-filled) in `timeZone`, for the dashboard's
+   * completions chart. Role-scoped like every other task read, and a single grouped COUNT over a
+   * bounded window (`days` ≤ 90), so it never pulls task rows.
+   */
+  async countCompletionsByDay(
+    userId: string,
+    organizationId: string,
+    opts: { days: number; timeZone?: string },
+  ): Promise<{ date: string; count: number }[]> {
+    await this.assertOrgMember(userId, organizationId);
+    const timeZone = opts.timeZone ?? "UTC";
+    const days = Math.min(Math.max(Math.trunc(opts.days), 1), 90);
+
+    const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+    const now = Date.now();
+    const keys: string[] = [];
+    for (let i = days - 1; i >= 0; i--) keys.push(dayKey.format(new Date(now - i * 86_400_000)));
+    const totals = new Map(keys.map((k) => [k, 0]));
+
+    const roleConditions = await this.roleScopedTaskConditions(userId, organizationId);
+    if (roleConditions === null) return keys.map((date) => ({ date, count: 0 }));
+
+    // One extra day of slack so the oldest local day is fully covered whatever the offset.
+    const since = new Date(now - (days + 1) * 86_400_000);
+    const day = sql<string>`to_char(${tasks.completedAt} AT TIME ZONE ${timeZone}, 'YYYY-MM-DD')`;
+    const rows = await this.db
+      .select({ day, value: count() })
+      .from(tasks)
+      .where(and(...roleConditions, eq(tasks.status, "done"), gte(tasks.completedAt, since)))
+      // By position: the time zone is a bound parameter, so repeating the expression here would
+      // bind it again ($1 vs $2) and Postgres would treat the two as different expressions.
+      .groupBy(sql`1`);
+
+    for (const r of rows) {
+      if (totals.has(r.day)) totals.set(r.day, Number(r.value));
+    }
+    return keys.map((date) => ({ date, count: totals.get(date) ?? 0 }));
+  }
+
+  /**
    * One summary row per recurring chain (count + latest occurrence + last completion) for the
    * statuses given — powers the collapsed RecurringSeriesCard header without ever fetching the
    * chain's full occurrence list. That list is only pulled on demand, via `listTasksForUser` with

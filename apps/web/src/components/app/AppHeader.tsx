@@ -68,10 +68,10 @@ function IconSettings({ className }: { className?: string }) {
 
 /* size-5 (20px) matches the online-teammate avatars in OnlineMembersAvatars. */
 const profileShell =
-  "flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[8px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-[var(--bg-header)]";
+  "flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-[8px] font-semibold uppercase tracking-tight text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-[var(--bg-header)]";
 
 const iconBtn =
-  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
+  "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--fill)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
 
 export function AppHeader({
   workspaceSlug,
@@ -150,10 +150,10 @@ export function AppHeader({
               aria-pressed={ask.open}
               onClick={ask.toggleAsk}
             >
-              <AiIcon className="size-[1.125rem]" />
+              <AiIcon className="size-[1.125rem] text-[var(--dept-3)]" />
               {/* Quiet "working" state: a steady dot, no looping animation. */}
               {ask.running && (
-                <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-sky-400 ring-2 ring-[var(--bg-header)]" aria-hidden />
+                <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-[var(--dept-3)] ring-2 ring-[var(--bg-header)]" aria-hidden />
               )}
             </button>
           )}
@@ -167,7 +167,7 @@ export function AppHeader({
               <IconBell className="size-[1.125rem]" />
               {notifications.unreadCount > 0 ? (
                 <span
-                  className="absolute right-0.5 top-0.5 size-2 shrink-0 rounded-full bg-red-600 ring-2 ring-[var(--surface-elevated)]"
+                  className="absolute right-0.5 top-0.5 size-2 shrink-0 rounded-full bg-[var(--danger)] ring-2 ring-[var(--bg-header)]"
                   aria-hidden
                 />
               ) : null}
@@ -194,14 +194,14 @@ export function AppHeader({
                   <Avatar name={user.name} email={user.email} image={user.image} size="size-full" />
                 </button>
                 <span
-                  className="pointer-events-none absolute bottom-0 right-0 size-2 rounded-full bg-green-500 ring-1 ring-[var(--bg-header)]"
+                  className="pointer-events-none absolute bottom-0 right-0 size-2 rounded-full bg-[var(--online)] ring-1 ring-[var(--bg-header)]"
                   aria-hidden
                 />
               </div>
               {accountMenuOpen && (
                 <div
                   id="account-menu"
-                  className="ui-dropdown-pop absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg shadow-black/10 dark:shadow-black/40"
+                  className="ui-dropdown-pop absolute right-0 top-full z-50 mt-1.5 min-w-[12rem] origin-top-right rounded-xl border border-[var(--line)] bg-[var(--card-raised)] p-1 shadow-overlay"
                 >
                   {user.email && (
                     <p className="max-w-[16rem] truncate px-3 py-2 font-mono-ledger text-xs text-[var(--muted)]" title={user.email}>
@@ -211,7 +211,7 @@ export function AppHeader({
                   {settingsHref && (
                     <Link
                       href={settingsHref}
-                      className="block px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                      className="block rounded-lg px-3 py-2 text-sm text-[var(--fg)] hover:bg-[var(--fill)]"
                       onClick={closeAccountMenu}
                     >
                       Your settings
@@ -219,7 +219,7 @@ export function AppHeader({
                   )}
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--surface-hover)]"
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--fg)] hover:bg-[var(--fill)]"
                     onClick={() => {
                       closeAccountMenu();
                       void authClient.signOut();

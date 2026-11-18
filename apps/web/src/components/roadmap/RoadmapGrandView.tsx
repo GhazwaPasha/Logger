@@ -8,6 +8,7 @@ import { STATUS_BAR_CLASS, formatRange, milestoneDepthStyle } from "@/lib/roadma
 import { buildTicks, clampZoomLevel, computeNaturalRange, fitZoomToRange, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
 import { ZoomLevelSwitch } from "@/components/roadmap/ZoomLevelSwitch";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
+import { CollapseRows } from "@/components/ui/Collapse";
 
 type TimelineRow = { milestone: MilestoneRow; depth: number };
 type DisplayRow =
@@ -308,7 +309,7 @@ export function RoadmapGrandView({
                 {ticks.map((t) => (
                   <span
                     key={t.pos}
-                    className="absolute top-0 whitespace-nowrap text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]"
+                    className="absolute top-0 whitespace-nowrap text-[12px] font-medium text-[var(--muted)]"
                     style={{ left: `${t.pos}%` }}
                   >
                     {t.label}
@@ -323,7 +324,8 @@ export function RoadmapGrandView({
               <p className="px-1 py-6 text-center text-sm text-[var(--muted)]">Nothing in this window — drag, zoom out, jump to Today, or Reset.</p>
             ) : (
               /* One continuous run — each goal's master toggle row, then (if expanded) its milestone bars, no divider breaking the flow. */
-              <div className="space-y-1.5">
+              <div>
+                <CollapseRows rowClassName="pb-1.5">
                 {displayRows.map((row) => {
                   if (row.kind === "goal") {
                     const isOpen = expandedGoals.has(row.goal.id);
@@ -344,7 +346,7 @@ export function RoadmapGrandView({
                         <div className="relative h-8 flex-1 rounded-md bg-[var(--surface-muted)]">
                           <button
                             type="button"
-                            className="absolute top-1 z-[1] flex h-6 max-w-[12rem] -translate-x-full items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 transition-colors hover:bg-[var(--surface-hover)]"
+                            className="absolute top-1 z-[1] flex h-6 max-w-[12rem] -translate-x-full items-center gap-1.5 whitespace-nowrap rounded-md bg-[var(--card)] shadow-card px-2 transition-colors hover:bg-[var(--surface-hover)]"
                             style={{ left: `calc(${anchorLeft}% + 1px)` }}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={() => toggleGoal(row.goal.id)}
@@ -354,7 +356,7 @@ export function RoadmapGrandView({
                               icon={faCaretRight}
                               className={`size-3.5 shrink-0 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                             />
-                            <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--fg)]">
+                            <span className="truncate text-xs font-semibold text-[var(--fg)]">
                               {row.goal.title}
                             </span>
                           </button>
@@ -439,7 +441,7 @@ export function RoadmapGrandView({
                         {isFirstInGoal && (
                           <button
                             type="button"
-                            className="absolute top-1 z-[1] flex h-6 max-w-[12rem] -translate-x-full items-center gap-1.5 whitespace-nowrap rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 transition-colors hover:bg-[var(--surface-hover)]"
+                            className="absolute top-1 z-[1] flex h-6 max-w-[12rem] -translate-x-full items-center gap-1.5 whitespace-nowrap rounded-md bg-[var(--card)] shadow-card px-2 transition-colors hover:bg-[var(--surface-hover)]"
                             style={{ left: `calc(${left}% + 1px)` }}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={() => toggleGoal(goal.id)}
@@ -447,7 +449,7 @@ export function RoadmapGrandView({
                             title={goal.title}
                           >
                             <FontAwesomeIcon icon={faCaretRight} className="size-3.5 shrink-0 rotate-90 transition-transform duration-150" />
-                            <span className="truncate text-xs font-semibold uppercase tracking-wide text-[var(--fg)]">
+                            <span className="truncate text-xs font-semibold text-[var(--fg)]">
                               {goal.title}
                             </span>
                           </button>
@@ -469,6 +471,7 @@ export function RoadmapGrandView({
                     </div>
                   );
                 })}
+                </CollapseRows>
               </div>
             )}
           </div>

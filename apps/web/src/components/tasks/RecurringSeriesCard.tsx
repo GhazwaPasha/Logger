@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faBell } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { MemberRow } from "@/lib/ledger-types";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
 import { formatInTimeZone } from "@/lib/date";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useSeriesOccurrences, type SeriesSummaryRow } from "@/hooks/useWorkTaskStats";
+import { Collapse } from "@/components/ui/Collapse";
 
 type Props = {
   orgId: string;
@@ -64,7 +65,7 @@ function CompletionLine({ t, members, timeZone }: { t: CompletionLike; members: 
           <FontAwesomeIcon
             icon={timing.late ? faBell : faCheck}
             className={`h-[0.7em] w-[0.7em] align-[1px] ${
-              timing.late ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
+              timing.late ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--success)] dark:text-[var(--success)]"
             }`}
           />{" "}
           {timing.late ? "late" : "in time"}
@@ -105,7 +106,6 @@ function OccurrenceListSkeleton() {
  */
 export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, members, onOpenTask }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const prefersReduced = useReducedMotion();
   const { timeZone } = useWorkspaceRoute();
   const { token } = useApiSession();
 
@@ -135,7 +135,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
             {summary.latest.title}
           </button>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono-ledger text-[10px] text-[var(--muted)]">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold">
               <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
                 <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 3.75a.75.75 0 0 0-1.5 0v3.5l2.25 2.25a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.75z"/>
               </svg>
@@ -177,16 +177,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
       </div>
 
       {/* Occurrence list — fetched on demand, only while expanded */}
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            className="border-t border-[var(--border-subtle)]/50"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-            style={{ overflow: "hidden" }}
-          >
+      <Collapse open={expanded} className="border-t border-[var(--border-subtle)]/50">
             {occurrencesLoading ? (
               <OccurrenceListSkeleton />
             ) : (
@@ -237,7 +228,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                   disabled={loadingMore}
                   className={`w-full rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
                     loadMoreError
-                      ? "border-red-400/40 text-red-400 hover:bg-red-500/[0.06]"
+                      ? "border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)]"
                       : "border-[var(--border-subtle)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] disabled:opacity-60"
                   }`}
                 >
@@ -250,9 +241,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                 Showing the {occurrences.length} most recent occurrences
               </div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Collapse>
     </li>
   );
 }

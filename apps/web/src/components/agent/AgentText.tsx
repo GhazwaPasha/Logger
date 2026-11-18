@@ -98,9 +98,9 @@ const STATUS_TONE: Record<string, string> = {
   pending: "bg-[var(--muted)]",
   open: "bg-[var(--muted)]",
   assigned: "bg-[var(--muted)]",
-  in_progress: "bg-violet-400",
-  late: "bg-violet-400",
-  done: "bg-emerald-500",
+  in_progress: "bg-[var(--dept-3)]",
+  late: "bg-[var(--dept-3)]",
+  done: "bg-[var(--success)]",
   cancelled: "bg-[var(--border)]",
 };
 const STATUS_LABEL: Record<string, string> = {
@@ -138,7 +138,7 @@ function TaskMiniCard({
     <Link
       href={href}
       onClick={onNavigate}
-      className="group/mini flex items-center gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 transition-[border-color,transform] duration-150 hover:-translate-y-px hover:border-[var(--border)]"
+      className="group/mini flex items-center gap-2.5 rounded-xl bg-[var(--card)] shadow-card px-3 py-2 transition-[border-color,transform] duration-150 hover:-translate-y-px hover:border-[var(--border)]"
     >
       <span
         className={`size-2 shrink-0 rounded-full ${STATUS_TONE[info?.status ?? ""] ?? "bg-[var(--border)]"}`}
@@ -149,7 +149,7 @@ function TaskMiniCard({
         <span className="block truncate text-[13px] font-medium text-[var(--fg)]">{info?.title ?? fallbackTitle}</span>
         {(note || due) && (
           <span className="block truncate text-[11px] text-[var(--muted)]">
-            {due && <span className={overdue ? "text-red-500 dark:text-red-400" : undefined}>{overdue ? `Overdue · ${due}` : due}</span>}
+            {due && <span className={overdue ? "text-[var(--danger)] dark:text-[var(--danger)]" : undefined}>{overdue ? `Overdue · ${due}` : due}</span>}
             {due && note ? " · " : null}
             {note}
           </span>

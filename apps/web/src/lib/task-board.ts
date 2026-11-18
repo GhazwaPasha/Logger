@@ -155,25 +155,33 @@ export function taskStatusDisplayLabel(stored: BoardTaskStatus): string {
  * Light mode uses slightly stronger fills (**`/22`–`/25`**) so hues read closer to dark-theme **`/15`** on elevated surfaces.
  */
 export function statusPillPaletteClasses(st: BoardTaskStatus): string {
-  const label = "text-[var(--fg)]";
-  if (st === "pending") return `bg-slate-500/22 dark:bg-slate-500/15 ${label}`;
-  if (st === "assigned") return `bg-sky-500/22 dark:bg-sky-500/15 ${label}`;
-  if (st === "in_progress") return `bg-violet-500/22 dark:bg-violet-500/15 ${label}`;
-  if (st === "late") return `bg-orange-500/24 dark:bg-orange-500/15 ${label}`;
-  if (st === "done") return `bg-emerald-500/22 dark:bg-emerald-500/15 ${label}`;
-  if (st === "cancelled") return "bg-neutral-500/15 text-[var(--muted)]";
-  return `bg-neutral-500/15 ${label}`;
+  if (st === "pending") return "bg-[var(--status-pending-bg)] text-[var(--status-pending-ink)]";
+  if (st === "assigned") return "bg-[var(--info-bg)] text-[var(--info-ink)]";
+  if (st === "in_progress") return "bg-[var(--status-progress-bg)] text-[var(--status-progress-ink)]";
+  if (st === "late") return "bg-[color-mix(in_srgb,var(--danger)_14%,transparent)] text-[var(--danger)]";
+  if (st === "done") return "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]";
+  if (st === "cancelled") return "bg-[var(--fill)] text-[var(--ink-2)]";
+  return "bg-[var(--fill)] text-[var(--ink)]";
 }
 
 /** Text-only colors for inline status mentions (activity log); hues align with {@link statusPillPaletteClasses}. */
 export function statusLabelTextClasses(st: BoardTaskStatus): string {
-  if (st === "pending") return "text-slate-600 dark:text-slate-400";
-  if (st === "assigned") return "text-sky-600 dark:text-sky-400";
-  if (st === "in_progress") return "text-violet-600 dark:text-violet-400";
-  if (st === "late") return "text-orange-600 dark:text-orange-400";
-  if (st === "done") return "text-emerald-600 dark:text-emerald-400";
-  if (st === "cancelled") return "text-neutral-600 dark:text-neutral-400";
-  return "text-neutral-600 dark:text-neutral-400";
+  if (st === "pending") return "text-[var(--status-pending-ink)]";
+  if (st === "assigned") return "text-[var(--info-ink)]";
+  if (st === "in_progress") return "text-[var(--status-progress-ink)]";
+  if (st === "late") return "text-[var(--danger)]";
+  if (st === "done") return "text-[var(--status-done-ink)]";
+  return "text-[var(--ink-2)]";
+}
+
+/** Small status dot color (cards, legends) — same hues as the pills. */
+export function statusDotColor(st: BoardTaskStatus): string {
+  if (st === "pending") return "var(--status-pending)";
+  if (st === "assigned") return "var(--info-ink)";
+  if (st === "in_progress") return "var(--status-progress)";
+  if (st === "late") return "var(--danger)";
+  if (st === "done") return "var(--status-done)";
+  return "var(--status-cancelled)";
 }
 
 /**

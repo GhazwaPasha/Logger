@@ -6,6 +6,7 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { STATUS_DOT_CLASS, STATUS_LABELS } from "@/lib/roadmap-format";
+import { Collapse } from "@/components/ui/Collapse";
 
 export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
   const { token } = useApiSession();
@@ -35,7 +36,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
           aria-controls="dashboard-roadmap-body"
-          className="-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+          className="-m-1 flex min-w-0 flex-1 items-start gap-2 rounded-lg p-1 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
         >
           <svg
             viewBox="0 0 20 20"
@@ -50,7 +51,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
             <path d="M7 4l6 6-6 6" />
           </svg>
           <span className="min-w-0">
-            <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Roadmap</span>
+            <span className="block text-xs font-semibold text-[var(--muted)]">Roadmap</span>
             <span className="mt-0.5 block text-sm text-[var(--muted)]">
               {expanded || roadmap.isLoading
                 ? "Milestones active right now"
@@ -60,7 +61,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
         </button>
       </div>
 
-      <div id="dashboard-roadmap-body" hidden={!expanded}>
+      <Collapse open={expanded} id="dashboard-roadmap-body">
         {roadmap.isLoading ? (
           <ul className="mt-2.5 space-y-2.5" aria-hidden aria-busy>
             {[0, 1, 2].map((i) => (
@@ -83,7 +84,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
                 <Link href={`${basePath}/roadmap`} className="block">
                   <div className="flex items-center gap-2 text-sm">
                     {goalTitleById.get(m.goalId) && (
-                      <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                      <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-[11.5px] font-medium text-[var(--muted)]">
                         {goalTitleById.get(m.goalId)}
                       </span>
                     )}
@@ -103,7 +104,7 @@ export function RoadmapDashboardPanel({ basePath }: { basePath: string }) {
             ))}
           </ul>
         )}
-      </div>
+      </Collapse>
     </div>
   );
 }

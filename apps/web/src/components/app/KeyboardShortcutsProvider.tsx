@@ -31,7 +31,7 @@ function ShortcutsHelp({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-[var(--scrim)] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -51,7 +51,7 @@ function ShortcutsHelp({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group}>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+              <p className="mb-2 text-[11.5px] font-semibold text-[var(--muted)]">
                 {group}
               </p>
               <ul className="space-y-1.5">

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { motionDuration } from "./motion-presets";
+import { reducedDuration } from "@/lib/motion";
 
 type ActionShorthand = { label: string; onClick: () => void };
 
@@ -55,7 +55,7 @@ export function EmptyState({
       className={`flex flex-col items-center justify-center text-center ${s.wrap} ${className ?? ""}`}
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: motionDuration(0.28, prefersReduced) }}
+      transition={{ duration: reducedDuration(0.28, prefersReduced) }}
     >
       <span
         className={`flex shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--accent)] ${s.badge}`}

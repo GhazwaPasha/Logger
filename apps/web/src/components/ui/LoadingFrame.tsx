@@ -80,58 +80,49 @@ export function LoadingScreen({
 }
 
 const BOOT_TEXT = "Preparing your Logs";
+const BOOT_WORDS = BOOT_TEXT.split(" ");
+
+/**
+ * Sign-in mounts this screen several times in a row (boot provider → session → workspace shell →
+ * route Suspense). Only the first mount plays the entrance; a remount within this window shows the
+ * settled state at once, so the logo and words never replay or flicker between hand-offs.
+ */
+const REPLAY_WINDOW_MS = 2000;
+let lastBootShownAt = 0;
 
 /** Full-screen boot screen shown during login + session bootstrap + route load. */
 export function AppBootScreen() {
-  const [charCount, setCharCount] = useState(0);
-  const [cursor, setCursor] = useState(true);
-
+  // Decided once per mount, before paint, so the first frame already has the right class.
+  const [settled] = useState(() => Date.now() - lastBootShownAt < REPLAY_WINDOW_MS);
   useEffect(() => {
-    if (charCount >= BOOT_TEXT.length) return;
-    const t = setTimeout(() => setCharCount((c) => c + 1), 38);
-    return () => clearTimeout(t);
-  }, [charCount]);
-
-  useEffect(() => {
-    const t = setInterval(() => setCursor((v) => !v), 530);
-    return () => clearInterval(t);
+    lastBootShownAt = Date.now();
+    return () => {
+      lastBootShownAt = Date.now();
+    };
   }, []);
 
   return (
     <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--surface-base)] px-6"
+      className={`boot-screen relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--sheet)] px-6 ${settled ? "boot-screen--settled" : ""}`}
+      role="status"
       aria-busy
       aria-label={BOOT_TEXT}
     >
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-          maskImage: "radial-gradient(ellipse 75% 60% at 50% 35%, black 40%, transparent 100%)",
-          WebkitMaskImage: "radial-gradient(ellipse 75% 60% at 50% 35%, black 40%, transparent 100%)",
-        }}
-        aria-hidden
-      />
-
-      <div
-        className="task-sync-ribbon-track"
-        style={{ borderRadius: 0 }}
-        aria-hidden
-      >
-        <div className="task-sync-ribbon-thumb" />
-      </div>
-
-      <div className="ui-page-enter relative z-[1] mb-[22vh] flex w-full max-w-3xl flex-col items-center gap-5 text-center">
-        <LogBaseMark size={72} decorative />
-        <p className="font-outfit whitespace-nowrap text-[1.5rem] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--fg)] sm:text-5xl" aria-live="polite">
-          {BOOT_TEXT.slice(0, charCount)}
-          <span className="text-[var(--accent)]" aria-hidden>
-            ..
-            <span style={{ opacity: cursor ? 1 : 0 }}>.</span>
-          </span>
+      <div className="relative z-[1] mb-[18vh] flex w-full max-w-3xl flex-col items-center text-center">
+        <span className="boot-mark">
+          <LogBaseMark size={64} decorative />
+        </span>
+        <p className="font-outfit mt-6 whitespace-nowrap text-[1.75rem] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--ink)] sm:text-[2.5rem]" aria-hidden>
+          {BOOT_WORDS.map((word, i) => (
+            <span key={word} className="boot-word" style={{ "--i": i } as React.CSSProperties}>
+              {word}
+              {i < BOOT_WORDS.length - 1 ? " " : null}
+            </span>
+          ))}
         </p>
+        <span className="boot-track mt-7" aria-hidden>
+          <span className="boot-thumb" />
+        </span>
       </div>
     </div>
   );

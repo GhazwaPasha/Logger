@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSquareCheck, faClock, faUserClock, faSquareXmark } from "@fortawesome/free-solid-svg-icons";
-import { FLOW_COLUMN_LABELS, statusPillPaletteClasses, type ManualTaskStatus } from "@/lib/task-board";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/primitives/popover";
+import { FLOW_COLUMN_LABELS, statusDotColor, statusPillPaletteClasses, type ManualTaskStatus } from "@/lib/task-board";
+import { cn } from "@/lib/utils";
 
-/** Same box for every workflow stage (`max-w` keeps dropdowns compact; label truncates). */
+/** Same minimum box for every stage; grows to fit the label so it never truncates. */
 export const STATUS_PILL_LAYOUT =
-  "relative inline-flex h-8 w-[6.875rem] min-w-[6.875rem] max-w-[6.875rem] shrink-0 items-center justify-between gap-0.5 rounded-lg px-1.5";
+  "relative inline-flex h-8 min-w-[6.875rem] shrink-0 items-center justify-center rounded-full";
 
 /** Kanban card meta row: status pill is icon-only, compact. */
 export const KANBAN_STATUS_SHELL_LAYOUT =
-  "relative inline-flex h-6 w-auto min-w-[5.5rem] shrink-0 items-center rounded";
+  "relative inline-flex h-6 w-auto shrink-0 items-center rounded-full";
 
 export function StatusIcon({ status, className, size }: { status: ManualTaskStatus; className?: string; size?: number }) {
   const style = size ? { width: size, height: size } : undefined;
@@ -24,7 +23,10 @@ export function StatusIcon({ status, className, size }: { status: ManualTaskStat
   return <FontAwesomeIcon icon={faClock} className={className} style={style} aria-hidden />;
 }
 
-/** Shared status pill/dropdown control — used by the board (list/kanban cards) and the task view panel. */
+/**
+ * Shared status pill + picker (board cards and the task panel), on the animate-ui Popover:
+ * the list grows from the pill, flips at screen edges, arrow keys move, Escape closes.
+ */
 export function StatusPillSelect({
   "aria-label": ariaLabel,
   value,
@@ -45,131 +47,72 @@ export function StatusPillSelect({
   shellLayoutClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLUListElement>(null);
-  const listboxId = useId();
-  const paletteKey = value;
-  const prefersReduced = useReducedMotion();
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setMenuPos(null);
-      return;
-    }
-    const el = triggerRef.current;
-    const sync = () => {
-      const r = el.getBoundingClientRect();
-      setMenuPos({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, el.offsetWidth) });
-    };
-    sync();
-    window.addEventListener("scroll", sync, true);
-    window.addEventListener("resize", sync);
-    return () => {
-      window.removeEventListener("scroll", sync, true);
-      window.removeEventListener("resize", sync);
-    };
-  }, [open]);
+  const blocked = disabled || pending;
 
   useEffect(() => {
     if (pending) setOpen(false);
   }, [pending]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDocMouseDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  const blocked = disabled || pending;
+  function moveFocus(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[role=option]"));
+    if (!items.length) return;
+    e.preventDefault();
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[(at + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+  }
 
   return (
-    <div
-      className={`relative ${shellLayoutClassName} ${statusPillPaletteClasses(paletteKey)} ${pending ? "opacity-[0.88]" : ""}`}
-    >
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={blocked}
-        aria-expanded={open}
-        aria-busy={pending || undefined}
-        aria-haspopup="listbox"
-        aria-controls={open ? listboxId : undefined}
-        aria-label={ariaLabel}
-        id={`${listboxId}-trigger`}
-        onClick={() => {
-          if (blocked) return;
-          setOpen((o) => !o);
-        }}
-        className="absolute inset-0 z-[1] flex cursor-pointer items-center justify-center rounded-[inherit] px-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <span className="pointer-events-none truncate text-[12px] font-semibold leading-none tracking-tight">
-          {FLOW_COLUMN_LABELS[value]}
-        </span>
-      </button>
-      {typeof window !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open && menuPos && (
-              <motion.ul
-                ref={menuRef}
-                id={listboxId}
-                role="listbox"
-                style={{
-                  position: "fixed",
-                  top: menuPos.top,
-                  left: menuPos.left,
-                  minWidth: menuPos.width,
-                  zIndex: 80,
-                  transformOrigin: "top",
-                }}
-                className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 dark:bg-[var(--surface-base)]"
-                variants={panelPopVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
-              >
-                {options.map((s) => (
-                  <li key={s} role="presentation" className="px-1">
-                    <button
-                      type="button"
-                      role="option"
-                      id={`${listboxId}-opt-${s}`}
-                      aria-selected={s === value}
-                      className={`flex w-full min-w-[8rem] items-center gap-2 rounded-md px-2 py-2 text-left text-[12px] font-semibold leading-snug tracking-tight outline-none transition-colors focus-visible:bg-[var(--surface-hover)] ${
-                        s === value
-                          ? "bg-[var(--accent-muted)]/55 text-[var(--fg)]"
-                          : "text-[var(--fg)] hover:bg-[var(--surface-hover)]"
-                      }`}
-                      onClick={() => {
-                        setOpen(false);
-                        if (s !== value) onChange(s);
-                        queueMicrotask(() => triggerRef.current?.focus());
-                      }}
-                    >
-                      <StatusIcon status={s} size={16} className="opacity-70" />
-                      {FLOW_COLUMN_LABELS[s]}
-                    </button>
-                  </li>
-                ))}
-              </motion.ul>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
+    <div className={cn(shellLayoutClassName, statusPillPaletteClasses(value), pending && "opacity-[0.88]")}>
+      <Popover open={open} onOpenChange={(next) => !blocked && setOpen(next)}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={blocked}
+            aria-busy={pending || undefined}
+            aria-haspopup="listbox"
+            aria-label={ariaLabel}
+            className="pressable relative z-[1] flex h-full w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-[inherit] px-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sheet)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span className="pointer-events-none text-[12px] font-semibold leading-none tracking-tight">
+              {FLOW_COLUMN_LABELS[value]}
+            </span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          role="listbox"
+          aria-label={ariaLabel}
+          align="start"
+          sideOffset={6}
+          collisionPadding={8}
+          className="z-[80] w-auto min-w-[var(--radix-popover-trigger-width)] rounded-xl p-1"
+          onKeyDown={moveFocus}
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).querySelector<HTMLButtonElement>("[aria-selected=true]")?.focus();
+          }}
+        >
+          {options.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="option"
+              aria-selected={s === value}
+              className={cn(
+                "flex w-full min-w-[9rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-semibold leading-snug tracking-tight text-ink outline-none transition-colors focus-visible:bg-fill-2",
+                s === value ? "bg-fill-2" : "hover:bg-fill",
+              )}
+              onClick={() => {
+                setOpen(false);
+                if (s !== value) onChange(s);
+              }}
+            >
+              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: statusDotColor(s) }} />
+              {FLOW_COLUMN_LABELS[s]}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

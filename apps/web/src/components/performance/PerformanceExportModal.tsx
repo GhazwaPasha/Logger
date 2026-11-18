@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/primitives/dialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-import { POP_EASE, backdropVariants, motionDuration, sheetCardVariants } from "@/components/ui/motion-presets";
 
 export type ExportRange = { dateFrom: string; dateTo: string };
 
@@ -78,9 +76,6 @@ export function PerformanceExportModal({
   const [preset, setPreset] = useState<PresetKey>("1w");
   const [customFrom, setCustomFrom] = useState(toDateInputValue(new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)));
   const [customTo, setCustomTo] = useState(toDateInputValue(today));
-  const prefersReduced = useReducedMotion();
-
-  if (typeof document === "undefined") return null;
 
   const rangeForPreset = (key: PresetKey): ExportRange | null => {
     switch (key) {
@@ -114,35 +109,18 @@ export function PerformanceExportModal({
     onExport(range);
   };
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[130]" role="presentation">
-          <motion.div
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-            aria-hidden
-            variants={backdropVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: motionDuration(0.18, prefersReduced) }}
-            onMouseDown={busy ? undefined : onClose}
-          />
-          {/* Pinned-bottom sheet below `md`, centered dialog at `md`+ — matches ConfirmDialog. */}
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-x-0 bottom-0 z-[1] w-full rounded-t-2xl border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl shadow-black/20 md:inset-0 md:m-auto md:h-fit md:max-w-sm md:rounded-2xl md:border md:pb-6"
-            variants={sheetCardVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-          >
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose();
+      }}
+    >
+      <DialogContent showCloseButton={false} overlayClassName="z-[130]" className="z-[130] gap-0 p-6 sm:max-w-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Export</p>
-                <h2 className="mt-0.5 text-lg font-semibold text-[var(--fg)]">Performance report</h2>
+                <p className="text-xs font-semibold text-[var(--muted)]">Export</p>
+                <DialogTitle className="mt-0.5 text-lg font-semibold text-[var(--fg)]">Performance report</DialogTitle>
               </div>
               <button
                 type="button"
@@ -164,7 +142,7 @@ export function PerformanceExportModal({
                   type="button"
                   className={`rounded-lg px-3 py-2.5 text-xs font-medium transition-colors sm:py-2 ${
                     preset === p.key
-                      ? "bg-[var(--accent-muted)] text-[var(--fg)]"
+                      ? "bg-primary text-on-primary"
                       : "bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
                   }`}
                   onClick={() => setPreset(p.key)}
@@ -178,7 +156,7 @@ export function PerformanceExportModal({
             {preset === "custom" && (
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                     From
                   </label>
                   <input
@@ -190,7 +168,7 @@ export function PerformanceExportModal({
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                     To
                   </label>
                   <input
@@ -203,12 +181,12 @@ export function PerformanceExportModal({
                 </div>
               </div>
             )}
-            {invalidCustom && <p className="mt-1.5 text-xs text-red-500">Pick a valid date range.</p>}
+            {invalidCustom && <p className="mt-1.5 text-xs text-[var(--danger)]">Pick a valid date range.</p>}
 
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                className="btn-secondary rounded-xl px-4 py-2 text-sm font-medium"
+                className="pressable h-10 rounded-xl bg-fill-2 px-4 text-sm font-medium text-ink hover:bg-fill-3"
                 onClick={onClose}
                 disabled={busy}
               >
@@ -216,17 +194,14 @@ export function PerformanceExportModal({
               </button>
               <button
                 type="button"
-                className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                className="pressable h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-60"
                 onClick={handleExport}
                 disabled={busy || invalidCustom}
               >
                 {busy ? "Exporting…" : "Export CSV"}
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }

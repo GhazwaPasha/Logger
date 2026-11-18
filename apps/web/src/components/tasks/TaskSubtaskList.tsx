@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import type { SubtaskRow } from "@/lib/ledger-types";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+
+import { CollapseItem } from "@/components/ui/Collapse";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
       {children}
     </label>
   );
@@ -40,7 +41,6 @@ export function TaskSubtaskList({
   /** Id of the row whose create/update/delete is currently in flight, for a per-row spinner. */
   pendingSubtaskId?: string | null;
 }) {
-  const prefersReduced = useReducedMotion();
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingVal, setEditingVal] = useState("");
@@ -78,22 +78,14 @@ export function TaskSubtaskList({
         {ordered.length > 0 ? `Subtasks — ${doneCount}/${ordered.length} done` : "Subtasks"}
       </SectionLabel>
       {error && (
-        <p className="mb-2 text-xs text-red-600 dark:text-red-400" role="alert">
+        <p className="mb-2 text-xs text-[var(--danger)] dark:text-[var(--danger)]" role="alert">
           {error}
         </p>
       )}
-      <div className="space-y-0.5">
+      <div>
         <AnimatePresence initial={false}>
           {ordered.map((item) => (
-            <motion.div
-              key={getStableKey ? getStableKey(item.id) : item.id}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-              className="group flex items-center gap-2.5 overflow-hidden py-1.5"
-            >
+            <CollapseItem key={getStableKey ? getStableKey(item.id) : item.id} reorder className="pb-0.5"><div className="group flex items-center gap-2.5 py-1.5">
             <button
               type="button"
               disabled={disabled || rowBusy(item.id)}
@@ -144,13 +136,13 @@ export function TaskSubtaskList({
               <button
                 type="button"
                 disabled={disabled || rowBusy(item.id)}
-                className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500 disabled:opacity-50"
+                className="shrink-0 text-xs text-[var(--muted)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-[var(--danger)] disabled:opacity-50"
                 onClick={() => onDelete(item.id)}
               >
                 Remove
               </button>
             )}
-            </motion.div>
+            </div></CollapseItem>
           ))}
         </AnimatePresence>
         {!toggleOnly && (

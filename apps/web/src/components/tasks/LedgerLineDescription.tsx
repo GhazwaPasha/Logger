@@ -7,7 +7,7 @@ import { normalizeTaskStatus, statusLabelTextClasses, taskStatusDisplayLabel } f
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { AiIcon } from "@/components/agent/AiIcon";
 
-const USER_LOG_CLASS = "font-medium text-blue-600 dark:text-blue-400";
+const USER_LOG_CLASS = "font-medium text-[var(--info-ink)] dark:text-[var(--info-ink)]";
 
 function UserName({ children }: { children: string }) {
   return <span className={USER_LOG_CLASS}>{children}</span>;
@@ -54,7 +54,7 @@ type Props = {
 
 function LateBadge() {
   return (
-    <span className="ml-1 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-600 dark:text-red-400">
+    <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--danger)] dark:text-[var(--danger)]">
       Late
     </span>
   );

@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleNotch } from "@fortawesome/free-solid-svg-icons";
-import { POP_EASE, backdropVariants, motionDuration, sheetCardVariants } from "./motion-presets";
+import { useEffect, useState } from "react";
+import { LoaderCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/primitives/dialog";
+import { cn } from "@/lib/utils";
 
 export type ConfirmDialogOptions = {
   title: string;
@@ -17,6 +20,11 @@ export type ConfirmDialogOptions = {
   onConfirm: () => void | Promise<void>;
 };
 
+/**
+ * Confirmation dialog on the animate-ui Dialog: spring-in from the center, dimmed backdrop,
+ * focus trapped and returned to the trigger, Escape and outside-click close it.
+ * Same props as before, so every caller keeps working.
+ */
 export function ConfirmDialog({
   open,
   options,
@@ -26,27 +34,16 @@ export function ConfirmDialog({
   options: ConfirmDialogOptions | null;
   onClose: () => void;
 }) {
-  const titleId = useId();
-  const descId = useId();
-  const confirmRef = useRef<HTMLButtonElement>(null);
   const [pending, setPending] = useState(false);
-  const prefersReduced = useReducedMotion();
+  // Callers clear `options` the same moment they close; keep the last ones so the exit
+  // animation still shows the text instead of collapsing to an empty card.
+  const [lastOptions, setLastOptions] = useState<ConfirmDialogOptions | null>(options);
+  if (options && options !== lastOptions) setLastOptions(options);
+  const shown = options ?? lastOptions;
 
   useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    if (open) confirmRef.current?.focus();
-    else setPending(false);
+    if (!open) setPending(false);
   }, [open]);
-
-  if (typeof document === "undefined") return null;
 
   async function confirm(o: ConfirmDialogOptions) {
     if (pending) return;
@@ -66,75 +63,58 @@ export function ConfirmDialog({
     onClose();
   }
 
-  return createPortal(
-    <AnimatePresence>
-      {open && options && (
-        <div
-          className="fixed inset-0 z-[140]"
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) onClose();
+  const danger = shown?.variant !== "default";
+
+  return (
+    <Dialog
+      open={open && options != null}
+      onOpenChange={(next) => {
+        if (!next && !pending) onClose();
+      }}
+    >
+      {shown ? (
+        <DialogContent
+          role="alertdialog"
+          showCloseButton={false}
+          overlayClassName="z-[140]"
+          className="z-[140] max-w-[calc(100%-2rem)] gap-0 p-6 sm:max-w-md"
+          onOpenAutoFocus={(e) => {
+            // Land on the confirm button, like the old dialog did.
+            e.preventDefault();
+            (e.currentTarget as HTMLElement).querySelector<HTMLButtonElement>("[data-confirm]")?.focus();
           }}
         >
-          <motion.div
-            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
-            aria-hidden
-            variants={backdropVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: motionDuration(0.18, prefersReduced) }}
-          />
-          {/* Pinned-bottom sheet below `md`, centered dialog at `md`+ — same slide-up motion reads
-           * as a sheet on mobile and a subtle rise-in on desktop. */}
-          <motion.div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={descId}
-            className="fixed inset-x-0 bottom-0 z-[1] w-full rounded-t-2xl border-t border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-xl shadow-black/20 md:inset-0 md:m-auto md:h-fit md:max-w-md md:rounded-2xl md:border md:pb-6"
-            variants={sheetCardVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-          >
-            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-[var(--fg)]">
-              {options.title}
-            </h2>
-            <p id={descId} className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-              {options.description}
-            </p>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className="btn-secondary rounded-xl px-4 py-2 text-sm font-medium"
-                onClick={onClose}
-                disabled={pending}
-              >
-                {options.cancelLabel ?? "Cancel"}
-              </button>
-              <button
-                ref={confirmRef}
-                type="button"
-                disabled={pending}
-                className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] disabled:opacity-70 ${
-                  options.variant !== "default"
-                    ? "bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
-                    : "bg-[var(--accent)] hover:opacity-95 dark:border dark:border-white/10 dark:bg-zinc-700 dark:hover:bg-zinc-600"
-                }`}
-                onClick={() => void confirm(options)}
-              >
-                {pending ? (
-                  <FontAwesomeIcon icon={faCircleNotch} className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                ) : null}
-                {pending ? "Working…" : options.confirmLabel}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>,
-    document.body,
+          <DialogTitle className="text-lg font-semibold leading-snug tracking-tight text-ink">
+            {shown.title}
+          </DialogTitle>
+          <DialogDescription className="mt-2 text-sm leading-relaxed text-ink-2">
+            {shown.description}
+          </DialogDescription>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="pressable h-10 rounded-xl bg-fill-2 px-4 text-sm font-medium text-ink hover:bg-fill-3 disabled:opacity-60"
+              onClick={onClose}
+              disabled={pending}
+            >
+              {shown.cancelLabel ?? "Cancel"}
+            </button>
+            <button
+              data-confirm
+              type="button"
+              disabled={pending}
+              className={cn(
+                "pressable inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card-raised)] disabled:opacity-70",
+                danger ? "bg-danger text-white hover:opacity-90" : "bg-primary text-on-primary hover:opacity-90",
+              )}
+              onClick={() => void confirm(shown)}
+            >
+              {pending ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              {pending ? "Working…" : shown.confirmLabel}
+            </button>
+          </div>
+        </DialogContent>
+      ) : null}
+    </Dialog>
   );
 }

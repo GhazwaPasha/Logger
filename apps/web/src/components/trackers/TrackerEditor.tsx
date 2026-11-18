@@ -29,9 +29,10 @@ import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/Confir
 import { TaskFormSyncIndicator } from "@/components/tasks/TaskFormSyncIndicator";
 import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
 import { PersonSearchField } from "./PersonSearchField";
-import { Segmented } from "./Segmented";
+import { Segmented } from "@/components/ui/Segmented";
 import { compactNumber } from "./tracker-format";
 import { TRACKER_TEMPLATES, templateById, type TrackerTemplate } from "./tracker-templates";
+import { Collapse, CollapseItem } from "@/components/ui/Collapse";
 
 type MetricDraft = {
   id: string;
@@ -63,13 +64,13 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const SPRING = { type: "spring", bounce: 0, duration: 0.3 } as const;
 
 /* The task page's visual language, so both editors read as one app. */
-const SECTION_LABEL = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]";
-const CARD_MAIN = "rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4";
-const CARD_SIDE = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5";
+const SECTION_LABEL = "mb-2 block text-[12.5px] font-semibold text-[var(--muted)]";
+const CARD_MAIN = "rounded-[20px] bg-[var(--card)] p-6 shadow-card";
+const CARD_SIDE = "rounded-[20px] bg-[var(--card)] p-5 shadow-card";
 const CHIP =
-  "inline-flex h-8 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 text-sm font-semibold text-[var(--fg)] transition-[background-color,transform] duration-150 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.97]";
+  "pressable inline-flex h-9 items-center gap-2 rounded-[11px] bg-[var(--fill)] px-3.5 text-sm font-semibold text-[var(--fg)] hover:bg-[var(--fill-2)]";
 const GHOST_BTN =
-  "inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]";
+  "inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97]";
 const FIELD =
   "h-8 w-full rounded-lg border border-transparent bg-transparent px-2.5 text-sm text-[var(--fg)] outline-none transition-[background-color,border-color] duration-150 placeholder:font-normal placeholder:text-[var(--muted)] hover:border-[var(--border-subtle)] focus:border-[var(--border-subtle)] focus:bg-[var(--surface-elevated)]";
 /** Borderless and small, for pickers inside a line of text (the formula under a calculated metric). */
@@ -424,7 +425,7 @@ export function TrackerEditor({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-5">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-6">
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
 
       {/* Top bar: Back + badge on the left, actions on the right — as on the task page. */}
@@ -434,7 +435,7 @@ export function TrackerEditor({
             <FontAwesomeIcon icon={faArrowLeft} className="size-4" />
             Back
           </button>
-          <span className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
+          <span className="font-outfit text-[22px] font-bold tracking-[-0.025em] text-[var(--fg)]">
             {editing ? "Tracker" : "New tracker"}
           </span>
         </div>
@@ -448,7 +449,7 @@ export function TrackerEditor({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="hidden text-sm text-red-600 sm:inline dark:text-red-400"
+                className="hidden text-sm text-[var(--danger)] sm:inline dark:text-[var(--danger)]"
               >
                 {error}
               </motion.span>
@@ -456,29 +457,29 @@ export function TrackerEditor({
           </AnimatePresence>
           {/* Say what blocks saving in words, not only in the indicator's tooltip. */}
           {problem && sync !== "saving" ? (
-            <span className="hidden text-xs font-medium text-amber-600 sm:inline dark:text-amber-400">{problem}</span>
+            <span className="hidden text-xs font-medium text-[var(--status-progress)] sm:inline dark:text-[var(--status-progress)]">{problem}</span>
           ) : null}
           <TaskFormSyncIndicator status={sync} error={syncError} hint={problem && sync !== "saving" ? problem : null} />
           <button
             type="button"
             onClick={() => void done()}
-            className="btn-primary rounded-lg px-3 py-1.5 text-sm font-medium transition-transform duration-150 active:scale-[0.97]"
+            className="btn-primary h-10 rounded-[11px] px-4 text-sm font-semibold"
           >
             Done
           </button>
         </div>
       </div>
-      {error && <p className="text-sm text-red-600 sm:hidden dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-[var(--danger)] sm:hidden dark:text-[var(--danger)]">{error}</p>}
 
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* ───────────── Main column ───────────── */}
-        <div className="min-w-0 flex-1 space-y-4">
-          <div className={`${CARD_MAIN} space-y-4`}>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Tracker</h3>
+        <div className="min-w-0 flex-1 space-y-6">
+          <div className={`${CARD_MAIN} space-y-5`}>
+            <h3 className="font-outfit text-[17px] font-semibold text-[var(--fg)]">Tracker</h3>
 
             <div>
               <label htmlFor="tracker-name" className={SECTION_LABEL}>
-                Tracker name <span className="text-red-500">*</span>
+                Tracker name <span className="text-[var(--danger)]">*</span>
               </label>
               <input
                 id="tracker-name"
@@ -490,7 +491,7 @@ export function TrackerEditor({
                 placeholder="e.g. Sales · Q4"
                 maxLength={120}
                 aria-required
-                className="w-full border-b border-[var(--border-subtle)] bg-transparent p-0 pb-1 text-2xl font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)]"
+                className="input h-[52px] rounded-[14px] font-outfit text-[22px] font-semibold tracking-[-0.02em] placeholder:text-[var(--ink-3)]"
               />
             </div>
 
@@ -512,7 +513,7 @@ export function TrackerEditor({
                         {on && (
                           <motion.span
                             layoutId="tracker-template-pick"
-                            className="absolute -inset-px rounded-lg border border-[var(--fg)]/60"
+                            className="absolute -inset-px rounded-[11px] shadow-[0_0_0_1.5px_var(--ink)]"
                             transition={reduced ? { duration: 0 } : SPRING}
                           />
                         )}
@@ -528,7 +529,7 @@ export function TrackerEditor({
           {/* Targets */}
           <div className={`${CARD_MAIN} space-y-3`}>
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Targets</h3>
+              <h3 className="text-xs font-semibold text-[var(--muted)]">Targets</h3>
               {units > 0 && (
                 <span className="text-xs text-[var(--muted)]">
                   <span className="tabular-nums text-[var(--fg)]">{units}</span> {split === "week" ? "weeks" : "working days"} in the
@@ -537,27 +538,20 @@ export function TrackerEditor({
               )}
             </div>
 
-            <div className={`hidden gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)] sm:grid ${GRID}`}>
+            <div className={`hidden gap-2 text-xs font-semibold text-[var(--muted)] sm:grid ${GRID}`}>
               <span className="px-2.5">Metric</span>
               <span>Measured as</span>
               <span>Target</span>
               <span />
             </div>
 
-            <div className="divide-y divide-[var(--border-subtle)]">
+            <div className="divide-y divide-[var(--line)]">
               <AnimatePresence initial={false}>
                 {metrics.map((m) => {
                   const t = num(m.target);
                   const per = t != null && units > 0 && m.kind === "input" ? t / units : null;
                   return (
-                    <motion.div
-                      key={m.id}
-                      layout={!reduced}
-                      initial={reduced ? false : { opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                      transition={SPRING}
-                    >
+                    <CollapseItem key={m.id} reorder>
                       <div className={`group grid grid-cols-1 items-center gap-2 py-2 ${GRID}`}>
                         <div className="min-w-0">
                           <input
@@ -567,7 +561,7 @@ export function TrackerEditor({
                             maxLength={80}
                             aria-label="Metric name"
                             aria-invalid={!m.name.trim()}
-                            className={`${FIELD} font-semibold ${m.name.trim() ? "" : "!border-amber-500/60"}`}
+                            className={`${FIELD} font-semibold ${m.name.trim() ? "" : "!border-[color-mix(in_srgb,var(--status-progress)_60%,transparent)]"}`}
                           />
                           {m.kind === "formula" && m.formula ? (
                             <div className="flex items-center gap-0.5 pl-2.5 text-xs text-[var(--muted)]">
@@ -634,7 +628,7 @@ export function TrackerEditor({
                             type="button"
                             onClick={() => removeMetric(m.id)}
                             aria-label={`Remove ${m.name || "metric"}`}
-                            className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--muted)] opacity-0 transition-[opacity,background-color,transform] duration-150 hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus:opacity-100 active:scale-[0.94] group-hover:opacity-100"
+                            className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--muted)] opacity-0 transition-[opacity,background-color,transform] duration-150 hover:bg-[var(--fill-2)] hover:text-[var(--fg)] focus:opacity-100 active:scale-[0.94] group-hover:opacity-100"
                           >
                             <FontAwesomeIcon icon={faXmark} className="size-3" />
                           </button>
@@ -642,13 +636,13 @@ export function TrackerEditor({
                           <span />
                         )}
                       </div>
-                    </motion.div>
+                    </CollapseItem>
                   );
                 })}
               </AnimatePresence>
             </div>
 
-            <div className="flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+            <div className="flex flex-wrap gap-2 pt-2">
               <button type="button" onClick={() => addMetric("input")} className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}>
                 <FontAwesomeIcon icon={faPlus} className="size-3" />
                 Add metric
@@ -667,8 +661,8 @@ export function TrackerEditor({
         </div>
 
         {/* ───────────── Sidebar: one card with section labels, then toggle cards — as on the task page ───────────── */}
-        <div className="w-full space-y-4 lg:w-72 lg:shrink-0">
-          <div className={`${CARD_SIDE} space-y-4`}>
+        <div className="w-full space-y-4 lg:w-80 lg:shrink-0">
+          <div className={`${CARD_SIDE} space-y-5`}>
             <div>
               <span className={SECTION_LABEL}>Assigned to</span>
               <PersonSearchField
@@ -712,7 +706,6 @@ export function TrackerEditor({
               <Segmented
                 value={split}
                 onChange={setSplit}
-                size="md"
                 aria-label="Target split"
                 options={[
                   { value: "day", label: "Per day" },
@@ -726,7 +719,6 @@ export function TrackerEditor({
               <Segmented
                 value={checkIn}
                 onChange={setCheckIn}
-                size="md"
                 aria-label="Logs progress"
                 options={[
                   { value: "daily", label: "Daily" },
@@ -737,7 +729,7 @@ export function TrackerEditor({
 
             <div>
               <span className={SECTION_LABEL}>Working days</span>
-              <div className="flex gap-1">
+              <div className="flex justify-between gap-1">
                 {DAY_LETTERS.map((d, i) => {
                   const iso = i + 1;
                   const on = workingDays.includes(iso);
@@ -751,10 +743,8 @@ export function TrackerEditor({
                       onClick={() =>
                         setWorkingDays((w) => (on ? (w.length > 1 ? w.filter((x) => x !== iso) : w) : [...w, iso].sort()))
                       }
-                      className={`size-8 rounded-lg text-xs font-semibold transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.94] ${
-                        on
-                          ? "border border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--fg)]"
-                          : "text-[var(--muted)] hover:bg-[var(--surface-hover)]"
+                      className={`pressable size-9 rounded-full text-xs font-bold ${
+                        on ? "bg-[var(--primary)] text-[var(--on-primary)]" : "bg-[var(--fill)] text-[var(--ink-3)] hover:bg-[var(--fill-2)]"
                       }`}
                     >
                       {d}
@@ -781,23 +771,12 @@ export function TrackerEditor({
                 aria-label="Send a reminder"
               />
             </div>
-            <AnimatePresence initial={false}>
-              {reminderTime && (
-                <motion.div
-                  initial={reduced ? false : { height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-                  exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-                  transition={{ duration: reduced ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  style={{ overflow: "hidden" }}
-                  className="space-y-1.5"
-                >
+            <Collapse open={!!reminderTime} className="space-y-1.5">
                   <PickerChip type="time" value={reminderTime} onChange={setReminderTime} label={timeLabel(reminderTime)} icon={faClock} ariaLabel="Reminder time" />
                   <p className="text-xs text-[var(--muted)]">
                     {checkIn === "weekly" ? "On the last working day, if the week isn’t logged." : "On working days, if the day isn’t logged."}
                   </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </Collapse>
           </div>
 
           {editing && (onArchive || onDelete) && (
@@ -825,7 +804,7 @@ export function TrackerEditor({
                       },
                     })
                   }
-                  className="inline-flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-[background-color,transform] duration-150 hover:bg-red-500/10 active:scale-[0.97] dark:text-red-400"
+                  className="inline-flex w-full items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--danger)] transition-[background-color,transform] duration-150 hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] active:scale-[0.97] dark:text-[var(--danger)]"
                 >
                   Delete tracker
                 </button>

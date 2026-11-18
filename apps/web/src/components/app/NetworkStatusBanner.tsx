@@ -64,7 +64,7 @@ export function NetworkStatusBanner() {
       <div
         role="status"
         aria-live="polite"
-        className="surface-elevated pointer-events-auto flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 shadow-lg dark:text-amber-100"
+        className="surface-elevated pointer-events-auto flex items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_30%,transparent)] bg-[color-mix(in_srgb,var(--status-progress)_10%,transparent)] px-4 py-2 text-sm text-[var(--status-progress)] shadow-lg dark:text-[var(--status-progress)]"
       >
         <span>
           {offline ? (

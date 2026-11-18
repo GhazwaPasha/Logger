@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { apiFetch } from "@/lib/api";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { formatInTimeZone } from "@/lib/date";
+import { Collapse, CollapseItem } from "@/components/ui/Collapse";
 
 type TimeEntry = {
   id: string;
@@ -132,7 +133,6 @@ export function TimeTracker({
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: timeKey }),
   });
 
-  const prefersReduced = useReducedMotion();
   const [showManual, setShowManual] = useState(false);
   const [manualStart, setManualStart] = useState("");
   const [manualEnd, setManualEnd] = useState("");
@@ -175,14 +175,14 @@ export function TimeTracker({
       className={
         embedded
           ? "space-y-3"
-          : "space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5"
+          : "space-y-3 rounded-2xl bg-[var(--card)] shadow-card p-5"
       }
     >
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       {(!embedded || totalSeconds > 0) && (
         <div className="flex items-center justify-between">
           {!embedded && (
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Time Tracking</h3>
+            <h3 className="text-xs font-semibold text-[var(--muted)]">Time Tracking</h3>
           )}
           {totalSeconds > 0 && (
             <span className="ml-auto text-xs font-semibold text-[var(--fg)]">{formatDuration(totalSeconds)} total</span>
@@ -196,15 +196,15 @@ export function TimeTracker({
           <div className="flex items-center gap-3">
             {runningEntry ? (
               <>
-                <span className="flex items-center gap-1.5 text-sm font-mono font-semibold text-red-500">
-                  <span className="size-2 animate-pulse rounded-full bg-red-500" />
+                <span className="flex items-center gap-1.5 text-sm font-mono font-semibold text-[var(--danger)]">
+                  <span className="size-2 animate-pulse rounded-full bg-[var(--danger)]" />
                   {formatSeconds(elapsed)}
                 </span>
                 <button
                   type="button"
                   onClick={() => stopMutation.mutate()}
                   disabled={stopMutation.isPending}
-                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-50"
+                  className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)] disabled:opacity-50"
                 >
                   Stop
                 </button>
@@ -214,7 +214,7 @@ export function TimeTracker({
                 type="button"
                 onClick={() => startMutation.mutate()}
                 disabled={startMutation.isPending}
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
               >
                 ▶ Start Timer
               </button>
@@ -228,22 +228,13 @@ export function TimeTracker({
             </button>
           </div>
           {startMutation.isError && (
-            <p className="text-xs text-red-500">{(startMutation.error as Error).message}</p>
+            <p className="text-xs text-[var(--danger)]">{(startMutation.error as Error).message}</p>
           )}
         </>
       )}
 
       {/* Manual log form */}
-      <AnimatePresence initial={false}>
-        {!viewOnly && showManual && (
-          <motion.div
-            className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-            style={{ overflow: "hidden" }}
-          >
+      <Collapse open={!viewOnly && showManual} className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3">
           <div className="space-y-1.5">
             <div>
               <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">Start</label>
@@ -272,7 +263,7 @@ export function TimeTracker({
             maxLength={512}
             className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1.5 text-xs outline-none placeholder:text-[var(--muted)]"
           />
-          {manualError && <p className="text-xs text-red-500">{manualError}</p>}
+          {manualError && <p className="text-xs text-[var(--danger)]">{manualError}</p>}
           <div className="flex gap-2">
             <button
               type="button"
@@ -281,36 +272,26 @@ export function TimeTracker({
                 logManualMutation.mutate();
               }}
               disabled={logManualMutation.isPending}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
+              className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition-colors hover:bg-[var(--surface-hover)] disabled:opacity-50"
             >
               Log
             </button>
             <button
               type="button"
               onClick={() => { setShowManual(false); setManualError(""); }}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             >
               Cancel
             </button>
           </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Collapse>
 
       {/* Entry list */}
       {completedEntries.length > 0 && (
-        <ul className="space-y-1">
+        <ul>
           <AnimatePresence initial={false}>
             {completedEntries.map((e) => (
-              <motion.li
-                key={e.id}
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-                className="flex items-start gap-2 overflow-hidden rounded-lg bg-[var(--surface-muted)] px-2.5 py-2 text-xs"
-              >
+              <CollapseItem as="li" key={e.id} reorder className="pb-1"><div className="flex items-start gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-2 text-xs">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <span className="font-medium">{e.userName}</span>
@@ -331,13 +312,13 @@ export function TimeTracker({
                         onConfirm: () => deleteMutation.mutate(e.id),
                       })
                     }
-                    className="shrink-0 text-[var(--muted)] hover:text-red-500"
+                    className="shrink-0 text-[var(--muted)] hover:text-[var(--danger)]"
                     aria-label="Delete entry"
                   >
                     ×
                   </button>
                 )}
-              </motion.li>
+              </div></CollapseItem>
             ))}
           </AnimatePresence>
         </ul>

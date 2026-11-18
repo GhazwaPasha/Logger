@@ -1,17 +1,9 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useCallback } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/primitives/popover";
 import { DueDateTimePanel } from "./DueDateTimePanel";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { cn } from "@/lib/utils";
 
 function formatDueTriggerLabel(value: string): string {
   const t = value.trim();
@@ -26,9 +18,6 @@ function formatDueTriggerLabel(value: string): string {
   }).format(d);
 }
 
-const POPOVER_W = 236;
-const POPOVER_EST_H = 340;
-
 type DueDateTimePopoverProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +28,7 @@ type DueDateTimePopoverProps = {
   triggerColorClassName?: string;
 };
 
+/** Due date + time picker on the animate-ui Popover (grows from the chip, flips at screen edges). */
 export function DueDateTimePopover({
   open,
   onOpenChange,
@@ -47,119 +37,42 @@ export function DueDateTimePopover({
   onClear,
   triggerColorClassName,
 }: DueDateTimePopoverProps) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const panelId = useId();
-  const prefersReduced = useReducedMotion();
-
-  const updatePosition = useCallback(() => {
-    const el = triggerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const pad = 8;
-    let left = rect.left;
-    if (left + POPOVER_W > window.innerWidth - pad) {
-      left = Math.max(pad, window.innerWidth - POPOVER_W - pad);
-    }
-    if (left < pad) left = pad;
-
-    let top = rect.bottom + 6;
-    if (top + POPOVER_EST_H > window.innerHeight - pad) {
-      top = Math.max(pad, window.innerHeight - POPOVER_EST_H - pad);
-    }
-
-    setPos({ top, left });
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePosition();
-  }, [open, updatePosition, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    updatePosition();
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [open, updatePosition]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (triggerRef.current?.contains(t)) return;
-      if (panelRef.current?.contains(t)) return;
-      onOpenChange(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onOpenChange(false);
-    }
-    document.addEventListener("mousedown", onDocMouseDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onOpenChange]);
-
   const handleClear = useCallback(() => {
     onClear();
     onOpenChange(false);
   }, [onClear, onOpenChange]);
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={`rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium transition-colors hover:text-[var(--fg)] ${triggerColorClassName ?? "text-[var(--muted)]"} ${open ? "ring-2 ring-[var(--accent)]/40" : ""}`}
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-haspopup="dialog"
-        onClick={() => onOpenChange(!open)}
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          className={cn(
+            "pressable h-8 rounded-[9px] bg-[var(--info-bg)] px-3 text-sm font-medium tabular-nums hover:brightness-[0.98]",
+            triggerColorClassName ?? "text-[var(--info-ink)]",
+            open && "bg-fill-2",
+          )}
+        >
+          {formatDueTriggerLabel(value)}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        role="dialog"
+        aria-label="Due date and time"
+        align="start"
+        sideOffset={6}
+        collisionPadding={8}
+        className="due-popover-scroll z-[100] w-[236px] max-h-[min(78vh,420px)] overflow-y-auto rounded-2xl p-2"
       >
-        {formatDueTriggerLabel(value)}
-      </button>
-      {typeof window !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open && (
-              <motion.div
-                ref={panelRef}
-                id={panelId}
-                role="dialog"
-                aria-label="Due date and time"
-                className="due-popover-scroll fixed z-[100] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-2"
-                style={{
-                  top: pos.top,
-                  left: pos.left,
-                  width: POPOVER_W,
-                  maxHeight: "min(78vh, 420px)",
-                  transformOrigin: "top",
-                }}
-                variants={panelPopVariants}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-              >
-                <DueDateTimePanel
-                  compact
-                  value={value}
-                  onChange={onChange}
-                  onClear={handleClear}
-                  onSave={() => onOpenChange(false)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
-    </>
+        <DueDateTimePanel
+          compact
+          value={value}
+          onChange={onChange}
+          onClear={handleClear}
+          onSave={() => onOpenChange(false)}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

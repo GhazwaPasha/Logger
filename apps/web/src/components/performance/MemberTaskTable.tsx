@@ -49,10 +49,10 @@ function formatDuration(seconds: number): string {
 function Chip({ label, tone }: { label: string; tone: "ok" | "bad" | "neutral" }) {
   const toneClass =
     tone === "ok"
-      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+      ? "bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)] dark:text-[var(--success)]"
       : tone === "bad"
-        ? "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-        : "bg-sky-500/15 text-sky-600 dark:text-sky-400";
+        ? "bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] dark:text-[var(--danger)]"
+        : "bg-[color-mix(in_srgb,var(--info-ink)_15%,transparent)] text-[var(--info-ink)] dark:text-[var(--info-ink)]";
   return (
     <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${toneClass}`}>
       {label}
@@ -116,9 +116,9 @@ function ComplianceCell({ task }: { task: MemberTaskRow }) {
 
 function priorityDotClass(p: string | undefined): string {
   const pr = (p ?? "medium") as TaskPriority;
-  if (pr === "high") return "bg-rose-500";
-  if (pr === "low") return "bg-slate-400";
-  return "bg-amber-500";
+  if (pr === "high") return "bg-[var(--danger)]";
+  if (pr === "low") return "bg-[var(--ink-2)]";
+  return "bg-[var(--status-progress)]";
 }
 
 export function MemberTaskTable({
@@ -172,7 +172,7 @@ export function MemberTaskTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[38rem] border-collapse text-sm">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wide text-[var(--muted)]">
+          <tr className="text-left text-[12px] text-[var(--muted)]">
             {COLUMNS.map((col) => (
               <th key={col.key} className={`pb-1.5 pr-2 font-medium ${col.align === "right" ? "text-right" : ""}`}>
                 <button
@@ -235,12 +235,12 @@ export function MemberTaskTable({
                     {taskStatusDisplayLabel(st)}
                   </span>
                 </td>
-                <td className={`py-1.5 pr-2 tabular-nums ${overdue ? "text-rose-600 dark:text-rose-400" : "text-[var(--fg)]"}`}>
+                <td className={`py-1.5 pr-2 tabular-nums ${overdue ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--fg)]"}`}>
                   {formatShortDate(t.dueAt, timeZone)}
                 </td>
                 <td className="py-1.5 pr-2 tabular-nums">
                   <div className="flex items-center gap-1">
-                    <span className={t.late ? "text-rose-600 dark:text-rose-400" : "text-[var(--fg)]"}>
+                    <span className={t.late ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--fg)]"}>
                       {formatShortDate(t.completedAt, timeZone)}
                     </span>
                     {t.occurrenceCount != null && t.occurrenceCount > 1 ? (

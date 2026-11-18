@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { dashboardClosedSince } from "@work-ledger/contracts";
+import { dashboardClosedSince, type CompletionsByDayResponse } from "@work-ledger/contracts";
 import { useCallback, useState } from "react";
 import { apiJson } from "@/lib/api";
 import { workspaceKeys } from "@/lib/query-keys";
@@ -197,4 +197,23 @@ export function useSeriesOccurrences(
     loadMoreError,
     loadMore,
   };
+}
+
+/**
+ * Done tasks per day for the dashboard's "Tasks completed" chart: one grouped COUNT on the server
+ * (`/tasks/completions-by-day`), zero-filled, oldest first, bucketed in the workspace time zone.
+ */
+export function useCompletionsByDay(token: string | null, orgId: string | null, days: number, timeZone: string) {
+  const asOf = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const q = useQuery({
+    queryKey: workspaceKeys.completionsByDay(orgId ?? "", days, timeZone, asOf),
+    queryFn: async () => {
+      const qs = new URLSearchParams({ days: String(days), timeZone, asOf });
+      const res = await apiJson<CompletionsByDayResponse>(`/organizations/${orgId}/tasks/completions-by-day?${qs}`, { token });
+      return res.days;
+    },
+    enabled: Boolean(token && orgId),
+    staleTime: 60_000,
+  });
+  return { days: q.data ?? null, isLoading: q.isPending && Boolean(token && orgId) };
 }

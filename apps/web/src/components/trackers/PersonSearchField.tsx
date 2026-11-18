@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCheck, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import type { MemberRow } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
-import { POP_EASE, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
 
 const label = (m: MemberRow) => (m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown";
 
@@ -134,13 +134,13 @@ export function PersonSearchField({
             id={`${uid}-list`}
             role="listbox"
             aria-label="Team members"
-            className="absolute z-[60] mt-1 max-h-60 w-full min-w-[14rem] overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1"
+            className="absolute z-[60] mt-1 max-h-60 w-full min-w-[14rem] overflow-auto rounded-xl bg-[var(--card)] shadow-card py-1"
             style={{ transformOrigin: "top" }}
-            variants={panelPopVariants}
+            variants={variants.panelPop}
             initial="hidden"
             animate="visible"
             exit="hidden"
-            transition={{ duration: motionDuration(0.16, reduced), ease: POP_EASE }}
+            transition={{ duration: reducedDuration(0.16, reduced), ease: curve.respond }}
           >
             {allowNone && value && !query.trim() ? (
               <li role="presentation">

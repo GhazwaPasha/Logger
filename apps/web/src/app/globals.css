@@ -19,136 +19,265 @@
   }
 }
 
-:root {
-  color-scheme: light;
-  --bg: #ffffff;
-  --fg: #0c0c0d;
-  --border: #e5e5e5;
-  --border-subtle: #ededed;
-  --accent: #27272a;
-  --accent-hover: #18181b;
-  --on-accent: #fafafa;
-  --muted: #737373;
-  --surface-base: #ffffff;
-  --surface: #f4f4f5;
-  --surface-elevated: #f4f4f5;
-  --surface-muted: #ececed;
-  --surface-hover: #ececed;
-  --surface-nav: #f4f4f5;
-  --bg-header: #f4f4f5;
-  --accent-muted: rgba(39, 39, 42, 0.09);
-  --accent-glow: rgba(39, 39, 42, 0.05);
-  --accent-glow-soft: rgba(39, 39, 42, 0.03);
-}
+/*
+ * Theme tokens — defined ONCE with light-dark(). `color-scheme` on <html> picks the side:
+ * data-theme="light" → light, "dark" → dark, "system" → follows the OS. This replaces the old
+ * three copies (light / dark / system-dark) that had drifted apart.
+ *
+ * Light: white sheet on a cool-gray frame, color lives in charts, icons and small accents.
+ * Dark: neutral surfaces, color only in icons, charts, status/due chips and other small things.
+ */
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }
+html[data-theme="system"] { color-scheme: light dark; }
 
-html[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #09090b;
-  --fg: #fafafa;
-  --border: #27272a;
-  --border-subtle: #1f1f23;
-  --accent: #e4e4e7;
-  --accent-hover: #fafafa;
-  --on-accent: #18181b;
-  --muted: #a1a1aa;
-  --surface-base: #09090b;
-  --surface: #121214;
-  --surface-elevated: #121214;
-  --surface-muted: #18181b;
-  --surface-hover: #1c1c21;
-  --surface-nav: #0f0f12;
-  --bg-header: #0f0f12;
-  --accent-muted: rgba(228, 228, 231, 0.12);
-  --accent-glow: rgba(228, 228, 231, 0.06);
-  --accent-glow-soft: rgba(228, 228, 231, 0.035);
-}
+/* Force a theme on one section (e.g. the always-dark landing hero). The build compiles light-dark()
+   into fallback variables that resolve where the tokens are declared, so the tokens are declared
+   again on these classes — that's what makes everything inside re-resolve to the forced side. */
+.scheme-dark { color-scheme: dark; }
+.scheme-light { color-scheme: light; }
 
-@media (prefers-color-scheme: dark) {
-  html[data-theme="system"] {
-    color-scheme: dark;
-    --bg: #09090b;
-    --fg: #fafafa;
-    --border: #27272a;
-    --border-subtle: #1f1f23;
-    --accent: #e4e4e7;
-    --accent-hover: #fafafa;
-    --on-accent: #18181b;
-    --muted: #a1a1aa;
-    --surface-base: #09090b;
-    --surface: #121214;
-    --surface-elevated: #121214;
-    --surface-muted: #18181b;
-    --surface-hover: #1c1c21;
-    --surface-nav: #0f0f12;
-    --bg-header: #0f0f12;
-    --accent-muted: rgba(228, 228, 231, 0.12);
-    --accent-glow: rgba(228, 228, 231, 0.06);
-    --accent-glow-soft: rgba(228, 228, 231, 0.035);
-  }
-}
+:root,
+.scheme-dark,
+.scheme-light {
+  /* Surfaces */
+  --chrome: light-dark(#ECECEF, #09090B);        /* header + sidebar frame */
+  --sheet: light-dark(#F7F7F9, #111113);         /* curved content sheet — a whisper of gray in light so white cards read */
+  --card: light-dark(#FFFFFF, #18181B);          /* cards and panels on the sheet */
+  --card-raised: light-dark(#FFFFFF, #1E1E22);   /* selected / popped card */
+  --overlay: light-dark(rgba(255, 255, 255, 0.86), rgba(30, 30, 34, 0.86)); /* menus, popovers (with blur) */
+  --scrim: light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.5));
 
-@media (prefers-color-scheme: light) {
-  html[data-theme="system"] {
-    color-scheme: light;
-    --bg: #ffffff;
-    --fg: #0c0c0d;
-    --border: #e5e5e5;
-    --border-subtle: #ededed;
-    --accent: #27272a;
-    --accent-hover: #18181b;
-    --on-accent: #fafafa;
-    --muted: #737373;
-    --surface-base: #ffffff;
-    --surface: #f4f4f5;
-    --surface-elevated: #f4f4f5;
-    --surface-muted: #f4f4f5;
-    --surface-hover: #f4f4f5;
-    --surface-nav: #f4f4f5;
-    --bg-header: #f4f4f5;
-    --accent-muted: rgba(39, 39, 42, 0.09);
-    --accent-glow: rgba(39, 39, 42, 0.05);
-    --accent-glow-soft: rgba(39, 39, 42, 0.03);
-  }
+  /* Text */
+  --ink: light-dark(#1C1C1E, #F2F2F3);
+  --ink-2: light-dark(#6E6E73, #9A9AA0);
+  --ink-3: light-dark(#A1A1A6, #5E5E64);
+
+  /* Lines and fills (translucent so they sit on any surface) */
+  --line: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.07));
+  --line-strong: light-dark(rgba(0, 0, 0, 0.14), rgba(255, 255, 255, 0.12));
+  --fill: light-dark(rgba(0, 0, 0, 0.045), rgba(255, 255, 255, 0.045));
+  --fill-2: light-dark(rgba(0, 0, 0, 0.075), rgba(255, 255, 255, 0.08));
+  --fill-3: light-dark(rgba(0, 0, 0, 0.11), rgba(255, 255, 255, 0.12));
+
+  /* Primary action: graphite in light, near-white in dark. Never blue. */
+  --primary: light-dark(#1C1C1E, #F2F2F3);
+  --primary-hover: light-dark(#000000, #FFFFFF);
+  --on-primary: light-dark(#FFFFFF, #111113);
+  --focus-ring: light-dark(rgba(0, 0, 0, 0.32), rgba(255, 255, 255, 0.36));
+
+  /* Departments — fixed order, validated for color-blind separation in both themes */
+  --dept-1: light-dark(#3366E0, #5B8BF0);
+  --dept-2: light-dark(#E0761F, #D27A2E);
+  --dept-3: light-dark(#8A57D6, #9D74E6);
+  --dept-4: light-dark(#1F9A7E, #2A9C82);
+  --dept-1-tint: light-dark(#E7EEFC, rgba(91, 139, 240, 0.16));
+  --dept-2-tint: light-dark(#FCEBDD, rgba(210, 122, 46, 0.16));
+  --dept-3-tint: light-dark(#EFE7FA, rgba(157, 116, 230, 0.16));
+  --dept-4-tint: light-dark(#DDF2EC, rgba(42, 156, 130, 0.16));
+
+  /* Status (always shown with a label) */
+  --status-pending: light-dark(#8C9AB5, #8A94A8);
+  --status-progress: light-dark(#E09A00, #C98A12);
+  --status-done: light-dark(#2E9E68, #3A9E70);
+  --status-cancelled: light-dark(#C4C4CA, #5E5A56);
+  --status-pending-bg: light-dark(#ECEEF3, rgba(255, 255, 255, 0.08));
+  --status-pending-ink: light-dark(#4B5466, #E4E4E7);
+  --status-progress-bg: light-dark(#FCF0D2, rgba(201, 138, 18, 0.16));
+  --status-progress-ink: light-dark(#8A5A00, #E7B04A);
+  --status-done-bg: light-dark(#DFF3E8, rgba(58, 158, 112, 0.16));
+  --status-done-ink: light-dark(#1F7A4D, #5CC08F);
+
+  /* Priority */
+  --priority-high: light-dark(#E5484D, #FF6369);
+  --priority-medium: light-dark(#F59E0B, #F5A524);
+  --priority-low: light-dark(#94A3B8, #8A94A8);
+
+  /* Signals */
+  --danger: light-dark(#D23F57, #FF6B7F);
+  --success: light-dark(#2E9E68, #3A9E70);
+  --info-bg: light-dark(#EAF0FD, rgba(91, 139, 240, 0.15));
+  --info-ink: light-dark(#2552C4, #8DB0F7);
+  --online: #22C55E;
+
+  /* Elevation: hairline + soft shadow, never a colored ring */
+  --hairline: light-dark(rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.07));
+  --hairline-strong: light-dark(rgba(0, 0, 0, 0.16), rgba(255, 255, 255, 0.2));
+  --shade-soft: light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.3));
+  --shade-mid: light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55));
+  --shade-deep: light-dark(rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.6));
+  --elev-card: 0 0 0 0.5px var(--hairline), 0 1px 3px var(--shade-soft);
+  --elev-raised: 0 0 0 1px var(--hairline-strong), 0 12px 32px var(--shade-mid);
+  --elev-overlay: 0 0 0 0.5px var(--hairline-strong), 0 12px 36px var(--shade-deep);
+  --elev-sheet: 0 0 0 0.5px var(--hairline), 0 10px 30px var(--shade-soft);
+
+  /* Motion — three curves for the whole app (see lib/motion.ts for the JS side) */
+  --motion-respond: cubic-bezier(0.23, 1, 0.32, 1);   /* menus, popovers, toasts, press */
+  --motion-move: cubic-bezier(0.32, 0.72, 0, 1);      /* panels, sheets, segmented thumbs */
+  --motion-in-out: cubic-bezier(0.77, 0, 0.175, 1);   /* on-screen movement */
+  --dur-press: 140ms;
+  --dur-fast: 180ms;
+  --dur-move: 380ms;
+
+  /* ---- Legacy aliases (kept so every existing screen keeps working; removed in phase 7) ---- */
+  --bg: var(--sheet);
+  --fg: var(--ink);
+  --muted: var(--ink-2);
+  --border: var(--line-strong);
+  --border-subtle: var(--line);
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --on-accent: var(--on-primary);
+  --surface-base: var(--sheet);
+  --surface: light-dark(#F4F4F6, #151517);
+  --surface-elevated: light-dark(#F4F4F6, #151517);
+  --surface-muted: light-dark(#EDEDF0, #1B1B1E);
+  --surface-hover: light-dark(#EDEDF0, #1F1F23);
+  --surface-nav: var(--chrome);
+  --bg-header: var(--chrome);
+  --accent-muted: var(--fill-2);
+  --accent-glow: var(--fill);
+  --accent-glow-soft: light-dark(rgba(0, 0, 0, 0.03), rgba(255, 255, 255, 0.035));
 }
 
 @theme inline {
+  /* New semantic colors as Tailwind utilities: bg-sheet, text-ink-2, border-line, bg-dept-1 … */
+  --color-chrome: var(--chrome);
+  --color-sheet: var(--sheet);
+  --color-card: var(--card);
+  --color-card-raised: var(--card-raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fill: var(--fill);
+  --color-fill-2: var(--fill-2);
+  --color-fill-3: var(--fill-3);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-dept-1: var(--dept-1);
+  --color-dept-2: var(--dept-2);
+  --color-dept-3: var(--dept-3);
+  --color-dept-4: var(--dept-4);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  /* Legacy utility names still used across the app */
   --color-bg: var(--bg);
   --color-fg: var(--fg);
   --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-muted: var(--muted);
-  --font-sans: var(--font-dm-sans);
-  --font-mono: var(--font-jetbrains);
-  /* Slightly sharper UI than Tailwind defaults (~25% tighter radii) */
-  --radius-sm: 0.1875rem;
-  --radius-md: 0.25rem;
-  --radius-lg: 0.3125rem;
-  --radius-xl: 0.4375rem;
-  --radius-2xl: 0.5625rem;
-  --radius-3xl: 0.75rem;
-  --radius-4xl: 1rem;
+
+  /* shadcn / animate-ui primitive vocabulary, mapped onto LogBase tokens */
+  --color-background: var(--sheet);
+  --color-foreground: var(--ink);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card-raised);
+  --color-popover-foreground: var(--ink);
+  --color-primary-foreground: var(--on-primary);
+  --color-secondary: var(--fill-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--fill);
+  --color-muted-foreground: var(--ink-2);
+  --color-accent: var(--fill-2);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--danger);
+  --color-input: var(--line-strong);
+  --color-ring: var(--focus-ring);
+
+  --font-sans: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* Concentric radii: chip 6 · control 9 · card 12 · panel 16 · sheet 24 */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.5625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+
+  --shadow-card: var(--elev-card);
+  --shadow-raised: var(--elev-raised);
+  --shadow-overlay: var(--elev-overlay);
+  --shadow-sheet: var(--elev-sheet);
+
+  --ease-respond: var(--motion-respond);
+  --ease-move: var(--motion-move);
+}
+
+/*
+ * Type scale — Apple-style: tracking tightens as size grows, leading loosens as it shrinks.
+ * Use these instead of one-off text-[13px] values.
+ */
+@utility text-large-title {
+  font-size: 1.875rem;
+  line-height: 1.1;
+  letter-spacing: -0.026em;
+  font-weight: 650;
+}
+@utility text-title {
+  font-size: 1.3125rem;
+  line-height: 1.25;
+  letter-spacing: -0.019em;
+  font-weight: 650;
+}
+@utility text-headline {
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  letter-spacing: -0.011em;
+  font-weight: 600;
+}
+@utility text-body {
+  font-size: 0.90625rem;
+  line-height: 1.45;
+  letter-spacing: -0.011em;
+}
+@utility text-callout {
+  font-size: 0.84375rem;
+  line-height: 1.4;
+  letter-spacing: -0.006em;
+}
+@utility text-footnote {
+  font-size: 0.78125rem;
+  line-height: 1.4;
+  letter-spacing: -0.003em;
+}
+@utility text-caption {
+  font-size: 0.71875rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+/* Primitives (data-slot) draw hairlines in the line token rather than currentColor. */
+@layer base {
+  [data-slot] {
+    border-color: var(--line);
+  }
+}
+
+/* Press feedback for anything tappable: scale on press, instant, interruptible. */
+@utility pressable {
+  transition-property: transform, background-color, color, box-shadow, opacity;
+  transition-duration: var(--dur-press);
+  transition-timing-function: var(--motion-respond);
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Marketing home only (toggled by <HideScrollbar> on mount/unmount)—hides the native scrollbar
-   chrome for the parallax page without touching scrollbars in the authenticated app. Scrolling
-   itself (wheel, touch, keyboard, screen readers) is untouched, only the visible track/thumb. */
-html.home-no-scrollbar {
-  scrollbar-width: none;
-}
-
-html.home-no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
 body {
   overflow-x: hidden;
   background: var(--surface-base);
   color: var(--fg);
-  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-family: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 .font-mono-ledger {
@@ -198,19 +327,9 @@ body {
 .dashboard-kpi-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-elevated);
-  transition:
-    border-color 0.22s ease,
-    box-shadow 0.28s ease,
-    transform 0.22s ease;
-}
-
-@media (hover: hover) {
-  .dashboard-kpi-card:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--accent) 24%, var(--border-subtle));
-  }
+  isolation: isolate;
+  background: var(--card);
+  box-shadow: var(--elev-card);
 }
 
 html[data-theme="light"] .dashboard-kpi-card--tone-periwinkle {
@@ -309,149 +428,136 @@ html[data-theme="light"] .dashboard-kpi-wave {
 }
 
 .panel {
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--surface-elevated);
+  border-radius: 1rem;
+  background: var(--card);
+  box-shadow: var(--elev-card);
 }
 
-.input {
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--surface-elevated);
-  color: var(--fg);
-  padding: 0.625rem 0.875rem;
-  width: 100%;
-  font-size: 0.875rem;
-  transition: border-color 0.15s ease;
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.input:focus-visible {
-  outline: 2px solid var(--accent-muted);
-  outline-offset: 2px;
-}
-
-.input-compact {
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  background: var(--surface-elevated);
-  color: var(--fg);
-  padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
-}
-
-.input-compact:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.input-compact:focus-visible {
-  outline: 2px solid var(--accent-muted);
-  outline-offset: 2px;
-}
-
-/* Native selects: visible chevron (default UA arrow is often invisible on dark surfaces). */
-select.input,
-select.input-compact {
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23525252' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.4rem center;
-  background-size: 0.875rem 0.875rem;
-}
-
-html[data-theme="dark"] select.input,
-html[data-theme="dark"] select.input-compact {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-}
-
-@media (prefers-color-scheme: dark) {
-  html[data-theme="system"] select.input,
-  html[data-theme="system"] select.input-compact {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+/* In the components layer so Tailwind utilities on an element (pl-11, h-12, rounded-xl…) win. */
+@layer components {
+  /* Form fields: soft fill + hairline inset, neutral focus glow (never a colored ring). */
+  .input,
+  .input-compact {
+    border: 1px solid transparent;
+    background: var(--fill);
+    box-shadow: inset 0 0 0 0.5px var(--line);
+    color: var(--fg);
+    font-size: 0.875rem;
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.18s var(--motion-respond);
   }
-}
 
-@media (prefers-color-scheme: light) {
-  html[data-theme="system"] select.input,
-  html[data-theme="system"] select.input-compact {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23525252' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  .input {
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    width: 100%;
   }
-}
 
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--on-accent);
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.1s ease;
-}
+  .input-compact {
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.5rem;
+  }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
+  .input::placeholder,
+  .input-compact::placeholder {
+    color: var(--ink-3);
+  }
 
-.btn-primary:active:not(:disabled) {
-  transform: scale(0.98);
-}
+  .input:hover,
+  .input-compact:hover {
+    background: var(--fill-2);
+  }
 
-.btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+  .input:focus,
+  .input-compact:focus {
+    outline: none;
+    background: var(--card);
+    box-shadow:
+      inset 0 0 0 1px var(--line-strong),
+      0 0 0 3.5px var(--fill-2);
+  }
 
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--surface-elevated);
-  color: var(--fg);
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
+  /* Native selects: one chevron (mid-gray reads on both themes). */
+  select.input,
+  select.input-compact {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 1.75rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.55rem center;
+    background-size: 0.875rem 0.875rem;
+  }
 
-.btn-secondary:hover {
-  background: var(--surface-hover);
-  border-color: var(--muted);
-}
+  /* Buttons: press to 0.97 instantly; primary is graphite (near-white in dark), never blue. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 560;
+    transition:
+      background-color 0.16s ease,
+      opacity 0.16s ease,
+      transform var(--dur-press) var(--motion-respond);
+  }
 
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.375rem;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
-}
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled) {
+    transform: scale(0.97);
+  }
 
-.btn-ghost:hover {
-  color: var(--fg);
-  background: var(--surface-hover);
+  .btn-primary {
+    border-radius: 0.625rem;
+    border: 1px solid transparent;
+    background: var(--primary);
+    color: var(--on-primary);
+    padding: 0.5rem 1rem;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    border-radius: 0.625rem;
+    border: 1px solid transparent;
+    background: var(--fill-2);
+    color: var(--fg);
+    padding: 0.5rem 1rem;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--fill-3);
+  }
+
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    border-radius: 0.5rem;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    padding: 0.25rem 0.5rem;
+  }
+
+  .btn-ghost:hover {
+    color: var(--fg);
+    background: var(--fill);
+  }
 }
 
 /* Legacy combo classes */
@@ -557,399 +663,7 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   border-color: var(--accent-hover);
 }
 
-/* --- Marketing home: motion (respects prefers-reduced-motion) --- */
-
-@keyframes home-cursor-blink {
-  0%,
-  45% {
-    opacity: 0.2;
-  }
-  50%,
-  95% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0.2;
-  }
-}
-
-@keyframes home-orbit-1 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.35;
-  }
-  50% {
-    transform: translate(12px, -18px);
-    opacity: 0.65;
-  }
-}
-
-@keyframes home-orbit-2 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.28;
-  }
-  50% {
-    transform: translate(-16px, 14px);
-    opacity: 0.55;
-  }
-}
-
-@keyframes home-orbit-3 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.4;
-  }
-  50% {
-    transform: translate(10px, 12px);
-    opacity: 0.75;
-  }
-}
-
-@keyframes home-mock-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(0.35deg);
-  }
-}
-
-@keyframes home-window-dot-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.65;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes home-shimmer {
-  0% {
-    background-position: -120% 0;
-  }
-  100% {
-    background-position: 220% 0;
-  }
-}
-
-@keyframes home-checkbox-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 22%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 0%, transparent);
-  }
-}
-
-@keyframes home-plus-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
-}
-
-@keyframes home-trust-shine {
-  0% {
-    background-position: 0% 50%;
-  }
-  100% {
-    background-position: 200% 50%;
-  }
-}
-
-@keyframes home-hero-word {
-  0% {
-    opacity: 0;
-    transform: translateY(0.65em) rotateX(-12deg);
-    filter: blur(6px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) rotateX(0);
-    filter: blur(0);
-  }
-}
-
-@keyframes home-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes home-cta-glow-pulse {
-  0%,
-  100% {
-    opacity: 0.82;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.04);
-  }
-}
-
-.home-scanlines {
-  /* CRT/terminal scanline texture—strictly grayscale off --fg, extremely low-contrast so it
-     reads as a screen texture rather than competing with content. */
-  background-image: repeating-linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--fg) 5%, transparent) 0px,
-    color-mix(in srgb, var(--fg) 5%, transparent) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.55;
-}
-
-.home-cursor-blink {
-  animation: home-cursor-blink 1.1s step-end infinite;
-}
-
-.home-orbit-1 {
-  animation: home-orbit-1 11s ease-in-out infinite;
-}
-
-.home-orbit-2 {
-  animation: home-orbit-2 13s ease-in-out infinite 1s;
-}
-
-.home-orbit-3 {
-  animation: home-orbit-3 9s ease-in-out infinite 2s;
-}
-
-.home-mock-float {
-  animation: home-mock-float 9s ease-in-out infinite;
-  transform-origin: center center;
-}
-
-.home-window-dot {
-  animation: home-window-dot-pulse 3.2s ease-in-out infinite;
-}
-
-.home-window-dot--delayed {
-  animation-delay: 0.35s;
-}
-
-.home-window-dot--delayed2 {
-  animation-delay: 0.7s;
-}
-
-.home-shimmer-bar {
-  background: linear-gradient(
-    105deg,
-    color-mix(in srgb, var(--fg) 14%, transparent) 0%,
-    color-mix(in srgb, var(--fg) 28%, transparent) 45%,
-    color-mix(in srgb, var(--fg) 14%, transparent) 90%
-  );
-  background-size: 200% 100%;
-  animation: home-shimmer 4.5s ease-in-out infinite;
-}
-
-.home-shimmer-bar--delayed {
-  animation-delay: 1.1s;
-}
-
-.home-checkbox-glow {
-  animation: home-checkbox-pulse 2.8s ease-in-out infinite;
-}
-
-.home-plus-pulse {
-  animation: home-plus-pulse 2.4s ease-in-out infinite;
-}
-
-.home-task-card {
-  transition:
-    border-color 0.25s ease,
-    transform 0.35s ease,
-    box-shadow 0.35s ease;
-}
-
-.home-task-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
-  transform: translateY(-2px);
-}
-
-.home-reveal {
-  opacity: 0;
-  transform: translateY(1.35rem);
-  transition:
-    opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.home-reveal--visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.home-hero-word {
-  display: flex;
-  opacity: 0;
-  transform-origin: 50% 80%;
-  animation: home-hero-word 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-/* Secondary phrase on hero lines — smaller, quieter; reads as a second meaning beside the verb */
-.home-hero-sub {
-  font-size: clamp(0.8125rem, 0.36em, 1.125rem);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  line-height: 1.15;
-  color: color-mix(in srgb, var(--muted) 88%, var(--fg));
-}
-
-.home-hero-word:nth-child(1) {
-  animation-delay: 0.06s;
-}
-
-.home-hero-word:nth-child(2) {
-  animation-delay: 0.14s;
-}
-
-.home-hero-word:nth-child(3) {
-  animation-delay: 0.22s;
-}
-
-.home-fade-item {
-  opacity: 0;
-  animation: home-fade-up 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.home-fade-item--1 {
-  animation-delay: 0.08s;
-}
-
-.home-fade-item--2 {
-  animation-delay: 0.38s;
-}
-
-.home-fade-item--3 {
-  animation-delay: 0.52s;
-}
-
-.home-cta-glow {
-  animation: home-cta-glow-pulse 14s ease-in-out infinite;
-  transform-origin: 0% 0%;
-}
-
-@keyframes home-scroll-cue-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.7;
-  }
-  50% {
-    transform: translateY(5px);
-    opacity: 1;
-  }
-}
-
-.home-scroll-cue-bounce {
-  animation: home-scroll-cue-bounce 1.8s ease-in-out infinite;
-}
-
-.home-trust-strip {
-  position: relative;
-  overflow: hidden;
-}
-
-.home-trust-strip::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent,
-    color-mix(in srgb, var(--accent) 28%, transparent),
-    transparent,
-    color-mix(in srgb, var(--accent) 18%, transparent),
-    transparent
-  );
-  background-size: 300% 100%;
-  animation: home-trust-shine 10s linear infinite;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .home-orbit-1,
-  .home-orbit-2,
-  .home-orbit-3,
-  .home-mock-float,
-  .home-window-dot,
-  .home-window-dot--delayed,
-  .home-window-dot--delayed2,
-  .home-shimmer-bar,
-  .home-shimmer-bar--delayed,
-  .home-checkbox-glow,
-  .home-plus-pulse,
-  .home-trust-strip::before,
-  .home-hero-word,
-  .home-fade-item,
-  .home-fade-item--1,
-  .home-fade-item--2,
-  .home-fade-item--3,
-  .home-cta-glow,
-  .home-scroll-cue-bounce,
-  .home-cursor-blink {
-    animation: none !important;
-  }
-
-  .home-fade-item,
-  .home-fade-item--1,
-  .home-fade-item--2,
-  .home-fade-item--3 {
-    opacity: 1;
-    transform: none;
-  }
-
-  .home-reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-
-  .home-reveal--visible {
-    opacity: 1;
-    transform: none;
-  }
-
-  .home-hero-word {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-
-  .home-task-card:hover {
-    transform: none;
-  }
-
   .ui-page-enter,
   .ui-auth-card-enter,
   .ui-dropdown-pop {
@@ -1000,7 +714,7 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
 @keyframes ui-dropdown-pop {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateY(-4px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -1018,9 +732,10 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   animation: ui-auth-card-enter 0.22s ease-out both;
 }
 
+/* Hand-rolled dropdowns (account menu, workspace switcher): grow from the trigger, 180ms respond curve.
+   Origin comes from the element's own origin-* class. */
 .ui-dropdown-pop {
-  animation: ui-dropdown-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transform-origin: top right;
+  animation: ui-dropdown-pop 0.18s var(--motion-respond) both;
 }
 
 /* --- Auth: "connecting to Discord" combo transition (LoginForm) --- */
@@ -1105,18 +820,12 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
     box-shadow 0.35s ease;
 }
 
+/* Panels on the sheet: white card + hairline shadow. The old 1px border stays for layout but goes
+   transparent, and there's no hover lift — cards are surfaces, not buttons. */
 .ui-elevated-panel {
-  transition:
-    border-color 0.22s ease,
-    box-shadow 0.28s ease,
-    transform 0.22s ease;
-}
-
-@media (hover: hover) {
-  .ui-elevated-panel:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--accent) 22%, var(--border-subtle));
-  }
+  background: var(--card);
+  border-color: transparent !important;
+  box-shadow: var(--elev-card);
 }
 
 /* Task panel: AI fill button — indeterminate bar while request runs */
@@ -1528,5 +1237,105 @@ html[data-theme="dark"] .header-live-island__hit {
 
   .activity-terminal-line--enter {
     animation: none;
+  }
+}
+
+/* --- Boot screen ("Preparing your Logs") ---
+   CSS animations on purpose: this screen is up while the app is loading and scripts are busy,
+   and CSS animations keep running off the main thread. Entrance plays once (see AppBootScreen);
+   the progress thumb is the only thing that keeps moving. */
+@keyframes boot-mark-in {
+  from { opacity: 0; transform: scale(0.94); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes boot-word-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes boot-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes boot-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(260%); }
+}
+
+.boot-mark {
+  display: inline-flex;
+  /* 120ms grace: a load that finishes almost instantly never flashes the screen. */
+  animation: boot-mark-in 560ms var(--motion-respond) 120ms both;
+}
+.boot-word {
+  display: inline-block;
+  animation: boot-word-in 520ms var(--motion-respond) both;
+  animation-delay: calc(300ms + var(--i, 0) * 60ms);
+}
+.boot-track {
+  position: relative;
+  display: block;
+  width: 7.5rem;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--fill-2);
+  animation: boot-fade-in 400ms ease 620ms both;
+}
+.boot-thumb {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--ink);
+  animation: boot-sweep 1.15s var(--motion-in-out) infinite;
+}
+
+/* Re-mounted during the same sign-in: already settled, no replay. */
+.boot-screen--settled .boot-mark,
+.boot-screen--settled .boot-word,
+.boot-screen--settled .boot-track {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-mark,
+  .boot-word {
+    animation: boot-fade-in 300ms ease both;
+  }
+  .boot-track {
+    animation: boot-fade-in 300ms ease both;
+  }
+  /* No travelling motion: a still, partly filled bar still reads as "working". */
+  .boot-thumb {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
+
+/* --- Accessibility: transparency and contrast preferences ---
+   Reduced transparency: frosted chrome (header, landing nav) becomes solid.
+   More contrast: hairlines, fills and secondary text step up so edges and labels hold. */
+@media (prefers-reduced-transparency: reduce) {
+  .ui-app-header,
+  .landing-hero header {
+    background: var(--chrome) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .landing-hero header {
+    background: #000 !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  .scheme-dark,
+  .scheme-light {
+    --line: light-dark(rgba(0, 0, 0, 0.22), rgba(255, 255, 255, 0.24));
+    --line-strong: light-dark(rgba(0, 0, 0, 0.4), rgba(255, 255, 255, 0.42));
+    --ink-2: light-dark(#4a4a4f, #c2c2c7);
+    --ink-3: light-dark(#6e6e73, #98989d);
+    --hairline: light-dark(rgba(0, 0, 0, 0.24), rgba(255, 255, 255, 0.26));
   }
 }

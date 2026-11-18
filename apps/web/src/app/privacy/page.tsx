@@ -42,8 +42,8 @@ export default function PrivacyPolicyPage() {
           </Link>
         </header>
 
-        <div className="mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 sm:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">Legal</p>
+        <div className="mt-6 rounded-2xl bg-[var(--card)] shadow-card p-6 sm:p-10">
+          <p className="text-xs font-semibold text-[var(--accent)]">Legal</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl">Privacy Policy</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">Last updated: {LAST_UPDATED}</p>
 

@@ -29,7 +29,7 @@ import {
 } from "@work-ledger/contracts";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
-import { POP_EASE } from "@/components/ui/motion-presets";
+import { curve } from "@/lib/motion";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { ApiError, apiJson, apiVoid } from "@/lib/api";
 import { agentKeys, streamAsk } from "@/lib/agent";
@@ -38,6 +38,7 @@ import { NODE_LABELS } from "@/lib/nodes";
 import { WORK_BOARD_SCOPE_EVENT, readWorkBoardScope, type WorkBoardScope } from "@/lib/work-board-scope";
 import { AiIcon } from "./AiIcon";
 import { AgentText, type TaskCardInfo } from "./AgentText";
+import { CollapseItem } from "@/components/ui/Collapse";
 
 type OpenAskOptions = { prompt?: string; taskId?: string; send?: boolean };
 export type TaskRef = { id: string; title: string };
@@ -594,7 +595,7 @@ export function AskPane() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: reduceMotion ? 0 : 0.18, ease: POP_EASE }}
+            transition={{ duration: reduceMotion ? 0 : 0.18, ease: curve.respond }}
             className="fixed inset-x-0 bottom-0 top-14 z-[70] flex flex-col bg-[var(--surface-base)]"
           >
             <AskChrome compact />
@@ -614,7 +615,7 @@ export function AskPane() {
           initial={{ width: 0 }}
           animate={{ width }}
           exit={{ width: 0 }}
-          transition={{ duration: dragging || reduceMotion ? 0 : 0.22, ease: POP_EASE }}
+          transition={{ duration: dragging || reduceMotion ? 0 : 0.22, ease: curve.respond }}
           className="relative h-full shrink-0 overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--surface-base)]"
         >
           {/* Fixed-width inner box: content doesn't reflow while the pane animates open or closed. */}
@@ -795,7 +796,7 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
             )}
             {ask.error && (
               <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5 text-[13px]">
-                <span className="mt-0.5 size-1.5 shrink-0 translate-y-1 rounded-full bg-red-500" aria-hidden />
+                <span className="mt-0.5 size-1.5 shrink-0 translate-y-1 rounded-full bg-[var(--danger)]" aria-hidden />
                 <p className="min-w-0 flex-1 text-[var(--fg)]">{ask.error.message}</p>
                 {ask.error.retry && (
                   <button
@@ -967,10 +968,10 @@ function Chip({ label, title, icon, onRemove }: { label: string; title: string; 
 }
 
 const PROPOSAL_STATE: Record<AgentProposal["status"], { label: string; tone: string }> = {
-  pending: { label: "Needs your approval", tone: "text-sky-500 dark:text-sky-400" },
-  applied: { label: "Applied", tone: "text-emerald-600 dark:text-emerald-400" },
-  partial: { label: "Partly applied", tone: "text-amber-600 dark:text-amber-400" },
-  failed: { label: "Couldn't apply", tone: "text-red-600 dark:text-red-400" },
+  pending: { label: "Needs your approval", tone: "text-[var(--info-ink)] dark:text-[var(--info-ink)]" },
+  applied: { label: "Applied", tone: "text-[var(--success)] dark:text-[var(--success)]" },
+  partial: { label: "Partly applied", tone: "text-[var(--status-progress)] dark:text-[var(--status-progress)]" },
+  failed: { label: "Couldn't apply", tone: "text-[var(--danger)] dark:text-[var(--danger)]" },
   rejected: { label: "Rejected", tone: "text-[var(--muted)]" },
   expired: { label: "Expired", tone: "text-[var(--muted)]" },
 };
@@ -1011,23 +1012,24 @@ function ProposalCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border bg-[var(--surface-base)] ${pending ? "border-sky-500/40" : "border-[var(--border-subtle)]"}`}
+      className={`overflow-hidden rounded-xl border bg-[var(--surface-base)] ${pending ? "border-[color-mix(in_srgb,var(--info-ink)_40%,transparent)]" : "border-[var(--border-subtle)]"}`}
     >
       <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
-        <AiIcon className={`size-3.5 shrink-0 ${pending ? "text-sky-400" : "text-[var(--muted)]"}`} />
+        <AiIcon className={`size-3.5 shrink-0 ${pending ? "text-[var(--info-ink)]" : "text-[var(--muted)]"}`} />
         <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]">{proposal.summary}</p>
         <span className={`shrink-0 text-[11px] font-medium ${state.tone}`}>{state.label}</span>
       </div>
 
       <ul className="divide-y divide-[var(--border-subtle)]">
+        <AnimatePresence initial={false}>
         {rows.map((it) => {
           const res = outcome.get(it.taskId);
           return (
-            <li key={it.taskId} className="px-3 py-2">
+            <CollapseItem as="li" key={it.taskId} className="px-3 py-2">
               <div className="flex items-center gap-2">
                 {res && (
                   <span
-                    className={`size-1.5 shrink-0 rounded-full ${res.ok ? "bg-emerald-500" : "bg-red-500"}`}
+                    className={`size-1.5 shrink-0 rounded-full ${res.ok ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`}
                     title={res.ok ? "Done" : res.error}
                     aria-hidden
                   />
@@ -1035,7 +1037,7 @@ function ProposalCard({
                 {/* A task the card would create doesn't exist until it's approved, so it isn't a link before then. */}
                 {proposal.kind === "create" && proposal.status !== "applied" && !res?.ok ? (
                   <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)]">
-                    <span className="mr-1 text-[10px] font-semibold uppercase tracking-wide text-sky-500 dark:text-sky-400">New</span>
+                    <span className="mr-1 text-[11.5px] font-semibold text-[var(--info-ink)] dark:text-[var(--info-ink)]">New</span>
                     {it.title}
                   </span>
                 ) : (
@@ -1065,10 +1067,11 @@ function ProposalCard({
                   <span className="truncate font-medium text-[var(--fg)]">{it.to}</span>
                 </p>
               )}
-              {res && !res.ok && <p className="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{res.error}</p>}
-            </li>
+              {res && !res.ok && <p className="mt-0.5 text-[11px] text-[var(--danger)] dark:text-[var(--danger)]">{res.error}</p>}
+            </CollapseItem>
           );
         })}
+        </AnimatePresence>
       </ul>
       {proposal.items.length > PROPOSAL_PREVIEW && (
         <button
@@ -1204,7 +1207,7 @@ function AssistantTurn({
                 title="Highlight these tasks on the board"
                 className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors hover:bg-[var(--surface-hover)] ${ask.showOnBoard ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}
               >
-                <span className={`size-1.5 rounded-full ${ask.showOnBoard ? "bg-sky-400" : "bg-[var(--border)]"}`} aria-hidden />
+                <span className={`size-1.5 rounded-full ${ask.showOnBoard ? "bg-[var(--info-ink)]" : "bg-[var(--border)]"}`} aria-hidden />
                 {ask.showOnBoard ? `Showing ${mentioned} on board` : `Show ${mentioned} on board`}
               </button>
             )}
@@ -1291,7 +1294,7 @@ function TaskMatches({
 }) {
   return (
     <div className="flex h-full flex-col justify-end">
-      <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">Jump to a task</p>
+      <p className="mb-1.5 px-2 text-[11.5px] font-semibold text-[var(--muted)]">Jump to a task</p>
       {rows.length === 0 && loading ? (
         <p className="px-2 text-xs text-[var(--muted)]">Searching…</p>
       ) : (
@@ -1382,7 +1385,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
       {groups.map((g) => (
         <section key={g.label} className="mb-4">
-          <p className="mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">{g.label}</p>
+          <p className="mb-1 px-2.5 text-[11.5px] font-semibold text-[var(--muted)]">{g.label}</p>
           <ul>
             {g.threads.map((t) => (
               <li
@@ -1407,7 +1410,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
                     }}
                     onBlur={() => setConfirmDelete(null)}
                     autoFocus
-                    className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                    className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
                   >
                     Delete?
                   </button>

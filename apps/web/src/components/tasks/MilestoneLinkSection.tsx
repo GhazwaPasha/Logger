@@ -48,7 +48,7 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
 
   return (
     <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Milestones</h3>
+      <h3 className="text-xs font-semibold text-[var(--muted)]">Milestones</h3>
       <div className="flex flex-wrap items-center gap-1.5">
         {linkedMilestones.map((m) => (
           <button

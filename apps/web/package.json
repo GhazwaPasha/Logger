@@ -11,6 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@animate-ui/react": "^2.4.6",
     "@better-auth/expo": "^1.6.9",
     "@better-auth/infra": "^0.2.5",
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
@@ -26,14 +27,19 @@
     "@work-ledger/contracts": "^0.0.1",
     "@work-ledger/db": "^0.0.1",
     "better-auth": "^1.6.9",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.2",
-    "motion": "^12.43.0",
+    "lucide-react": "^1.74.0",
+    "motion": "^14.14.0",
     "next": "^16.2.4",
     "pg": "^8.20.0",
+    "radix-ui": "^1.8.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

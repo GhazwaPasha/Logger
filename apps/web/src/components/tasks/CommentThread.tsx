@@ -45,7 +45,7 @@ function MentionHighlightedBody({ body }: { body: string }) {
         const match = part.match(/^@\[([^\]]+)\]\(([^)]+)\)$/);
         if (match) {
           return (
-            <span key={i} className="font-medium text-blue-600 dark:text-blue-400">
+            <span key={i} className="font-medium text-[var(--info-ink)] dark:text-[var(--info-ink)]">
               @{match[1]}
             </span>
           );
@@ -161,7 +161,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
   return (
     <div className="relative flex items-end gap-2">
       {showMentionPicker && filteredMembers.length > 0 && (
-        <ul className="absolute bottom-full left-0 z-50 mb-2 max-h-40 w-56 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg">
+        <ul className="absolute bottom-full left-0 z-50 mb-2 max-h-40 w-56 overflow-y-auto rounded-xl bg-[var(--card)] shadow-card py-1 shadow-lg">
           {filteredMembers.map((m) => (
             <li key={m.userId}>
               <button
@@ -199,7 +199,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
         type="button"
         onClick={() => mutation.mutate(body)}
         disabled={!body.trim() || mutation.isPending}
-        className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-neutral-700 hover:bg-neutral-600 disabled:opacity-30 transition-colors"
+        className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-[var(--ink-2)] hover:bg-[var(--ink-2)] disabled:opacity-30 transition-colors"
         aria-label="Send"
       >
         <FontAwesomeIcon icon={faPaperPlane} className="size-[15px]" color="white" />
@@ -300,7 +300,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(comment.id)}
-                  className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-red-500 transition-opacity"
+                  className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--danger)] transition-opacity"
                   aria-label="Delete"
                 >
                   <FontAwesomeIcon icon={faTrashCan} className="size-[11px]" />
@@ -413,13 +413,13 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)]">
       {/* Header */}
       <div className="shrink-0 px-4 pt-4 pb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Comments</h3>
+        <h3 className="text-xs font-semibold text-[var(--muted)]">Comments</h3>
       </div>
 
       {/* Comment list */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5" style={{ maxHeight: "420px" }}>
         {query.isPending && <p className="text-sm text-[var(--muted)]">Loading…</p>}
-        {query.error && <p className="text-sm text-red-600">{(query.error as Error).message}</p>}
+        {query.error && <p className="text-sm text-[var(--danger)]">{(query.error as Error).message}</p>}
         {query.data && roots.length === 0 && !viewOnly && (
           <EmptyState icon={faComment} title="No comments yet" description="Be the first to comment." size="compact" />
         )}

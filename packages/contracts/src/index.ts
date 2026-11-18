@@ -308,6 +308,20 @@ export const seriesSummaryQuerySchema = z.object({
 export type SeriesSummaryQuery = z.infer<typeof seriesSummaryQuerySchema>;
 
 /**
+ * Done-task counts per calendar day, in the workspace time zone, for the dashboard's
+ * "Tasks completed" chart. One grouped COUNT on the server — no rows are fetched.
+ */
+export const completionsByDayQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(90).default(14),
+  timeZone: z.string().min(1).max(64).refine(isValidTimeZone, { message: "Not a recognized IANA timezone" }).optional(),
+  /** Client's local date. Unused by the query; it gives each day its own URL so a cached
+   *  "not modified" answer from yesterday can't hold the chart's window past midnight. */
+  asOf: z.string().max(10).optional(),
+});
+export type CompletionsByDayQuery = z.infer<typeof completionsByDayQuerySchema>;
+export type CompletionsByDayResponse = { days: { date: string; count: number }[] };
+
+/**
  * Occurrence list for one recurring chain, fetched only when its card is expanded. Paginated like
  * the main task list (cursor/limit) — a chain's history is unbounded, so this must never be an
  * unpaginated "fetch everything" query.

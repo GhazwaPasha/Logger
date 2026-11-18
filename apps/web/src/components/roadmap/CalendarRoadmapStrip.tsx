@@ -36,11 +36,11 @@ export function CalendarRoadmapStrip({ year, month }: { year: number; month: num
         <Link
           key={m.id}
           href={`/${workspaceSlug}/roadmap`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-1 text-xs font-medium text-[var(--fg)] transition-colors hover:border-[var(--accent)]"
+          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--card)] shadow-card px-2.5 py-1 text-xs font-medium text-[var(--fg)] transition-colors hover:border-[var(--accent)]"
           title={`${m.title} — ${STATUS_LABELS[m.status]}, ${m.progress.pct}% done`}
         >
           {goalTitleById.get(m.goalId) && (
-            <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+            <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-[11.5px] font-medium text-[var(--muted)]">
               {goalTitleById.get(m.goalId)}
             </span>
           )}

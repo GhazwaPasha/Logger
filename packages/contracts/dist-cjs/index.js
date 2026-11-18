@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.seriesOccurrencesQuerySchema = exports.seriesSummaryQuerySchema = exports.taskCountsQuerySchema = exports.DASHBOARD_WINDOW_DAYS = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
+exports.createApiKeySchema = exports.logTimeEntrySchema = exports.linkMilestoneTasksSchema = exports.updateMilestoneSchema = exports.createMilestoneSchema = exports.updateGoalSchema = exports.createGoalSchema = exports.roadmapStatusSchema = exports.editCommentSchema = exports.createCommentSchema = exports.seriesOccurrencesQuerySchema = exports.completionsByDayQuerySchema = exports.seriesSummaryQuerySchema = exports.taskCountsQuerySchema = exports.DASHBOARD_WINDOW_DAYS = exports.listTasksQuerySchema = exports.taskCapabilitiesSchema = exports.discordIntegrationConfigSchema = exports.patchTaskSchema = exports.updateTaskStatusSchema = exports.rescheduleTaskSchema = exports.appendLedgerSchema = exports.reorderListsSchema = exports.updateListSchema = exports.createListSchema = exports.createTaskSchema = exports.MAX_SUBTASKS_PER_TASK_MUTATION = exports.updateSubtaskSchema = exports.createSubtaskSchema = exports.reorderDepartmentsSchema = exports.updateDepartmentSchema = exports.createDepartmentSchema = exports.upsertOrganizationMemberSchema = exports.updateOrganizationSchema = exports.createOrganizationSchema = exports.appendableLedgerTypeSchema = exports.ledgerTypeSchema = exports.taskDueRepeatSchema = exports.taskPrioritySchema = exports.taskManualStatusInputSchema = exports.taskStatusInputSchema = exports.taskStatusSchema = exports.taskManualStatusSchema = exports.orgRoleSchema = void 0;
 exports.dashboardClosedSince = dashboardClosedSince;
 const zod_1 = require("zod");
 const timezone_js_1 = require("./timezone.js");
@@ -279,6 +279,17 @@ exports.taskCountsQuerySchema = zod_1.z.object(boardFilterQueryFields);
 exports.seriesSummaryQuerySchema = zod_1.z.object({
     status: zod_1.z.string().min(1).transform((s) => s.split(",").filter(Boolean)),
     ...boardFilterQueryFields,
+});
+/**
+ * Done-task counts per calendar day, in the workspace time zone, for the dashboard's
+ * "Tasks completed" chart. One grouped COUNT on the server — no rows are fetched.
+ */
+exports.completionsByDayQuerySchema = zod_1.z.object({
+    days: zod_1.z.coerce.number().int().min(1).max(90).default(14),
+    timeZone: zod_1.z.string().min(1).max(64).refine(timezone_js_1.isValidTimeZone, { message: "Not a recognized IANA timezone" }).optional(),
+    /** Client's local date. Unused by the query; it gives each day its own URL so a cached
+     *  "not modified" answer from yesterday can't hold the chart's window past midnight. */
+    asOf: zod_1.z.string().max(10).optional(),
 });
 /**
  * Occurrence list for one recurring chain, fetched only when its card is expanded. Paginated like

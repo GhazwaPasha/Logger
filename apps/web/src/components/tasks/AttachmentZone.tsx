@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLock } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { formatInTimeZone } from "@/lib/date";
+import { CollapseItem } from "@/components/ui/Collapse";
 
 type AttachmentRow = {
   id: string;
@@ -50,7 +51,6 @@ type Props = {
 export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
   const { timeZone } = useWorkspaceRoute();
   const queryClient = useQueryClient();
-  const prefersReduced = useReducedMotion();
   const [confirm, setConfirm] = useState<ConfirmDialogOptions | null>(null);
 
   const query = useQuery({
@@ -71,7 +71,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
     <div className="space-y-2">
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Attachments</h3>
+        <h3 className="text-xs font-semibold text-[var(--muted)]">Attachments</h3>
         {!viewOnly && (
           <button
             type="button"
@@ -90,18 +90,10 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
       )}
 
       {query.data && query.data.length > 0 && (
-        <ul className="space-y-1">
+        <ul>
           <AnimatePresence initial={false}>
             {query.data.map((a) => (
-              <motion.li
-                key={a.id}
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
-                className="flex items-center gap-2 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2"
-              >
+              <CollapseItem as="li" key={a.id} reorder className="pb-1"><div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2">
                 {a.storageKey ? (
                   <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
                 ) : (
@@ -143,7 +135,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                     }
                     disabled={deleteMutation.isPending}
                     aria-label="Delete attachment"
-                    className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] transition-colors"
+                    className="shrink-0 rounded-md p-1 text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--surface-hover)] transition-colors"
                   >
                     <svg viewBox="0 0 16 16" fill="currentColor" className="size-3.5" aria-hidden>
                       <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
@@ -151,7 +143,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                     </svg>
                   </button>
                 )}
-              </motion.li>
+              </div></CollapseItem>
             ))}
           </AnimatePresence>
         </ul>

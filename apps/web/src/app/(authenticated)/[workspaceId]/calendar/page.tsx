@@ -16,16 +16,16 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_NAMES_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
 const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-red-500",
-  medium: "bg-amber-500",
-  low: "bg-green-500",
+  high: "bg-[var(--danger)]",
+  medium: "bg-[var(--status-progress)]",
+  low: "bg-[var(--success)]",
 };
 
 const STATUS_CHIP: Record<string, string> = {
-  pending: "bg-slate-500/15 dark:bg-slate-500/25",
-  in_progress: "bg-blue-500/15 dark:bg-blue-500/25",
-  done: "bg-green-500/15 dark:bg-green-500/25",
-  cancelled: "bg-neutral-400/15 dark:bg-neutral-500/25",
+  pending: "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] dark:bg-[color-mix(in_srgb,var(--ink-2)_25%,transparent)]",
+  in_progress: "bg-[color-mix(in_srgb,var(--info-ink)_15%,transparent)] dark:bg-[color-mix(in_srgb,var(--info-ink)_25%,transparent)]",
+  done: "bg-[color-mix(in_srgb,var(--success)_15%,transparent)] dark:bg-[color-mix(in_srgb,var(--success)_25%,transparent)]",
+  cancelled: "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] dark:bg-[color-mix(in_srgb,var(--ink-2)_25%,transparent)]",
 };
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -205,7 +205,7 @@ export default function CalendarPage() {
 
   const todayStr = isoDateStr(today.year, today.month - 1, today.day);
 
-  const dropdownClass = "inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]";
+  const dropdownClass = "inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]";
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4 px-1 sm:px-0">
@@ -305,7 +305,7 @@ export default function CalendarPage() {
           <div className="min-w-[280px]">
             <div className="grid grid-cols-7 border-b border-[var(--border-subtle)]">
               {DAY_NAMES.map((d, i) => (
-                <div key={d} className="px-1 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)] sm:px-2">
+                <div key={d} className="px-1 py-2 text-center text-[12px] font-semibold text-[var(--muted)] sm:px-2">
                   <span className="hidden sm:inline">{d}</span>
                   <span className="sm:hidden">{DAY_NAMES_SHORT[i]}</span>
                 </div>
@@ -337,7 +337,7 @@ export default function CalendarPage() {
                                   onClick={() => openTask(t.id)}
                                   className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""} ${idx >= 1 ? "hidden sm:flex" : ""}`}
                                 >
-                                  <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-slate-400"}`} aria-hidden />
+                                  <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-[var(--ink-2)]"}`} aria-hidden />
                                   <span className="min-w-0 truncate">{t.title}</span>
                                 </button>
                               );
@@ -363,7 +363,7 @@ export default function CalendarPage() {
         {noDateTasks.length > 0 && (
           <div className="w-full lg:w-52 lg:shrink-0">
             <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface)] p-3">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <h3 className="mb-2 text-xs font-semibold text-[var(--muted)]">
                 No due date ({noDateTasks.length})
               </h3>
               <ul className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-1">
@@ -376,7 +376,7 @@ export default function CalendarPage() {
                         onClick={() => openTask(t.id)}
                         className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs leading-snug text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""}`}
                       >
-                        <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-slate-400"}`} aria-hidden />
+                        <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-[var(--ink-2)]"}`} aria-hidden />
                         <span className="min-w-0 truncate">{t.title}</span>
                       </button>
                     </li>

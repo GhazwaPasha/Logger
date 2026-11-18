@@ -4,13 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { faLayerGroup, faListUl } from "@fortawesome/free-solid-svg-icons";
-import {
-  readWorkBoardScope,
-  writeWorkBoardScope,
-  WORK_BOARD_SCOPE_EVENT,
-} from "@/lib/work-board-scope";
+import { readWorkBoardScope, writeWorkBoardScope, WORK_BOARD_SCOPE_EVENT } from "@/lib/work-board-scope";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { apiJson, apiVoid } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
@@ -27,7 +23,9 @@ import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+import { CalendarDays, ChartNoAxesColumn, CircleCheck, LayoutGrid, Milestone, Target } from "lucide-react";
+
+import { Collapse } from "@/components/ui/Collapse";
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -71,8 +69,8 @@ function moveBefore<T extends string>(order: T[], draggedId: T, targetId: T): T[
 
 function rowBase(active: boolean, compact = false) {
   return [
-    `flex min-w-0 items-center gap-1 rounded-md ${compact ? "py-0.5" : "py-1.5"} pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]`,
-    active ? "bg-[var(--accent-muted)] text-[var(--fg)]" : "text-[var(--fg)] hover:bg-[var(--surface-hover)]",
+    `flex min-w-0 items-center gap-1 rounded-md ${compact ? "py-0.5" : "py-1"} pr-2 text-left text-sm font-semibold transition-[background-color,color,transform] duration-200 ease-out motion-safe:active:scale-[0.99]`,
+    active ? "bg-[var(--card)] text-[var(--fg)] shadow-card" : "text-[var(--fg)] hover:bg-[var(--fill)]",
   ].join(" ");
 }
 
@@ -602,7 +600,7 @@ export function WorkspaceSidebar({
     <>
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="fixed inset-0 z-40 bg-[var(--scrim)] backdrop-blur-[2px] md:hidden"
           aria-hidden
           onClick={onMobileClose}
         />
@@ -610,7 +608,7 @@ export function WorkspaceSidebar({
     <aside
       className={[
         "ui-sidebar-chrome font-outfit flex min-h-0 shrink-0 flex-col bg-[var(--surface-nav)]",
-        "fixed inset-y-0 left-0 z-50 w-72 border-r border-[var(--border-subtle)] transition-transform duration-300 ease-out",
+        "fixed inset-y-0 left-0 z-50 w-72 border-r border-[var(--line)] transition-transform duration-[380ms] ease-[var(--motion-move)]",
         mobileOpen ? "translate-x-0" : "-translate-x-full",
         "md:relative md:h-full md:w-60 md:translate-x-0 md:border-r-0 md:transition-none",
       ].join(" ")}
@@ -628,11 +626,11 @@ export function WorkspaceSidebar({
         onClose={() => setStructureMenu(null)}
       />
       <nav className="flex min-h-0 flex-1 flex-col" aria-label="Workspace tree">
-        <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-2 pb-2">
           <button
             type="button"
             onClick={() => setWorkspacePickerOpen((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-[background-color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] motion-safe:active:scale-[0.99]"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-[background-color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] motion-safe:active:scale-[0.99]"
             aria-expanded={workspacePickerOpen}
             aria-label="Toggle workspace switcher"
           >
@@ -647,7 +645,7 @@ export function WorkspaceSidebar({
             <Chevron open={workspacePickerOpen} />
           </button>
           {workspacePickerOpen && (
-            <div className="ui-dropdown-pop origin-top-left mt-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-base)] p-1 shadow-lg shadow-black/10 dark:shadow-black/40">
+            <div className="ui-dropdown-pop origin-top-left mt-2 rounded-xl border border-[var(--line)] bg-[var(--card-raised)] p-1 shadow-overlay">
               <ul className="space-y-0.5">
                 {orgs.map((o) => {
                   const active = o.id === workspaceId;
@@ -674,39 +672,48 @@ export function WorkspaceSidebar({
               </Link>
             </div>
           )}
-          <div className="mt-2 space-y-0.5 px-1">
+          <div className="mt-1 space-y-px px-1">
             {[
-              { href: `${base}/dashboard`, active: activeDashboard, label: "Dashboard" },
+              { href: `${base}/dashboard`, active: activeDashboard, label: "Dashboard", Icon: LayoutGrid, tint: "var(--dept-1)" },
               ...(showPerformanceLink
-                ? [{ href: `${base}/performance`, active: activePerformance, label: "Performance" }]
+                ? [{ href: `${base}/performance`, active: activePerformance, label: "Performance", Icon: ChartNoAxesColumn, tint: "var(--dept-4)" }]
                 : []),
-              { href: `${base}/roadmap`, active: activeRoadmap, label: "Roadmap" },
-              { href: `${base}/trackers`, active: activeTrackers, label: "Trackers" },
-              { href: `${base}/calendar`, active: activeCalendar, label: "Calendar" },
-              { href: `${base}/my-tasks`, active: activeMyTasks, label: "My tasks" },
+              { href: `${base}/roadmap`, active: activeRoadmap, label: "Roadmap", Icon: Milestone, tint: "var(--dept-3)" },
+              { href: `${base}/trackers`, active: activeTrackers, label: "Trackers", Icon: Target, tint: "var(--dept-2)" },
+              { href: `${base}/calendar`, active: activeCalendar, label: "Calendar", Icon: CalendarDays, tint: "var(--danger)" },
+              { href: `${base}/my-tasks`, active: activeMyTasks, label: "My tasks", Icon: CircleCheck, tint: "#8E8E93" },
             ].map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={item.active ? "page" : undefined}
-                className="relative flex min-w-0 items-center gap-1 rounded-md py-1.5 pl-2 pr-2 text-left text-sm font-semibold text-[var(--fg)] transition-transform duration-200 ease-out motion-safe:active:scale-[0.99] hover:bg-[var(--surface-hover)]"
+                className="relative flex min-w-0 items-center gap-2.5 rounded-lg py-1 pl-1.5 pr-2 text-left text-sm font-semibold text-[var(--fg)] transition-[background-color,transform] duration-150 ease-[var(--motion-respond)] active:scale-[0.98] hover:bg-[var(--fill)]"
               >
                 {item.active && (
                   <motion.span
                     layoutId="sidebar-primary-nav-pill"
-                    className="absolute inset-0 rounded-md bg-[var(--accent-muted)]"
-                    transition={{ duration: motionDuration(0.28, prefersReduced), ease: POP_EASE }}
+                    className="absolute inset-0 rounded-lg bg-[var(--card)] shadow-card"
+                    transition={prefersReduced ? { duration: 0 } : { type: "spring", duration: 0.38, bounce: 0 }}
                   />
                 )}
+                {/* Light: the icon carries its color. Dark: a plain neutral icon (no tile, no color). */}
+                <item.Icon
+                  aria-hidden
+                  className="relative size-[18px] shrink-0 text-[var(--nav-tint)] dark:text-[var(--ink-2)]"
+                  style={{ "--nav-tint": item.tint } as React.CSSProperties}
+                  strokeWidth={2}
+                />
                 <span className="relative truncate">{item.label}</span>
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+        <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-1.5">
           <div
-            className="group/alltasks mb-1 flex w-full items-center gap-0.5 rounded-md hover:bg-[var(--surface-hover)]"
+            // Stays pinned flush at the top while the tree scrolls under it: opaque sidebar fill, with the hover
+            // tint layered on top so it stays opaque.
+            className="group/alltasks sticky top-0 z-10 mb-1 flex w-full items-center gap-0.5 rounded-md bg-[var(--surface-nav)] hover:[background-image:linear-gradient(var(--surface-hover),var(--surface-hover))]"
             onContextMenu={(e) => {
               if (!canRenameOrgStructure) return;
               e.preventDefault();
@@ -750,7 +757,7 @@ export function WorkspaceSidebar({
             )}
             <button
               type="button"
-              className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+              className="shrink-0 rounded-md p-1.5 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
               aria-expanded={orgTreeOpen}
               aria-label={
                 orgTreeOpen
@@ -762,17 +769,7 @@ export function WorkspaceSidebar({
               <Chevron open={orgTreeOpen} />
             </button>
           </div>
-          <AnimatePresence initial={false}>
-            {orgTreeOpen && (
-              <motion.div
-                key="org-tree"
-                className="space-y-2"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-                exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-                transition={{ duration: motionDuration(0.24, prefersReduced), ease: POP_EASE }}
-                style={{ overflow: "hidden" }}
-              >
+          <Collapse open={orgTreeOpen} className="space-y-2">
                 {workspaceLoading ? (
                   <LoadingFrame
                     show
@@ -788,7 +785,7 @@ export function WorkspaceSidebar({
                 ) : depts.length === 0 ? (
                   <EmptyState icon={faLayerGroup} title={`No ${NODE_LABELS.level.toLowerCase()}s yet.`} size="compact" />
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul className="space-y-px">
                 {sortedDepts.map((d) => {
                   const open = expanded.has(d.id);
                   const levelLists = listsByLevel.get(d.id) ?? [];
@@ -843,7 +840,7 @@ export function WorkspaceSidebar({
                       >
                         {renamingLevelId === d.id ? (
                           <div
-                            className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 ${
+                            className={`flex min-w-0 flex-1 items-center gap-2 px-2 py-1 ${
                               pathname === `${base}/work` &&
                               boardScope?.levelId === d.id &&
                               boardScope?.listId == null
@@ -906,7 +903,7 @@ export function WorkspaceSidebar({
                             )}
                             <Link
                               href={`${base}/work`}
-                              className={`flex min-w-0 flex-1 items-center px-2 py-1.5 pr-1 ${
+                              className={`flex min-w-0 flex-1 items-center px-2 py-1 pr-1 ${
                                 reorderMode ? "cursor-grab active:cursor-grabbing" : ""
                               }`}
                               title={`Open ${d.name}`}
@@ -924,7 +921,7 @@ export function WorkspaceSidebar({
                         )}
                         <button
                           type="button"
-                          className="shrink-0 rounded-md p-2 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
+                          className="shrink-0 rounded-md p-1.5 text-[var(--muted)] transition-colors duration-150 hover:bg-[var(--accent-muted)] hover:text-[var(--fg)]"
                           aria-expanded={open}
                           aria-label={open ? `Collapse ${d.name}` : `Expand ${d.name}`}
                           onClick={() => toggleLevel(d.id)}
@@ -932,18 +929,9 @@ export function WorkspaceSidebar({
                           <Chevron open={open} />
                         </button>
                       </div>
-                      <AnimatePresence initial={false}>
-                        {open && (
-                          <motion.ul
-                            key="lists"
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-                            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-                            transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-                            style={{ overflow: "hidden" }}
-                          >
+                      <Collapse open={open} as="ul">
                           {levelLists.length === 0 ? (
-                            <li className="py-1 pl-1">
+                            <li className="pl-1">
                               <EmptyState icon={faListUl} title={`No ${NODE_LABELS.list.toLowerCase()}s yet`} size="compact" />
                             </li>
                           ) : (
@@ -1067,7 +1055,7 @@ export function WorkspaceSidebar({
                                         )}
                                         <Link
                                           href={`${base}/work`}
-                                          className={`flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-1.5 pr-1 ${
+                                          className={`flex min-w-0 flex-1 items-center gap-1 overflow-hidden py-0.5 pr-1 ${
                                             reorderMode ? "cursor-grab active:cursor-grabbing" : ""
                                           }`}
                                           title={l.name}
@@ -1101,7 +1089,7 @@ export function WorkspaceSidebar({
                             })
                           )}
                           {showAddListForLevel === d.id && (
-                            <li className="py-1 pl-1">
+                            <li className="pl-1">
                               <div
                                 className="relative"
                                 aria-busy={addingList ? true : undefined}
@@ -1145,9 +1133,7 @@ export function WorkspaceSidebar({
                               </div>
                             </li>
                           )}
-                          </motion.ul>
-                        )}
-                      </AnimatePresence>
+                      </Collapse>
                     </li>
                   );
                 })}
@@ -1195,10 +1181,8 @@ export function WorkspaceSidebar({
                     </div>
                   </div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <div className="space-y-0.5 border-t border-[var(--border-subtle)] pt-1">
+              </Collapse>
+          <div className="space-y-px border-t border-[var(--border-subtle)] pt-1">
             <Link href={`${base}/archived`} className={`${rowBase(activeArchived)} pl-2`}>
               Archived
             </Link>

@@ -24,8 +24,8 @@ type EditState = {
 };
 
 const ROLE_BADGE: Record<string, string> = {
-  owner: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
-  manager: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  owner: "bg-[var(--status-progress)] text-[var(--status-progress)] dark:bg-[color-mix(in_srgb,var(--status-progress)_30%,transparent)] dark:text-[var(--status-progress)]",
+  manager: "bg-[var(--info-ink)] text-[var(--info-ink)] dark:bg-[color-mix(in_srgb,var(--info-ink)_30%,transparent)] dark:text-[var(--info-ink)]",
   member: "bg-[var(--surface-muted)] text-[var(--fg-muted,var(--muted))]",
 };
 
@@ -322,12 +322,12 @@ export default function PeoplePage() {
 
                 {/* Delete confirmation */}
                 {isConfirmingDelete && !editing && (
-                  <div className="rounded-lg border border-red-500/40 bg-red-500/[0.04] p-3 text-xs dark:bg-red-500/[0.06]">
-                    <p className="mb-2 font-medium text-red-700 dark:text-red-300">Remove {m.name} from the workspace?</p>
+                  <div className="rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--danger)_4%,transparent)] p-3 text-xs dark:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)]">
+                    <p className="mb-2 font-medium text-[var(--danger)] dark:text-[var(--danger)]">Remove {m.name} from the workspace?</p>
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--danger)] px-3 py-1.5 text-xs font-medium text-[var(--danger)] transition-colors hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] disabled:cursor-not-allowed disabled:opacity-50 dark:text-[var(--danger)]"
                         onClick={() => void deleteMember(m.userId)}
                         disabled={removeBusy}
                         aria-busy={removeBusy || undefined}
@@ -360,7 +360,7 @@ export default function PeoplePage() {
                     </button>
                     <button
                       type="button"
-                      className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
                       onClick={() => setDeleteConfirm(m.userId)}
                     >
                       <FontAwesomeIcon icon={faTrash} className="size-3" aria-hidden />

@@ -42,7 +42,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@/lib/api";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { SimpleContextMenu, type SimpleContextMenuItem } from "@/components/ui/SimpleContextMenu";
-import { POP_EASE, backdropVariants, motionDuration, panelPopVariants } from "@/components/ui/motion-presets";
+import { curve, reducedDuration, variants } from "@/lib/motion";
 import { taskEditCaps } from "@/lib/workspace-permissions";
 import { formatInTimeZone, getZonedParts } from "@/lib/date";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -66,6 +66,8 @@ import { usePrefetchTaskDetail } from "@/hooks/usePrefetchTaskDetail";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
+import { NewButton } from "@/components/ui/NewButton";
+import { Collapse } from "@/components/ui/Collapse";
 import { Avatar } from "@/components/ui/Avatar";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { NODE_LABELS } from "@/lib/nodes";
@@ -150,6 +152,31 @@ function saveTaskPaneWidth(w: number) {
 }
 
 type ViewMode = "list" | "kanban";
+
+/** Small ring that fills as subtasks get done — the card header's progress glyph. */
+function SubtaskRing({ done, total }: { done: number; total: number }) {
+  const r = 7;
+  const c = 2 * Math.PI * r;
+  const frac = total > 0 ? done / total : 0;
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" className="-rotate-90 shrink-0" aria-hidden>
+      <circle cx={9} cy={9} r={r} fill="none" strokeWidth={2.4} style={{ stroke: "var(--fill-2)" }} />
+      <circle
+        cx={9}
+        cy={9}
+        r={r}
+        fill="none"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeDasharray={`${frac * c} ${c}`}
+        style={{
+          stroke: frac === 1 ? "var(--status-done)" : "var(--info-ink)",
+          transition: "stroke-dasharray 420ms var(--motion-move)",
+        }}
+      />
+    </svg>
+  );
+}
 
 function IconChevron({ className, open }: { className?: string; open: boolean }) {
   return (
@@ -264,11 +291,11 @@ const LIST_ROW_BADGE_LABEL =
 
 /** List / kanban: overflow control to open task edit panel (matches list badge row height). */
 const TASK_ROW_OVERFLOW_MENU_BTN =
-  "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]";
+  "inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]";
 
 /** Kanban card meta row: priority tile fills an equal-width cell (matches list-row tile height). */
 const KANBAN_PRIORITY_SHELL_LAYOUT =
-  "relative box-border inline-flex h-8 w-full min-h-8 max-h-8 min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-sm border-0 bg-[var(--surface-muted)] px-1 py-0.5 text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--accent)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]";
+  "relative box-border inline-flex h-8 w-full min-h-8 max-h-8 min-w-0 shrink-0 items-center justify-center overflow-hidden rounded-sm border-0 bg-[var(--surface-muted)] px-1 py-0.5 text-[var(--fg)] hover:opacity-95 focus-within:ring-2 focus-within:ring-[var(--focus-ring)] focus-within:ring-offset-2 focus-within:ring-offset-[var(--surface-elevated)]";
 
 /** Kanban grid: due chip must fill the cell (overrides {@link TASK_DUE_CHIP_CLASS} `w-max` / `min-w` / `shrink-0`). */
 const KANBAN_DUE_CHIP_CELL = "!w-full !min-w-0 !shrink justify-start px-1.5";
@@ -297,11 +324,11 @@ function formatCustomDueChip(ymd: string): string {
 /** Toolbar icon buttons all share one footprint (`size-10`) and one icon size ({@link TASKS_TOOLBAR_ICON_CLASS}) so hover highlights line up. */
 function tasksToolbarIconButtonClasses(active: boolean) {
   return [
-    "inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)]",
+    "pressable relative inline-flex size-9 shrink-0 items-center justify-center rounded-[10px]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sheet)]",
     active
-      ? "bg-[var(--fg)] text-[var(--surface-base)]"
-      : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]",
+      ? "bg-[var(--card)] text-[var(--fg)] shadow-card"
+      : "text-[var(--muted)] hover:bg-[var(--fill-2)] hover:text-[var(--fg)]",
   ].join(" ");
 }
 
@@ -312,8 +339,8 @@ const DONE_CANCELLED_STATUSES = ["done", "cancelled"] as const;
 /** done/cancelled columns group same-chain occurrences into one card; other columns show every task individually. */
 const SERIES_GROUPED_COLUMNS = new Set<string>(DONE_CANCELLED_STATUSES);
 
-const DROP_VALID_CLASSES = ["border-[var(--accent)]", "bg-[var(--accent-glow-soft)]"];
-const DROP_INVALID_CLASSES = ["border-red-400/50", "bg-red-500/[0.04]"];
+const DROP_VALID_CLASSES = ["border-[var(--line-strong)]", "bg-[var(--fill)]"];
+const DROP_INVALID_CLASSES = ["border-[color-mix(in_srgb,var(--danger)_45%,transparent)]", "bg-[color-mix(in_srgb,var(--danger)_5%,transparent)]"];
 
 type ColumnItem =
   | { kind: "task"; task: TaskRow }
@@ -323,7 +350,7 @@ type ColumnItem =
 function TaskCardSkeleton() {
   return (
     <div
-      className="animate-pulse rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2.5 py-2.5"
+      className="animate-pulse rounded-xl bg-[var(--card)] shadow-card px-2.5 py-2.5"
       aria-hidden
     >
       <div className="h-3 w-3/4 rounded bg-[var(--surface-hover)]" />
@@ -437,8 +464,8 @@ function ColumnList({
               key={item.task.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: motionDuration(0.15, prefersReduced) }}
-              className="pb-1"
+              transition={{ duration: reducedDuration(0.15, prefersReduced) }}
+              className="pb-2.5"
             >
               {renderTaskCard(item.task)}
             </motion.div>
@@ -450,7 +477,7 @@ function ColumnList({
               key={item.summary.seriesId}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: motionDuration(0.15, prefersReduced) }}
+              transition={{ duration: reducedDuration(0.15, prefersReduced) }}
               className="pb-1"
             >
               <RecurringSeriesCard
@@ -475,7 +502,7 @@ function ColumnList({
                   setAttemptedCursor(null);
                   void loadMoreColumn(item.status);
                 }}
-                className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+                className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
               >
                 Couldn&apos;t load more · retry ({item.loaded} of {item.total})
               </button>
@@ -491,7 +518,7 @@ function ColumnList({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                    transition={{ duration: reducedDuration(0.15, prefersReduced) }}
                     className="flex flex-col gap-1"
                   >
                     <TaskCardSkeleton />
@@ -588,7 +615,7 @@ function KanbanBoard({
             type="button"
             onClick={() => scrollByPage(-1)}
             aria-label="Scroll columns left"
-            className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+            className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
             <FontAwesomeIcon icon={faChevronLeft} className="size-3" aria-hidden />
           </button>
@@ -598,7 +625,7 @@ function KanbanBoard({
             type="button"
             onClick={() => scrollByPage(1)}
             aria-label="Scroll columns right"
-            className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
+            className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
             <FontAwesomeIcon icon={faChevronRight} className="size-3" aria-hidden />
           </button>
@@ -815,20 +842,20 @@ function ListViewCards({
           item.kind === "task" ? (
             <motion.div
               key={item.task.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: motionDuration(0.15, prefersReduced) }}
-              className="mb-1 break-inside-avoid"
+              initial={prefersReduced ? { opacity: 0 } : { opacity: 0, transform: "translateY(12px)" }}
+              animate={{ opacity: 1, transform: "translateY(0px)" }}
+              transition={prefersReduced ? { duration: 0.15 } : { type: "spring", duration: 0.45, bounce: 0.1 }}
+              className="mb-2.5 break-inside-avoid"
             >
               {renderTaskCard(item.task)}
             </motion.div>
           ) : (
             <motion.div
               key={item.summary.seriesId}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: motionDuration(0.15, prefersReduced) }}
-              className="mb-1 break-inside-avoid"
+              initial={prefersReduced ? { opacity: 0 } : { opacity: 0, transform: "translateY(12px)" }}
+              animate={{ opacity: 1, transform: "translateY(0px)" }}
+              transition={prefersReduced ? { duration: 0.15 } : { type: "spring", duration: 0.45, bounce: 0.1 }}
+              className="mb-2.5 break-inside-avoid"
             >
               <RecurringSeriesCard
                 orgId={workspaceId}
@@ -853,7 +880,7 @@ function ListViewCards({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: motionDuration(0.15, prefersReduced) }}
+                transition={{ duration: reducedDuration(0.15, prefersReduced) }}
                 className="flex flex-col gap-2"
               >
                 <TaskCardSkeleton />
@@ -869,7 +896,7 @@ function ListViewCards({
                 setAttemptedCursors((prev) => ({ ...prev, [status]: null }));
                 void loadMoreColumn(status);
               }}
-              className="w-full rounded-lg border border-red-400/40 px-3 py-2 text-[11px] font-medium text-red-400 hover:bg-red-500/[0.06] transition-colors"
+              className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
             >
               Couldn&apos;t load more {FLOW_COLUMN_LABELS[status]} tasks · retry
             </button>
@@ -1697,11 +1724,9 @@ function WorkItemsInner() {
     const assigneeInitial = assigneeFirstName?.trim().charAt(0).toUpperCase() ?? "";
     return (
       <div
-        className={`group/card relative overflow-hidden rounded-xl border transition-[border-color,background-color,transform] duration-200 ${
-          taskPatchSyncing
-            ? "border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
-            : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)]"
-        }`}
+        className={`group/card relative overflow-hidden rounded-2xl bg-[var(--card)] transition-[box-shadow,background-color,opacity] duration-200 ease-[var(--motion-respond)] ${
+          viewTaskId === task.id ? "bg-[var(--card-raised)] shadow-raised" : "shadow-card"
+        } ${taskPatchSyncing ? "opacity-[0.92]" : ""}`}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
         onMouseEnter={() => prefetchTaskDetail(task.id)}
       >
@@ -1712,7 +1737,7 @@ function WorkItemsInner() {
         ) : null}
 
         {/* Header: checkbox + title + status + overflow */}
-        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+        <div className="flex items-center gap-3 px-4 pt-3.5 pb-1.5">
           <button
             type="button"
             role="checkbox"
@@ -1739,14 +1764,14 @@ function WorkItemsInner() {
                     : "Cannot advance task"
             }
             aria-busy={taskPatchSyncing || undefined}
-            className={`flex size-[18px] shrink-0 items-center justify-center rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+            className={`pressable flex size-5 shrink-0 items-center justify-center rounded-full transition-[background-color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] ${
               checklistDone
-                ? "surface-glass-primary border-solid text-[var(--fg)]"
-                : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-base)] text-[var(--muted)] hover:border-[var(--accent)]"
+                ? "bg-[var(--status-done)] text-white"
+                : "text-[var(--muted)] shadow-[inset_0_0_0_1.5px_var(--ink-3)] hover:shadow-[inset_0_0_0_1.5px_var(--ink-2)]"
             } ${
               taskPatchSyncing || checklistDisabled || (!checklistDone && advanceTo == null)
                 ? "cursor-not-allowed opacity-40"
-                : "cursor-pointer hover:bg-[var(--surface-hover)]"
+                : "cursor-pointer"
             }`}
             onClick={() => {
               if (taskPatchSyncing || checklistDisabled) return;
@@ -1760,7 +1785,7 @@ function WorkItemsInner() {
             {taskPatchSyncing ? (
               <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
             ) : checklistDone ? (
-              <FontAwesomeIcon icon={faCheck} className="size-[11px] shrink-0" aria-hidden />
+              <FontAwesomeIcon icon={faCheck} className="size-[10px] shrink-0" aria-hidden />
             ) : null}
           </button>
 
@@ -1768,9 +1793,9 @@ function WorkItemsInner() {
             <button
               type="button"
               onClick={() => openViewTask(task.id)}
-              className={`line-clamp-2 text-left text-sm font-medium leading-snug underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+              className={`line-clamp-2 text-left text-[15px] font-semibold leading-snug tracking-[-0.01em] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
                 flowCol === "cancelled"
-                  ? "text-[var(--muted)] line-through decoration-red-500"
+                  ? "text-[var(--muted)] line-through decoration-[var(--danger)]"
                   : checklistDone
                     ? "text-[var(--muted)] line-through decoration-[var(--muted)]"
                     : "text-[var(--fg)]"
@@ -1782,11 +1807,11 @@ function WorkItemsInner() {
 
           <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
             <RecurringTaskMark repeat={task.dueRepeat} />
-            <KanbanStatusPill task={task} />
+            {KanbanStatusPill({ task })}
             <button
               type="button"
               onClick={() => openViewTask(task.id)}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] group-hover/card:opacity-100"
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] group-hover/card:opacity-100"
               title="Edit task"
               aria-label={`More options — edit: ${task.title}`}
             >
@@ -1796,26 +1821,32 @@ function WorkItemsInner() {
         </div>
 
         {/* Subtasks + meta row — always visible */}
-        <div className="border-t border-[var(--border-subtle)]/40 px-3 pb-2 pt-2" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="pb-3 pl-12 pr-4" onMouseDown={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             {subtasksPreview.length > 0 ? (
               <button
                 type="button"
                 onClick={() => toggleListRowExpand(task.id)}
                 aria-expanded={expanded}
-                className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
               >
-                Subtasks
                 {Array.isArray(subtasksState) ? (
-                  <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
-                ) : null}
+                  <>
+                    <SubtaskRing done={subtasksState.filter((x) => x.done).length} total={subtasksState.length} />
+                    <span className="tabular-nums">
+                      {subtasksState.filter((x) => x.done).length} of {subtasksState.length}
+                    </span>
+                  </>
+                ) : (
+                  "Subtasks"
+                )}
                 <IconChevron open={expanded} className="opacity-70" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => openViewTask(task.id)}
-                className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                 title="Add subtasks"
                 aria-label="Add subtasks"
               >
@@ -1826,15 +1857,15 @@ function WorkItemsInner() {
             <div className="flex-1" />
             <div className="flex items-center gap-1">
               <TaskMilestoneIconBtn taskId={task.id} />
-              <AssigneeIconBtn task={task} />
-              <DueIconBtn task={task} />
-              <PriorityIconBtn task={task} />
-              <AttachIconBtn task={task} />
-              <DiscordIconBtn task={task} />
+              {AssigneeIconBtn({ task })}
+              {DueIconBtn({ task })}
+              {PriorityIconBtn({ task })}
+              {AttachIconBtn({ task })}
+              {DiscordIconBtn({ task })}
             </div>
           </div>
-          {expanded && subtasksPreview.length > 0 && (
-            <ul className="mt-1.5 space-y-1">
+          <Collapse open={expanded && subtasksPreview.length > 0} className="pt-2">
+            <ul className="space-y-1.5">
               {subtasksPreview.map((s) => {
                 const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                 return (
@@ -1844,17 +1875,17 @@ function WorkItemsInner() {
                       disabled={subPending}
                       onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
                       aria-busy={subPending || undefined}
-                      className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
+                      className={`pressable mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] transition-[background-color,box-shadow] duration-150 ${
                         s.done
-                          ? "surface-glass-primary border-solid"
-                          : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                          ? "bg-[var(--info-ink)] text-white"
+                          : "shadow-[inset_0_0_0_1.4px_var(--ink-3)] hover:shadow-[inset_0_0_0_1.4px_var(--ink-2)]"
                       } disabled:cursor-not-allowed disabled:opacity-60`}
                       aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                     >
                       {subPending ? (
                         <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
                       ) : s.done ? (
-                        <FontAwesomeIcon icon={faCheck} className="size-[9px] shrink-0" aria-hidden />
+                        <FontAwesomeIcon icon={faCheck} className="size-[8px] shrink-0" aria-hidden />
                       ) : null}
                     </button>
                     <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}>
@@ -1864,10 +1895,10 @@ function WorkItemsInner() {
                 );
               })}
             </ul>
-          )}
+          </Collapse>
         </div>
 
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={<CommentIconBtn task={task} />} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={CommentIconBtn({ task })} /> : null}
       </div>
     );
   }
@@ -1912,10 +1943,10 @@ function WorkItemsInner() {
     const canEdit = taskEditCaps(task, lists, sessionUserId, members).canEditFields;
     const color =
       p === "high"
-        ? "text-amber-500 dark:text-amber-400"
+        ? "text-[var(--priority-high)]"
         : p === "low"
-          ? "text-sky-500 dark:text-sky-400"
-          : "text-[var(--muted)]";
+          ? "text-[var(--priority-low)]"
+          : "text-[var(--priority-medium)]";
     const icon =
       p === "high" ? (
         <FontAwesomeIcon icon={faAnglesUp} className="size-4" aria-hidden />
@@ -1942,7 +1973,7 @@ function WorkItemsInner() {
           label: PRIORITY_LABELS[k],
         }))}
         disabled={syncing}
-        triggerClassName={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50 ${color}`}
+        triggerClassName={`flex size-5 shrink-0 items-center justify-center transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] disabled:cursor-not-allowed disabled:opacity-50 ${color}`}
         triggerContent={
           <span className={syncing ? "pointer-events-none opacity-45" : "pointer-events-none"} aria-hidden>
             {icon}
@@ -1968,7 +1999,7 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
-        className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
+        className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
       >
         {isLate ? (
           <FontAwesomeIcon icon={faBell} className="size-4 shrink-0" aria-hidden />
@@ -1994,7 +2025,7 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title={tooltip}
         aria-label={tooltip}
-        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         {member ? (
           <Avatar
@@ -2002,7 +2033,7 @@ function WorkItemsInner() {
             email={member.email}
             image={member.image}
             size="size-5"
-            className="bg-sky-500/20 text-[9px] font-bold leading-none tabular-nums text-[var(--fg)]"
+            className="bg-[var(--fill-2)] text-[9px] font-bold leading-none tabular-nums text-[var(--fg)]"
           />
         ) : (
           <FontAwesomeIcon icon={faUserPlus} className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
@@ -2018,7 +2049,7 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title="Comments"
         aria-label="Comments"
-        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         <FontAwesomeIcon icon={faComment} className="size-4" aria-hidden />
       </button>
@@ -2032,7 +2063,7 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title="Attachments"
         aria-label="Attachments"
-        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         <FontAwesomeIcon icon={faPaperclip} className="size-4" aria-hidden />
       </button>
@@ -2050,7 +2081,7 @@ function WorkItemsInner() {
         onClick={() => openViewTask(task.id)}
         title={label}
         aria-label={label}
-        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
+        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
         <svg viewBox="0 0 127.14 96.36" fill="currentColor" className="size-4" aria-hidden>
           <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
@@ -2093,25 +2124,23 @@ function WorkItemsInner() {
         }}
         onContextMenu={(e) => openTaskContextMenu(e, task)}
         onMouseEnter={() => prefetchTaskDetail(task.id)}
-        className={`group/card relative touch-manipulation overflow-hidden rounded-xl border transition-[border-color,background-color,transform,opacity] duration-200 ${
-          taskPatchSyncing
-            ? "cursor-default border-[color-mix(in_srgb,var(--accent)_26%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-elevated)_94%,var(--accent-muted))]"
-            : "cursor-grab border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:-translate-y-px hover:border-[var(--border)] active:cursor-grabbing"
-        }`}
+        className={`group/card relative touch-manipulation overflow-hidden rounded-2xl bg-[var(--card)] transition-[box-shadow,background-color,opacity] duration-200 ease-[var(--motion-respond)] ${
+          viewTaskId === task.id ? "bg-[var(--card-raised)] shadow-raised" : "shadow-card"
+        } ${taskPatchSyncing ? "cursor-default opacity-[0.92]" : "cursor-grab active:cursor-grabbing"}`}
       >
         {taskPatchSyncing ? (
           <div className="task-sync-ribbon-track" aria-hidden>
             <div className="task-sync-ribbon-thumb" />
           </div>
         ) : null}
-        <div className="flex flex-col gap-1.5 px-2.5 pb-2 pt-2.5">
+        <div className="flex flex-col gap-1.5 px-3.5 pb-3 pt-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => openViewTask(task.id)}
-              className={`line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
+              className={`line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
                 flowCol === "cancelled"
-                  ? "text-[var(--muted)] line-through decoration-red-500"
+                  ? "text-[var(--muted)] line-through decoration-[var(--danger)]"
                   : flowCol === "done"
                     ? "text-[var(--muted)] line-through decoration-[var(--muted)] hover:decoration-[var(--accent)]"
                     : "text-[var(--fg)] decoration-[var(--muted)]/40 hover:decoration-[var(--accent)]"
@@ -2121,11 +2150,11 @@ function WorkItemsInner() {
             </button>
             <div className="flex shrink-0 items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
               <RecurringTaskMark repeat={task.dueRepeat} />
-              <KanbanStatusPill task={task} />
+              {KanbanStatusPill({ task })}
               <button
                 type="button"
                 onClick={() => openViewTask(task.id)}
-                className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded border border-transparent text-[var(--muted)] opacity-50 transition-[opacity,colors] hover:border-[var(--border-subtle)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] focus-visible:opacity-100 group-hover/card:opacity-100"
                 title="Edit task"
                 aria-label={`More options — edit: ${task.title}`}
               >
@@ -2135,30 +2164,36 @@ function WorkItemsInner() {
           </div>
 
           {subtasksState === "loading" && (
-            <p className="border-t border-[var(--border-subtle)]/40 pt-2 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
+            <p className="pt-1 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
           )}
 
           {/* Subtasks + meta row — always visible */}
-          <div className="border-t border-[var(--border-subtle)]/40 pt-2" onMouseDown={(e) => e.stopPropagation()}>
+          <div onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3">
               {subtasksPreview.length > 0 ? (
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="View subtasks"
                   aria-label="View subtasks"
                 >
-                  Subtasks
                   {Array.isArray(subtasksState) ? (
-                    <span className="ml-0.5 tabular-nums text-[var(--muted)]/80">({subtasksState.length})</span>
-                  ) : null}
+                    <>
+                      <SubtaskRing done={subtasksState.filter((x) => x.done).length} total={subtasksState.length} />
+                      <span className="tabular-nums">
+                        {subtasksState.filter((x) => x.done).length} of {subtasksState.length}
+                      </span>
+                    </>
+                  ) : (
+                    "Subtasks"
+                  )}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="Add subtasks"
                   aria-label="Add subtasks"
                 >
@@ -2171,15 +2206,15 @@ function WorkItemsInner() {
               <div className="flex-1" />
               <div className="flex items-center gap-1">
                 <TaskMilestoneIconBtn taskId={task.id} />
-                <AssigneeIconBtn task={task} />
-                <DueIconBtn task={task} />
-                <PriorityIconBtn task={task} />
-                <AttachIconBtn task={task} />
-                <DiscordIconBtn task={task} />
+                {AssigneeIconBtn({ task })}
+                {DueIconBtn({ task })}
+                {PriorityIconBtn({ task })}
+                {AttachIconBtn({ task })}
+                {DiscordIconBtn({ task })}
               </div>
             </div>
             {subtasksPreview.length > 0 && (
-              <ul className="mt-1.5 space-y-1">
+              <ul className="mt-2 space-y-1.5">
                 {subtasksPreview.map((s) => {
                   const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                   return (
@@ -2189,10 +2224,10 @@ function WorkItemsInner() {
                         disabled={subPending}
                         onClick={() => void patchListSubtaskDone(task.id, s.id, !s.done)}
                         aria-busy={subPending || undefined}
-                        className={`mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-md border transition-colors ${
+                        className={`pressable mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[5px] transition-[background-color,box-shadow] duration-150 ${
                           s.done
-                            ? "surface-glass-primary border-solid"
-                            : "border-[color-mix(in_srgb,var(--fg)_18%,transparent)] dark:border-[color-mix(in_srgb,var(--fg)_22%,transparent)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]"
+                            ? "bg-[var(--info-ink)] text-white"
+                            : "shadow-[inset_0_0_0_1.4px_var(--ink-3)] hover:shadow-[inset_0_0_0_1.4px_var(--ink-2)]"
                         } disabled:cursor-not-allowed disabled:opacity-60`}
                         aria-label={s.done ? "Mark subtask not done" : "Mark subtask done"}
                       >
@@ -2217,7 +2252,7 @@ function WorkItemsInner() {
                     +{subtasksOverflow} more —{" "}
                     <button
                       type="button"
-                      className="font-medium text-[var(--accent)] hover:underline"
+                      className="font-medium text-[var(--fg)] underline-offset-2 hover:underline"
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => openViewTask(task.id)}
                     >
@@ -2229,7 +2264,7 @@ function WorkItemsInner() {
             )}
           </div>
         </div>
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={<CommentIconBtn task={task} />} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={CommentIconBtn({ task })} /> : null}
       </li>
     );
   }
@@ -2332,7 +2367,7 @@ function WorkItemsInner() {
                   <span
                     className={
                       isCurrent
-                        ? "inline-flex items-center rounded-full border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]"
+                        ? "inline-flex items-center rounded-full bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium leading-none text-[var(--fg)]"
                         : "text-sm font-medium text-[var(--muted)]"
                     }
                   >
@@ -2343,22 +2378,8 @@ function WorkItemsInner() {
             })}
           </h1>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 lg:col-start-1 lg:row-start-2 lg:justify-start">
-            <button
-              type="button"
-              title="New task"
-              aria-label="New task"
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)] shadow-sm transition-[box-shadow,transform] duration-150 hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] disabled:translate-y-0 disabled:opacity-70 disabled:shadow-none"
-              onClick={() => openNewTask(listId || undefined)}
-              disabled={isOpeningNewTask}
-              aria-busy={isOpeningNewTask || undefined}
-            >
-              {isOpeningNewTask ? (
-                <InlineSpinner className="size-4 animate-spin motion-reduce:animate-none" />
-              ) : (
-                <FontAwesomeIcon icon={faPlus} className="size-4" />
-              )}
-            </button>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-header)] p-1.5">
+            <NewButton label="New task" onClick={() => openNewTask(listId || undefined)} busy={isOpeningNewTask} />
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1.5 rounded-[13px] bg-[var(--fill)] p-[3px]">
               <div
                 className="inline-flex items-center gap-0.5 rounded-lg"
                 role="group"
@@ -2366,21 +2387,35 @@ function WorkItemsInner() {
               >
                 <button
                   type="button"
-                  className={tasksToolbarIconButtonClasses(viewMode === "list")}
+                  className={tasksToolbarIconButtonClasses(false).replace("hover:bg-[var(--fill-2)]", "")}
                   onClick={() => setViewMode("list")}
                   aria-label="List view"
                   aria-pressed={viewMode === "list"}
                 >
-                  <FontAwesomeIcon icon={faTableList} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
+                  {viewMode === "list" && (
+                    <motion.span
+                      layoutId="work-view-thumb"
+                      className="absolute inset-0 rounded-[10px] bg-[var(--card)] shadow-card"
+                      transition={prefersReduced ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0 }}
+                    />
+                  )}
+                  <FontAwesomeIcon icon={faTableList} className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "list" ? "text-[var(--fg)]" : ""}`} aria-hidden />
                 </button>
                 <button
                   type="button"
-                  className={tasksToolbarIconButtonClasses(viewMode === "kanban")}
+                  className={tasksToolbarIconButtonClasses(false).replace("hover:bg-[var(--fill-2)]", "")}
                   onClick={() => setViewMode("kanban")}
                   aria-label="Kanban view"
                   aria-pressed={viewMode === "kanban"}
                 >
-                  <FontAwesomeIcon icon={faTableColumns} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
+                  {viewMode === "kanban" && (
+                    <motion.span
+                      layoutId="work-view-thumb"
+                      className="absolute inset-0 rounded-[10px] bg-[var(--card)] shadow-card"
+                      transition={prefersReduced ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0 }}
+                    />
+                  )}
+                  <FontAwesomeIcon icon={faTableColumns} className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "kanban" ? "text-[var(--fg)]" : ""}`} aria-hidden />
                 </button>
               </div>
               <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
@@ -2432,7 +2467,7 @@ function WorkItemsInner() {
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: "auto", opacity: 1 }}
                       exit={{ width: 0, opacity: 0 }}
-                      transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                      transition={{ duration: reducedDuration(0.18, prefersReduced), ease: curve.respond }}
                       role="group"
                       aria-label="Due date range"
                     >
@@ -2440,10 +2475,10 @@ function WorkItemsInner() {
                         <button
                           key={opt.value}
                           type="button"
-                          className={`inline-flex h-8 shrink-0 items-center justify-center rounded-lg px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+                          className={`pressable inline-flex h-9 shrink-0 items-center justify-center rounded-[10px] px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                             dueWindow === opt.value
-                              ? "bg-[var(--accent-muted)] text-[var(--fg)]"
-                              : "text-[var(--muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+                              ? "bg-[var(--card)] text-[var(--fg)] shadow-card"
+                              : "text-[var(--muted)] hover:text-[var(--fg)]"
                           }`}
                           onClick={() => {
                             setDueWindow(opt.value);
@@ -2517,13 +2552,13 @@ function WorkItemsInner() {
                 className="surface-elevated flex flex-col overflow-hidden rounded-xl border border-[var(--border-subtle)] py-2"
                 role="menu"
                 aria-label="Sort options"
-                variants={panelPopVariants}
+                variants={variants.panelPop}
                 initial="hidden"
                 animate="visible"
                 exit="hidden"
-                transition={{ duration: motionDuration(0.18, prefersReduced), ease: POP_EASE }}
+                transition={{ duration: reducedDuration(0.18, prefersReduced), ease: curve.respond }}
               >
-                <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">Sort by</p>
+                <p className="px-3 pb-2 text-[11.5px] font-medium text-[var(--muted)]">Sort by</p>
                 <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
                   {SORT_OPTIONS.map((opt) => (
                     <li key={opt.value}>
@@ -2551,7 +2586,13 @@ function WorkItemsInner() {
           document.body,
         )}
 
-      <section>
+      {/* List ↔ board: one surface changing shape — a short cross-fade with a hint of scale, not a hard swap. */}
+      <motion.section
+        key={viewMode}
+        initial={prefersReduced ? { opacity: 0 } : { opacity: 0, transform: "scale(0.995)" }}
+        animate={{ opacity: 1, transform: "scale(1)" }}
+        transition={{ duration: prefersReduced ? 0.12 : 0.24, ease: curve.respond }}
+      >
         {workspaceLoading ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] py-10 text-center text-sm text-[var(--muted)]">
             Loading tasks…
@@ -2588,7 +2629,7 @@ function WorkItemsInner() {
             prefersReduced={prefersReduced}
             members={members}
             openViewTask={openViewTask}
-            renderTaskCard={(task) => frameCard(task, <ListTaskCard task={task} />)}
+            renderTaskCard={(task) => frameCard(task, ListTaskCard({ task }))}
           />
         ) : (
           <KanbanBoard
@@ -2609,10 +2650,10 @@ function WorkItemsInner() {
             boardFilter={boardFilter}
             prefersReduced={prefersReduced}
             openViewTask={openViewTask}
-            renderTaskCard={(task) => frameCard(task, <TaskCard task={task} />)}
+            renderTaskCard={(task) => frameCard(task, TaskCard({ task }))}
           />
         )}
-      </section>
+      </motion.section>
 
       {/* Desktop: dock the task details beside the board (like the Ask pane) so the board shrinks instead of being covered. */}
       {!isMobile &&
@@ -2626,18 +2667,27 @@ function WorkItemsInner() {
                 initial={{ width: 0 }}
                 animate={{ width: detailPaneW }}
                 exit={{ width: 0 }}
-                transition={{ duration: detailPaneDragging ? 0 : motionDuration(0.22, prefersReduced), ease: POP_EASE }}
-                className="relative h-full shrink-0 overflow-hidden border-l border-[var(--border-subtle)] bg-[var(--surface-base)]"
+                // Drawer curve: the board makes room while the details arrive from the right.
+                transition={{ duration: detailPaneDragging ? 0 : reducedDuration(0.38, prefersReduced), ease: curve.move }}
+                className="relative h-full shrink-0 overflow-hidden border-l border-[var(--line)] bg-[var(--sheet)]"
               >
-                {/* Fixed-width inner box so content doesn't reflow while the pane animates. */}
-                <div className="flex h-full flex-col" style={{ width: detailPaneW }}>
+                {/* Fixed-width inner box so content doesn't reflow while the pane animates. Keyed per task:
+                    switching tasks cross-fades with a small shift instead of hard-swapping the panel. */}
+                <motion.div
+                  key={viewTaskId}
+                  className="flex h-full flex-col"
+                  style={{ width: detailPaneW }}
+                  initial={prefersReduced ? { opacity: 0 } : { opacity: 0, transform: "translateX(24px)" }}
+                  animate={{ opacity: 1, transform: "translateX(0px)" }}
+                  transition={{ duration: reducedDuration(0.34, prefersReduced) || 0.15, ease: curve.move }}
+                >
                   <TaskViewPanel
                     key={viewTaskId}
                     taskId={viewTaskId}
                     onClose={() => setViewTaskId(null)}
                     onOpenTask={(id: string) => setViewTaskId(id)}
                   />
-                </div>
+                </motion.div>
                 <div
                   role="separator"
                   aria-orientation="vertical"
@@ -2678,7 +2728,7 @@ function WorkItemsInner() {
                   className="group absolute inset-y-0 left-0 z-10 w-1.5 -translate-x-0.5 cursor-col-resize touch-none outline-none"
                 >
                   <span
-                    className={`absolute inset-y-0 left-0.5 w-px transition-colors duration-150 group-hover:bg-[var(--muted)] group-focus-visible:bg-[var(--accent)] ${detailPaneDragging ? "bg-[var(--accent)]" : "bg-transparent"}`}
+                    className={`absolute inset-y-0 left-0.5 w-px transition-colors duration-150 group-hover:bg-[var(--ink-3)] group-focus-visible:bg-[var(--focus-ring)] ${detailPaneDragging ? "bg-[var(--ink-2)]" : "bg-transparent"}`}
                   />
                 </div>
               </motion.aside>
@@ -2694,25 +2744,25 @@ function WorkItemsInner() {
             {viewTaskId && (
               <div className="fixed bottom-0 left-0 top-14 z-[60] overflow-hidden md:left-72 md:rounded-tl-3xl" style={{ right: "var(--ask-pane-w, 0px)" }}>
                 <motion.div
-                  className="absolute inset-0 backdrop-blur-sm"
+                  className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[2px]"
                   aria-hidden
                   onClick={() => setViewTaskId(null)}
-                  variants={backdropVariants}
+                  variants={variants.backdrop}
                   initial="hidden"
                   animate="visible"
                   exit="hidden"
-                  transition={{ duration: motionDuration(0.2, prefersReduced) }}
+                  transition={{ duration: reducedDuration(0.2, prefersReduced) }}
                 />
                 <motion.section
                   role="dialog"
                   aria-modal="true"
                   aria-label="Task details"
-                  className="surface-elevated absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--border-subtle)]"
+                  className="absolute right-0 top-0 z-10 flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--line)] bg-[var(--sheet)] shadow-raised"
                   onClick={(e) => e.stopPropagation()}
                   initial={{ x: "100%" }}
                   animate={{ x: 0 }}
                   exit={{ x: "100%" }}
-                  transition={{ duration: motionDuration(0.32, prefersReduced), ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: reducedDuration(0.38, prefersReduced), ease: curve.move }}
                 >
                   <TaskViewPanel
                     key={viewTaskId}

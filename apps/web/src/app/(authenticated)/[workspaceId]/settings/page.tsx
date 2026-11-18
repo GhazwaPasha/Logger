@@ -214,7 +214,7 @@ export default function UserSettingsPage() {
         )}
         <dl className="space-y-4 text-sm">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Avatar</dt>
+            <dt className="text-xs font-medium text-[var(--muted)]">Avatar</dt>
             <dd className="mt-1.5">
               {avatarOptions.length === 0 ? (
                 <div className="flex items-center gap-3">
@@ -265,7 +265,7 @@ export default function UserSettingsPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Email</dt>
+            <dt className="text-xs font-medium text-[var(--muted)]">Email</dt>
             <dd className="mt-0.5 font-mono-ledger text-[var(--fg)]">{user?.email ?? "—"}</dd>
           </div>
         </dl>
@@ -314,8 +314,8 @@ export default function UserSettingsPage() {
         description="Long-lived credentials for connecting external tools and AI agents (via the MCP endpoint) to your account."
       >
         {createdKey && (
-          <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-50 p-4 dark:bg-amber-900/20">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+          <div className="mb-4 rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_50%,transparent)] bg-[var(--status-progress)] p-4 dark:bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)]">
+            <p className="text-sm font-semibold text-[var(--status-progress)] dark:text-[var(--status-progress)]">
               Save this key now — it won't be shown again.
             </p>
             <div className="mt-2 flex items-center gap-2">
@@ -337,7 +337,7 @@ export default function UserSettingsPage() {
             <button
               type="button"
               onClick={() => setCreatedKey(null)}
-              className="mt-2 text-xs text-amber-700 underline dark:text-amber-400"
+              className="mt-2 text-xs text-[var(--status-progress)] underline dark:text-[var(--status-progress)]"
             >
               I've saved it, dismiss
             </button>
@@ -389,7 +389,7 @@ export default function UserSettingsPage() {
                 type="button"
                 onClick={() => revokeKeyMutation.mutate(k.id)}
                 disabled={revokeKeyMutation.isPending && revokeKeyMutation.variables === k.id}
-                className="shrink-0 rounded-lg px-2.5 py-1 text-xs text-red-500 hover:bg-red-500/10"
+                className="shrink-0 rounded-lg px-2.5 py-1 text-xs text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]"
               >
                 Revoke
               </button>
@@ -424,7 +424,7 @@ export default function UserSettingsPage() {
 
         <div className="mt-6 space-y-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <p className="text-xs font-semibold text-[var(--muted)]">
               Claude Desktop or claude.ai
             </p>
             <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-[var(--fg)]">
@@ -442,7 +442,7 @@ export default function UserSettingsPage() {
             </ol>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Claude Code (CLI)</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Claude Code (CLI)</p>
             <p className="mt-2 text-sm text-[var(--fg)]">
               Create an API key above, then run:
             </p>
@@ -465,7 +465,7 @@ export default function UserSettingsPage() {
             </p>
             <button
               type="button"
-              className="shrink-0 rounded-xl border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400"
+              className="shrink-0 rounded-xl border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-4 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
               onClick={() => {
                 setDeleteError(null);
                 setDeleteConfirmText("");
@@ -523,7 +523,7 @@ export default function UserSettingsPage() {
               </button>
               <button
                 type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50 dark:hover:bg-red-500"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--danger)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--danger)] disabled:opacity-50 dark:hover:bg-[var(--danger)]"
                 disabled={deleteConfirmText !== "DELETE" || deleteAccountMutation.isPending || !token}
                 aria-busy={deleteAccountMutation.isPending || undefined}
                 onClick={() => {

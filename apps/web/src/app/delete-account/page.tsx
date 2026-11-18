@@ -41,8 +41,8 @@ export default function DeleteAccountPage() {
           </Link>
         </header>
 
-        <div className="mt-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 sm:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">Your data</p>
+        <div className="mt-6 rounded-2xl bg-[var(--card)] shadow-card p-6 sm:p-10">
+          <p className="text-xs font-semibold text-[var(--accent)]">Your data</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl">Delete your account</h1>
           <p className="mt-6 text-[15px] leading-relaxed text-[var(--muted)]">
             You can delete your LogBase account at any time, from the web app or the Android app. This page explains

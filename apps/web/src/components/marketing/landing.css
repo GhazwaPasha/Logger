@@ -1,0 +1,101 @@
+/*
+ * Landing page motion — CSS scroll-driven animations, so nothing runs JavaScript on scroll and the
+ * motion follows the scrollbar exactly (forwards and backwards). Browsers without
+ * `animation-timeline` show every element in its finished state.
+ */
+
+/* The hero is always dark (cinematic), whatever the visitor's theme. It also carries the
+   `scheme-dark` class, which re-declares the theme tokens so everything inside — product shot
+   included — resolves to its dark side. */
+.landing-hero {
+  background: #000;
+  color: #f5f5f7;
+}
+
+/* Entrance for the hero copy: rises out of a slight blur, staggered by --i. */
+@keyframes landing-rise {
+  from { opacity: 0; transform: translateY(16px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.landing-rise {
+  animation: landing-rise 900ms var(--motion-respond) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+/* Product shot: starts tilted back, settles flat as it scrolls into view. */
+.landing-stage {
+  perspective: 1800px;
+}
+.landing-shot {
+  transform-origin: 50% 100%;
+  transform: rotateX(18deg) scale(0.9) translateY(30px);
+  animation: landing-settle linear both;
+  animation-timeline: view();
+  animation-range: entry 10% cover 45%;
+}
+@keyframes landing-settle {
+  to { transform: none; }
+}
+
+/* Story: the task card stays pinned while five steps scroll past; each step's own view timeline
+   drives its layer of the card. */
+.landing-story {
+  timeline-scope: --s1, --s2, --s3, --s4, --s5;
+}
+.landing-step:nth-child(1) { view-timeline-name: --s1; }
+.landing-step:nth-child(2) { view-timeline-name: --s2; }
+.landing-step:nth-child(3) { view-timeline-name: --s3; }
+.landing-step:nth-child(4) { view-timeline-name: --s4; }
+.landing-step:nth-child(5) { view-timeline-name: --s5; }
+
+.landing-layer {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: landing-layer linear both;
+  animation-range: cover 30% cover 70%;
+}
+.landing-layer[data-step="1"] { animation-timeline: --s1; }
+.landing-layer[data-step="2"] { animation-timeline: --s2; }
+.landing-layer[data-step="3"] { animation-timeline: --s3; }
+.landing-layer[data-step="4"] { animation-timeline: --s4; }
+.landing-layer[data-step="5"] { animation-timeline: --s5; animation-name: landing-layer-last; }
+
+@keyframes landing-layer {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(4px); }
+  20%, 80% { opacity: 1; transform: none; filter: blur(0); }
+  100% { opacity: 0; transform: translateY(-14px) scale(0.98); filter: blur(4px); }
+}
+@keyframes landing-layer-last {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(4px); }
+  20%, 100% { opacity: 1; transform: none; filter: blur(0); }
+}
+
+/* Sections fade up as they enter. */
+.landing-reveal {
+  animation: landing-rise linear both;
+  animation-timeline: view();
+  animation-range: entry 0% entry 60%;
+}
+
+@supports not (animation-timeline: view()) {
+  .landing-shot { transform: none; animation: none; }
+  .landing-reveal { animation: none; }
+  .landing-layer { animation: none; opacity: 0; }
+  .landing-layer[data-step="5"] { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-reveal { animation: none; }
+  .landing-shot { animation: none; transform: none; }
+  .landing-layer { transform: none !important; filter: none !important; }
+}
+
+/* Phones: no pinning — show the finished card above the steps. */
+@media (max-width: 860px) {
+  .landing-story { display: block; }
+  .landing-pin { position: relative !important; top: 0 !important; height: auto !important; margin-bottom: 24px; }
+  .landing-layer { display: none; }
+  .landing-layer[data-step="5"] { display: block; opacity: 1; transform: none; filter: none; animation: none; }
+  .landing-step { min-height: auto !important; padding: 36px 0; }
+}

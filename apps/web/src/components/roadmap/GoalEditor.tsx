@@ -86,16 +86,16 @@ export function GoalEditor({
 
   return createPortal(
     <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="presentation">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-hidden onMouseDown={onClose} />
+      <div className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[2px]" aria-hidden onMouseDown={onClose} />
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-[1] max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-6 shadow-xl shadow-black/20"
+        className="relative z-[1] max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[var(--card)] shadow-card p-6 shadow-raised"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Goal</p>
+            <p className="text-xs font-semibold text-[var(--muted)]">Goal</p>
             <h2 className="mt-0.5 text-lg font-semibold text-[var(--fg)]">
               {mode.kind === "create" ? "New goal" : "Edit goal"}
             </h2>
@@ -111,14 +111,14 @@ export function GoalEditor({
         </div>
 
         {error && (
-          <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          <p className="mt-3 rounded-lg border border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-3 py-2 text-sm text-[var(--danger)] dark:text-[var(--danger)]">
             {error}
           </p>
         )}
 
         <div className="mt-4 space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
               Title
             </label>
             <input
@@ -131,7 +131,7 @@ export function GoalEditor({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
               Description
             </label>
             <textarea
@@ -145,7 +145,7 @@ export function GoalEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                 {NODE_LABELS.level}
               </label>
               <SelectPopover
@@ -156,7 +156,7 @@ export function GoalEditor({
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                 Owner
               </label>
               <SelectPopover
@@ -173,7 +173,7 @@ export function GoalEditor({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                 Target date
               </label>
               <input
@@ -186,7 +186,7 @@ export function GoalEditor({
             </div>
             {editing && (
               <div>
-                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <label className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
                   Status
                 </label>
                 <SelectPopover
@@ -207,7 +207,7 @@ export function GoalEditor({
           {editing ? (
             <button
               type="button"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-red-500 transition-colors hover:text-red-600 dark:hover:text-red-400"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--danger)] transition-colors hover:text-[var(--danger)] dark:hover:text-[var(--danger)]"
               onClick={() =>
                 setConfirm({
                   title: "Delete this goal?",

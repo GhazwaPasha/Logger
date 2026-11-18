@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { formatInTimeZone } from "@/lib/date";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { faPlug, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
+import { Collapse } from "@/components/ui/Collapse";
 
 const ALLOWED_EVENTS = ["task.created", "task.status_changed", "task.ledger_added", "member.added"];
 
@@ -134,8 +135,8 @@ export default function WebhooksPage() {
 
       {/* Secret banner */}
       {generatedSecret && (
-        <div className="rounded-xl border border-amber-400/50 bg-amber-50 p-4 dark:bg-amber-900/20">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <div className="rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_50%,transparent)] bg-[var(--status-progress)] p-4 dark:bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)]">
+          <p className="text-sm font-semibold text-[var(--status-progress)] dark:text-[var(--status-progress)]">
             Save your signing secret — it won't be shown again.
           </p>
           <div className="mt-2 flex items-center gap-2">
@@ -157,7 +158,7 @@ export default function WebhooksPage() {
           <button
             type="button"
             onClick={() => setGeneratedSecret(null)}
-            className="mt-2 text-xs text-amber-700 underline dark:text-amber-400"
+            className="mt-2 text-xs text-[var(--status-progress)] underline dark:text-[var(--status-progress)]"
           >
             I've saved it, dismiss
           </button>
@@ -194,7 +195,7 @@ export default function WebhooksPage() {
               ))}
             </div>
           </div>
-          {createError && <p className="text-xs text-red-500">{createError}</p>}
+          {createError && <p className="text-xs text-[var(--danger)]">{createError}</p>}
           <button
             type="button"
             onClick={() => {
@@ -250,7 +251,7 @@ export default function WebhooksPage() {
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(ep.id)}
-                  className="rounded-lg px-2.5 py-1 text-xs text-red-500 hover:bg-red-500/10"
+                  className="rounded-lg px-2.5 py-1 text-xs text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)]"
                 >
                   Delete
                 </button>
@@ -259,7 +260,7 @@ export default function WebhooksPage() {
 
             {/* Test result */}
             {testMutation.isSuccess && testMutation.variables === ep.id && (
-              <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${testMutation.data.status && testMutation.data.status >= 200 && testMutation.data.status < 300 ? "bg-green-500/10 text-green-700 dark:text-green-300" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>
+              <div className={`mt-3 rounded-lg px-3 py-2 text-xs ${testMutation.data.status && testMutation.data.status >= 200 && testMutation.data.status < 300 ? "bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success)] dark:text-[var(--success)]" : "bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] text-[var(--danger)] dark:text-[var(--danger)]"}`}>
                 <span className="font-semibold">Status: {testMutation.data.status ?? "timeout"}</span>
                 {testMutation.data.body && <p className="mt-0.5 truncate opacity-70">{testMutation.data.body}</p>}
               </div>
@@ -279,7 +280,7 @@ export default function WebhooksPage() {
                       onClick={() => setExpandedDelivery((v) => (v === d.id ? null : d.id))}
                       className="flex w-full items-center gap-2 text-xs"
                     >
-                      <span className={`rounded px-1.5 py-0.5 font-mono font-semibold ${d.deliveredAt ? "bg-green-500/15 text-green-700 dark:text-green-300" : "bg-red-500/15 text-red-600 dark:text-red-400"}`}>
+                      <span className={`rounded px-1.5 py-0.5 font-mono font-semibold ${d.deliveredAt ? "bg-[color-mix(in_srgb,var(--success)_15%,transparent)] text-[var(--success)] dark:text-[var(--success)]" : "bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] dark:text-[var(--danger)]"}`}>
                         {d.responseStatus ?? "–"}
                       </span>
                       <code className="text-[var(--muted)]">{d.event}</code>
@@ -287,11 +288,11 @@ export default function WebhooksPage() {
                         {formatInTimeZone(new Date(d.createdAt), timeZone, { dateStyle: "medium", timeStyle: "short" })}
                       </span>
                     </button>
-                    {expandedDelivery === d.id && d.responseBody && (
-                      <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all text-[10px] text-[var(--muted)]">
+                    <Collapse open={expandedDelivery === d.id && !!d.responseBody} className="pt-2">
+                      <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-[10px] text-[var(--muted)]">
                         {d.responseBody}
                       </pre>
-                    )}
+                    </Collapse>
                   </div>
                 ))}
               </div>

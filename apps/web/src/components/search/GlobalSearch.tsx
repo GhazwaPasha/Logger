@@ -16,9 +16,9 @@ type SearchResult = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-400/20 text-amber-700 dark:text-amber-300",
-  in_progress: "bg-blue-400/20 text-blue-700 dark:text-blue-300",
-  done: "bg-green-400/20 text-green-700 dark:text-green-300",
+  pending: "bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)] text-[var(--status-progress)] dark:text-[var(--status-progress)]",
+  in_progress: "bg-[color-mix(in_srgb,var(--info-ink)_20%,transparent)] text-[var(--info-ink)] dark:text-[var(--info-ink)]",
+  done: "bg-[color-mix(in_srgb,var(--success)_20%,transparent)] text-[var(--success)] dark:text-[var(--success)]",
   cancelled: "bg-[var(--muted)]/20 text-[var(--muted)]",
 };
 
@@ -139,7 +139,7 @@ export function GlobalSearch() {
           setOpen(true);
           setTimeout(() => inputRef.current?.focus(), 50);
         }}
-        className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)] ${open ? "hidden" : ""}`}
+        className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,color,transform] duration-200 ease-out hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)] ${open ? "hidden" : ""}`}
       >
         <svg aria-hidden viewBox="0 0 20 20" fill="currentColor" className="size-[1.125rem] shrink-0">
           <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9z" clipRule="evenodd" />
@@ -209,7 +209,7 @@ export function GlobalSearch() {
                         className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors ${i === highlighted ? "bg-[var(--surface-hover)]" : ""}`}
                       >
                         <span
-                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STATUS_COLORS[result.status] ?? ""}`}
+                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11.5px] font-semibold ${STATUS_COLORS[result.status] ?? ""}`}
                         >
                           {STATUS_LABELS[result.status] ?? result.status}
                         </span>

@@ -41,7 +41,8 @@ import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+import { curve, reducedDuration } from "@/lib/motion";
+import { Collapse } from "@/components/ui/Collapse";
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -59,7 +60,7 @@ function formatDueDate(iso: string | null | undefined, timeZone: string): string
 function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: string | null }) {
   const cfg =
     status === "error"
-      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-red-600 dark:text-red-400", icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3" aria-hidden /> }
+      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-[var(--danger)] dark:text-[var(--danger)]", icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3" aria-hidden /> }
       : status === "saving" || status === "pending"
         ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCircleNotch} className="size-3 animate-spin motion-reduce:animate-none" aria-hidden /> }
         : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCheck} className="size-3" aria-hidden /> };
@@ -79,7 +80,7 @@ function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: s
 /** Matches the Ask pane header: h-11, 13px semibold title, 32px icon buttons. */
 function PanelHeader({ title, onClose, children }: { title: string; onClose: () => void; children?: React.ReactNode }) {
   return (
-    <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] pl-3.5 pr-1.5">
+    <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-[var(--line)] pl-6 pr-2">
       <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={title}>
         {title}
       </p>
@@ -96,7 +97,7 @@ function PanelHeader({ title, onClose, children }: { title: string; onClose: () 
  * (the auto-sized title textarea went to 0px). Text steps down to the Ask pane's scale: 14px → 13px.
  */
 const PANEL_BODY =
-  "scrollbar-hide flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5 text-[13px] [&>*]:shrink-0 [&_.text-sm]:text-[13px]";
+  "scrollbar-hide flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8 pt-5 text-[13px] [&>*]:shrink-0 [&_.text-sm]:text-[13px]";
 
 export function TaskViewPanel({
   taskId,
@@ -206,10 +207,10 @@ export function TaskViewPanel({
           }}
           placeholder={TASK_TITLE_PLACEHOLDER}
           aria-label="Task title"
-          className="w-full resize-none overflow-hidden bg-transparent p-0 [field-sizing:content] text-[15px] font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
+          className="w-full resize-none overflow-hidden bg-transparent p-0 [field-sizing:content] text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
         />
       ) : (
-        <h3 className="text-[15px] font-semibold leading-snug text-[var(--fg)]">{task.title}</h3>
+        <h3 className="text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)]">{task.title}</h3>
       )}
 
       {/* Subtasks — always shown, right below title */}
@@ -252,9 +253,9 @@ export function TaskViewPanel({
           (() => {
             const color =
               form.priority === "high"
-                ? "text-amber-500 dark:text-amber-400"
+                ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
                 : form.priority === "low"
-                  ? "text-sky-500 dark:text-sky-400"
+                  ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                   : "text-[var(--muted)]";
             const icon =
               form.priority === "high" ? (
@@ -275,7 +276,7 @@ export function TaskViewPanel({
                   value: k,
                   label: PRIORITY_LABELS[k],
                 }))}
-                triggerClassName={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}
+                triggerClassName={`inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[var(--fill)] px-3 text-xs font-semibold ${color}`}
                 triggerContent={
                   <>
                     <span aria-hidden>{icon}</span>
@@ -291,12 +292,12 @@ export function TaskViewPanel({
           (() => {
             const p = task.priority as TaskPriority;
             const color = p === "high"
-              ? "text-amber-500 dark:text-amber-400"
+              ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
               : p === "low"
-                ? "text-sky-500 dark:text-sky-400"
+                ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                 : "text-[var(--muted)]";
             return (
-              <span className={`inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold ${color}`}>
+              <span className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[var(--fill)] px-3 text-xs font-semibold ${color}`}>
                 {p === "high" ? <FontAwesomeIcon icon={faAnglesUp} className="size-3" /> : p === "low" ? <FontAwesomeIcon icon={faAnglesDown} className="size-3" /> : <FontAwesomeIcon icon={faArrowUp} className="size-3" />}
                 {PRIORITY_LABELS[p] ?? "Medium"}
               </span>
@@ -305,15 +306,15 @@ export function TaskViewPanel({
         )}
       </div>
       {form.syncStatus === "error" && form.syncError && (
-        <p className="-mt-3 text-xs text-red-600 dark:text-red-400" role="alert">
+        <p className="-mt-3 text-xs text-[var(--danger)] dark:text-[var(--danger)]" role="alert">
           {form.syncError}
         </p>
       )}
 
       {/* Assignees */}
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Assignees</p>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <p className="mb-2 text-[12px] font-semibold text-[var(--muted)]">Assignees</p>
+        <div className="flex flex-wrap items-center gap-2">
           {form.assigneeIds.length === 0 && !caps.canEditFields ? (
             <p className="text-sm text-[var(--muted)]">Unassigned</p>
           ) : (
@@ -328,8 +329,8 @@ export function TaskViewPanel({
                     initial={{ opacity: 0, scale: 0.85 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.85 }}
-                    transition={{ duration: motionDuration(0.16, prefersReduced), ease: POP_EASE }}
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-3 text-sm font-medium text-[var(--fg)]"
+                    transition={{ duration: reducedDuration(0.16, prefersReduced), ease: curve.respond }}
+                    className="inline-flex h-8 items-center gap-2 rounded-full bg-[var(--fill)] pl-1 pr-3 text-sm font-medium text-[var(--fg)]"
                   >
                     <Avatar
                       name={m?.name}
@@ -357,36 +358,25 @@ export function TaskViewPanel({
           {caps.canEditFields && (
             <button
               type="button"
-              className="inline-flex items-center rounded-full border border-dashed border-[var(--border-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+              className="pressable inline-flex h-8 items-center rounded-full px-3 text-xs font-medium text-[var(--muted)] shadow-[inset_0_0_0_1px_var(--line-strong)] transition-colors hover:text-[var(--fg)]"
               onClick={() => setShowAssignees((v) => !v)}
             >
               {form.assigneeIds.length === 0 ? "Add assignee" : "+ Add"}
             </button>
           )}
         </div>
-        <AnimatePresence initial={false}>
-          {caps.canEditFields && showAssignees && (
-            <motion.div
-              className="mt-2"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-              exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-              transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-              style={{ overflow: "hidden" }}
-            >
+        <Collapse open={caps.canEditFields && showAssignees} className="pt-2">
               <AssigneeSearchField
                 members={members}
                 assigneeIds={form.assigneeIds}
                 onToggleAssignee={form.toggleAssignee}
               />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </Collapse>
       </div>
 
       {/* Due date */}
       <div>
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Due date</p>
+        <p className="mb-2 text-[12px] font-semibold text-[var(--muted)]">Due date</p>
         {caps.canEditFields ? (
           <div className="flex flex-wrap gap-2">
             <DueDateTimePopover

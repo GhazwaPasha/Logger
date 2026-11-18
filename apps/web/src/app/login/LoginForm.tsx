@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Outfit } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, CircleAlert, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, UserRound, type LucideIcon } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faGoogle } from "@fortawesome/free-brands-svg-icons";
 import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
@@ -11,6 +13,9 @@ import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { useBoot } from "@/components/app/BootProvider";
+import { Toggle } from "@/components/ui/Toggle";
+import { curve } from "@/lib/motion";
+import { CollapseItem } from "@/components/ui/Collapse";
 
 const brand = Outfit({
   subsets: ["latin"],
@@ -20,35 +25,6 @@ const brand = Outfit({
 type Step = "hub" | "connecting" | "email";
 type OAuthProvider = "discord" | "google";
 type HubOption = { kind: "provider"; provider: OAuthProvider } | { kind: "email" };
-
-function IconEye({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  );
-}
-
-function IconEyeOff({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-      <line x1="2" x2="22" y1="2" y2="22" />
-    </svg>
-  );
-}
-
-function IconArrowLeft({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M19 12H5" />
-      <path d="M12 19l-7-7 7-7" />
-    </svg>
-  );
-}
 
 const PROVIDER_META: Record<
   OAuthProvider,
@@ -214,6 +190,235 @@ function ConnectingStep({ provider }: { provider: OAuthProvider }) {
   );
 }
 
+const FIELD =
+  "input h-12 rounded-xl pl-11 text-[15px] disabled:opacity-60";
+
+function Field({
+  id,
+  label,
+  icon: Icon,
+  trailing,
+  ...input
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="pl-1 text-left text-[13px] font-medium text-[var(--muted)]">
+        {label}
+      </label>
+      <div className="relative">
+        <Icon aria-hidden className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-[var(--ink-3)]" strokeWidth={2} />
+        <input id={id} className={`${FIELD} ${trailing ? "pr-12" : ""}`} {...input} />
+        {trailing}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Email sign-in / sign-up card. A sliding segmented control picks the mode (the name field grows
+ * in and out with it), fields carry leading icons, "Stay signed in" is a switch, and the submit
+ * button shows its own working state.
+ */
+function EmailCard({
+  mode,
+  setMode,
+  ids,
+  values,
+  setName,
+  setEmail,
+  setPassword,
+  showPassword,
+  setShowPassword,
+  staySignedIn,
+  setStaySignedIn,
+  loading,
+  error,
+  onSubmit,
+  onBack,
+}: {
+  mode: "signin" | "signup";
+  setMode: (m: "signin" | "signup") => void;
+  ids: { nameId: string; emailId: string; passwordId: string; rememberId: string };
+  values: { name: string; email: string; password: string };
+  setName: (v: string) => void;
+  setEmail: (v: string) => void;
+  setPassword: (v: string) => void;
+  showPassword: boolean;
+  setShowPassword: (fn: (v: boolean) => boolean) => void;
+  staySignedIn: boolean;
+  setStaySignedIn: (v: boolean) => void;
+  loading: boolean;
+  error: string | null;
+  onSubmit: (e: React.FormEvent) => void;
+  onBack: () => void;
+}) {
+  const reduce = useReducedMotion();
+  const signup = mode === "signup";
+  return (
+    <div className="ui-auth-card-enter mt-6 w-full rounded-[24px] bg-[var(--card)] p-7 shadow-raised sm:p-8">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          className="pressable -ml-2 inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm font-medium text-[var(--muted)] hover:bg-[var(--fill)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          Back
+        </button>
+        <Link href="/" className="rounded-lg opacity-90 transition-opacity hover:opacity-100" aria-label="LogBase home">
+          <LogBaseMark variant="auth" decorative />
+        </Link>
+      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={mode}
+          initial={reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(6px)" }}
+          animate={{ opacity: 1, transform: "translateY(0px)" }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(-6px)" }}
+          transition={{ duration: 0.18, ease: curve.respond }}
+          className="mt-5"
+        >
+          <h1 className={`text-[28px] font-bold leading-tight tracking-[-0.03em] text-[var(--fg)] ${brand.className}`}>
+            {signup ? "Create your account" : "Welcome back"}
+          </h1>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-[var(--muted)]">
+            {signup ? "Start keeping every task on the record." : "Log in to LogBase with your email."}
+          </p>
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="mt-6 grid grid-cols-2 rounded-[13px] bg-[var(--fill-2)] p-[3px]" role="tablist" aria-label="Log in or create an account">
+        {(["signin", "signup"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => setMode(m)}
+            disabled={loading}
+            className={`relative h-9 rounded-[10px] text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
+              mode === m ? "text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]"
+            }`}
+          >
+            {mode === m && (
+              <motion.span
+                layoutId="auth-mode-thumb"
+                className="absolute inset-0 rounded-[10px] bg-[var(--card)] shadow-card"
+                transition={reduce ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0 }}
+              />
+            )}
+            <span className="relative">{m === "signin" ? "Log in" : "Create account"}</span>
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
+        <AnimatePresence initial={false}>
+          {signup && (
+            <CollapseItem key="name" boxClassName="-mb-4" className="pb-4">
+              <Field
+                id={ids.nameId}
+                label="Name"
+                icon={UserRound}
+                placeholder="How LogBase should greet you"
+                value={values.name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading}
+                autoComplete="name"
+              />
+            </CollapseItem>
+          )}
+        </AnimatePresence>
+
+        <Field
+          id={ids.emailId}
+          label="Email"
+          icon={Mail}
+          type="email"
+          required
+          autoComplete="email"
+          placeholder="you@company.com"
+          value={values.email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+        />
+
+        <Field
+          id={ids.passwordId}
+          label="Password"
+          icon={LockKeyhole}
+          type={showPassword ? "text" : "password"}
+          required
+          autoComplete={signup ? "new-password" : "current-password"}
+          placeholder={signup ? "At least 8 characters" : "Your password"}
+          value={values.password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
+          trailing={
+            <button
+              type="button"
+              className="pressable absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--fill-2)] hover:text-[var(--fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-pressed={showPassword}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="size-[18px]" aria-hidden /> : <Eye className="size-[18px]" aria-hidden />}
+            </button>
+          }
+        />
+
+        <div className="flex items-center justify-between gap-3 px-1">
+          <label htmlFor={ids.rememberId} className="text-left text-sm text-[var(--muted)]">
+            Stay signed in
+          </label>
+          <span id={ids.rememberId}>
+            <Toggle checked={staySignedIn} onChange={setStaySignedIn} disabled={loading} aria-label="Stay signed in" />
+          </span>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {error && (
+            <motion.p
+              key="error"
+              role="alert"
+              initial={reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(-4px)" }}
+              animate={{ opacity: 1, transform: "translateY(0px)" }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: curve.respond }}
+              className="flex items-start gap-2.5 rounded-xl bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-3.5 py-3 text-sm leading-relaxed text-[var(--danger)]"
+            >
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>{error}</span>
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        <button
+          className="pressable mt-1 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] text-[15px] font-semibold text-[var(--on-primary)] hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] disabled:opacity-70"
+          type="submit"
+          disabled={loading}
+          aria-label={signup ? "Create your LogBase account" : "Log in to LogBase with email and password"}
+        >
+          {loading ? <LoaderCircle className="size-[18px] animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+          {loading ? (signup ? "Creating account…" : "Logging in…") : signup ? "Create account" : "Log in"}
+        </button>
+      </form>
+
+      <p className="mt-6 text-center text-xs leading-relaxed text-[var(--muted)]">
+        By continuing you agree to the{" "}
+        <Link href="/terms" className="font-medium text-[var(--fg)] underline-offset-2 hover:underline">Terms</Link> and{" "}
+        <Link href="/privacy" className="font-medium text-[var(--fg)] underline-offset-2 hover:underline">Privacy Policy</Link>.
+      </p>
+    </div>
+  );
+}
+
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
 
@@ -302,11 +507,6 @@ export function LoginForm({ next }: { next: string }) {
     setStep("hub");
   }
 
-  function flipMode() {
-    setMode((m) => (m === "signin" ? "signup" : "signin"));
-    setError(null);
-  }
-
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[var(--surface-base)] px-4 py-10 text-[var(--fg)] sm:px-6">
       <div
@@ -321,7 +521,7 @@ export function LoginForm({ next }: { next: string }) {
       <div className="relative z-[1] flex flex-1 flex-col items-center justify-center">
         <div
           className={`flex w-full flex-col items-center ${
-            step === "email" ? "max-w-[22rem] sm:max-w-[24rem]" : "max-w-3xl"
+            step === "email" ? "max-w-[26rem]" : "max-w-3xl"
           }`}
         >
           {step === "hub" && <HubStep error={error} onSelect={onSelectHubOption} />}
@@ -329,135 +529,26 @@ export function LoginForm({ next }: { next: string }) {
           {step === "connecting" && connectingProvider && <ConnectingStep provider={connectingProvider} />}
 
           {step === "email" && (
-          <div className="ui-auth-card-enter surface-elevated mt-6 w-full rounded-xl border border-[var(--border-subtle)] px-6 py-7 shadow-[0_24px_64px_-28px_color-mix(in_srgb,var(--fg)_14%,transparent)] sm:px-7 sm:py-8">
-            <button
-              type="button"
-              onClick={goBackToHub}
-              className="mb-5 inline-flex items-center gap-1.5 rounded-lg text-sm text-[var(--muted)] outline-offset-4 transition-colors hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-            >
-              <IconArrowLeft className="size-3.5" />
-              Back
-            </button>
-
-            <div className="flex flex-col items-center text-center">
-              <p className="text-pretty text-sm leading-relaxed text-[var(--muted)]">Continue to your</p>
-              <Link
-                href="/"
-                className={`mt-2 inline-flex items-center gap-2.5 rounded-lg outline-offset-4 transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${brand.className}`}
-              >
-                <LogBaseMark variant="auth" decorative />
-                <span className="text-2xl font-bold tracking-[-0.03em] text-[var(--fg)]">LogBase</span>
-              </Link>
-            </div>
-
-            <form onSubmit={onSubmit} className="mt-7 space-y-4">
-              {mode === "signup" && (
-                <div>
-                  <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={nameId}>
-                    Name
-                  </label>
-                  <input
-                    id={nameId}
-                    className="input rounded-xl"
-                    placeholder="How your base will greet you"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={loading}
-                    autoComplete="name"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={emailId}>
-                  Email
-                </label>
-                <input
-                  id={emailId}
-                  className="input rounded-xl"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-left text-xs font-medium text-[var(--muted)]" htmlFor={passwordId}>
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id={passwordId}
-                    className="input rounded-xl pr-11"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-pressed={showPassword}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <IconEyeOff className="h-4 w-4" /> : <IconEye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <input
-                  id={`${formId}-stay-signed-in`}
-                  type="checkbox"
-                  className="size-4 shrink-0 rounded border border-[var(--border)] accent-[var(--accent)]"
-                  checked={staySignedIn}
-                  onChange={(e) => setStaySignedIn(e.target.checked)}
-                  disabled={loading}
-                />
-                <label htmlFor={`${formId}-stay-signed-in`} className="text-left text-sm leading-snug text-[var(--muted)]">
-                  Remember me?
-                </label>
-              </div>
-
-              {error && (
-                <p
-                  role="alert"
-                  className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-800 dark:text-red-200"
-                >
-                  {error}
-                </p>
-              )}
-
-              <button
-                className="btn-primary flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-medium"
-                type="submit"
-                aria-label={mode === "signin" ? "Sign in to LogBase with email and password" : "Create your LogBase account"}
-              >
-                {mode === "signin" ? "Log in" : "Create Account"}
-              </button>
-            </form>
-
-            <button
-              type="button"
-              className="mt-6 w-full text-pretty text-center text-sm leading-relaxed text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
-              onClick={flipMode}
-            >
-              {mode === "signin" ? (
-                <span className={`font-semibold text-[var(--fg)] ${brand.className}`}>Create account?</span>
-              ) : (
-                <>
-                  Already have an account?{" "}
-                  <span className={`font-semibold text-[var(--fg)] ${brand.className}`}>Log in</span>
-                </>
-              )}
-            </button>
-          </div>
+            <EmailCard
+              mode={mode}
+              setMode={(m) => {
+                setMode(m);
+                setError(null);
+              }}
+              ids={{ nameId, emailId, passwordId, rememberId: `${formId}-stay-signed-in` }}
+              values={{ name, email, password }}
+              setName={setName}
+              setEmail={setEmail}
+              setPassword={setPassword}
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+              staySignedIn={staySignedIn}
+              setStaySignedIn={setStaySignedIn}
+              loading={loading}
+              error={error}
+              onSubmit={onSubmit}
+              onBack={goBackToHub}
+            />
           )}
         </div>
       </div>

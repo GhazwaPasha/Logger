@@ -89,13 +89,13 @@ export default function WorkspacePerformancePage() {
           <PerformanceKpiRow totals={scorecardsQuery.data?.totals} loading={loading} />
 
           <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team scorecard</h2>
+            <h2 className="text-xs font-semibold text-[var(--muted)]">Team scorecard</h2>
             <p className="mt-0.5 text-sm text-[var(--muted)]">Completion, on-time rate, workload, and time logged per person</p>
             <TeamScorecardTable members={scorecardMembers} loading={loading} />
           </div>
 
           <div className="surface-elevated ui-elevated-panel rounded-2xl border border-[var(--border-subtle)] p-2.5">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Team members</h2>
+            <h2 className="text-xs font-semibold text-[var(--muted)]">Team members</h2>
             <p className="mt-0.5 text-sm text-[var(--muted)]">Pick a person for their full breakdown and tasks</p>
             <div className="mt-2">
               <MemberChipRow
@@ -115,7 +115,7 @@ export default function WorkspacePerformancePage() {
           </div>
 
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Activity</h2>
+            <h2 className="text-xs font-semibold text-[var(--muted)]">Activity</h2>
             <p className="mt-0.5 text-sm text-[var(--muted)]">Everyone&rsquo;s activity, newest first — filter down to one person</p>
             <div className="mt-2">
               <PerformanceActivityFeed

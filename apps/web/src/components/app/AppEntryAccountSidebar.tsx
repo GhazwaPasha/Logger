@@ -64,7 +64,7 @@ export function AppEntryAccountSidebar() {
   return (
     <aside className="ui-sidebar-chrome flex max-h-[70vh] min-h-0 w-full shrink-0 flex-col border-b border-[var(--border-subtle)] bg-[var(--surface-nav)] md:max-h-none md:h-[calc(100vh-3.5rem)] md:w-60 md:border-b-0 md:border-r">
       <nav ref={navRef} className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Account">
-        <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
+        <div className="shrink-0 border-b border-[var(--border-subtle)] px-2 pb-2">
           <button
             type="button"
             onClick={() => setPickerOpen((v) => !v)}

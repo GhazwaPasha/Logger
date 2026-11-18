@@ -105,14 +105,14 @@ function FillArc({
     <>
       <motion.path
         d={directedArc(fromDeg, toDeg)}
-        stroke={color}
         strokeWidth={STROKE}
         fill="none"
         strokeDasharray={`${length} ${length + 1}`}
-        style={{ strokeDashoffset: offset }}
+        // Colors are CSS variables, which SVG presentation attributes can't read — so they go in style.
+        style={{ stroke: color, strokeDashoffset: offset }}
       />
-      {startCap ? <motion.circle cx={s.x} cy={s.y} r={STROKE / 2} fill={color} style={{ opacity: startOpacity }} /> : null}
-      {endCap ? <motion.circle cx={e.x} cy={e.y} r={STROKE / 2} fill={color} style={{ opacity: endOpacity }} /> : null}
+      {startCap ? <motion.circle cx={s.x} cy={s.y} r={STROKE / 2} style={{ fill: color, opacity: startOpacity }} /> : null}
+      {endCap ? <motion.circle cx={e.x} cy={e.y} r={STROKE / 2} style={{ fill: color, opacity: endOpacity }} /> : null}
     </>
   );
 }
@@ -249,51 +249,55 @@ export function StatusPriorityRing({
   return (
     // Side-by-side only when *this card* has room (container query), not when the window does — a docked
     // side pane can make the card narrow on a wide screen, and the legend labels then truncated to nothing.
-    <div className="@container">
-    <div className="flex flex-col items-center gap-6 @[30rem]:flex-row @[30rem]:items-center @[30rem]:justify-center @[44rem]:gap-8">
-      <div
-        className="relative aspect-square w-full max-w-[17rem] shrink-0 @[30rem]:w-[48%] @[30rem]:max-w-[20rem]"
-        role="img"
-        aria-label={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
-      >
-        <TickRing top={top} bottom={bottom} focus={focus} ready={!loading} fillDelay={fillDelay} />
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          {loading ? (
-            <span className="h-8 w-14 animate-pulse rounded-lg bg-[var(--surface-muted)] motion-reduce:animate-none" />
-          ) : focus && focused ? (
-            <>
-              <span className="mb-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: focused.color }} />
-              <span className="text-[2.6rem] font-bold leading-none tracking-tight tabular-nums">{focused.value}</span>
-              <span className="mt-1 text-sm font-medium">{focused.label}</span>
-              <span className="text-xs tabular-nums text-[var(--muted)]">
-                {pct(focused.value, sum(focus.half === "top" ? top : bottom))}% of{" "}
-                {focus.half === "top" ? topLabel : bottomLabel}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-[2.1rem] font-bold leading-none tracking-tight tabular-nums">{sum(top)}</span>
-              <span className="mt-1 text-[11px] uppercase tracking-wider text-[var(--muted)]">{topLabel}</span>
-              <span className="my-2 h-px w-[30%] bg-[var(--border-subtle)]" />
-              <span className="text-[2.1rem] font-bold leading-none tracking-tight tabular-nums">{sum(bottom)}</span>
-              <span className="mt-1 text-[11px] uppercase tracking-wider text-[var(--muted)]">{bottomLabel}</span>
-            </>
-          )}
+    <div className="@container flex-1">
+    <div className="flex h-full flex-col gap-5">
+      {/* Ring + status beside it; priority runs underneath, across the card, so the ring can be big. */}
+      <div className="flex flex-1 flex-col items-center gap-5 @[24rem]:flex-row @[24rem]:justify-center @[40rem]:gap-8">
+        <div
+          className="relative aspect-square w-full max-w-[17rem] shrink-0 @[24rem]:w-[54%] @[24rem]:max-w-[17.5rem]"
+          role="img"
+          aria-label={`${topTitle}: ${sum(top)} ${topLabel}. ${bottomTitle}: ${sum(bottom)} ${bottomLabel}.`}
+        >
+          <TickRing top={top} bottom={bottom} focus={focus} ready={!loading} fillDelay={fillDelay} />
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+            {loading ? (
+              <span className="h-8 w-14 animate-pulse rounded-lg bg-[var(--surface-muted)] motion-reduce:animate-none" />
+            ) : focus && focused ? (
+              <>
+                <span className="mb-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: focused.color }} />
+                <span className="text-[2.8rem] font-bold leading-none tracking-tight tabular-nums">{focused.value}</span>
+                <span className="mt-1 text-sm font-medium">{focused.label}</span>
+                <span className="text-xs tabular-nums text-[var(--muted)]">
+                  {pct(focused.value, sum(focus.half === "top" ? top : bottom))}% of{" "}
+                  {focus.half === "top" ? topLabel : bottomLabel}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-outfit text-[2.4rem] font-bold leading-none tracking-tight tabular-nums">{sum(top)}</span>
+                <span className="mt-1 text-[12px] text-[var(--muted)]">{topLabel}</span>
+                <span className="my-2.5 h-px w-[30%] bg-[var(--border-subtle)]" />
+                <span className="font-outfit text-[2.4rem] font-bold leading-none tracking-tight tabular-nums">{sum(bottom)}</span>
+                <span className="mt-1 text-[12px] text-[var(--muted)]">{bottomLabel}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="w-full min-w-0 @[24rem]:max-w-[14rem] @[24rem]:flex-1" onMouseLeave={() => setHover(null)}>
+          <LegendGroup
+            title={topTitle}
+            half="top"
+            segments={top}
+            focus={focus}
+            loading={loading}
+            onHover={setHover}
+            onPin={setPinned}
+          />
         </div>
       </div>
 
-      {/* Beside the ring the rows tighten so the legend's height stays close to the ring's. */}
-      <div className="w-full min-w-[12rem] max-w-[18rem] space-y-3 @[30rem]:space-y-1.5" onMouseLeave={() => setHover(null)}>
-        <LegendGroup
-          title={topTitle}
-          half="top"
-          segments={top}
-          focus={focus}
-          loading={loading}
-          onHover={setHover}
-          onPin={setPinned}
-        />
-        <div className="mx-2.5 h-px bg-[var(--border-subtle)]" />
+      <div className="border-t border-[var(--line)] pt-3" onMouseLeave={() => setHover(null)}>
         <LegendGroup
           title={bottomTitle}
           half="bottom"
@@ -302,6 +306,7 @@ export function StatusPriorityRing({
           loading={loading}
           onHover={setHover}
           onPin={setPinned}
+          across
         />
       </div>
     </div>
@@ -317,7 +322,10 @@ function LegendGroup({
   loading,
   onHover,
   onPin,
+  across = false,
 }: {
+  /** Lay the rows out side by side (a strip under the ring) instead of a list. */
+  across?: boolean;
   title: string;
   half: Half;
   segments: RingSegment[];
@@ -328,23 +336,23 @@ function LegendGroup({
 }) {
   return (
     <div>
-      <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+      <p className="px-1.5 pb-1 text-[11.5px] font-semibold text-[var(--muted)]">
         {half === "top" ? "▲" : "▼"} {title}
       </p>
-      <ul>
+      <ul className={across ? "grid grid-cols-2 gap-x-1 @[24rem]:grid-cols-4" : undefined}>
         {segments.map((s) => {
           const active = focus?.half === half && focus.key === s.key;
           const row = (
             <>
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
-              <span className={`min-w-0 flex-1 truncate text-sm ${active ? "font-semibold" : "font-medium"}`}>
+              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
+              <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-semibold" : "font-medium"}`}>
                 {s.label}
               </span>
-              <span className="min-w-[2.25rem] text-right text-sm font-semibold tabular-nums">{loading ? "…" : s.value}</span>
+              <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums">{loading ? "…" : s.value}</span>
             </>
           );
           const className =
-            "flex min-h-9 w-full items-center gap-2.5 rounded-xl px-2.5 text-left @[30rem]:min-h-7 no-underline transition-colors hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]";
+            "flex min-h-8 w-full items-center gap-1.5 rounded-lg px-1.5 text-left @[27rem]:min-h-7 no-underline transition-colors hover:bg-[var(--fill)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]";
           const style = active ? { backgroundColor: `color-mix(in srgb, ${s.color} 16%, transparent)` } : undefined;
           const handlers = {
             onMouseEnter: () => onHover({ half, key: s.key }),

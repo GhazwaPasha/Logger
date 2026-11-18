@@ -72,7 +72,7 @@ export function ExportButton({ types = ["tasks", "activity"] }: { types?: Export
         {busy ? "Downloading…" : "Export"}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] py-1 shadow-lg shadow-black/10 dark:shadow-black/30">
+        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[10rem] rounded-xl bg-[var(--card)] shadow-card py-1 shadow-lg shadow-black/10 dark:shadow-black/30">
           {types.map((type) => (
             <button
               key={type}

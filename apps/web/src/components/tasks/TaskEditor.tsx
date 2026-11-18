@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { faDiscord } from "@fortawesome/free-brands-svg-icons";
@@ -39,24 +39,14 @@ import { SelectPopover } from "@/components/ui/SelectPopover";
 import { Toggle } from "@/components/ui/Toggle";
 import { Avatar } from "@/components/ui/Avatar";
 import { isWorkspaceOwner, taskEditCaps } from "@/lib/workspace-permissions";
-import {
-  TASK_FLOW_ORDER,
-  PRIORITY_LABELS,
-  dueIndicatorColorClass,
-  statusPillPaletteClasses,
-  type ManualTaskStatus,
-  type TaskPriority,
-} from "@/lib/task-board";
+import { TASK_FLOW_ORDER, PRIORITY_LABELS, dueIndicatorColorClass, statusPillPaletteClasses, type ManualTaskStatus, type TaskPriority } from "@/lib/task-board";
 import { parseTaskDueRepeat, type TaskMutationResult } from "@/lib/ledger-types";
 import type { AgentTaskFormFill } from "@work-ledger/contracts";
-import {
-  hasMeaningfulTitle,
-  isDefaultTaskTitle,
-  TASK_TITLE_PLACEHOLDER,
-} from "@/lib/task-default-title";
+import { hasMeaningfulTitle, isDefaultTaskTitle, TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
 import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
-import { POP_EASE, motionDuration } from "@/components/ui/motion-presets";
+
+import { Collapse } from "@/components/ui/Collapse";
 
 const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   pending: "Pending",
@@ -79,7 +69,7 @@ function formatDueDate(iso: string | null | undefined, timeZone: string): string
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <label className="mb-2 block text-xs font-semibold text-[var(--muted)]">
       {children}
     </label>
   );
@@ -105,11 +95,10 @@ function ToggleSection({
   toggleActiveClassName?: string;
   children?: React.ReactNode;
 }) {
-  const prefersReduced = useReducedMotion();
   return (
     <div
       className={
-        className ?? "rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-3"
+        className ?? "rounded-2xl bg-[var(--card)] shadow-card p-5 space-y-3"
       }
     >
       <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
@@ -124,19 +113,9 @@ function ToggleSection({
           activeClassName={toggleActiveClassName}
         />
       </div>
-      <AnimatePresence initial={false}>
-        {checked && children && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-            exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-            transition={{ duration: motionDuration(0.22, prefersReduced), ease: POP_EASE }}
-            style={{ overflow: "hidden" }}
-          >
+      <Collapse open={Boolean(checked && children)}>
             {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Collapse>
     </div>
   );
 }
@@ -154,7 +133,6 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const { tasks, lists, members, depts } = useWorkspaceData();
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
-  const prefersReduced = useReducedMotion();
   const [showAssignees, setShowAssignees] = useState(false);
   const [showDuePanel, setShowDuePanel] = useState(false);
   const [showRepeatPanel, setShowRepeatPanel] = useState(false);
@@ -289,7 +267,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
     return (
       <div className="p-8 text-center text-sm text-[var(--muted)]">
         Task not found.{" "}
-        <button type="button" className="text-[var(--accent)] underline" onClick={requestLeave}>
+        <button type="button" className="font-medium text-[var(--fg)] underline underline-offset-2" onClick={requestLeave}>
           Back to board
         </button>
       </div>
@@ -303,20 +281,20 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
   const subtasksForList = detail?.subtasks ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-5">
+    <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-6">
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={requestLeave}
           >
             <FontAwesomeIcon icon={faArrowLeft} className="size-4" />
             Back
           </button>
-          <span className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
+          <span className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
             Task
           </span>
         </div>
@@ -325,7 +303,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             <button
               type="button"
               onClick={() => ask.openAsk()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
             >
               <AiIcon className="size-3.5" />
               Fill with AI
@@ -335,19 +313,19 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="space-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Task</h3>
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-6">
+          <div className="space-y-6 rounded-[20px] bg-[var(--card)] p-6 shadow-card">
+            <h3 className="text-xs font-semibold text-[var(--muted)]">Task</h3>
 
             <div>
               {caps.canEditFields ? (
                 <>
                   <label
                     htmlFor="task-title"
-                    className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]"
+                    className="mb-2 block text-xs font-semibold text-[var(--muted)]"
                   >
-                    Task title <span className="text-red-500">*</span>
+                    Task title <span className="text-[var(--danger)]">*</span>
                   </label>
                   <textarea
                     id="task-title"
@@ -360,11 +338,11 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                     }}
                     placeholder={TASK_TITLE_PLACEHOLDER}
                     aria-required
-                    className="w-full resize-none overflow-hidden bg-transparent p-0 text-2xl font-semibold leading-snug text-[var(--fg)] outline-none placeholder:text-[var(--muted)] border-b border-[var(--border-subtle)] [&::-webkit-scrollbar]:hidden"
+                    className="w-full resize-none overflow-hidden bg-transparent p-0 text-2xl font-semibold leading-snug tracking-[-0.02em] text-[var(--fg)] outline-none placeholder:text-[var(--muted)] border-b border-[var(--border-subtle)] [&::-webkit-scrollbar]:hidden"
                   />
                 </>
               ) : (
-                <p className="border-b border-[var(--border-subtle)] pb-1.5 text-2xl font-semibold leading-snug text-[var(--fg)]">
+                <p className="text-2xl font-semibold leading-snug tracking-[-0.02em] text-[var(--fg)]">
                   {form.title}
                 </p>
               )}
@@ -407,12 +385,12 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
           )}
 
           {detail && (
-            <TaskPanelHistoryCard task={detail.task} ledger={detail.ledger} members={members} className="mt-6" />
+            <TaskPanelHistoryCard task={detail.task} ledger={detail.ledger} members={members} />
           )}
         </div>
 
-        <div className="w-full space-y-1 lg:w-72 lg:shrink-0">
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-4">
+        <div className="w-full space-y-4 lg:w-80 lg:shrink-0">
+          <div className="space-y-5 rounded-[20px] bg-[var(--card)] p-5 shadow-card">
             <div>
               <SectionLabel>Status &amp; Priority</SectionLabel>
               <div className="flex flex-wrap items-center gap-2">
@@ -433,9 +411,9 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 {(() => {
                   const color =
                     form.priority === "high"
-                      ? "text-amber-500 dark:text-amber-400"
+                      ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
                       : form.priority === "low"
-                        ? "text-sky-500 dark:text-sky-400"
+                        ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                         : "text-[var(--muted)]";
                   const icon =
                     form.priority === "high" ? (
@@ -448,7 +426,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   if (!caps.canEditFields) {
                     return (
                       <span
-                        className={`inline-flex min-w-[6rem] items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 ${color}`}
+                        className={`inline-flex min-w-[6rem] items-center gap-2 rounded-[9px] bg-[var(--fill)] px-3 py-1.5 ${color}`}
                       >
                         <span aria-hidden>{icon}</span>
                         <span className="text-sm font-semibold">{PRIORITY_LABELS[form.priority]}</span>
@@ -466,7 +444,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                         value: k,
                         label: PRIORITY_LABELS[k],
                       }))}
-                      triggerClassName={`inline-flex min-w-[6rem] items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-3 py-1.5 ${color}`}
+                      triggerClassName={`inline-flex min-w-[6rem] items-center gap-2 rounded-[9px] bg-[var(--fill)] px-3 py-1.5 ${color}`}
                       triggerContent={
                         <>
                           <span aria-hidden>{icon}</span>
@@ -556,7 +534,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
 
             <div>
               <SectionLabel>Assignees</SectionLabel>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {form.assigneeIds.map((id) => {
                   const m = members.find((r) => r.userId === id);
                   if (!m) return null;
@@ -564,7 +542,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   return (
                     <span
                       key={id}
-                      className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-muted)] py-1 pl-1.5 pr-2 text-sm font-medium text-[var(--fg)]"
+                      className="inline-flex h-8 items-center gap-2 rounded-full bg-[var(--fill)] pl-1 pr-2.5 text-sm font-medium text-[var(--fg)]"
                     >
                       <Avatar
                         name={m.name}
@@ -590,7 +568,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 {caps.canEditFields && (
                   <button
                     type="button"
-                    className="inline-flex items-center rounded-full border border-dashed border-[var(--border-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                    className="pressable inline-flex h-8 items-center rounded-full px-3 text-xs font-medium shadow-[inset_0_0_0_1px_var(--line-strong)] text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                     onClick={() => setShowAssignees((v) => !v)}
                   >
                     {form.assigneeIds.length === 0 ? "Add assignee" : "+ Add"}
@@ -600,24 +578,13 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                   <span className="text-sm text-[var(--muted)]">Unassigned</span>
                 )}
               </div>
-              <AnimatePresence initial={false}>
-                {caps.canEditFields && showAssignees && (
-                  <motion.div
-                    className="mt-2"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1, transitionEnd: { overflow: "visible" } }}
-                    exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-                    transition={{ duration: motionDuration(0.2, prefersReduced), ease: POP_EASE }}
-                    style={{ overflow: "hidden" }}
-                  >
+              <Collapse open={caps.canEditFields && showAssignees} className="pt-2">
                     <AssigneeSearchField
                       members={members}
                       assigneeIds={form.assigneeIds}
                       onToggleAssignee={form.toggleAssignee}
                     />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </Collapse>
             </div>
           </div>
 
@@ -627,8 +594,8 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
               checked={discordEnabled}
               ariaLabel="Enable Discord submission for this task"
               icon={<FontAwesomeIcon icon={faDiscord} className="size-6 text-[#5865F2]" />}
-              className="rounded-3xl border border-[#5865F2]/30 bg-[#5865F2]/[0.06] p-5 space-y-3"
-              toggleActiveClassName="bg-[#5865F2]"
+              className="space-y-3 rounded-[20px] bg-[#5865F2]/[0.07] p-5"
+              toggleActiveClassName="data-[state=checked]:bg-[#5865F2]"
               onChange={(next) => {
                 setDiscordEnabled(next);
                 if (!next) form.setDiscordChannel(null);
@@ -680,7 +647,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
           )}
 
           {detail && token && sessionUserId && (
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 space-y-2">
+            <div className="space-y-3 rounded-[20px] bg-[var(--card)] p-5 shadow-card">
               {caps.canEditFields ? (
                 <div className="flex items-center justify-between gap-2 text-sm font-semibold text-[var(--fg)]">
                   <span title="Attachments are disabled — this can only be turned off, not on">
@@ -712,7 +679,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
                 onClick={() =>
                   setConfirm({
                     title: "Archive this task?",

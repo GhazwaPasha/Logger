@@ -4,7 +4,7 @@ export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss
   return (
     <div
       role="alert"
-      className="surface-elevated flex items-start justify-between gap-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-800 dark:text-red-200"
+      className="surface-elevated flex items-start justify-between gap-4 rounded-xl border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-4 py-3 text-sm text-[var(--danger)] dark:text-[var(--danger)]"
     >
       <span>{message}</span>
       {onDismiss && (
