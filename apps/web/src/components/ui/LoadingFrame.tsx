@@ -3,46 +3,31 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
-
-const RIBBON_ROUND: Record<"default" | "2xl", string> = {
-  default: "",
-  "2xl": "task-sync-ribbon-track--rounded-2xl",
-};
+import { useEdgeLoading } from "@/components/app/EdgeLoader";
 
 /**
- * Wraps content with the same accent sync ribbon + tinted chrome used on task rows/cards
- * while data is loading or saving (dashboard panels, org settings, etc.).
+ * Marks content as loading. The visual is the workspace's edge light (see EdgeLoader), which runs
+ * along the sidebar edge and header curve while any LoadingFrame is showing — no strip on the panel.
+ * `ribbonRadius` / `padForRibbon` are accepted for older call sites and ignored.
  */
 export function LoadingFrame({
   show,
   children,
   className = "",
-  ribbonRadius = "default",
-  padForRibbon = true,
   "aria-label": ariaLabel,
 }: {
   show: boolean;
   children: ReactNode;
   className?: string;
-  /** Match the host surface’s top corner radius (`2xl` for dashboard / full-page cards). */
-  ribbonRadius?: keyof typeof RIBBON_ROUND;
-  /** Add slight top padding when the ribbon is visible so content doesn’t touch it. */
+  ribbonRadius?: "default" | "2xl";
   padForRibbon?: boolean;
   "aria-label"?: string;
 }) {
+  useEdgeLoading(show);
   if (!show) return <>{children}</>;
-
-  const round = RIBBON_ROUND[ribbonRadius];
   return (
-    <div
-      className={`relative overflow-hidden border-[color-mix(in_srgb,var(--accent)_22%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--surface-base)_96%,var(--accent-muted))] transition-[border-color,background-color] duration-200 ${className}`}
-      aria-busy
-      aria-label={ariaLabel ?? "Loading"}
-    >
-      <div className={`task-sync-ribbon-track ${round}`} aria-hidden>
-        <div className="task-sync-ribbon-thumb" />
-      </div>
-      <div className={padForRibbon ? "pt-1" : undefined}>{children}</div>
+    <div className={`relative ${className}`} aria-busy aria-label={ariaLabel ?? "Loading"}>
+      {children}
     </div>
   );
 }

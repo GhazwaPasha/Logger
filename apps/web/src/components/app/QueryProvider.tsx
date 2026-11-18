@@ -8,6 +8,8 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { makeQueryClient } from "@/lib/query-client";
 import { QUERY_CACHE_VERSION, QUERY_STORAGE_KEY_PREFIX } from "@/lib/query-cache-version";
 
+const PERSISTED_ROOTS = new Set(["organizations", "workspace", "roadmap", "trackers", "performance"]);
+
 export function QueryProvider({ children }: { children: ReactNode }) {
   const { session } = useApiSession();
   const userId = session?.user?.id ?? "";
@@ -34,8 +36,9 @@ export function QueryProvider({ children }: { children: ReactNode }) {
           if (!userId) return false;
           // Never persist errors (e.g. "Failed to fetch") — they stick across reloads for maxAge and mask fixes.
           if (query.state.status !== "success") return false;
-          const root = query.queryKey[0];
-          if (root !== "organizations" && root !== "workspace") return false;
+          // Page data only, so revisiting any page is instant — never secrets (api-keys, webhooks,
+          // discord) and nothing large and per-item (comments, attachments, task details).
+          if (!PERSISTED_ROOTS.has(String(query.queryKey[0]))) return false;
           // Never persist the activity feed: WorkspaceNotificationsProvider seeds its toast-dedup
           // baseline from the *first* data this query ever returns, silently. If that first data is a
           // stale rehydrated snapshot (up to `maxAge` old) instead of a live fetch, the subsequent

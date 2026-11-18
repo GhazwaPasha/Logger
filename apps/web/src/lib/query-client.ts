@@ -21,7 +21,9 @@ export function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        gcTime: 5 * 60_000,
+        // Keep data for a day (same as the persisted cache's maxAge): a page you left a while ago comes
+        // back instantly and refreshes in the background, instead of loading from scratch.
+        gcTime: 24 * 60 * 60_000,
         refetchOnWindowFocus: false,
         retry: shouldRetry,
         retryDelay,

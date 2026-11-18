@@ -67,6 +67,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { NewButton } from "@/components/ui/NewButton";
+import { useEdgeLoading } from "@/components/app/EdgeLoader";
 import { Collapse } from "@/components/ui/Collapse";
 import { Avatar } from "@/components/ui/Avatar";
 import { SelectPopover } from "@/components/ui/SelectPopover";
@@ -1363,6 +1364,8 @@ function WorkItemsInner() {
     patchTaskMutation.isPending && patchTaskMutation.variables
       ? patchTaskMutation.variables.taskId
       : null;
+  // Saving a task (status, priority…) runs the workspace edge light.
+  useEdgeLoading(patchTaskPendingId != null);
 
   const patchSubtaskPendingKey =
     patchSubtaskMutation.isPending && patchSubtaskMutation.variables
@@ -1730,11 +1733,6 @@ function WorkItemsInner() {
         onContextMenu={(e) => openTaskContextMenu(e, task)}
         onMouseEnter={() => prefetchTaskDetail(task.id)}
       >
-        {taskPatchSyncing ? (
-          <div className="task-sync-ribbon-track" aria-hidden>
-            <div className="task-sync-ribbon-thumb" />
-          </div>
-        ) : null}
 
         {/* Header: checkbox + title + status + overflow */}
         <div className="flex items-center gap-3 px-4 pt-3.5 pb-1.5">
@@ -2128,11 +2126,6 @@ function WorkItemsInner() {
           viewTaskId === task.id ? "bg-[var(--card-raised)] shadow-raised" : "shadow-card"
         } ${taskPatchSyncing ? "cursor-default opacity-[0.92]" : "cursor-grab active:cursor-grabbing"}`}
       >
-        {taskPatchSyncing ? (
-          <div className="task-sync-ribbon-track" aria-hidden>
-            <div className="task-sync-ribbon-thumb" />
-          </div>
-        ) : null}
         <div className="flex flex-col gap-1.5 px-3.5 pb-3 pt-3">
           <div className="flex min-w-0 items-center gap-1.5">
             <button

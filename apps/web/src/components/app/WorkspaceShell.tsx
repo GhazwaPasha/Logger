@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "./AppHeader";
 import { RouteTransition } from "./RouteTransition";
+import { EdgeLoader, EdgeLoadingProvider } from "./EdgeLoader";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceRouteContext, WORKSPACE_DETAIL_SLOT_ID } from "./workspace-route-context";
 import { WorkspaceDataProvider } from "@/components/app/WorkspaceDataProvider";
@@ -84,6 +85,7 @@ export function WorkspaceShell({
         <WorkspaceNotificationsProvider>
         <KeyboardShortcutsProvider>
         <AskProvider>
+        <EdgeLoadingProvider>
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[var(--surface-base)] md:bg-[var(--surface-nav)]">
             <AppHeader workspaceSlug={workspaceSlug} onMenuToggle={() => setMobileSidebarOpen((v) => !v)} joinedToSidebar />
             <div className="flex min-h-0 w-full flex-1 overflow-hidden md:flex-row md:items-stretch">
@@ -94,7 +96,9 @@ export function WorkspaceShell({
                 onMobileClose={closeMobileSidebar}
               />
               {/* The content sheet: a soft hairline + shadow (no hard border), curving where the header meets the sidebar. */}
-              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--surface-base)] md:rounded-tl-3xl md:shadow-sheet">
+              <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[var(--surface-base)] md:rounded-tl-3xl md:shadow-sheet">
+                {/* Loading light: runs up the sidebar edge, round the curve, along the header. */}
+                <EdgeLoader />
                 <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain scrollbar-hide px-3 pb-6 pt-3 sm:px-4 lg:px-5 sm:pt-4">
                   {/* Pages fly in and out here (see RouteTransition); `relative` anchors the exiting page. */}
                   <RouteTransition>{children}</RouteTransition>
@@ -105,6 +109,7 @@ export function WorkspaceShell({
               </div>
             </div>
           </div>
+        </EdgeLoadingProvider>
         </AskProvider>
         </KeyboardShortcutsProvider>
         </WorkspaceNotificationsProvider>
