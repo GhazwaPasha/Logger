@@ -43,8 +43,8 @@ html[data-theme="system"] { color-scheme: light dark; }
   /* Surfaces */
   --chrome: light-dark(#ECECEF, #09090B);        /* header + sidebar frame */
   --sheet: light-dark(#F7F7F9, #111113);         /* curved content sheet — a whisper of gray in light so white cards read */
-  --card: light-dark(#FFFFFF, #18181B);          /* cards and panels on the sheet */
-  --card-raised: light-dark(#FFFFFF, #1E1E22);   /* selected / popped card */
+  --card: light-dark(#FFFFFF, #000000);          /* cards and panels on the sheet — true black in dark */
+  --card-raised: light-dark(#FFFFFF, #141416);   /* selected / popped card — a step up from black in dark */
   --overlay: light-dark(rgba(255, 255, 255, 0.86), rgba(30, 30, 34, 0.86)); /* menus, popovers (with blur) */
   --scrim: light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.5));
 
