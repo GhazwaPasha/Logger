@@ -146,9 +146,9 @@ function TaskMiniCard({
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium text-[var(--fg)]">{info?.title ?? fallbackTitle}</span>
+        <span className="block truncate text-footnote font-medium text-[var(--fg)]">{info?.title ?? fallbackTitle}</span>
         {(note || due) && (
-          <span className="block truncate text-[11px] text-[var(--muted)]">
+          <span className="block truncate text-caption text-[var(--muted)]">
             {due && <span className={overdue ? "text-[var(--danger)] dark:text-[var(--danger)]" : undefined}>{overdue ? `Overdue · ${due}` : due}</span>}
             {due && note ? " · " : null}
             {note}
@@ -157,7 +157,7 @@ function TaskMiniCard({
       </span>
       {info?.assignee && (
         <span
-          className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-[9px] font-semibold uppercase text-[var(--fg)]"
+          className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--accent-muted)] text-2xs font-semibold uppercase text-[var(--fg)]"
           title={info.assignee}
         >
           {info.assigneeImage ? (
@@ -197,7 +197,7 @@ function inline(line: string, taskHref: (taskId: string) => string, onNavigate?:
       );
     } else {
       out.push(
-        <code key={m.index} className="rounded bg-[var(--surface-elevated)] px-1 py-px font-mono text-[12px]">
+        <code key={m.index} className="rounded bg-[var(--surface-elevated)] px-1 py-px font-mono text-xs">
           {m[4]}
         </code>,
       );

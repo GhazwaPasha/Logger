@@ -45,7 +45,7 @@ export function CompletionsChart() {
   return (
     <section className="flex h-full min-w-0 flex-col rounded-[18px] bg-[var(--card)] p-5 shadow-card" aria-labelledby="completions-title">
       <div className="flex items-center gap-3">
-        <h2 id="completions-title" className="min-w-0 flex-1 font-outfit text-base font-semibold tracking-tight">
+        <h2 id="completions-title" className="min-w-0 flex-1 font-outfit text-base font-semibold">
           Tasks completed
         </h2>
         <Segmented
@@ -64,11 +64,11 @@ export function CompletionsChart() {
       <div className="mt-3 min-h-[62px]" aria-live="polite">
         {model ? (
           <>
-            <p className="text-[12px] font-semibold text-[var(--muted)]">
+            <p className="text-xs font-semibold text-[var(--muted)]">
               {scrubbing ? shortDate(model.cur[hover!].date) : `Last ${range} days`}
             </p>
             <p className="mt-0.5 flex items-baseline gap-2">
-              <span className="font-outfit text-[34px] font-bold leading-none tracking-[-0.035em] tabular-nums">
+              <span className="font-outfit text-4xl font-semibold leading-none tracking-[-0.035em] tabular-nums">
                 {scrubbing ? model.values[hover!] : model.total}
               </span>
               <span className="text-sm text-[var(--muted)]">{(scrubbing ? model.values[hover!] : model.total) === 1 ? "task" : "tasks"}</span>

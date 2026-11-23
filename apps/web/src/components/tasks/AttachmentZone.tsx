@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock } from "@fortawesome/free-solid-svg-icons";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { formatInTimeZone } from "@/lib/date";
 import { CollapseItem } from "@/components/ui/Collapse";
+import { FileImageIcon, FileTextIcon, LockIcon, PaperclipIcon } from "lucide-react";
+import { DiscordIcon } from "@/components/brand/BrandIcons";
 
 type AttachmentRow = {
   id: string;
@@ -34,11 +33,13 @@ function formatBytes(bytes: string | number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function fileIcon(mime: string): string {
-  if (mime.startsWith("image/")) return "🖼";
-  if (mime === "application/pdf") return "📄";
-  if (mime.startsWith("text/")) return "📝";
-  return "📎";
+function FileTypeIcon({ mime }: { mime: string }) {
+  const Icon = mime.startsWith("image/")
+    ? FileImageIcon
+    : mime === "application/pdf" || mime.startsWith("text/")
+      ? FileTextIcon
+      : PaperclipIcon;
+  return <Icon className="size-4 shrink-0 text-[var(--muted)]" aria-hidden />;
 }
 
 type Props = {
@@ -80,7 +81,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
             title="Attachments are disabled"
             className="inline-flex size-6 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] opacity-50"
           >
-            <FontAwesomeIcon icon={faLock} className="size-3" />
+            <LockIcon className="size-3" />
           </button>
         )}
       </div>
@@ -95,9 +96,9 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
             {query.data.map((a) => (
               <CollapseItem as="li" key={a.id} reorder className="pb-1"><div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface)] px-3 py-2">
                 {a.storageKey ? (
-                  <span className="text-base" aria-hidden>{fileIcon(a.mimeType)}</span>
+                  <FileTypeIcon mime={a.mimeType} />
                 ) : (
-                  <FontAwesomeIcon icon={faDiscord} className="size-4 shrink-0 text-[#5865F2]" aria-hidden />
+                  <DiscordIcon className="size-4 shrink-0 text-[#5865F2]" aria-hidden />
                 )}
                 <div className="min-w-0 flex-1">
                   <a
@@ -109,14 +110,14 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
                   >
                     {a.fileName}
                   </a>
-                  <p className="font-mono-ledger text-[10px] text-[var(--muted)]">
+                  <p className="font-mono-ledger text-2xs text-[var(--muted)]">
                     {a.storageKey ? formatBytes(a.fileSize) : "View in Discord"}
                   </p>
                 </div>
                 {a.discordDeliveredAt && (
                   <span
                     title={`Sent to Discord ${formatInTimeZone(new Date(a.discordDeliveredAt), timeZone, { dateStyle: "medium", timeStyle: "short" })}`}
-                    className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-[10px] font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
+                    className="shrink-0 rounded-full bg-[#5865F2]/15 px-2 py-0.5 text-2xs font-semibold text-[#5865F2] dark:bg-[#5865F2]/25"
                   >
                     Discord
                   </span>

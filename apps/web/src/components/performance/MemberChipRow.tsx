@@ -50,7 +50,7 @@ export function MemberChipRow({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={m.image} alt="" className="size-5 shrink-0 rounded-full object-cover" />
             ) : (
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[9px] font-semibold text-[var(--fg)]">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]">
                 {nameInitials(m.name, m.email)}
               </span>
             )}

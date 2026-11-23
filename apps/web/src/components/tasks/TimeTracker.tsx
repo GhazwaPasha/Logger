@@ -237,7 +237,7 @@ export function TimeTracker({
       <Collapse open={!viewOnly && showManual} className="space-y-2 rounded-lg bg-[var(--surface-muted)] p-3">
           <div className="space-y-1.5">
             <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">Start</label>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--muted)]">Start</label>
               <input
                 type="datetime-local"
                 value={manualStart}
@@ -246,7 +246,7 @@ export function TimeTracker({
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-[10px] font-medium text-[var(--muted)]">End</label>
+              <label className="mb-0.5 block text-2xs font-medium text-[var(--muted)]">End</label>
               <input
                 type="datetime-local"
                 value={manualEnd}

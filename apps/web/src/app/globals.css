@@ -203,49 +203,38 @@ html[data-theme="system"] { color-scheme: light dark; }
 
   --ease-respond: var(--motion-respond);
   --ease-move: var(--motion-move);
+
+  /*
+   * Type scale. Every text size in the app is one of these steps, never a one-off text-[Npx]:
+   *   2xs 10 · caption 11 · xs 12 · footnote 13 · sm 14 · subhead 15 · base 16 · lg 18
+   *   xl 20 · 2xl 24 · 3xl 30 · 4xl 36 · figure 40
+   * xs, sm, base and up are Tailwind's own steps. Text under 20px keeps zero tracking; only
+   * titles and figures tighten. The custom names are registered with tailwind-merge in lib/utils.
+   */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
+  --text-footnote: 0.8125rem;
+  --text-footnote--line-height: 1.125rem;
+  --text-subhead: 0.9375rem;
+  --text-subhead--line-height: 1.375rem;
+  --text-figure: 2.5rem;
+  --text-figure--line-height: 1;
+  --text-figure--letter-spacing: -0.03em;
 }
 
-/*
- * Type scale — Apple-style: tracking tightens as size grows, leading loosens as it shrinks.
- * Use these instead of one-off text-[13px] values.
- */
-@utility text-large-title {
-  font-size: 1.875rem;
-  line-height: 1.1;
-  letter-spacing: -0.026em;
-  font-weight: 650;
-}
-@utility text-title {
-  font-size: 1.3125rem;
-  line-height: 1.25;
-  letter-spacing: -0.019em;
-  font-weight: 650;
-}
-@utility text-headline {
-  font-size: 0.9375rem;
-  line-height: 1.35;
-  letter-spacing: -0.011em;
+/* Page title: one style for every top-level page (Outfit, 24px on phones, 30px from sm). */
+@utility page-title {
+  font-family: var(--font-outfit), var(--font-dm-sans), system-ui, sans-serif;
+  font-size: var(--text-2xl);
+  line-height: 1.2;
   font-weight: 600;
-}
-@utility text-body {
-  font-size: 0.90625rem;
-  line-height: 1.45;
-  letter-spacing: -0.011em;
-}
-@utility text-callout {
-  font-size: 0.84375rem;
-  line-height: 1.4;
-  letter-spacing: -0.006em;
-}
-@utility text-footnote {
-  font-size: 0.78125rem;
-  line-height: 1.4;
-  letter-spacing: -0.003em;
-}
-@utility text-caption {
-  font-size: 0.71875rem;
-  line-height: 1.35;
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
+  @media (width >= 40rem) {
+    font-size: var(--text-3xl);
+    line-height: 1.15;
+  }
 }
 
 /* Primitives (data-slot) draw hairlines in the line token rather than currentColor. */
@@ -970,7 +959,7 @@ html[data-theme="dark"] .header-live-island__hit {
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .header-live-island__description {

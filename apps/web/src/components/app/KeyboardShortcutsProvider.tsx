@@ -51,7 +51,7 @@ function ShortcutsHelp({ onClose }: { onClose: () => void }) {
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group}>
-              <p className="mb-2 text-[11.5px] font-semibold text-[var(--muted)]">
+              <p className="mb-2 text-caption font-semibold text-[var(--muted)]">
                 {group}
               </p>
               <ul className="space-y-1.5">

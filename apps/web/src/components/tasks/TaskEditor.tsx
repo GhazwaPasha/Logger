@@ -4,9 +4,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowLeft, faAnglesUp, faAnglesDown, faArrowUp } from "@fortawesome/free-solid-svg-icons";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiJson } from "@/lib/api";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useTaskFormNavigationGuard } from "@/hooks/useTaskFormNavigationGuard";
@@ -47,6 +44,8 @@ import { taskKeys, workspaceKeys } from "@/lib/query-keys";
 import type { WorkspaceBundle } from "@/hooks/useOrgWorkspace";
 
 import { Collapse } from "@/components/ui/Collapse";
+import { ArrowLeftIcon, ArrowUpIcon, ChevronsDownIcon, ChevronsUpIcon } from "lucide-react";
+import { DiscordIcon } from "@/components/brand/BrandIcons";
 
 const STATUS_LABELS_FORM: Record<ManualTaskStatus, string> = {
   pending: "Pending",
@@ -291,7 +290,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={requestLeave}
           >
-            <FontAwesomeIcon icon={faArrowLeft} className="size-4" />
+            <ArrowLeftIcon className="size-4" />
             Back
           </button>
           <span className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
@@ -417,11 +416,11 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                         : "text-[var(--muted)]";
                   const icon =
                     form.priority === "high" ? (
-                      <FontAwesomeIcon icon={faAnglesUp} className="size-3.5" />
+                      <ChevronsUpIcon className="size-3.5" />
                     ) : form.priority === "low" ? (
-                      <FontAwesomeIcon icon={faAnglesDown} className="size-3.5" />
+                      <ChevronsDownIcon className="size-3.5" />
                     ) : (
-                      <FontAwesomeIcon icon={faArrowUp} className="size-3.5" />
+                      <ArrowUpIcon className="size-3.5" />
                     );
                   if (!caps.canEditFields) {
                     return (
@@ -549,7 +548,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                         email={m.email}
                         image={m.image}
                         size="size-5"
-                        className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                        className="bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
                       />
                       {name}
                       {caps.canEditFields && (
@@ -593,7 +592,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
               label="Send to Discord"
               checked={discordEnabled}
               ariaLabel="Enable Discord submission for this task"
-              icon={<FontAwesomeIcon icon={faDiscord} className="size-6 text-[#5865F2]" />}
+              icon={<DiscordIcon className="size-6 text-[#5865F2]" />}
               className="space-y-3 rounded-[20px] bg-[#5865F2]/[0.07] p-5"
               toggleActiveClassName="data-[state=checked]:bg-[#5865F2]"
               onChange={(next) => {

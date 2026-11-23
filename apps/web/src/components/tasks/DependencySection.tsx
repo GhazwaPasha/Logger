@@ -3,12 +3,12 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { faLink } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch } from "@/lib/api";
 import type { TaskRow } from "@/lib/ledger-types";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { curve, reducedDuration, variants } from "@/lib/motion";
 import { CollapseItem } from "@/components/ui/Collapse";
+import { LinkIcon } from "lucide-react";
 
 type DependencyTask = { id: string; title: string; status: string };
 
@@ -38,7 +38,7 @@ const STATUS_CHIP: Record<string, string> = {
 function StatusChip({ status }: { status: string }) {
   const label = status === "in_progress" ? "In Progress" : status.charAt(0).toUpperCase() + status.slice(1);
   return (
-    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_CHIP[status] ?? "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] text-[var(--ink-2)]"}`}>
+    <span className={`rounded px-1.5 py-0.5 text-2xs font-medium ${STATUS_CHIP[status] ?? "bg-[color-mix(in_srgb,var(--ink-2)_15%,transparent)] text-[var(--ink-2)]"}`}>
       {label}
     </span>
   );
@@ -208,7 +208,7 @@ export function DependencySection({
               <button
                 type="button"
                 onClick={() => setShowBlockerPicker((v) => !v)}
-                className="rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent)] hover:bg-[var(--surface-muted)]"
+                className="rounded px-2 py-0.5 text-caption font-medium text-[var(--accent)] hover:bg-[var(--surface-muted)]"
               >
                 + Add
               </button>
@@ -227,7 +227,7 @@ export function DependencySection({
           )}
         </div>
         {blockers.length === 0 ? (
-          <EmptyState icon={faLink} title="No blockers" size="compact" />
+          <EmptyState icon={LinkIcon} title="No blockers" size="compact" />
         ) : (
           <ul>
             <AnimatePresence initial={false}>

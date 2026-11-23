@@ -1,30 +1,5 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faBell,
-  faArrowUp,
-  faArrowRight,
-  faArrowsUpDown,
-  faCalendar,
-  faCalendarDays,
-  faCalendarPlus,
-  faAnglesDown,
-  faAnglesUp,
-  faCaretRight,
-  faChevronLeft,
-  faChevronRight,
-  faComment,
-  faCheck,
-  faTableColumns,
-  faEllipsisVertical,
-  faLayerGroup,
-  faPaperclip,
-  faPlus,
-  faTableList,
-  faStopwatch,
-  faUserPlus,
-} from "@fortawesome/free-solid-svg-icons";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode, RefObject } from "react";
 import {
@@ -126,6 +101,7 @@ import {
   taskPriority,
   taskShowsLateFooter,
 } from "@/lib/task-board";
+import { ArrowRightIcon, ArrowUpDownIcon, ArrowUpIcon, BellIcon, CalendarDaysIcon, CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsDownIcon, ChevronsUpIcon, Columns3Icon, EllipsisVerticalIcon, LayersIcon, ListIcon, MessageCircleIcon, PaperclipIcon, PlusIcon, TimerIcon, UserPlusIcon } from "lucide-react";
 
 /** Docked task-details pane: default width (the old overlay's max-w-xl), drag limits, and remembered width. */
 const TASK_DETAIL_PANE_W = 576;
@@ -181,8 +157,7 @@ function SubtaskRing({ done, total }: { done: number; total: number }) {
 
 function IconChevron({ className, open }: { className?: string; open: boolean }) {
   return (
-    <FontAwesomeIcon
-      icon={faCaretRight}
+    <ChevronRightIcon
       className={`${className ?? ""} shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
       aria-hidden
     />
@@ -194,7 +169,7 @@ const TASK_PANEL_HEADER_ROW =
   "-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 pt-0 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-0";
 
 const TASK_PANEL_HEADER_TITLE =
-  "min-w-0 truncate text-sm font-semibold leading-tight tracking-tight text-[var(--fg)] sm:min-w-[6rem] sm:flex-1";
+  "min-w-0 truncate text-sm font-semibold leading-tight text-[var(--fg)] sm:min-w-[6rem] sm:flex-1";
 
 const TASK_PANEL_HEADER_RIGHT =
   "flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:flex-nowrap sm:gap-2";
@@ -288,7 +263,7 @@ const KANBAN_SUBTASK_BELOW_BADGE_HEIGHT =
 
 
 const LIST_ROW_BADGE_LABEL =
-  "pointer-events-none w-full min-w-0 truncate text-center text-[11px] font-semibold leading-none tracking-wide tabular-nums";
+  "pointer-events-none w-full min-w-0 truncate text-center text-caption font-semibold leading-none tracking-wide tabular-nums";
 
 /** List / kanban: overflow control to open task edit panel (matches list badge row height). */
 const TASK_ROW_OVERFLOW_MENU_BTN =
@@ -503,7 +478,7 @@ function ColumnList({
                   setAttemptedCursor(null);
                   void loadMoreColumn(item.status);
                 }}
-                className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
+                className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-caption font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
               >
                 Couldn&apos;t load more · retry ({item.loaded} of {item.total})
               </button>
@@ -618,7 +593,7 @@ function KanbanBoard({
             aria-label="Scroll columns left"
             className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
-            <FontAwesomeIcon icon={faChevronLeft} className="size-3" aria-hidden />
+            <ChevronLeftIcon className="size-3" aria-hidden />
           </button>
         )}
         {canScrollRight && (
@@ -628,7 +603,7 @@ function KanbanBoard({
             aria-label="Scroll columns right"
             className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
-            <FontAwesomeIcon icon={faChevronRight} className="size-3" aria-hidden />
+            <ChevronRightIcon className="size-3" aria-hidden />
           </button>
         )}
         <div
@@ -696,8 +671,8 @@ function KanbanBoard({
                   className={`shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1.5 shadow-sm ${statusPillPaletteClasses(col)}`}
                 >
                   <div className="flex items-center justify-between gap-1.5">
-                    <span className="text-[11px] font-semibold leading-none tracking-tight">{label}</span>
-                    <span className="tabular-nums text-[10px] font-medium opacity-80">
+                    <span className="text-caption font-semibold leading-none">{label}</span>
+                    <span className="tabular-nums text-2xs font-medium opacity-80">
                       {columnMeta[col]?.nextCursor
                         ? `${colTasks.length}/${statusCounts[col]}`
                         : (statusCounts[col] ?? colTasks.length)}
@@ -897,7 +872,7 @@ function ListViewCards({
                 setAttemptedCursors((prev) => ({ ...prev, [status]: null }));
                 void loadMoreColumn(status);
               }}
-              className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
+              className="w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] px-3 py-2 text-caption font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
             >
               Couldn&apos;t load more {FLOW_COLUMN_LABELS[status]} tasks · retry
             </button>
@@ -1783,7 +1758,7 @@ function WorkItemsInner() {
             {taskPatchSyncing ? (
               <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
             ) : checklistDone ? (
-              <FontAwesomeIcon icon={faCheck} className="size-[10px] shrink-0" aria-hidden />
+              <CheckIcon className="size-[10px] shrink-0" aria-hidden />
             ) : null}
           </button>
 
@@ -1791,7 +1766,7 @@ function WorkItemsInner() {
             <button
               type="button"
               onClick={() => openViewTask(task.id)}
-              className={`line-clamp-2 text-left text-[15px] font-semibold leading-snug tracking-[-0.01em] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
+              className={`line-clamp-2 text-left text-subhead font-semibold leading-snug tracking-[-0.01em] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-base)] ${
                 flowCol === "cancelled"
                   ? "text-[var(--muted)] line-through decoration-[var(--danger)]"
                   : checklistDone
@@ -1813,7 +1788,7 @@ function WorkItemsInner() {
               title="Edit task"
               aria-label={`More options — edit: ${task.title}`}
             >
-              <FontAwesomeIcon icon={faEllipsisVertical} className="size-4" aria-hidden />
+              <EllipsisVerticalIcon className="size-4" aria-hidden />
             </button>
           </div>
         </div>
@@ -1826,7 +1801,7 @@ function WorkItemsInner() {
                 type="button"
                 onClick={() => toggleListRowExpand(task.id)}
                 aria-expanded={expanded}
-                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
               >
                 {Array.isArray(subtasksState) ? (
                   <>
@@ -1838,18 +1813,18 @@ function WorkItemsInner() {
                 ) : (
                   "Subtasks"
                 )}
-                <IconChevron open={expanded} className="opacity-70" />
+                <IconChevron open={expanded} className="size-3 opacity-70" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => openViewTask(task.id)}
-                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                 title="Add subtasks"
                 aria-label="Add subtasks"
               >
                 Subtasks
-                <FontAwesomeIcon icon={faPlus} className="size-4 opacity-60" aria-hidden />
+                <PlusIcon className="size-4 opacity-60" aria-hidden />
               </button>
             )}
             <div className="flex-1" />
@@ -1867,7 +1842,7 @@ function WorkItemsInner() {
               {subtasksPreview.map((s) => {
                 const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                 return (
-                  <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
+                  <li key={s.id} className="flex items-start gap-2 text-footnote leading-snug">
                     <button
                       type="button"
                       disabled={subPending}
@@ -1883,7 +1858,7 @@ function WorkItemsInner() {
                       {subPending ? (
                         <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
                       ) : s.done ? (
-                        <FontAwesomeIcon icon={faCheck} className="size-[8px] shrink-0" aria-hidden />
+                        <CheckIcon className="size-[8px] shrink-0" aria-hidden />
                       ) : null}
                     </button>
                     <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}>
@@ -1947,11 +1922,11 @@ function WorkItemsInner() {
           : "text-[var(--priority-medium)]";
     const icon =
       p === "high" ? (
-        <FontAwesomeIcon icon={faAnglesUp} className="size-4" aria-hidden />
+        <ChevronsUpIcon className="size-4" aria-hidden />
       ) : p === "low" ? (
-        <FontAwesomeIcon icon={faAnglesDown} className="size-4" aria-hidden />
+        <ChevronsDownIcon className="size-4" aria-hidden />
       ) : (
-        <FontAwesomeIcon icon={faArrowUp} className="size-4" aria-hidden />
+        <ArrowUpIcon className="size-4" aria-hidden />
       );
 
     if (!canEdit) {
@@ -2000,11 +1975,11 @@ function WorkItemsInner() {
         className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
       >
         {isLate ? (
-          <FontAwesomeIcon icon={faBell} className="size-4 shrink-0" aria-hidden />
+          <BellIcon className="size-4 shrink-0" aria-hidden />
         ) : hasDue ? (
-          <FontAwesomeIcon icon={faStopwatch} className="size-4 shrink-0" aria-hidden />
+          <TimerIcon className="size-4 shrink-0" aria-hidden />
         ) : (
-          <FontAwesomeIcon icon={faCalendarPlus} className="size-4 shrink-0" aria-hidden />
+          <CalendarPlusIcon className="size-4 shrink-0" aria-hidden />
         )}
         {dueSummary ? (
           <span className="whitespace-nowrap text-xs font-medium leading-none tabular-nums">{dueSummary}</span>
@@ -2031,10 +2006,10 @@ function WorkItemsInner() {
             email={member.email}
             image={member.image}
             size="size-5"
-            className="bg-[var(--fill-2)] text-[9px] font-bold leading-none tabular-nums text-[var(--fg)]"
+            className="bg-[var(--fill-2)] text-2xs font-semibold leading-none tabular-nums text-[var(--fg)]"
           />
         ) : (
-          <FontAwesomeIcon icon={faUserPlus} className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
+          <UserPlusIcon className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
         )}
       </button>
     );
@@ -2049,7 +2024,7 @@ function WorkItemsInner() {
         aria-label="Comments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <FontAwesomeIcon icon={faComment} className="size-4" aria-hidden />
+        <MessageCircleIcon className="size-4" aria-hidden />
       </button>
     );
   }
@@ -2063,7 +2038,7 @@ function WorkItemsInner() {
         aria-label="Attachments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <FontAwesomeIcon icon={faPaperclip} className="size-4" aria-hidden />
+        <PaperclipIcon className="size-4" aria-hidden />
       </button>
     );
   }
@@ -2131,7 +2106,7 @@ function WorkItemsInner() {
             <button
               type="button"
               onClick={() => openViewTask(task.id)}
-              className={`line-clamp-3 min-w-0 flex-1 text-left text-[15px] font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
+              className={`line-clamp-3 min-w-0 flex-1 text-left text-subhead font-semibold leading-snug tracking-tight underline-offset-4 hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-elevated)] ${
                 flowCol === "cancelled"
                   ? "text-[var(--muted)] line-through decoration-[var(--danger)]"
                   : flowCol === "done"
@@ -2151,13 +2126,13 @@ function WorkItemsInner() {
                 title="Edit task"
                 aria-label={`More options — edit: ${task.title}`}
               >
-                <FontAwesomeIcon icon={faEllipsisVertical} className="size-4" aria-hidden />
+                <EllipsisVerticalIcon className="size-4" aria-hidden />
               </button>
             </div>
           </div>
 
           {subtasksState === "loading" && (
-            <p className="pt-1 text-[11px] text-[var(--muted)]">Loading subtasks…</p>
+            <p className="pt-1 text-caption text-[var(--muted)]">Loading subtasks…</p>
           )}
 
           {/* Subtasks + meta row — always visible */}
@@ -2167,7 +2142,7 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="View subtasks"
                   aria-label="View subtasks"
                 >
@@ -2186,7 +2161,7 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-[12.5px] font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="Add subtasks"
                   aria-label="Add subtasks"
                 >
@@ -2211,7 +2186,7 @@ function WorkItemsInner() {
                 {subtasksPreview.map((s) => {
                   const subPending = patchSubtaskPendingKey === `${task.id}:${s.id}`;
                   return (
-                    <li key={s.id} className="flex items-start gap-2 text-[13px] leading-snug">
+                    <li key={s.id} className="flex items-start gap-2 text-footnote leading-snug">
                       <button
                         type="button"
                         disabled={subPending}
@@ -2241,7 +2216,7 @@ function WorkItemsInner() {
                   );
                 })}
                 {subtasksOverflow > 0 && (
-                  <li className="pt-0.5 text-[11px] text-[var(--muted)]">
+                  <li className="pt-0.5 text-caption text-[var(--muted)]">
                     +{subtasksOverflow} more —{" "}
                     <button
                       type="button"
@@ -2392,7 +2367,7 @@ function WorkItemsInner() {
                       transition={prefersReduced ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0 }}
                     />
                   )}
-                  <FontAwesomeIcon icon={faTableList} className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "list" ? "text-[var(--fg)]" : ""}`} aria-hidden />
+                  <ListIcon className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "list" ? "text-[var(--fg)]" : ""}`} aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -2408,7 +2383,7 @@ function WorkItemsInner() {
                       transition={prefersReduced ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0 }}
                     />
                   )}
-                  <FontAwesomeIcon icon={faTableColumns} className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "kanban" ? "text-[var(--fg)]" : ""}`} aria-hidden />
+                  <Columns3Icon className={`relative ${TASKS_TOOLBAR_ICON_CLASS} ${viewMode === "kanban" ? "text-[var(--fg)]" : ""}`} aria-hidden />
                 </button>
               </div>
               <span className="hidden h-8 w-px shrink-0 bg-[var(--border-subtle)] sm:inline-block" aria-hidden />
@@ -2425,7 +2400,7 @@ function WorkItemsInner() {
                 aria-haspopup="menu"
                 aria-label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label ?? sortMode}`}
               >
-                <FontAwesomeIcon icon={faArrowsUpDown} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
+                <ArrowUpDownIcon className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
               </button>
               <div ref={dueWindowContainerRef} className="flex items-center gap-1">
                 <button
@@ -2443,10 +2418,10 @@ function WorkItemsInner() {
                       : "Due date filter"
                   }
                 >
-                  <FontAwesomeIcon icon={faCalendarDays} className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
+                  <CalendarDaysIcon className={TASKS_TOOLBAR_ICON_CLASS} aria-hidden />
                   {dueWindow !== "all" && (
                     <span
-                      className="absolute -right-1 -bottom-1 inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[9px] font-bold leading-none text-[var(--on-accent)] ring-2 ring-[var(--surface-base)]"
+                      className="absolute -right-1 -bottom-1 inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-[var(--accent)] px-1 text-2xs font-semibold leading-none text-[var(--on-accent)] ring-2 ring-[var(--surface-base)]"
                       aria-hidden
                     >
                       {DUE_WINDOW_OPTIONS.find((o) => o.value === dueWindow)?.label}
@@ -2468,7 +2443,7 @@ function WorkItemsInner() {
                         <button
                           key={opt.value}
                           type="button"
-                          className={`pressable inline-flex h-9 shrink-0 items-center justify-center rounded-[10px] px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
+                          className={`pressable inline-flex h-9 shrink-0 items-center justify-center rounded-[10px] px-3.5 text-footnote font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] ${
                             dueWindow === opt.value
                               ? "bg-[var(--card)] text-[var(--fg)] shadow-card"
                               : "text-[var(--muted)] hover:text-[var(--fg)]"
@@ -2489,11 +2464,11 @@ function WorkItemsInner() {
                         <div className="ml-1 flex shrink-0 items-center gap-1 rounded-full bg-[var(--surface-muted)] p-1">
                           <div className="relative flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-[var(--surface-hover)]">
                             {dueFrom ? (
-                              <span className="pointer-events-none whitespace-nowrap text-[11px] font-medium leading-none text-[var(--fg)]">
+                              <span className="pointer-events-none whitespace-nowrap text-caption font-medium leading-none text-[var(--fg)]">
                                 {formatCustomDueChip(dueFrom)}
                               </span>
                             ) : (
-                              <FontAwesomeIcon icon={faCalendar} className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                              <CalendarIcon className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
                             )}
                             <input
                               type="date"
@@ -2504,14 +2479,14 @@ function WorkItemsInner() {
                               title={dueFrom ? formatCustomDueChip(dueFrom) : "Due from"}
                             />
                           </div>
-                          <FontAwesomeIcon icon={faArrowRight} className="size-3 shrink-0 text-[var(--muted)]" aria-hidden />
+                          <ArrowRightIcon className="size-3 shrink-0 text-[var(--muted)]" aria-hidden />
                           <div className="relative flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-[var(--surface-hover)]">
                             {dueTo ? (
-                              <span className="pointer-events-none whitespace-nowrap text-[11px] font-medium leading-none text-[var(--fg)]">
+                              <span className="pointer-events-none whitespace-nowrap text-caption font-medium leading-none text-[var(--fg)]">
                                 {formatCustomDueChip(dueTo)}
                               </span>
                             ) : (
-                              <FontAwesomeIcon icon={faCalendar} className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                              <CalendarIcon className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
                             )}
                             <input
                               type="date"
@@ -2551,7 +2526,7 @@ function WorkItemsInner() {
                 exit="hidden"
                 transition={{ duration: reducedDuration(0.18, prefersReduced), ease: curve.respond }}
               >
-                <p className="px-3 pb-2 text-[11.5px] font-medium text-[var(--muted)]">Sort by</p>
+                <p className="px-3 pb-2 text-caption font-medium text-[var(--muted)]">Sort by</p>
                 <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
                   {SORT_OPTIONS.map((opt) => (
                     <li key={opt.value}>
@@ -2592,7 +2567,7 @@ function WorkItemsInner() {
           </p>
         ) : sortedDepts.length === 0 ? (
           <EmptyState
-            icon={faLayerGroup}
+            icon={LayersIcon}
             title={`No ${NODE_LABELS.level.toLowerCase()}s yet`}
             description={`Create a ${NODE_LABELS.level.toLowerCase()} from the sidebar to start organizing ${NODE_LABELS.workItem.toLowerCase()}s.`}
           />

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSquareCheck, faClock, faUserClock, faSquareXmark } from "@fortawesome/free-solid-svg-icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/primitives/popover";
 import { FLOW_COLUMN_LABELS, statusDotColor, statusPillPaletteClasses, type ManualTaskStatus } from "@/lib/task-board";
 import { cn } from "@/lib/utils";
+import { ClockIcon, HourglassIcon, SquareCheckIcon, SquareXIcon } from "lucide-react";
 
 /** Same minimum box for every stage; grows to fit the label so it never truncates. */
 export const STATUS_PILL_LAYOUT =
@@ -17,10 +16,10 @@ export const KANBAN_STATUS_SHELL_LAYOUT =
 
 export function StatusIcon({ status, className, size }: { status: ManualTaskStatus; className?: string; size?: number }) {
   const style = size ? { width: size, height: size } : undefined;
-  if (status === "done") return <FontAwesomeIcon icon={faSquareCheck} className={className} style={style} aria-hidden />;
-  if (status === "in_progress") return <FontAwesomeIcon icon={faUserClock} className={className} style={style} aria-hidden />;
-  if (status === "cancelled") return <FontAwesomeIcon icon={faSquareXmark} className={className} style={style} aria-hidden />;
-  return <FontAwesomeIcon icon={faClock} className={className} style={style} aria-hidden />;
+  if (status === "done") return <SquareCheckIcon className={className} style={style} aria-hidden />;
+  if (status === "in_progress") return <HourglassIcon className={className} style={style} aria-hidden />;
+  if (status === "cancelled") return <SquareXIcon className={className} style={style} aria-hidden />;
+  return <ClockIcon className={className} style={style} aria-hidden />;
 }
 
 /**
@@ -74,7 +73,7 @@ export function StatusPillSelect({
             aria-label={ariaLabel}
             className="pressable relative z-[1] flex h-full w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-[inherit] px-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sheet)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span className="pointer-events-none text-[12px] font-semibold leading-none tracking-tight">
+            <span className="pointer-events-none text-xs font-semibold leading-none">
               {FLOW_COLUMN_LABELS[value]}
             </span>
           </button>
@@ -99,7 +98,7 @@ export function StatusPillSelect({
               role="option"
               aria-selected={s === value}
               className={cn(
-                "flex w-full min-w-[9rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-semibold leading-snug tracking-tight text-ink outline-none transition-colors focus-visible:bg-fill-2",
+                "flex w-full min-w-[9rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-semibold leading-snug text-ink outline-none transition-colors focus-visible:bg-fill-2",
                 s === value ? "bg-fill-2" : "hover:bg-fill",
               )}
               onClick={() => {

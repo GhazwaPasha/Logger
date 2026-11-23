@@ -67,7 +67,7 @@ export default function WorkspacePerformancePage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Performance</h1>
+          <h1 className="page-title">Performance</h1>
           <p className="mt-0.5 max-w-2xl text-sm text-[var(--muted)]">
             Who did what, when, and how compliant it was — across the team.
           </p>

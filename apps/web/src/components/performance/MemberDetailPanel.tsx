@@ -24,7 +24,7 @@ function complianceSegments(fulfilled: number, required: number) {
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-[var(--surface-muted)] px-2.5 py-1.5">
-      <p className="text-[11.5px] font-medium text-[var(--muted)]">{label}</p>
+      <p className="text-caption font-medium text-[var(--muted)]">{label}</p>
       <p className="text-lg font-semibold tabular-nums leading-tight text-[var(--fg)]">{value}</p>
     </div>
   );
@@ -81,7 +81,7 @@ export function MemberDetailPanel({
 
       <div className="space-y-3">
         <div>
-          <p className="text-[12px] font-semibold text-[var(--muted)]">Current workload</p>
+          <p className="text-xs font-semibold text-[var(--muted)]">Current workload</p>
           {hasWorkload ? (
             <>
               <div className="mt-1.5">
@@ -103,12 +103,12 @@ export function MemberDetailPanel({
         </div>
 
         <div>
-          <p className="text-[12px] font-semibold text-[var(--muted)]">Compliance</p>
+          <p className="text-xs font-semibold text-[var(--muted)]">Compliance</p>
           {hasCompliance ? (
             <div className="mt-1.5 space-y-2">
               {member.submissionsRequired > 0 && (
                 <div>
-                  <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
+                  <div className="flex items-center justify-between text-caption text-[var(--muted)]">
                     <span>Required Discord submissions</span>
                     <span className="tabular-nums">
                       {member.submissionsFulfilled}/{member.submissionsRequired}
@@ -122,7 +122,7 @@ export function MemberDetailPanel({
               )}
               {member.submissionsOptional > 0 && (
                 <div>
-                  <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
+                  <div className="flex items-center justify-between text-caption text-[var(--muted)]">
                     <span>Optional Discord submissions</span>
                     <span className="tabular-nums">
                       {member.submissionsOptionalFulfilled}/{member.submissionsOptional}
@@ -144,7 +144,7 @@ export function MemberDetailPanel({
               )}
               {member.attachmentsRequired > 0 && (
                 <div>
-                  <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
+                  <div className="flex items-center justify-between text-caption text-[var(--muted)]">
                     <span>Required attachments</span>
                     <span className="tabular-nums">
                       {member.attachmentsFulfilled}/{member.attachmentsRequired}
@@ -164,7 +164,7 @@ export function MemberDetailPanel({
       </div>
 
       <div className="min-w-0">
-        <p className="text-[12px] font-semibold text-[var(--muted)]">Tasks</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">Tasks</p>
         <div className="mt-1.5">
           <MemberTaskTable tasks={tasksQuery.data ?? []} loading={tasksQuery.isPending} workHrefBase={workHrefBase} />
         </div>

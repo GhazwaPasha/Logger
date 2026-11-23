@@ -28,7 +28,7 @@ export function TaskCardLastActivity({ entry, members, taskDueAt, compact, varia
 
   if (variant === "inline") {
     return (
-      <div className="min-w-0 font-mono-ledger text-[11px] leading-snug" aria-label="Last activity">
+      <div className="min-w-0 font-mono-ledger text-caption leading-snug" aria-label="Last activity">
         <p className={`min-w-0 text-[var(--muted)] ${lineClamp}`}>
           <span className="text-[var(--muted)]">{formatLogTimestamp(entry.createdAt, timeZone)}</span>
           <span className="text-[var(--muted)]">: </span>
@@ -42,7 +42,7 @@ export function TaskCardLastActivity({ entry, members, taskDueAt, compact, varia
 
   return (
     <div
-      className={`flex items-center gap-2 border-t border-[var(--border-subtle)]/50 ${compact ? "px-2.5 pb-2 pt-1.5" : "px-4 pb-3 pt-2"} font-mono-ledger text-[11px] leading-snug`}
+      className={`flex items-center gap-2 border-t border-[var(--border-subtle)]/50 ${compact ? "px-2.5 pb-2 pt-1.5" : "px-4 pb-3 pt-2"} font-mono-ledger text-caption leading-snug`}
       aria-label="Last activity"
     >
       <p className={`min-w-0 flex-1 text-[var(--muted)] ${lineClamp}`}>

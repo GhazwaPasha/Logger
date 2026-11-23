@@ -3,19 +3,16 @@
 import Link from "next/link";
 import { Outfit } from "next/font/google";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useState, type ComponentType, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowLeft, CircleAlert, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, UserRound, type LucideIcon } from "lucide-react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faDiscord, faGoogle } from "@fortawesome/free-brands-svg-icons";
-import { faEnvelope } from "@fortawesome/free-solid-svg-icons";
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import { LogBaseMark } from "@/components/brand/LogBaseMark";
 import { authClient } from "@/lib/auth-client";
 import { useBoot } from "@/components/app/BootProvider";
 import { Toggle } from "@/components/ui/Toggle";
 import { curve } from "@/lib/motion";
 import { CollapseItem } from "@/components/ui/Collapse";
+import { DiscordIcon, GoogleIcon } from "@/components/brand/BrandIcons";
 
 const brand = Outfit({
   subsets: ["latin"],
@@ -24,22 +21,24 @@ const brand = Outfit({
 
 type Step = "hub" | "connecting" | "email";
 type OAuthProvider = "discord" | "google";
+/** A lucide icon or one of our brand marks: both take className and style. */
+type IconComponent = ComponentType<{ className?: string; style?: CSSProperties }>;
 type HubOption = { kind: "provider"; provider: OAuthProvider } | { kind: "email" };
 
 const PROVIDER_META: Record<
   OAuthProvider,
-  { label: string; icon: IconDefinition; iconClassName: string; tintClassName: string; ringClassName: string }
+  { label: string; icon: IconComponent; iconClassName: string; tintClassName: string; ringClassName: string }
 > = {
   discord: {
     label: "Discord",
-    icon: faDiscord,
+    icon: DiscordIcon,
     iconClassName: "text-[#5865F2]",
     tintClassName: "border-[#5865F2]/30 bg-[#5865F2]/[0.08] hover:bg-[#5865F2]/[0.14]",
     ringClassName: "auth-combo-badge--discord",
   },
   google: {
     label: "Google",
-    icon: faGoogle,
+    icon: GoogleIcon,
     iconClassName: "text-[#4285F4]",
     tintClassName: "border-[#4285F4]/30 bg-[#4285F4]/[0.08] hover:bg-[#4285F4]/[0.14]",
     ringClassName: "auth-combo-badge--google",
@@ -48,7 +47,7 @@ const PROVIDER_META: Record<
 
 const EMAIL_OPTION_META = {
   label: "Email",
-  icon: faEnvelope,
+  icon: Mail,
   iconClassName: "text-[var(--accent)]",
   tintClassName: "border-[var(--border-subtle)] bg-[var(--surface-base)] hover:bg-[var(--surface-hover)]",
 };
@@ -90,7 +89,7 @@ function HubOptionRow({ option, onSelect }: { option: HubOption; onSelect: (opti
       onClick={() => onSelect(option)}
       className={`flex h-16 w-72 items-center gap-4 rounded-2xl border pl-5 pr-6 text-left text-base font-medium text-[var(--fg)] transition-colors ${meta.tintClassName}`}
     >
-      <FontAwesomeIcon icon={meta.icon} className={`size-6 shrink-0 ${meta.iconClassName}`} />
+      <meta.icon className={`size-6 shrink-0 ${meta.iconClassName}`} />
       Continue with {meta.label}
     </button>
   );
@@ -105,7 +104,7 @@ function HubOptionButtonCompact({ option, onSelect }: { option: HubOption; onSel
       onClick={() => onSelect(option)}
       className={`flex h-14 w-full items-center justify-center gap-3 rounded-xl border text-base font-medium text-[var(--fg)] transition-colors ${meta.tintClassName}`}
     >
-      <FontAwesomeIcon icon={meta.icon} className={`size-5 ${meta.iconClassName}`} />
+      <meta.icon className={`size-5 ${meta.iconClassName}`} />
       Continue with {meta.label}
     </button>
   );
@@ -182,9 +181,8 @@ function ConnectingStep({ provider }: { provider: OAuthProvider }) {
         className={`auth-combo-seq-ring ${meta.ringClassName} flex size-28 items-center justify-center rounded-full sm:size-32`}
         style={{ animationDelay: "2.8s" }}
       >
-        {/* Inline style, not a `size-*` class — guarantees an exact pixel match with LogBaseMark's
-            `size={84}` regardless of CSS cascade order (see fontawesome-config.ts for the class it fought before). */}
-        <FontAwesomeIcon icon={meta.icon} className={meta.iconClassName} style={{ width: 84, height: 84 }} />
+        {/* Inline size, matching LogBaseMark's `size={84}` exactly. */}
+        <meta.icon className={meta.iconClassName} style={{ width: 84, height: 84 }} />
       </span>
     </div>
   );

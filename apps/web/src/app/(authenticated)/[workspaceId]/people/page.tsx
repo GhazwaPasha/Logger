@@ -14,8 +14,7 @@ import type { MemberRow } from "@/lib/ledger-types";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { Avatar } from "@/components/ui/Avatar";
 import { SettingsCard } from "@/components/ui/SettingsCard";
-import { faUsers, faUserPlus, faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { PencilIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 
 type EditState = {
   role: "owner" | "manager" | "member";
@@ -197,7 +196,7 @@ export default function PeoplePage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
+        <h1 className="page-title">Team</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Who can access this {NODE_LABELS.workspace.toLowerCase()} and, for managers, which{" "}
           {NODE_LABELS.level.toLowerCase()}(s) they cover.
@@ -206,7 +205,7 @@ export default function PeoplePage() {
 
       <div className="flex items-center gap-2 pt-2">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-          <FontAwesomeIcon icon={faUsers} className="size-3.5" aria-hidden />
+          <UsersIcon className="size-3.5" aria-hidden />
         </span>
         <h2 className="text-sm font-semibold">Members</h2>
         <span className="text-xs text-[var(--muted)]">
@@ -355,7 +354,7 @@ export default function PeoplePage() {
                       className="btn-secondary inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                       onClick={() => startEdit(m)}
                     >
-                      <FontAwesomeIcon icon={faPen} className="size-3" aria-hidden />
+                      <PencilIcon className="size-3" aria-hidden />
                       Edit
                     </button>
                     <button
@@ -363,7 +362,7 @@ export default function PeoplePage() {
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
                       onClick={() => setDeleteConfirm(m.userId)}
                     >
-                      <FontAwesomeIcon icon={faTrash} className="size-3" aria-hidden />
+                      <Trash2Icon className="size-3" aria-hidden />
                       Remove
                     </button>
                   </div>
@@ -374,7 +373,7 @@ export default function PeoplePage() {
       </div>
 
       <SettingsCard
-        icon={faUserPlus}
+        icon={UserPlusIcon}
         title="Invite by email"
         description="They must already have an account. Owners can add or update roles."
       >

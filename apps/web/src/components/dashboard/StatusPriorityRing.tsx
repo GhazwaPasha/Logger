@@ -265,7 +265,7 @@ export function StatusPriorityRing({
             ) : focus && focused ? (
               <>
                 <span className="mb-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: focused.color }} />
-                <span className="text-[2.8rem] font-bold leading-none tracking-tight tabular-nums">{focused.value}</span>
+                <span className="text-figure font-semibold leading-none tracking-tight tabular-nums">{focused.value}</span>
                 <span className="mt-1 text-sm font-medium">{focused.label}</span>
                 <span className="text-xs tabular-nums text-[var(--muted)]">
                   {pct(focused.value, sum(focus.half === "top" ? top : bottom))}% of{" "}
@@ -274,11 +274,11 @@ export function StatusPriorityRing({
               </>
             ) : (
               <>
-                <span className="font-outfit text-[2.4rem] font-bold leading-none tracking-tight tabular-nums">{sum(top)}</span>
-                <span className="mt-1 text-[12px] text-[var(--muted)]">{topLabel}</span>
+                <span className="font-outfit text-figure font-semibold leading-none tracking-tight tabular-nums">{sum(top)}</span>
+                <span className="mt-1 text-xs text-[var(--muted)]">{topLabel}</span>
                 <span className="my-2.5 h-px w-[30%] bg-[var(--border-subtle)]" />
-                <span className="font-outfit text-[2.4rem] font-bold leading-none tracking-tight tabular-nums">{sum(bottom)}</span>
-                <span className="mt-1 text-[12px] text-[var(--muted)]">{bottomLabel}</span>
+                <span className="font-outfit text-figure font-semibold leading-none tracking-tight tabular-nums">{sum(bottom)}</span>
+                <span className="mt-1 text-xs text-[var(--muted)]">{bottomLabel}</span>
               </>
             )}
           </div>
@@ -336,7 +336,7 @@ function LegendGroup({
 }) {
   return (
     <div>
-      <p className="px-1.5 pb-1 text-[11.5px] font-semibold text-[var(--muted)]">
+      <p className="px-1.5 pb-1 text-caption font-semibold text-[var(--muted)]">
         {half === "top" ? "▲" : "▼"} {title}
       </p>
       <ul className={across ? "grid grid-cols-2 gap-x-1 @[24rem]:grid-cols-4" : undefined}>
@@ -345,10 +345,10 @@ function LegendGroup({
           const row = (
             <>
               <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} aria-hidden />
-              <span className={`min-w-0 flex-1 truncate text-[13px] ${active ? "font-semibold" : "font-medium"}`}>
+              <span className={`min-w-0 flex-1 truncate text-footnote ${active ? "font-semibold" : "font-medium"}`}>
                 {s.label}
               </span>
-              <span className="shrink-0 text-right text-[13px] font-semibold tabular-nums">{loading ? "…" : s.value}</span>
+              <span className="shrink-0 text-right text-footnote font-semibold tabular-nums">{loading ? "…" : s.value}</span>
             </>
           );
           const className =

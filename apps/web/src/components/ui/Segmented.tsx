@@ -90,7 +90,7 @@ export function Segmented<T extends string>({
             className={cn(
               "pressable relative inline-flex items-center justify-center gap-1.5 whitespace-nowrap font-semibold transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
-              sm ? "h-6 rounded-lg text-xs" : "h-9 rounded-[10px] text-[13px]",
+              sm ? "h-6 rounded-lg text-xs" : "h-9 rounded-[10px] text-footnote",
               iconOnly ? (sm ? "w-7" : "w-11") : sm ? "px-2.5" : "px-3.5",
               on ? "text-[var(--fg)]" : "text-[var(--muted)] hover:text-[var(--fg)]",
             )}

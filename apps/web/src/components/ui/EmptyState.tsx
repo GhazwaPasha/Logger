@@ -2,8 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import type { LucideIcon } from "lucide-react";
 import { reducedDuration } from "@/lib/motion";
 
 type ActionShorthand = { label: string; onClick: () => void };
@@ -15,15 +14,17 @@ function isActionShorthand(action: ActionShorthand | ReactNode): action is Actio
 const SIZE = {
   default: {
     wrap: "gap-2.5 py-6",
-    badge: "size-12 text-base",
+    badge: "size-12",
+    icon: "size-5",
     title: "text-sm font-medium",
     description: "text-xs",
   },
   compact: {
     wrap: "gap-1.5 py-3",
-    badge: "size-9 text-sm",
+    badge: "size-9",
+    icon: "size-4",
     title: "text-xs font-medium",
-    description: "text-[11px]",
+    description: "text-caption",
   },
 } as const;
 
@@ -33,14 +34,14 @@ const SIZE = {
  * as the sole content of a panel.
  */
 export function EmptyState({
-  icon,
+  icon: Icon,
   title,
   description,
   action,
   size = "default",
   className,
 }: {
-  icon: IconDefinition;
+  icon: LucideIcon;
   title: string;
   description?: ReactNode;
   action?: ActionShorthand | ReactNode;
@@ -61,7 +62,7 @@ export function EmptyState({
         className={`flex shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[var(--accent)] ${s.badge}`}
         aria-hidden
       >
-        <FontAwesomeIcon icon={icon} />
+        <Icon className={s.icon} />
       </span>
       <p className={`${s.title} text-[var(--fg)]`}>{title}</p>
       {description ? <p className={`max-w-xs ${s.description} leading-relaxed text-[var(--muted)]`}>{description}</p> : null}

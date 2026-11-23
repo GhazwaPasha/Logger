@@ -2,18 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faArrowLeft,
-  faCalculator,
-  faCalendar,
-  faChevronDown,
-  faClock,
-  faDivide,
-  faMinus,
-  faPlus,
-  faXmark,
-} from "@fortawesome/free-solid-svg-icons";
 import {
   applyTrackerFormula,
   trackerSlotKeys,
@@ -33,6 +21,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { compactNumber } from "./tracker-format";
 import { TRACKER_TEMPLATES, templateById, type TrackerTemplate } from "./tracker-templates";
 import { Collapse, CollapseItem } from "@/components/ui/Collapse";
+import { ArrowLeftIcon, CalculatorIcon, CalendarIcon, ChevronDownIcon, ClockIcon, DivideIcon, MinusIcon, PlusIcon, XIcon, type LucideIcon } from "lucide-react";
 
 type MetricDraft = {
   id: string;
@@ -51,7 +40,13 @@ const UNIT_OPTIONS: SelectOption<TrackerMetricUnit>[] = [
   { value: "currency", label: "Money" },
   { value: "percent", label: "Percent" },
 ];
-const OP_ICON = { div: faDivide, mul: faXmark, add: faPlus, sub: faMinus } as const;
+const OP_GLYPH_CLASS = "size-2.5";
+const OP_ICON = {
+  div: <DivideIcon className={OP_GLYPH_CLASS} />,
+  mul: <XIcon className={OP_GLYPH_CLASS} />,
+  add: <PlusIcon className={OP_GLYPH_CLASS} />,
+  sub: <MinusIcon className={OP_GLYPH_CLASS} />,
+} as const;
 const OP_OPTIONS: SelectOption<TrackerFormula["op"]>[] = [
   { value: "div", label: "Divided by" },
   { value: "mul", label: "Times" },
@@ -64,7 +59,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const SPRING = { type: "spring", bounce: 0, duration: 0.3 } as const;
 
 /* The task page's visual language, so both editors read as one app. */
-const SECTION_LABEL = "mb-2 block text-[12.5px] font-semibold text-[var(--muted)]";
+const SECTION_LABEL = "mb-2 block text-xs font-semibold text-[var(--muted)]";
 const CARD_MAIN = "rounded-[20px] bg-[var(--card)] p-6 shadow-card";
 const CARD_SIDE = "rounded-[20px] bg-[var(--card)] p-5 shadow-card";
 const CHIP =
@@ -141,7 +136,7 @@ function fromTemplate(t: TrackerTemplate): MetricDraft[] {
 }
 
 function Chevron() {
-  return <FontAwesomeIcon icon={faChevronDown} className="size-2.5 text-[var(--muted)]" />;
+  return <ChevronDownIcon className="size-2.5 text-[var(--muted)]" />;
 }
 
 function Pick<T extends string>({
@@ -184,14 +179,14 @@ function PickerChip({
   value,
   onChange,
   label,
-  icon,
+  icon: Icon,
   ariaLabel,
 }: {
   type: "date" | "time";
   value: string;
   onChange: (v: string) => void;
   label: string;
-  icon: typeof faCalendar;
+  icon: LucideIcon;
   ariaLabel: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -207,7 +202,7 @@ function PickerChip({
           else el?.focus();
         }}
       >
-        <FontAwesomeIcon icon={icon} className="size-3 text-[var(--muted)]" />
+        <Icon className="size-3 text-[var(--muted)]" />
         <span className="tabular-nums">{label}</span>
       </button>
       <input
@@ -432,10 +427,10 @@ export function TrackerEditor({
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button type="button" onClick={() => void done()} className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}>
-            <FontAwesomeIcon icon={faArrowLeft} className="size-4" />
+            <ArrowLeftIcon className="size-4" />
             Back
           </button>
-          <span className="font-outfit text-[22px] font-bold tracking-[-0.025em] text-[var(--fg)]">
+          <span className="font-outfit text-xl font-semibold tracking-[-0.025em] text-[var(--fg)]">
             {editing ? "Tracker" : "New tracker"}
           </span>
         </div>
@@ -475,7 +470,7 @@ export function TrackerEditor({
         {/* ───────────── Main column ───────────── */}
         <div className="min-w-0 flex-1 space-y-6">
           <div className={`${CARD_MAIN} space-y-5`}>
-            <h3 className="font-outfit text-[17px] font-semibold text-[var(--fg)]">Tracker</h3>
+            <h3 className="font-outfit text-lg font-semibold text-[var(--fg)]">Tracker</h3>
 
             <div>
               <label htmlFor="tracker-name" className={SECTION_LABEL}>
@@ -491,7 +486,7 @@ export function TrackerEditor({
                 placeholder="e.g. Sales · Q4"
                 maxLength={120}
                 aria-required
-                className="input h-[52px] rounded-[14px] font-outfit text-[22px] font-semibold tracking-[-0.02em] placeholder:text-[var(--ink-3)]"
+                className="input h-[52px] rounded-[14px] font-outfit text-xl font-semibold tracking-[-0.02em] placeholder:text-[var(--ink-3)]"
               />
             </div>
 
@@ -574,7 +569,7 @@ export function TrackerEditor({
                                 label="Operation"
                                 className={INLINE}
                               >
-                                <FontAwesomeIcon icon={OP_ICON[m.formula.op]} className="size-2.5" />
+                                {OP_ICON[m.formula.op]}
                               </Pick>
                               <FormulaPick value={m.formula.b} options={inputs} onChange={(b) => patch(m.id, { formula: { ...m.formula!, b } })} />
                             </div>
@@ -630,7 +625,7 @@ export function TrackerEditor({
                             aria-label={`Remove ${m.name || "metric"}`}
                             className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--muted)] opacity-0 transition-[opacity,background-color,transform] duration-150 hover:bg-[var(--fill-2)] hover:text-[var(--fg)] focus:opacity-100 active:scale-[0.94] group-hover:opacity-100"
                           >
-                            <FontAwesomeIcon icon={faXmark} className="size-3" />
+                            <XIcon className="size-3" />
                           </button>
                         ) : (
                           <span />
@@ -644,7 +639,7 @@ export function TrackerEditor({
 
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="button" onClick={() => addMetric("input")} className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}>
-                <FontAwesomeIcon icon={faPlus} className="size-3" />
+                <PlusIcon className="size-3" />
                 Add metric
               </button>
               <button
@@ -653,7 +648,7 @@ export function TrackerEditor({
                 title="Worked out from two others, like revenue ÷ orders"
                 className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}
               >
-                <FontAwesomeIcon icon={faCalculator} className="size-3" />
+                <CalculatorIcon className="size-3" />
                 Add calculated
               </button>
             </div>
@@ -680,8 +675,8 @@ export function TrackerEditor({
             <div>
               <span className={SECTION_LABEL}>Period</span>
               <div className="flex flex-col items-start gap-2">
-                <PickerChip type="date" value={periodStart} onChange={setPeriodStart} label={`From ${shortDate(periodStart)}`} icon={faCalendar} ariaLabel="Start date" />
-                <PickerChip type="date" value={periodEnd} onChange={setPeriodEnd} label={`To ${shortDate(periodEnd)}`} icon={faCalendar} ariaLabel="End date" />
+                <PickerChip type="date" value={periodStart} onChange={setPeriodStart} label={`From ${shortDate(periodStart)}`} icon={CalendarIcon} ariaLabel="Start date" />
+                <PickerChip type="date" value={periodEnd} onChange={setPeriodEnd} label={`To ${shortDate(periodEnd)}`} icon={CalendarIcon} ariaLabel="End date" />
               </div>
               <div className="mt-2 flex gap-3 text-xs">
                 {(["month", "quarter", "year"] as const).map((p) => (
@@ -743,7 +738,7 @@ export function TrackerEditor({
                       onClick={() =>
                         setWorkingDays((w) => (on ? (w.length > 1 ? w.filter((x) => x !== iso) : w) : [...w, iso].sort()))
                       }
-                      className={`pressable size-9 rounded-full text-xs font-bold ${
+                      className={`pressable size-9 rounded-full text-xs font-semibold ${
                         on ? "bg-[var(--primary)] text-[var(--on-primary)]" : "bg-[var(--fill)] text-[var(--ink-3)] hover:bg-[var(--fill-2)]"
                       }`}
                     >
@@ -772,7 +767,7 @@ export function TrackerEditor({
               />
             </div>
             <Collapse open={!!reminderTime} className="space-y-1.5">
-                  <PickerChip type="time" value={reminderTime} onChange={setReminderTime} label={timeLabel(reminderTime)} icon={faClock} ariaLabel="Reminder time" />
+                  <PickerChip type="time" value={reminderTime} onChange={setReminderTime} label={timeLabel(reminderTime)} icon={ClockIcon} ariaLabel="Reminder time" />
                   <p className="text-xs text-[var(--muted)]">
                     {checkIn === "weekly" ? "On the last working day, if the week isn’t logged." : "On working days, if the day isn’t logged."}
                   </p>

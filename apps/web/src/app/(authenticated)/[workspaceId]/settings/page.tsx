@@ -18,7 +18,7 @@ import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { Avatar } from "@/components/ui/Avatar";
 import { SettingsCard, SettingsFieldRow, EditableField } from "@/components/ui/SettingsCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { faPalette, faUser, faKey, faPlug, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { KeyRoundIcon, PaletteIcon, PlugIcon, TriangleAlertIcon, UserIcon } from "lucide-react";
 
 const AVATAR_PROVIDER_LABELS = { discord: "Discord", google: "Google" } as const;
 
@@ -177,11 +177,11 @@ export default function UserSettingsPage() {
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-2">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Your settings</h1>
+        <h1 className="page-title">Your settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Account and appearance for your signed-in user.</p>
       </div>
       <SettingsCard
-        icon={faPalette}
+        icon={PaletteIcon}
         title="Appearance"
         description="Color theme for this browser. System follows your OS light/dark mode."
       >
@@ -201,7 +201,7 @@ export default function UserSettingsPage() {
           />
         </div>
       </SettingsCard>
-      <SettingsCard icon={faUser} title="Profile" description="Information from your login session.">
+      <SettingsCard icon={UserIcon} title="Profile" description="Information from your login session.">
         {nameError && (
           <div className="mb-4">
             <ErrorBanner message={nameError} onDismiss={() => setNameError(null)} />
@@ -309,14 +309,14 @@ export default function UserSettingsPage() {
         </p>
       </SettingsCard>
       <SettingsCard
-        icon={faKey}
+        icon={KeyRoundIcon}
         title="API keys"
         description="Long-lived credentials for connecting external tools and AI agents (via the MCP endpoint) to your account."
       >
         {createdKey && (
           <div className="mb-4 rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_50%,transparent)] bg-[var(--status-progress)] p-4 dark:bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)]">
             <p className="text-sm font-semibold text-[var(--status-progress)] dark:text-[var(--status-progress)]">
-              Save this key now — it won't be shown again.
+              Save this key now — it won’t be shown again.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <code className="flex-1 break-all rounded-lg bg-white/60 px-3 py-2 font-mono text-xs dark:bg-black/30">
@@ -339,7 +339,7 @@ export default function UserSettingsPage() {
               onClick={() => setCreatedKey(null)}
               className="mt-2 text-xs text-[var(--status-progress)] underline dark:text-[var(--status-progress)]"
             >
-              I've saved it, dismiss
+              I’ve saved it, dismiss
             </button>
           </div>
         )}
@@ -371,7 +371,7 @@ export default function UserSettingsPage() {
         <div className="mt-5 space-y-2">
           {apiKeysLoading && <p className="text-xs text-[var(--muted)]">Loading…</p>}
           {!apiKeysLoading && apiKeys.length === 0 && (
-            <EmptyState icon={faKey} title="No API keys yet" size="compact" />
+            <EmptyState icon={KeyRoundIcon} title="No API keys yet" size="compact" />
           )}
           {apiKeys.map((k) => (
             <div
@@ -398,7 +398,7 @@ export default function UserSettingsPage() {
         </div>
       </SettingsCard>
       <SettingsCard
-        icon={faPlug}
+        icon={PlugIcon}
         title="Connect to Claude"
         description="Let Claude read and update your tasks, time entries, and roadmap directly."
       >
@@ -453,7 +453,7 @@ export default function UserSettingsPage() {
         </div>
       </SettingsCard>
       <SettingsCard
-        icon={faTriangleExclamation}
+        icon={TriangleAlertIcon}
         title="Delete account"
         description="Permanently remove your personal data from LogBase."
       >

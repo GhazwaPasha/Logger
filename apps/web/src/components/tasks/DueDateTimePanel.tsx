@@ -57,7 +57,7 @@ function todayZonedDateString(timeZone: string): string {
 
 /** Popover header actions (no global `.btn-*` — padding matches). */
 const COMPACT_DUE_ACTION_BASE =
-  "box-border inline-flex h-6 items-center justify-center rounded-md border border-solid px-1.5 text-[10px] font-medium leading-none transition-colors";
+  "box-border inline-flex h-6 items-center justify-center rounded-md border border-solid px-1.5 text-2xs font-medium leading-none transition-colors";
 const COMPACT_DUE_ACTION_GRID_CELL = `${COMPACT_DUE_ACTION_BASE} w-full min-w-0`;
 
 /** Single due: native date + time (matches task filter date inputs). */
@@ -109,7 +109,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
 
   const timeInputValue = selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "";
 
-  const labelClass = `block font-medium text-[var(--muted)] ${compact ? "text-[11.5px] " : "text-xs"}`;
+  const labelClass = `block font-medium text-[var(--muted)] ${compact ? "text-caption " : "text-xs"}`;
   const sectionGap = compact ? "mt-2 space-y-1 pt-2" : "mt-3 space-y-1.5 pt-3";
 
   return (
@@ -150,7 +150,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
           <span className="text-xs font-medium text-[var(--muted)]">Due (date & time)</span>
           <button
             type="button"
-            className="btn-secondary shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--fg)]"
+            className="btn-secondary shrink-0 rounded-lg px-2.5 py-1 text-caption font-medium text-[var(--muted)] hover:text-[var(--fg)]"
             disabled={!value.trim()}
             onClick={() => onClear()}
           >
@@ -160,7 +160,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
       )}
 
       <div className={compact ? "space-y-1" : "space-y-2 p-2 sm:p-3"}>
-        <p className="text-[11.5px] font-medium text-[var(--muted)]">Due date</p>
+        <p className="text-caption font-medium text-[var(--muted)]">Due date</p>
         <input
           type="date"
           className={`${DUE_DATE_INPUT_CLASS} mt-1`}
@@ -198,7 +198,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
                     type="button"
                     onClick={() => onDueRepeatChange(active ? null : rv)}
                     aria-pressed={active}
-                    className={`rounded-md border px-2 py-1.5 text-center text-[11px] font-medium transition-colors ${
+                    className={`rounded-md border px-2 py-1.5 text-center text-caption font-medium transition-colors ${
                       active
                         ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--fg)]"
                         : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--muted)] hover:border-[var(--border)] hover:text-[var(--fg)]"
@@ -210,7 +210,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
               })}
             </div>
             {!compact ? (
-              <p className="text-[10px] leading-snug text-[var(--muted)]">
+              <p className="text-2xs leading-snug text-[var(--muted)]">
                 Stored with the task; generation of next occurrences is not wired yet.
               </p>
             ) : null}
@@ -219,7 +219,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
       </div>
 
       {!compact ? (
-        <p className="text-[11px] text-[var(--muted)]">
+        <p className="text-caption text-[var(--muted)]">
           Native date and time controls (same style as the task list due filter). Stored as a single instant in your
           device&apos;s local timezone.
         </p>

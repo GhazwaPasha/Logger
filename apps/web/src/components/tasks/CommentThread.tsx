@@ -2,8 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPaperPlane, faPen, faTrashCan, faComment } from "@fortawesome/free-solid-svg-icons";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -11,6 +9,7 @@ import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import type { MemberRow } from "@/lib/ledger-types";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { formatInTimeZone } from "@/lib/date";
+import { MessageCircleIcon, PencilIcon, SendIcon, Trash2Icon } from "lucide-react";
 
 type CommentRow = {
   id: string;
@@ -177,7 +176,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
                   email={m.email}
                   image={m.image}
                   size="size-5"
-                  className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                  className="bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
                 />
                 <span className="truncate">{m.name ?? m.email}</span>
               </button>
@@ -202,7 +201,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
         className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-[var(--ink-2)] hover:bg-[var(--ink-2)] disabled:opacity-30 transition-colors"
         aria-label="Send"
       >
-        <FontAwesomeIcon icon={faPaperPlane} className="size-[15px]" color="white" />
+        <SendIcon className="size-[15px]" color="white" />
       </button>
     </div>
   );
@@ -274,7 +273,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
             email={comment.authorEmail}
             image={comment.authorImage}
             size="mt-0.5 size-8"
-            className="bg-[var(--accent-muted)] text-[11px] font-semibold text-[var(--fg)]"
+            className="bg-[var(--accent-muted)] text-caption font-semibold text-[var(--fg)]"
           />
 
           {/* Content */}
@@ -284,8 +283,8 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               <span className={`text-xs font-semibold ${isOwn ? "text-[var(--accent)]" : "text-[var(--fg)]"}`}>
                 {comment.authorName ?? comment.authorEmail}
               </span>
-              <span className="text-[10px] text-[var(--muted)]">{formatRelative(comment.createdAt, timeZone)}</span>
-              {comment.editedAt && <span className="text-[10px] text-[var(--muted)]">(edited)</span>}
+              <span className="text-2xs text-[var(--muted)]">{formatRelative(comment.createdAt, timeZone)}</span>
+              {comment.editedAt && <span className="text-2xs text-[var(--muted)]">(edited)</span>}
               {isOwn && !comment.deletedAt && !viewOnly && (
                 <button
                   type="button"
@@ -293,7 +292,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                   className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
                   aria-label="Edit"
                 >
-                  <FontAwesomeIcon icon={faPen} className="size-[11px]" />
+                  <PencilIcon className="size-[11px]" />
                 </button>
               )}
               {(isOwn || isOrgOwner) && !comment.deletedAt && !viewOnly && (
@@ -303,7 +302,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                   className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--danger)] transition-opacity"
                   aria-label="Delete"
                 >
-                  <FontAwesomeIcon icon={faTrashCan} className="size-[11px]" />
+                  <Trash2Icon className="size-[11px]" />
                 </button>
               )}
             </div>
@@ -316,7 +315,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                   <button
                     type="button"
                     onClick={() => restoreMutation.mutate(comment.id)}
-                    className="text-[10px] font-medium text-[var(--muted)] underline hover:text-[var(--fg)]"
+                    className="text-2xs font-medium text-[var(--muted)] underline hover:text-[var(--fg)]"
                   >
                     Restore
                   </button>
@@ -367,7 +366,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                         setReplyMention(mention);
                       }
                     }}
-                    className="shrink-0 text-[10px] text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
+                    className="shrink-0 text-2xs text-[var(--muted)] hover:text-[var(--fg)] transition-colors"
                   >
                     Reply
                   </button>
@@ -421,7 +420,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
         {query.isPending && <p className="text-sm text-[var(--muted)]">Loading…</p>}
         {query.error && <p className="text-sm text-[var(--danger)]">{(query.error as Error).message}</p>}
         {query.data && roots.length === 0 && !viewOnly && (
-          <EmptyState icon={faComment} title="No comments yet" description="Be the first to comment." size="compact" />
+          <EmptyState icon={MessageCircleIcon} title="No comments yet" description="Be the first to comment." size="compact" />
         )}
         {query.data && roots.map((c) => <CommentRow key={c.id} comment={c} />)}
       </div>
@@ -446,7 +445,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               onClick={() => setShowInput(true)}
               className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
             >
-              <FontAwesomeIcon icon={faComment} className="size-4" />
+              <MessageCircleIcon className="size-4" />
               <span>Add a comment…</span>
             </button>
           )}

@@ -176,13 +176,13 @@ function KpiCard({
 }
 
 const KpiLabel = ({ icon: Icon, tint, children }: { icon: LucideIcon; tint: string; children: ReactNode }) => (
-  <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--muted)]">
+  <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
     <Icon aria-hidden className="size-3.5" strokeWidth={2.4} style={{ color: tint }} />
     {children}
   </p>
 );
 const KpiNote = ({ children }: { children: ReactNode }) => (
-  <p className="mt-auto truncate pt-2 text-[12px] text-[var(--muted)]">{children}</p>
+  <p className="mt-auto truncate pt-2 text-xs text-[var(--muted)]">{children}</p>
 );
 const wholeNumber = (v: number | null) => String(Math.round(v ?? 0));
 
@@ -191,7 +191,7 @@ function KpiValue({ loading, className, value }: { loading: boolean; className?:
   return loading ? (
     <span className="mt-2.5 mb-0.5 block h-9 w-12 animate-pulse rounded-lg bg-[var(--fill-2)] motion-reduce:animate-none" />
   ) : (
-    <p className={`mt-2.5 font-outfit text-[2.6rem] font-semibold leading-none tracking-[-0.03em] tabular-nums ${className ?? ""}`}>
+    <p className={`mt-2.5 font-outfit text-figure font-semibold leading-none tracking-[-0.03em] tabular-nums ${className ?? ""}`}>
       <SpringNumber value={value} format={wholeNumber} />
     </p>
   );
@@ -261,8 +261,8 @@ export function DashboardOverview({
               { label: NODE_LABELS.listPlural, value: lists.length },
             ].map(({ label, value }) => (
               <div key={label} className="flex min-w-0 flex-col-reverse">
-                <dt className="truncate text-[11px] text-[var(--muted)]">{label}</dt>
-                <dd className="font-outfit text-[1.65rem] font-semibold leading-tight tracking-[-0.02em] tabular-nums">
+                <dt className="truncate text-caption text-[var(--muted)]">{label}</dt>
+                <dd className="font-outfit text-2xl font-semibold leading-tight tracking-[-0.02em] tabular-nums">
                   {loading ? (
                     <span className="my-0.5 block h-5 w-6 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
                   ) : (
@@ -347,7 +347,7 @@ export function DashboardOverview({
         {stats.subtasksTotal > 0 ? (
           <div className="rounded-[18px] bg-[var(--card)] p-5 shadow-card">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="font-outfit text-base font-semibold tracking-tight">Checklist progress</h2>
+              <h2 className="font-outfit text-base font-semibold">Checklist progress</h2>
               <span className="text-xs tabular-nums text-[var(--muted)]">
                 {stats.subtasksDone} of {stats.subtasksTotal} subtasks · {subtaskPct}%
               </span>

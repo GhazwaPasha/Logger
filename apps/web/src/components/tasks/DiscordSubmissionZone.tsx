@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCloudArrowUp, faCheck, faCircleNotch, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { apiFetch } from "@/lib/api";
+import { CheckIcon, CircleAlertIcon, CloudUploadIcon, LoaderCircleIcon } from "lucide-react";
+import { DiscordIcon } from "@/components/brand/BrandIcons";
 
 type DiscordSubmitResponse = { discord: { ok: true } | { ok: false; reason: string } };
 
@@ -200,8 +199,7 @@ export function DiscordSubmissionZone({
         aria-label="Browse files"
         className="rounded-full text-[#5865F2] transition-colors hover:text-[#4752c4] disabled:cursor-default disabled:hover:text-[#5865F2]"
       >
-        <FontAwesomeIcon
-          icon={faCloudArrowUp}
+        <CloudUploadIcon
           className={`size-5 ${submitting ? "animate-pulse motion-reduce:animate-none" : ""}`}
           aria-hidden
         />
@@ -230,15 +228,14 @@ export function DiscordSubmissionZone({
       {queue.map((item) => (
         <li key={item.id} className="flex items-center gap-2 text-xs">
           {item.status === "uploading" || item.status === "pending" ? (
-            <FontAwesomeIcon
-              icon={faCircleNotch}
+            <LoaderCircleIcon
               className="size-3 shrink-0 animate-spin text-[#5865F2] motion-reduce:animate-none"
               aria-hidden
             />
           ) : item.status === "success" ? (
-            <FontAwesomeIcon icon={faCheck} className="size-3 shrink-0 text-[var(--success)] dark:text-[var(--success)]" aria-hidden />
+            <CheckIcon className="size-3 shrink-0 text-[var(--success)] dark:text-[var(--success)]" aria-hidden />
           ) : (
-            <FontAwesomeIcon icon={faCircleExclamation} className="size-3 shrink-0 text-[var(--danger)] dark:text-[var(--danger)]" aria-hidden />
+            <CircleAlertIcon className="size-3 shrink-0 text-[var(--danger)] dark:text-[var(--danger)]" aria-hidden />
           )}
           <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg)]" title={item.file.name}>
             {item.file.name}
@@ -279,7 +276,7 @@ export function DiscordSubmissionZone({
     <div className="space-y-3 rounded-2xl border border-[#5865F2]/25 bg-[#5865F2]/[0.05] p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#5865F2]/15 text-[#5865F2] dark:bg-[#5865F2]/25">
-          <FontAwesomeIcon icon={faDiscord} className="size-5" aria-hidden />
+          <DiscordIcon className="size-5" aria-hidden />
         </span>
         <h3 className="text-sm font-semibold text-[var(--fg)]">
           Send to Discord

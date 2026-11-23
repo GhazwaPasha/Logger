@@ -7,8 +7,8 @@ import { useApiSession } from "@/hooks/useApiSession";
 import { apiFetch } from "@/lib/api";
 import { formatInTimeZone } from "@/lib/date";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { faPlug, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
 import { Collapse } from "@/components/ui/Collapse";
+import { HistoryIcon, PlugIcon } from "lucide-react";
 
 const ALLOWED_EVENTS = ["task.created", "task.status_changed", "task.ledger_added", "member.added"];
 
@@ -127,7 +127,7 @@ export default function WebhooksPage() {
   return (
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
+        <h1 className="page-title">Webhooks</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           Send real-time event notifications to external URLs. Only organization owners can manage webhooks.
         </p>
@@ -137,7 +137,7 @@ export default function WebhooksPage() {
       {generatedSecret && (
         <div className="rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_50%,transparent)] bg-[var(--status-progress)] p-4 dark:bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)]">
           <p className="text-sm font-semibold text-[var(--status-progress)] dark:text-[var(--status-progress)]">
-            Save your signing secret — it won't be shown again.
+            Save your signing secret — it won’t be shown again.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <code className="flex-1 break-all rounded-lg bg-white/60 px-3 py-2 font-mono text-xs dark:bg-black/30">
@@ -160,7 +160,7 @@ export default function WebhooksPage() {
             onClick={() => setGeneratedSecret(null)}
             className="mt-2 text-xs text-[var(--status-progress)] underline dark:text-[var(--status-progress)]"
           >
-            I've saved it, dismiss
+            I’ve saved it, dismiss
           </button>
         </div>
       )}
@@ -214,7 +214,7 @@ export default function WebhooksPage() {
       <section className="space-y-3">
         {isLoading && <p className="text-sm text-[var(--muted)]">Loading…</p>}
         {!isLoading && endpoints.length === 0 && (
-          <EmptyState icon={faPlug} title="No webhooks configured yet" size="compact" />
+          <EmptyState icon={PlugIcon} title="No webhooks configured yet" size="compact" />
         )}
         {endpoints.map((ep) => (
           <div
@@ -226,7 +226,7 @@ export default function WebhooksPage() {
                 <p className="truncate font-mono text-sm">{ep.url}</p>
                 <div className="mt-1 flex flex-wrap gap-1">
                   {ep.events.map((ev) => (
-                    <code key={ev} className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-[10px]">
+                    <code key={ev} className="rounded bg-[var(--surface-muted)] px-1.5 py-0.5 text-2xs">
                       {ev}
                     </code>
                   ))}
@@ -271,7 +271,7 @@ export default function WebhooksPage() {
               <div className="mt-4 space-y-1.5">
                 <p className="text-xs font-semibold text-[var(--muted)]">Recent Deliveries</p>
                 {deliveries.length === 0 && (
-                  <EmptyState icon={faClockRotateLeft} title="No deliveries yet" size="compact" />
+                  <EmptyState icon={HistoryIcon} title="No deliveries yet" size="compact" />
                 )}
                 {deliveries.map((d) => (
                   <div key={d.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
@@ -289,7 +289,7 @@ export default function WebhooksPage() {
                       </span>
                     </button>
                     <Collapse open={expandedDelivery === d.id && !!d.responseBody} className="pt-2">
-                      <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-[10px] text-[var(--muted)]">
+                      <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-2xs text-[var(--muted)]">
                         {d.responseBody}
                       </pre>
                     </Collapse>

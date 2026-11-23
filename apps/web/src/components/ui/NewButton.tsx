@@ -1,9 +1,8 @@
 "use client";
 
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { cn } from "@/lib/utils";
+import { PlusIcon } from "lucide-react";
 
 /**
  * THE "create" button for page toolbars — New task, New tracker, New goal… One size and style
@@ -41,7 +40,7 @@ export function NewButton({
       {busy ? (
         <InlineSpinner className="size-4 animate-spin motion-reduce:animate-none" />
       ) : (
-        <FontAwesomeIcon icon={faPlus} className="size-4" aria-hidden />
+        <PlusIcon className="size-4" aria-hidden />
       )}
     </button>
   );

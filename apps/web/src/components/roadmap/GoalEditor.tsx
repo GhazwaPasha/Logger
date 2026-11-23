@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import type { Dept, GoalRow, MemberRow, RoadmapStatus } from "@/lib/ledger-types";
 import type { useRoadmap } from "@/hooks/useRoadmap";
 import { STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
 import { NODE_LABELS } from "@/lib/nodes";
+import { XIcon } from "lucide-react";
 
 export type GoalEditorMode = { kind: "create" } | { kind: "edit"; goal: GoalRow };
 
@@ -106,7 +105,7 @@ export function GoalEditor({
             onClick={onClose}
             aria-label="Close"
           >
-            <FontAwesomeIcon icon={faXmark} className="size-4" />
+            <XIcon className="size-4" />
           </button>
         </div>
 

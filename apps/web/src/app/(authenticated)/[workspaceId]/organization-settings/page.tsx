@@ -14,8 +14,6 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { SettingsCard, EditableField } from "@/components/ui/SettingsCard";
-import { faBuilding, faClock, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { Org } from "@/lib/ledger-types";
 import { discordKeys, orgKeys, workspaceKeys } from "@/lib/query-keys";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
@@ -24,6 +22,8 @@ import { isWorkspaceOwner } from "@/lib/workspace-permissions";
 import { NODE_LABELS } from "@/lib/nodes";
 import { TIMEZONE_GROUPS } from "@/lib/timezones";
 import { formatInTimeZone } from "@/lib/date";
+import { Building2Icon, ClockIcon, TriangleAlertIcon } from "lucide-react";
+import { DiscordIcon } from "@/components/brand/BrandIcons";
 
 type DiscordIntegrationConfig = { guildId: string; updatedAt: string } | null;
 type DiscordConnectionResult = { ok: true; guildName: string } | { ok: false; reason: string };
@@ -326,7 +326,7 @@ export default function OrganizationSettingsPage() {
       />
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Organization settings</h1>
+        <h1 className="page-title">Organization settings</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">Manage this organization&apos;s name and identity details.</p>
       </div>
       {orgLoading ? (
@@ -349,7 +349,7 @@ export default function OrganizationSettingsPage() {
         <p className="text-sm text-[var(--muted)]">Could not load this organization.</p>
       ) : (
         <SettingsCard
-          icon={faBuilding}
+          icon={Building2Icon}
           title="Rename organization"
           description="This updates how the organization appears across your workspace list."
         >
@@ -388,7 +388,7 @@ export default function OrganizationSettingsPage() {
       )}
       {!orgLoading && org ? (
         <SettingsCard
-          icon={faClock}
+          icon={ClockIcon}
           title="Time zone"
           description="Due dates, activity timestamps, and the Discord bot all display times in this timezone."
         >
@@ -437,7 +437,7 @@ export default function OrganizationSettingsPage() {
       ) : null}
       {!orgLoading && org && canDeleteOrg ? (
         <SettingsCard
-          icon={faDiscord}
+          icon={DiscordIcon}
           title="Discord integration"
           description="Invite the bot to your Discord server, then connect it here so task attachments can be posted to a channel picked per task."
         >
@@ -564,7 +564,7 @@ export default function OrganizationSettingsPage() {
       ) : null}
       {!orgLoading && org && canDeleteOrg ? (
         <SettingsCard
-          icon={faTriangleExclamation}
+          icon={TriangleAlertIcon}
           title="Delete organization"
           description={`Permanently delete this workspace, all ${NODE_LABELS.level.toLowerCase()}s, ${NODE_LABELS.list.toLowerCase()}s, tasks, and members. This cannot be undone.`}
           tone="danger"

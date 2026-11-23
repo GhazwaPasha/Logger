@@ -138,7 +138,7 @@ export default function RoadmapPage() {
       {displayError && <ErrorBanner message={displayError} onDismiss={() => setError(null)} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="shrink-0 font-outfit text-[30px] font-bold tracking-[-0.03em]">Roadmap</h1>
+        <h1 className="page-title shrink-0">Roadmap</h1>
         <div className="flex items-center gap-2">
           <NewButton label="New goal" onClick={openGoalForCreate} />
           <Segmented

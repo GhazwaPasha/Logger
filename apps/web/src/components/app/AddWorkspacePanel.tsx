@@ -60,7 +60,7 @@ export function AddWorkspacePanel({
     <div className="mx-auto w-full max-w-screen-lg space-y-8">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="page-title">{title}</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">{description}</p>
       </div>
 

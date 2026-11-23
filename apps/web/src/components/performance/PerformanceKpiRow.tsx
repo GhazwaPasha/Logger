@@ -66,9 +66,9 @@ export function PerformanceKpiRow({
           >
             <DashboardKpiWave back={tone.waveBack} front={tone.waveFront} />
             <div className="relative z-[1]">
-              <p className="text-[12px] font-medium text-[var(--muted)]">{card.label}</p>
+              <p className="text-xs font-medium text-[var(--muted)]">{card.label}</p>
               <p className="mt-0.5 text-4xl font-semibold tabular-nums leading-none tracking-tight">{card.value}</p>
-              <p className="mt-1 text-[11px] leading-snug text-[var(--muted)]">{card.hint}</p>
+              <p className="mt-1 text-caption leading-snug text-[var(--muted)]">{card.hint}</p>
             </div>
           </div>
         );

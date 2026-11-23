@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { faBoxArchive, faClockRotateLeft } from "@fortawesome/free-solid-svg-icons";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -16,6 +15,7 @@ import { NODE_LABELS } from "@/lib/nodes";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import type { DeletionLogEntry, TaskRow } from "@/lib/ledger-types";
+import { ArchiveIcon, HistoryIcon } from "lucide-react";
 
 const ENTITY_LABEL: Record<DeletionLogEntry["entityType"], string> = {
   task: NODE_LABELS.workItem,
@@ -114,7 +114,7 @@ export default function ArchivedPage() {
       <ConfirmDialog open={confirm != null} options={confirm} onClose={() => setConfirm(null)} />
 
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Archived</h1>
+        <h1 className="page-title">Archived</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
           {NODE_LABELS.workItem}s that have been archived. Restore them, or permanently delete them if you have
           rights to.
@@ -183,7 +183,7 @@ export default function ArchivedPage() {
           )}
           {tasksLoading && <p className="text-sm text-[var(--muted)]">Loading…</p>}
           {!tasksLoading && archivedTasks.length === 0 && (
-            <EmptyState icon={faBoxArchive} title={`No archived ${NODE_LABELS.workItem.toLowerCase()}s`} size="compact" />
+            <EmptyState icon={ArchiveIcon} title={`No archived ${NODE_LABELS.workItem.toLowerCase()}s`} size="compact" />
           )}
           {archivedTasks.map((task) => {
             const caps = archivedTaskCaps(task, lists, sessionUserId, members);
@@ -221,7 +221,7 @@ export default function ArchivedPage() {
         <section className="space-y-2">
           {logLoading && <p className="text-sm text-[var(--muted)]">Loading…</p>}
           {!logLoading && logEntries.length === 0 && (
-            <EmptyState icon={faClockRotateLeft} title="Nothing permanently deleted yet" size="compact" />
+            <EmptyState icon={HistoryIcon} title="Nothing permanently deleted yet" size="compact" />
           )}
           {logEntries.map((entry) => (
             <div

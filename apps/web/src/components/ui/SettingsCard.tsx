@@ -1,17 +1,17 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { FontAwesomeIcon, type FontAwesomeIconProps } from "@fortawesome/react-fontawesome";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
+import type { ComponentType, ReactNode, SVGProps } from "react";
+import { PencilIcon } from "lucide-react";
 
 export function SettingsCard({
-  icon,
+  icon: Icon,
   title,
   description,
   tone = "default",
   children,
 }: {
-  icon: FontAwesomeIconProps["icon"];
+  /** A lucide icon or a brand mark from components/brand/BrandIcons. */
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   title: string;
   description?: string;
   tone?: "default" | "danger";
@@ -34,7 +34,7 @@ export function SettingsCard({
               : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)]"
           }
         >
-          <FontAwesomeIcon icon={icon} className="size-4" aria-hidden />
+          <Icon className="size-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1 pt-0.5">
           <h2 className={isDanger ? "text-sm font-semibold text-[var(--danger)] dark:text-[var(--danger)]" : "text-sm font-semibold"}>
@@ -126,7 +126,7 @@ export function EditableField({
               className="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
               onClick={onEdit}
             >
-              <FontAwesomeIcon icon={faPen} className="size-3" aria-hidden />
+              <PencilIcon className="size-3" aria-hidden />
               Edit
             </button>
           )}

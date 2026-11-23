@@ -166,7 +166,7 @@ export function SmoothLineChart({
               }}
             />
           )}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between text-[11px] font-medium text-[var(--ink-3)]">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between text-caption font-medium text-[var(--ink-3)]">
             <span>{startLabel}</span>
             <span>{endLabel}</span>
           </div>

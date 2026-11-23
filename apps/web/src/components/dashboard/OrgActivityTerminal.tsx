@@ -134,7 +134,7 @@ export function OrgActivityTerminal({
   if (entries.length === 0) {
     return (
       <TerminalChrome label="activity.log">
-        <div className="space-y-2 p-3 font-mono-ledger text-[12px] leading-snug">
+        <div className="space-y-2 p-3 font-mono-ledger text-xs leading-snug">
           <TerminalPulseLine />
           <p className="text-sm text-[var(--term-muted)]">
             No activity logged yet for tasks you can access in this workspace.
@@ -148,7 +148,7 @@ export function OrgActivityTerminal({
     <TerminalChrome label="activity.log">
       <div
         ref={scrollRef}
-        className={`scrollbar-hide ${maxHeightClassName} overflow-y-auto overflow-x-hidden overscroll-contain p-3 font-mono-ledger text-[12px] leading-snug`}
+        className={`scrollbar-hide ${maxHeightClassName} overflow-y-auto overflow-x-hidden overscroll-contain p-3 font-mono-ledger text-xs leading-snug`}
       >
         <div className="space-y-2">
           <TerminalPulseLine />

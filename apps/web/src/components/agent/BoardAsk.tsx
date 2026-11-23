@@ -118,7 +118,7 @@ export function SelectionAskBar({ selection, onClear }: { selection: TaskRef[]; 
           >
             {/* Quick asks get their own row so the input always keeps its full width. */}
             <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-subtle)] px-3 py-1.5">
-              <span className="mr-1 text-[11px] text-[var(--muted)]">
+              <span className="mr-1 text-caption text-[var(--muted)]">
                 {selection.length === 1 ? "1 task selected" : `${selection.length} tasks selected`}
               </span>
               {(selection.length === 1 ? QUICK_ASKS_ONE : QUICK_ASKS).map((q) => (
@@ -126,7 +126,7 @@ export function SelectionAskBar({ selection, onClear }: { selection: TaskRef[]; 
                   key={q}
                   type="button"
                   onClick={() => go(q)}
-                  className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+                  className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-caption text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
                 >
                   {q}
                 </button>

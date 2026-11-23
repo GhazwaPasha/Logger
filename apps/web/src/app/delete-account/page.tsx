@@ -19,7 +19,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
   return (
     <section id={id} className="scroll-mt-24">
       <h2 className="text-xl font-semibold tracking-tight text-[var(--fg)]">{title}</h2>
-      <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-[var(--muted)]">{children}</div>
+      <div className="mt-3 space-y-3 text-subhead leading-relaxed text-[var(--muted)]">{children}</div>
     </section>
   );
 }
@@ -34,7 +34,7 @@ export default function DeleteAccountPage() {
             className={`flex items-center gap-2.5 rounded-lg outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${wordmark.className}`}
           >
             <LogBaseMark variant="marketing" decorative className="shrink-0" />
-            <span className="text-xl font-bold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
+            <span className="text-xl font-semibold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
           </Link>
           <Link href="/" className="text-sm text-[var(--muted)] transition-colors hover:text-[var(--fg)]">
             ← Back home
@@ -43,8 +43,8 @@ export default function DeleteAccountPage() {
 
         <div className="mt-6 rounded-2xl bg-[var(--card)] shadow-card p-6 sm:p-10">
           <p className="text-xs font-semibold text-[var(--accent)]">Your data</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl">Delete your account</h1>
-          <p className="mt-6 text-[15px] leading-relaxed text-[var(--muted)]">
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg)] sm:text-4xl">Delete your account</h1>
+          <p className="mt-6 text-subhead leading-relaxed text-[var(--muted)]">
             You can delete your LogBase account at any time, from the web app or the Android app. This page explains
             how, and exactly what is erased and what is kept.
           </p>

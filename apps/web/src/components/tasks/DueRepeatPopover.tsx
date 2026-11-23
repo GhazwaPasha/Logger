@@ -57,7 +57,7 @@ export function DueRepeatPopover({ open, onOpenChange, dueLocalValue, value, onC
         collisionPadding={8}
         className="z-[100] w-[220px] rounded-2xl p-2"
       >
-        <p className="mb-1.5 px-1 text-[11px] font-semibold text-ink-2">Repeat</p>
+        <p className="mb-1.5 px-1 text-caption font-semibold text-ink-2">Repeat</p>
         <div className="grid grid-cols-2 gap-1">
           {REPEAT_OPTIONS.map(({ value: rv, label: optLabel }) => {
             const active = value === rv;
@@ -68,7 +68,7 @@ export function DueRepeatPopover({ open, onOpenChange, dueLocalValue, value, onC
                 onClick={() => onChange(active ? null : rv)}
                 aria-pressed={active}
                 className={cn(
-                  "pressable rounded-lg px-2 py-1.5 text-center text-[12px] font-medium",
+                  "pressable rounded-lg px-2 py-1.5 text-center text-xs font-medium",
                   active ? "bg-primary text-on-primary" : "bg-fill text-ink-2 hover:bg-fill-2 hover:text-ink",
                 )}
               >
@@ -77,7 +77,7 @@ export function DueRepeatPopover({ open, onOpenChange, dueLocalValue, value, onC
             );
           })}
         </div>
-        <p className="mt-2 px-1 text-[11px] leading-snug text-ink-2">Tap again to clear.</p>
+        <p className="mt-2 px-1 text-caption leading-snug text-ink-2">Tap again to clear.</p>
       </PopoverContent>
     </Popover>
   );

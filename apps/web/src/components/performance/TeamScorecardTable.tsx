@@ -66,7 +66,7 @@ export function TeamScorecardTable({ members, loading }: { members: PerformanceS
     <div className="mt-2 overflow-x-auto">
       <table className="w-full min-w-[42rem] border-collapse text-sm">
         <thead>
-          <tr className="text-left text-[12px] text-[var(--muted)]">
+          <tr className="text-left text-xs text-[var(--muted)]">
             <th className="pb-1.5 pr-2 font-medium">Person</th>
             {COLUMNS.map((col) => (
               <th key={col.key} className="pb-1.5 pl-2 font-medium">
@@ -91,7 +91,7 @@ export function TeamScorecardTable({ members, loading }: { members: PerformanceS
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={m.image} alt="" className="size-6 shrink-0 rounded-full object-cover" />
                   ) : (
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]">
                       {nameInitials(m.name, m.email)}
                     </span>
                   )}

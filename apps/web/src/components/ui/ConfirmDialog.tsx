@@ -84,7 +84,7 @@ export function ConfirmDialog({
             (e.currentTarget as HTMLElement).querySelector<HTMLButtonElement>("[data-confirm]")?.focus();
           }}
         >
-          <DialogTitle className="text-lg font-semibold leading-snug tracking-tight text-ink">
+          <DialogTitle className="text-lg font-semibold leading-snug text-ink">
             {shown.title}
           </DialogTitle>
           <DialogDescription className="mt-2 text-sm leading-relaxed text-ink-2">

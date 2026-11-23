@@ -2,11 +2,10 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import type { MemberRow } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
 import { curve, reducedDuration, variants } from "@/lib/motion";
+import { CheckIcon, SearchIcon } from "lucide-react";
 
 const label = (m: MemberRow) => (m.name ?? "").trim() || (m.email ?? "").trim() || "Unknown";
 
@@ -72,7 +71,7 @@ export function PersonSearchField({
     <div ref={wrapRef} className="relative">
       {open ? (
         <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5">
-          <FontAwesomeIcon icon={faMagnifyingGlass} className="size-3 text-[var(--muted)]" />
+          <SearchIcon className="size-3 text-[var(--muted)]" />
           <input
             ref={inputRef}
             value={query}
@@ -119,10 +118,10 @@ export function PersonSearchField({
               email={selected.email}
               image={selected.image}
               size="size-6"
-              className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+              className="bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
             />
           ) : (
-            <FontAwesomeIcon icon={faMagnifyingGlass} className="size-3" />
+            <SearchIcon className="size-3" />
           )}
           <span className="truncate">{selected ? label(selected) : allowNone ? "Unassigned" : "Search for a person"}</span>
         </button>
@@ -187,7 +186,7 @@ export function PersonSearchField({
                         email={m.email}
                         image={m.image}
                         size="size-6"
-                        className="shrink-0 bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                        className="shrink-0 bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium text-[var(--fg)]">{label(m)}</span>
@@ -195,7 +194,7 @@ export function PersonSearchField({
                           <span className="block truncate text-xs text-[var(--muted)]">{email}</span>
                         ) : null}
                       </span>
-                      {on && <FontAwesomeIcon icon={faCheck} className="size-3 shrink-0 text-[var(--fg)]" />}
+                      {on && <CheckIcon className="size-3 shrink-0 text-[var(--fg)]" />}
                     </button>
                   </li>
                 );

@@ -54,7 +54,7 @@ type Props = {
 
 function LateBadge() {
   return (
-    <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-1.5 py-0.5 text-[11.5px] font-semibold text-[var(--danger)] dark:text-[var(--danger)]">
+    <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-1.5 py-0.5 text-caption font-semibold text-[var(--danger)] dark:text-[var(--danger)]">
       Late
     </span>
   );
@@ -296,7 +296,7 @@ function LedgerLineBody({ entry, members, taskDueAt }: Props) {
         <>
           <UserName>{actor}</UserName> commented
           {typeof preview === "string" && preview.length > 0 && (
-            <span className="text-[var(--muted)]">: "{stripMentionMarkup(preview)}"</span>
+            <span className="text-[var(--muted)]">: “{stripMentionMarkup(preview)}”</span>
           )}
         </>
       );

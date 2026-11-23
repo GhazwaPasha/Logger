@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { faLayerGroup, faListUl } from "@fortawesome/free-solid-svg-icons";
 import { readWorkBoardScope, writeWorkBoardScope, WORK_BOARD_SCOPE_EVENT } from "@/lib/work-board-scope";
 import { workspaceUrlSegment } from "@/lib/workspace-url";
 import { apiJson, apiVoid } from "@/lib/api";
@@ -23,7 +22,7 @@ import { useOrganizationsState } from "@/components/app/OrganizationsProvider";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import { LoadingFrame } from "@/components/ui/LoadingFrame";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { CalendarDays, ChartNoAxesColumn, CircleCheck, LayoutGrid, Milestone, Target } from "lucide-react";
+import { CalendarDays, ChartNoAxesColumn, CircleCheck, LayersIcon, LayoutGrid, ListIcon, Milestone, Target } from "lucide-react";
 
 import { Collapse } from "@/components/ui/Collapse";
 
@@ -783,7 +782,7 @@ export function WorkspaceSidebar({
                     </div>
                   </LoadingFrame>
                 ) : depts.length === 0 ? (
-                  <EmptyState icon={faLayerGroup} title={`No ${NODE_LABELS.level.toLowerCase()}s yet.`} size="compact" />
+                  <EmptyState icon={LayersIcon} title={`No ${NODE_LABELS.level.toLowerCase()}s yet.`} size="compact" />
                 ) : (
                   <ul className="space-y-px">
                 {sortedDepts.map((d) => {
@@ -932,7 +931,7 @@ export function WorkspaceSidebar({
                       <Collapse open={open} as="ul">
                           {levelLists.length === 0 ? (
                             <li className="pl-1">
-                              <EmptyState icon={faListUl} title={`No ${NODE_LABELS.list.toLowerCase()}s yet`} size="compact" />
+                              <EmptyState icon={ListIcon} title={`No ${NODE_LABELS.list.toLowerCase()}s yet`} size="compact" />
                             </li>
                           ) : (
                             levelLists.map((l) => {

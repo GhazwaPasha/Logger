@@ -51,7 +51,7 @@ export function ConsentCard({ consentCode, clientName, clientIcon, scopes, userE
             </div>
           )}
         </div>
-        <h1 className="mt-4 text-center text-lg font-semibold tracking-tight">
+        <h1 className="mt-4 text-center text-lg font-semibold">
           {clientName} wants to access your account
         </h1>
         <p className="mt-1.5 text-center text-sm text-[var(--muted)]">Signed in as {userEmail}</p>

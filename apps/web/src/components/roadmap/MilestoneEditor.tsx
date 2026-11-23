@@ -4,8 +4,6 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { ConfirmDialog, type ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
@@ -24,6 +22,7 @@ import type {
 import type { useRoadmap } from "@/hooks/useRoadmap";
 import { defaultMilestoneRange, formatDate, STATUS_LABELS, toDateInputValue } from "@/lib/roadmap-format";
 import { NODE_LABELS } from "@/lib/nodes";
+import { XIcon } from "lucide-react";
 
 export type MilestoneEditorMode =
   | { kind: "create"; goalId: string; parent: MilestoneRow | null; departmentId: string | null }
@@ -252,7 +251,7 @@ export function MilestoneEditor({
             onClick={onClose}
             aria-label="Close"
           >
-            <FontAwesomeIcon icon={faXmark} className="size-4" />
+            <XIcon className="size-4" />
           </button>
         </div>
 
@@ -400,7 +399,7 @@ export function MilestoneEditor({
 
               {suggestedTasks.length > 0 && !taskQuery.trim() && (
                 <div className="mt-2.5">
-                  <p className="mb-1 text-[12px] font-medium text-[var(--muted)]">
+                  <p className="mb-1 text-xs font-medium text-[var(--muted)]">
                     Suggested — same {NODE_LABELS.level.toLowerCase()} or due in range
                   </p>
                   <div className="flex flex-wrap gap-1.5">

@@ -3,12 +3,11 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { useRoadmap } from "@/hooks/useRoadmap";
 import { SelectPopover } from "@/components/ui/SelectPopover";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
+import { FlagIcon } from "lucide-react";
 
 export function MilestoneLinkSection({ taskId, token }: { taskId: string; token: string | null }) {
   const router = useRouter();
@@ -30,7 +29,7 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
     return (
       <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--surface)] p-4">
         <EmptyState
-          icon={faFlag}
+          icon={FlagIcon}
           title="No milestones yet"
           description={
             <>
@@ -58,7 +57,7 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
             onClick={() => router.push(`/${workspaceSlug}/roadmap`)}
             title="Open Roadmap"
           >
-            <FontAwesomeIcon icon={faFlag} className="size-3" />
+            <FlagIcon className="size-3" />
             {m.title}
             <span
               role="button"

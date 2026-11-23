@@ -660,9 +660,10 @@ function AskChrome({ compact }: { compact?: boolean }) {
 
   return (
     <>
-      <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-[var(--border-subtle)] pl-3.5 pr-1.5">
+      {/* Same height and hairline as the task details header (TaskViewPanel), so the two panes line up side by side. */}
+      <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-[var(--line)] pl-3.5 pr-1.5">
         <AiIcon className="size-[18px] text-[var(--fg)]" />
-        <p className="ml-1 min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={heading}>
+        <p className="ml-1 min-w-0 flex-1 truncate text-footnote font-semibold text-[var(--fg)]" title={heading}>
           {heading}
         </p>
         <PaneButton label="New conversation" onClick={ask.newChat}>
@@ -795,7 +796,7 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
               />
             )}
             {ask.error && (
-              <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5 text-[13px]">
+              <div className="flex items-start gap-2.5 rounded-xl border border-[var(--border-subtle)] px-3 py-2.5 text-footnote">
                 <span className="mt-0.5 size-1.5 shrink-0 translate-y-1 rounded-full bg-[var(--danger)]" aria-hidden />
                 <p className="min-w-0 flex-1 text-[var(--fg)]">{ask.error.message}</p>
                 {ask.error.retry && (
@@ -858,7 +859,7 @@ function Conversation({ taskHref, closeOnNavigate }: { taskHref: (id: string) =>
             className="block max-h-40 min-h-[2.75rem] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-sm leading-relaxed text-[var(--fg)] placeholder:text-[var(--muted)] focus:outline-none"
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
-            <p className="truncate pl-1 text-[11px] text-[var(--muted)]">
+            <p className="truncate pl-1 text-caption text-[var(--muted)]">
               {ask.taskForm
                 ? "Fills the form on this page · you can edit anything"
                 : ask.taskId && !ask.threadId
@@ -932,7 +933,7 @@ function ContextChips() {
         <button
           type="button"
           onClick={() => ask.setScopeOff(false)}
-          className="rounded-full px-2 py-0.5 text-[11px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+          className="rounded-full px-2 py-0.5 text-caption text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
         >
           Whole workspace · use {ask.boardView.label}
         </button>
@@ -945,7 +946,7 @@ function Chip({ label, title, icon, onRemove }: { label: string; title: string; 
   return (
     <span
       title={title}
-      className={`inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] py-0.5 pl-2 text-[11px] text-[var(--fg)] ${onRemove ? "pr-0.5" : "pr-2"}`}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] py-0.5 pl-2 text-caption text-[var(--fg)] ${onRemove ? "pr-0.5" : "pr-2"}`}
     >
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="size-3 shrink-0 text-[var(--muted)]" aria-hidden>
         {icon}
@@ -1016,8 +1017,8 @@ function ProposalCard({
     >
       <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
         <AiIcon className={`size-3.5 shrink-0 ${pending ? "text-[var(--info-ink)]" : "text-[var(--muted)]"}`} />
-        <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]">{proposal.summary}</p>
-        <span className={`shrink-0 text-[11px] font-medium ${state.tone}`}>{state.label}</span>
+        <p className="min-w-0 flex-1 truncate text-footnote font-semibold text-[var(--fg)]">{proposal.summary}</p>
+        <span className={`shrink-0 text-caption font-medium ${state.tone}`}>{state.label}</span>
       </div>
 
       <ul className="divide-y divide-[var(--border-subtle)]">
@@ -1036,38 +1037,38 @@ function ProposalCard({
                 )}
                 {/* A task the card would create doesn't exist until it's approved, so it isn't a link before then. */}
                 {proposal.kind === "create" && proposal.status !== "applied" && !res?.ok ? (
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)]">
-                    <span className="mr-1 text-[11.5px] font-semibold text-[var(--info-ink)] dark:text-[var(--info-ink)]">New</span>
+                  <span className="min-w-0 flex-1 truncate text-footnote text-[var(--fg)]">
+                    <span className="mr-1 text-caption font-semibold text-[var(--info-ink)] dark:text-[var(--info-ink)]">New</span>
                     {it.title}
                   </span>
                 ) : (
                   <Link
                     href={taskHref(it.taskId)}
                     onClick={onNavigate}
-                    className="min-w-0 flex-1 truncate text-[13px] text-[var(--fg)] hover:underline"
+                    className="min-w-0 flex-1 truncate text-footnote text-[var(--fg)] hover:underline"
                   >
                     {it.title}
                   </Link>
                 )}
               </div>
               {isComment ? (
-                <p className="mt-1 whitespace-pre-wrap rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] leading-relaxed text-[var(--fg)]">
+                <p className="mt-1 whitespace-pre-wrap rounded-lg bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs leading-relaxed text-[var(--fg)]">
                   {it.to}
                 </p>
               ) : it.from == null || it.to.includes("\n") ? (
                 // Nothing to cross out (a new task), or a multi-line edit: show what changes, one per line.
-                <div className="mt-0.5 space-y-0.5 text-[11px] text-[var(--muted)]">
+                <div className="mt-0.5 space-y-0.5 text-caption text-[var(--muted)]">
                   {it.from && <p className="truncate line-through decoration-[var(--border)]">{it.from}</p>}
                   <p className="whitespace-pre-line font-medium text-[var(--fg)]">{it.to}</p>
                 </div>
               ) : (
-                <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--muted)]">
+                <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-caption text-[var(--muted)]">
                   <span className="truncate line-through decoration-[var(--border)]">{it.from}</span>
                   <span aria-hidden>→</span>
                   <span className="truncate font-medium text-[var(--fg)]">{it.to}</span>
                 </p>
               )}
-              {res && !res.ok && <p className="mt-0.5 text-[11px] text-[var(--danger)] dark:text-[var(--danger)]">{res.error}</p>}
+              {res && !res.ok && <p className="mt-0.5 text-caption text-[var(--danger)] dark:text-[var(--danger)]">{res.error}</p>}
             </CollapseItem>
           );
         })}
@@ -1077,7 +1078,7 @@ function ProposalCard({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-full border-t border-[var(--border-subtle)] px-3 py-1.5 text-left text-[11px] text-[var(--muted)] hover:text-[var(--fg)]"
+          className="w-full border-t border-[var(--border-subtle)] px-3 py-1.5 text-left text-caption text-[var(--muted)] hover:text-[var(--fg)]"
         >
           {expanded ? "Show fewer" : `Show all ${proposal.items.length}`}
         </button>
@@ -1154,7 +1155,7 @@ function AssistantTurn({
         {live ? (
           // While working: each finished lookup stays as a quiet line, the current one sits at the bottom.
           (steps.length > 0 || waiting) && (
-            <ul className="space-y-0.5 font-mono text-[11px] leading-snug text-[var(--muted)]">
+            <ul className="space-y-0.5 font-mono text-caption leading-snug text-[var(--muted)]">
               {steps.map((s, i) => (
                 <li key={i} className="truncate">
                   <span aria-hidden className="mr-1.5 opacity-50">›</span>
@@ -1176,7 +1177,7 @@ function AssistantTurn({
                 type="button"
                 onClick={() => setShowSteps((v) => !v)}
                 aria-expanded={showSteps}
-                className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
+                className="inline-flex items-center gap-1 font-mono text-caption text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
               >
                 <svg viewBox="0 0 12 12" className={`size-2.5 transition-transform duration-150 ${showSteps ? "rotate-90" : ""}`} aria-hidden>
                   <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
@@ -1184,7 +1185,7 @@ function AssistantTurn({
                 {steps.length === 1 ? "1 lookup" : `${steps.length} lookups`}
               </button>
               {showSteps && (
-                <ul className="mt-1 space-y-0.5 border-l border-[var(--border-subtle)] pl-2.5 font-mono text-[11px] leading-snug text-[var(--muted)]">
+                <ul className="mt-1 space-y-0.5 border-l border-[var(--border-subtle)] pl-2.5 font-mono text-caption leading-snug text-[var(--muted)]">
                   {steps.map((s, i) => (
                     <li key={i} className="truncate">
                       {s}
@@ -1205,7 +1206,7 @@ function AssistantTurn({
                 aria-pressed={ask.showOnBoard}
                 onClick={() => ask.setShowOnBoard(!ask.showOnBoard)}
                 title="Highlight these tasks on the board"
-                className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] transition-colors hover:bg-[var(--surface-hover)] ${ask.showOnBoard ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}
+                className={`inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-caption transition-colors hover:bg-[var(--surface-hover)] ${ask.showOnBoard ? "text-[var(--fg)]" : "text-[var(--muted)]"}`}
               >
                 <span className={`size-1.5 rounded-full ${ask.showOnBoard ? "bg-[var(--info-ink)]" : "bg-[var(--border)]"}`} aria-hidden />
                 {ask.showOnBoard ? `Showing ${mentioned} on board` : `Show ${mentioned} on board`}
@@ -1223,7 +1224,7 @@ function AssistantTurn({
                   })
                   .catch(() => undefined);
               }}
-              className="rounded-md px-1.5 py-0.5 text-[11px] text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
+              className="rounded-md px-1.5 py-0.5 text-caption text-[var(--muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--fg)]"
             >
               {copied ? "Copied" : "Copy"}
             </button>
@@ -1251,9 +1252,9 @@ function EmptyState({
         <span className="flex size-9 items-center justify-center rounded-xl bg-[var(--surface-elevated)] text-[var(--fg)]">
           <AiIcon className="size-5" />
         </span>
-        <p className="pt-1 text-[15px] font-semibold text-[var(--fg)]">{form?.isNew ? "Describe this task" : form ? "Change this task" : fromTask ? "Ask about this task" : "Ask LogBase"}
+        <p className="pt-1 text-subhead font-semibold text-[var(--fg)]">{form?.isNew ? "Describe this task" : form ? "Change this task" : fromTask ? "Ask about this task" : "Ask LogBase"}
         </p>
-        <p className="text-[13px] leading-relaxed text-[var(--muted)]">
+        <p className="text-footnote leading-relaxed text-[var(--muted)]">
           {form?.isNew
             ? "Say what needs doing, who it's for and when, in your own words. LogBase fills in the form for you to check."
             : form
@@ -1269,7 +1270,7 @@ function EmptyState({
             key={s}
             type="button"
             onClick={() => onSuggestion(s)}
-            className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-[13px] text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
+            className="rounded-full border border-[var(--border-subtle)] px-3 py-1 text-footnote text-[var(--fg)] transition-colors hover:bg-[var(--surface-hover)]"
           >
             {s}
           </button>
@@ -1294,7 +1295,7 @@ function TaskMatches({
 }) {
   return (
     <div className="flex h-full flex-col justify-end">
-      <p className="mb-1.5 px-2 text-[11.5px] font-semibold text-[var(--muted)]">Jump to a task</p>
+      <p className="mb-1.5 px-2 text-caption font-semibold text-[var(--muted)]">Jump to a task</p>
       {rows.length === 0 && loading ? (
         <p className="px-2 text-xs text-[var(--muted)]">Searching…</p>
       ) : (
@@ -1312,7 +1313,7 @@ function TaskMatches({
           ))}
         </ul>
       )}
-      <p className="mt-3 px-2 text-[11px] text-[var(--muted)]">
+      <p className="mt-3 px-2 text-caption text-[var(--muted)]">
         <kbd className="font-sans">↑↓</kbd> pick a task · <kbd className="font-sans">Enter</kbd> ask LogBase
       </p>
     </div>
@@ -1376,16 +1377,16 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
       </div>
     );
   }
-  if (threads.isError) return <p className="px-4 py-4 text-[13px] text-[var(--muted)]">Couldn&apos;t load your conversations.</p>;
+  if (threads.isError) return <p className="px-4 py-4 text-footnote text-[var(--muted)]">Couldn&apos;t load your conversations.</p>;
   if (groups.length === 0) {
-    return <p className="px-4 py-4 text-[13px] text-[var(--muted)]">No conversations yet. They&apos;ll show up here.</p>;
+    return <p className="px-4 py-4 text-footnote text-[var(--muted)]">No conversations yet. They&apos;ll show up here.</p>;
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
       {groups.map((g) => (
         <section key={g.label} className="mb-4">
-          <p className="mb-1 px-2.5 text-[11.5px] font-semibold text-[var(--muted)]">{g.label}</p>
+          <p className="mb-1 px-2.5 text-caption font-semibold text-[var(--muted)]">{g.label}</p>
           <ul>
             {g.threads.map((t) => (
               <li
@@ -1395,7 +1396,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
                 <button
                   type="button"
                   onClick={() => void ask.loadThread(t.id)}
-                  className="min-w-0 flex-1 truncate px-2.5 py-1.5 text-left text-[13px] text-[var(--fg)]"
+                  className="min-w-0 flex-1 truncate px-2.5 py-1.5 text-left text-footnote text-[var(--fg)]"
                 >
                   {t.title}
                 </button>
@@ -1410,7 +1411,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
                     }}
                     onBlur={() => setConfirmDelete(null)}
                     autoFocus
-                    className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
+                    className="shrink-0 rounded-md px-1.5 py-0.5 text-caption font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
                   >
                     Delete?
                   </button>
@@ -1436,7 +1437,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
           </ul>
         </section>
       ))}
-      <p className="px-2.5 pt-1 text-[11px] leading-relaxed text-[var(--muted)]">
+      <p className="px-2.5 pt-1 text-caption leading-relaxed text-[var(--muted)]">
         Conversations are private to you. Unpinned ones are cleared after 90 days.
       </p>
     </div>

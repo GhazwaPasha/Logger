@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/primitives/dialog";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import { XIcon } from "lucide-react";
 
 export type ExportRange = { dateFrom: string; dateTo: string };
 
@@ -129,7 +128,7 @@ export function PerformanceExportModal({
                 disabled={busy}
                 aria-label="Close"
               >
-                <FontAwesomeIcon icon={faXmark} className="size-4" />
+                <XIcon className="size-4" />
               </button>
             </div>
 

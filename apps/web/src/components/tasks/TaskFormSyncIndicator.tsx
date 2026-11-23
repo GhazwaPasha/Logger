@@ -1,8 +1,7 @@
 "use client";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faCircleNotch, faCloudArrowUp, faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
+import { CheckIcon, CircleAlertIcon, CloudUploadIcon, LoaderCircleIcon } from "lucide-react";
 
 type IndicatorConfig = {
   label: string;
@@ -19,7 +18,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: error ?? "Could not save",
       className:
         "border-[color-mix(in_srgb,var(--danger)_80%,transparent)] bg-[var(--danger)] text-[var(--danger)] dark:border-[color-mix(in_srgb,var(--danger)_50%,transparent)] dark:bg-[color-mix(in_srgb,var(--danger)_40%,transparent)] dark:text-[var(--danger)]",
-      icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3.5 shrink-0" aria-hidden />,
+      icon: <CircleAlertIcon className="size-3.5 shrink-0" aria-hidden />,
     };
   }
   if (status === "saving") {
@@ -28,8 +27,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: "Saving your changes…",
       className: "border-[var(--accent)]/35 bg-[var(--accent-muted)] text-[var(--fg)]",
       icon: (
-        <FontAwesomeIcon
-          icon={faCircleNotch}
+        <LoaderCircleIcon
           className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
           aria-hidden
         />
@@ -41,7 +39,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Pending",
       title: "Changes will save shortly",
       className: "border-[var(--border-subtle)] bg-[var(--surface-muted)] text-[var(--muted)]",
-      icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 text-[var(--accent)]" aria-hidden />,
+      icon: <CloudUploadIcon className="size-3.5 shrink-0 text-[var(--accent)]" aria-hidden />,
       pulse: true,
     };
   }
@@ -51,7 +49,7 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       title: "All changes saved",
       className:
         "border-[color-mix(in_srgb,var(--success)_80%,transparent)] bg-[var(--success)] text-[var(--success)] dark:border-[color-mix(in_srgb,var(--success)_50%,transparent)] dark:bg-[color-mix(in_srgb,var(--success)_35%,transparent)] dark:text-[var(--success)]",
-      icon: <FontAwesomeIcon icon={faCheck} className="size-3.5 shrink-0" aria-hidden />,
+      icon: <CheckIcon className="size-3.5 shrink-0" aria-hidden />,
     };
   }
   if (hint) {
@@ -59,14 +57,14 @@ function configFor(status: TaskSyncStatus, error: string | null, hint: string | 
       label: "Draft",
       title: hint,
       className: "border-dashed border-[var(--border-subtle)] bg-transparent text-[var(--muted)]",
-      icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 opacity-50" aria-hidden />,
+      icon: <CloudUploadIcon className="size-3.5 shrink-0 opacity-50" aria-hidden />,
     };
   }
   return {
     label: "Auto-save",
     title: "Changes save automatically when you edit",
     className: "border-[var(--border-subtle)] bg-[var(--surface-elevated)] text-[var(--muted)]",
-    icon: <FontAwesomeIcon icon={faCloudArrowUp} className="size-3.5 shrink-0 opacity-50" aria-hidden />,
+    icon: <CloudUploadIcon className="size-3.5 shrink-0 opacity-50" aria-hidden />,
   };
 }
 
@@ -91,13 +89,13 @@ export function TaskFormSyncIndicator({
     >
       <span
         title={cfg.title}
-        className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center gap-1.5 rounded-full border px-2.5 text-[12px] font-semibold transition-colors duration-200 ${cfg.className} ${cfg.pulse ? "animate-pulse motion-reduce:animate-none" : ""}`}
+        className={`inline-flex h-7 min-w-[5.75rem] items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-colors duration-200 ${cfg.className} ${cfg.pulse ? "animate-pulse motion-reduce:animate-none" : ""}`}
       >
         {cfg.icon}
         <span className="tabular-nums">{cfg.label}</span>
       </span>
       {showDetail && (
-        <span className="max-w-[12rem] truncate text-right text-[10px] font-medium text-[var(--danger)] dark:text-[var(--danger)]">
+        <span className="max-w-[12rem] truncate text-right text-2xs font-medium text-[var(--danger)] dark:text-[var(--danger)]">
           {error}
         </span>
       )}

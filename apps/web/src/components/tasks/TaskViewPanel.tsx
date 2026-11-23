@@ -35,14 +35,13 @@ import {
   stageControlDropdownOptions,
   type TaskPriority,
 } from "@/lib/task-board";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faAnglesUp, faAnglesDown, faArrowUp, faCheck, faCircleExclamation, faCircleNotch } from "@fortawesome/free-solid-svg-icons";
 import type { TaskSyncStatus } from "@/hooks/useTaskAutoSync";
 import { parseTaskDueRepeat } from "@/lib/ledger-types";
 import { Avatar } from "@/components/ui/Avatar";
 import { TASK_TITLE_PLACEHOLDER } from "@/lib/task-default-title";
 import { curve, reducedDuration } from "@/lib/motion";
 import { Collapse } from "@/components/ui/Collapse";
+import { ArrowUpIcon, CheckIcon, ChevronsDownIcon, ChevronsUpIcon, CircleAlertIcon, LoaderCircleIcon } from "lucide-react";
 
 const REPEAT_LABELS: Record<string, string> = {
   daily: "Daily",
@@ -60,16 +59,16 @@ function formatDueDate(iso: string | null | undefined, timeZone: string): string
 function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: string | null }) {
   const cfg =
     status === "error"
-      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-[var(--danger)] dark:text-[var(--danger)]", icon: <FontAwesomeIcon icon={faCircleExclamation} className="size-3" aria-hidden /> }
+      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-[var(--danger)] dark:text-[var(--danger)]", icon: <CircleAlertIcon className="size-3" aria-hidden /> }
       : status === "saving" || status === "pending"
-        ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCircleNotch} className="size-3 animate-spin motion-reduce:animate-none" aria-hidden /> }
-        : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <FontAwesomeIcon icon={faCheck} className="size-3" aria-hidden /> };
+        ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <LoaderCircleIcon className="size-3 animate-spin motion-reduce:animate-none" aria-hidden /> }
+        : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <CheckIcon className="size-3" aria-hidden /> };
   return (
     <span
       role="status"
       aria-live="polite"
       title={cfg.title}
-      className={`mr-1 inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium ${cfg.cls}`}
+      className={`mr-1 inline-flex shrink-0 items-center gap-1.5 text-caption font-medium ${cfg.cls}`}
     >
       {cfg.icon}
       {cfg.label}
@@ -81,7 +80,7 @@ function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: s
 function PanelHeader({ title, onClose, children }: { title: string; onClose: () => void; children?: React.ReactNode }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-[var(--line)] pl-6 pr-2">
-      <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--fg)]" title={title}>
+      <p className="min-w-0 flex-1 truncate text-footnote font-semibold text-[var(--fg)]" title={title}>
         {title}
       </p>
       {children}
@@ -97,7 +96,7 @@ function PanelHeader({ title, onClose, children }: { title: string; onClose: () 
  * (the auto-sized title textarea went to 0px). Text steps down to the Ask pane's scale: 14px → 13px.
  */
 const PANEL_BODY =
-  "scrollbar-hide flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8 pt-5 text-[13px] [&>*]:shrink-0 [&_.text-sm]:text-[13px]";
+  "scrollbar-hide flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8 pt-5 text-footnote [&>*]:shrink-0 [&_.text-sm]:text-footnote";
 
 export function TaskViewPanel({
   taskId,
@@ -207,10 +206,10 @@ export function TaskViewPanel({
           }}
           placeholder={TASK_TITLE_PLACEHOLDER}
           aria-label="Task title"
-          className="w-full resize-none overflow-hidden bg-transparent p-0 [field-sizing:content] text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
+          className="w-full resize-none overflow-hidden bg-transparent p-0 [field-sizing:content] text-xl font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)] outline-none placeholder:text-[var(--muted)] [&::-webkit-scrollbar]:hidden"
         />
       ) : (
-        <h3 className="text-[20px] font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)]">{task.title}</h3>
+        <h3 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-[var(--fg)]">{task.title}</h3>
       )}
 
       {/* Subtasks — always shown, right below title */}
@@ -259,11 +258,11 @@ export function TaskViewPanel({
                   : "text-[var(--muted)]";
             const icon =
               form.priority === "high" ? (
-                <FontAwesomeIcon icon={faAnglesUp} className="size-3" />
+                <ChevronsUpIcon className="size-3" />
               ) : form.priority === "low" ? (
-                <FontAwesomeIcon icon={faAnglesDown} className="size-3" />
+                <ChevronsDownIcon className="size-3" />
               ) : (
-                <FontAwesomeIcon icon={faArrowUp} className="size-3" />
+                <ArrowUpIcon className="size-3" />
               );
             return (
               <SelectPopover
@@ -298,7 +297,7 @@ export function TaskViewPanel({
                 : "text-[var(--muted)]";
             return (
               <span className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[var(--fill)] px-3 text-xs font-semibold ${color}`}>
-                {p === "high" ? <FontAwesomeIcon icon={faAnglesUp} className="size-3" /> : p === "low" ? <FontAwesomeIcon icon={faAnglesDown} className="size-3" /> : <FontAwesomeIcon icon={faArrowUp} className="size-3" />}
+                {p === "high" ? <ChevronsUpIcon className="size-3" /> : p === "low" ? <ChevronsDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />}
                 {PRIORITY_LABELS[p] ?? "Medium"}
               </span>
             );
@@ -313,7 +312,7 @@ export function TaskViewPanel({
 
       {/* Assignees */}
       <div>
-        <p className="mb-2 text-[12px] font-semibold text-[var(--muted)]">Assignees</p>
+        <p className="mb-2 text-xs font-semibold text-[var(--muted)]">Assignees</p>
         <div className="flex flex-wrap items-center gap-2">
           {form.assigneeIds.length === 0 && !caps.canEditFields ? (
             <p className="text-sm text-[var(--muted)]">Unassigned</p>
@@ -337,7 +336,7 @@ export function TaskViewPanel({
                       email={m?.email}
                       image={m?.image}
                       size="size-5"
-                      className="bg-[var(--accent-muted)] text-[10px] font-semibold text-[var(--fg)]"
+                      className="bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
                     />
                     {name}
                     {caps.canEditFields && (
@@ -376,7 +375,7 @@ export function TaskViewPanel({
 
       {/* Due date */}
       <div>
-        <p className="mb-2 text-[12px] font-semibold text-[var(--muted)]">Due date</p>
+        <p className="mb-2 text-xs font-semibold text-[var(--muted)]">Due date</p>
         {caps.canEditFields ? (
           <div className="flex flex-wrap gap-2">
             <DueDateTimePopover

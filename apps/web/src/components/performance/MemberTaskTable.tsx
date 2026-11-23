@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faRepeat } from "@fortawesome/free-solid-svg-icons";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { LoadingLinesBlock } from "@/components/ui/LoadingFrame";
 import {
@@ -14,6 +12,7 @@ import {
   type TaskPriority,
 } from "@/lib/task-board";
 import type { MemberTaskRow } from "@/lib/ledger-types";
+import { RepeatIcon } from "lucide-react";
 
 type SortKey = "title" | "status" | "dueAt" | "completedAt" | "timeLoggedSeconds";
 
@@ -54,7 +53,7 @@ function Chip({ label, tone }: { label: string; tone: "ok" | "bad" | "neutral" }
         ? "bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] text-[var(--danger)] dark:text-[var(--danger)]"
         : "bg-[color-mix(in_srgb,var(--info-ink)_15%,transparent)] text-[var(--info-ink)] dark:text-[var(--info-ink)]";
   return (
-    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${toneClass}`}>
+    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-medium leading-none ${toneClass}`}>
       {label}
     </span>
   );
@@ -133,6 +132,8 @@ export function MemberTaskTable({
   const { timeZone } = useWorkspaceRoute();
   const [sortKey, setSortKey] = useState<SortKey>("dueAt");
   const [sortDesc, setSortDesc] = useState(false);
+  /** Read once per mount: "overdue" is judged against when the table opened, keeping render pure. */
+  const [now] = useState(Date.now);
 
   const sorted = useMemo(() => {
     const rows = [...tasks];
@@ -172,7 +173,7 @@ export function MemberTaskTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[38rem] border-collapse text-sm">
         <thead>
-          <tr className="text-left text-[12px] text-[var(--muted)]">
+          <tr className="text-left text-xs text-[var(--muted)]">
             {COLUMNS.map((col) => (
               <th key={col.key} className={`pb-1.5 pr-2 font-medium ${col.align === "right" ? "text-right" : ""}`}>
                 <button
@@ -193,7 +194,7 @@ export function MemberTaskTable({
         <tbody className="divide-y divide-[var(--border-subtle)]">
           {sorted.map((t) => {
             const st = normalizeTaskStatus(t.status);
-            const overdue = !t.completedAt && t.dueAt != null && new Date(t.dueAt).getTime() < Date.now();
+            const overdue = !t.completedAt && t.dueAt != null && new Date(t.dueAt).getTime() < now;
             return (
               <tr key={t.id}>
                 <td className="max-w-[16rem] py-1.5 pr-2">
@@ -221,17 +222,17 @@ export function MemberTaskTable({
                     )}
                     {t.occurrenceCount != null && t.occurrenceCount > 1 && (
                       <span
-                        className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
+                        className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-2xs font-medium text-[var(--muted)]"
                         title="Recurring task — completed occurrences grouped together"
                       >
-                        <FontAwesomeIcon icon={faRepeat} className="size-2.5" aria-hidden />
+                        <RepeatIcon className="size-2.5" aria-hidden />
                         ×{t.occurrenceCount}
                       </span>
                     )}
                   </div>
                 </td>
                 <td className="py-1.5 pr-2">
-                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusPillPaletteClasses(st)}`}>
+                  <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-medium ${statusPillPaletteClasses(st)}`}>
                     {taskStatusDisplayLabel(st)}
                   </span>
                 </td>

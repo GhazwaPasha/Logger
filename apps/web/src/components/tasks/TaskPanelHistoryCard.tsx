@@ -66,7 +66,7 @@ export function TaskPanelHistoryCard({ task, ledger, members, className }: Props
       </button>
       <Collapse open={expanded} id={regionId} role="region" aria-labelledby={headingId}>
             <div
-              className="mt-3 space-y-2 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]"
+              className="mt-3 space-y-2 font-mono-ledger text-xs leading-snug text-[var(--fg)]"
               aria-label="Task activity log"
             >
               <p className="break-words">

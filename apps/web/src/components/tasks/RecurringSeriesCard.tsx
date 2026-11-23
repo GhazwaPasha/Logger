@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faBell } from "@fortawesome/free-solid-svg-icons";
-import { faDiscord } from "@fortawesome/free-brands-svg-icons";
 import type { MemberRow } from "@/lib/ledger-types";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
 import { formatInTimeZone } from "@/lib/date";
@@ -13,6 +10,8 @@ import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useSeriesOccurrences, type SeriesSummaryRow } from "@/hooks/useWorkTaskStats";
 import { Collapse } from "@/components/ui/Collapse";
+import { BellIcon, CheckIcon } from "lucide-react";
+import { DiscordIcon } from "@/components/brand/BrandIcons";
 
 type Props = {
   orgId: string;
@@ -56,14 +55,14 @@ function completionTiming(t: CompletionLike): { late: boolean } | null {
 function CompletionLine({ t, members, timeZone }: { t: CompletionLike; members: MemberRow[]; timeZone: string }) {
   if (!t.completedAt) return null;
   const timing = completionTiming(t);
+  const TimingIcon = timing?.late ? BellIcon : CheckIcon;
   return (
     <span>
       {formatLogTimestamp(t.completedAt, timeZone)}, {assigneeNames(members, t)} completed this task
       {timing && (
         <>
           {" "}
-          <FontAwesomeIcon
-            icon={timing.late ? faBell : faCheck}
+          <TimingIcon
             className={`h-[0.7em] w-[0.7em] align-[1px] ${
               timing.late ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--success)] dark:text-[var(--success)]"
             }`}
@@ -80,7 +79,7 @@ function DiscordSubmissionLine({ t, timeZone }: { t: CompletionLike; timeZone: s
   if (!t.lastSubmittedAt) return null;
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5">
-      Sent to <FontAwesomeIcon icon={faDiscord} className="h-[0.7em] w-[0.7em] text-[#5865F2]" /> Discord
+      Sent to <DiscordIcon className="h-[0.7em] w-[0.7em] text-[#5865F2]" /> Discord
       <span className="text-[var(--muted)]/50">·</span>
       {formatLogTimestamp(t.lastSubmittedAt, timeZone)}
     </span>
@@ -134,8 +133,8 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
           >
             {summary.latest.title}
           </button>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono-ledger text-[10px] text-[var(--muted)]">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-[9px] font-semibold">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono-ledger text-2xs text-[var(--muted)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-2xs font-semibold">
               <svg width="8" height="8" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
                 <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 3.75a.75.75 0 0 0-1.5 0v3.5l2.25 2.25a.75.75 0 1 0 1.06-1.06L8.75 7.69V4.75z"/>
               </svg>
@@ -184,7 +183,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
               <ul className="divide-y divide-[var(--border-subtle)]/30">
                 {occurrences.map((t) => (
                   <li key={t.id} className="flex items-center gap-2 px-3 py-2">
-                    <span className="min-w-0 flex-1 font-mono-ledger text-[11px] text-[var(--muted)]">
+                    <span className="min-w-0 flex-1 font-mono-ledger text-caption text-[var(--muted)]">
                       {t.completedAt ? (
                         <>
                           <CompletionLine t={t} members={members} timeZone={timeZone} />
@@ -208,7 +207,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                     <button
                       type="button"
                       onClick={() => onOpenTask(t.id)}
-                      className="shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors"
+                      className="shrink-0 rounded-md px-2 py-0.5 text-2xs font-medium text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] transition-colors"
                     >
                       Open
                     </button>
@@ -226,7 +225,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className={`w-full rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                  className={`w-full rounded-lg border px-3 py-1.5 text-caption font-medium transition-colors ${
                     loadMoreError
                       ? "border-[color-mix(in_srgb,var(--danger)_40%,transparent)] text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)]"
                       : "border-[var(--border-subtle)] text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-hover)] disabled:opacity-60"
@@ -237,7 +236,7 @@ export function RecurringSeriesCard({ orgId, summary, occurrenceStatuses, member
               </div>
             )}
             {!occurrencesLoading && hasMoreBeyondCap && (
-              <div className="px-3 py-2 text-center text-[10px] text-[var(--muted)]">
+              <div className="px-3 py-2 text-center text-2xs text-[var(--muted)]">
                 Showing the {occurrences.length} most recent occurrences
               </div>
             )}

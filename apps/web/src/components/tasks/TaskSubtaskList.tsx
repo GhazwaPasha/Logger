@@ -2,12 +2,11 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck } from "@fortawesome/free-solid-svg-icons";
 import { InlineSpinner } from "@/components/ui/InlineSpinner";
 import type { SubtaskRow } from "@/lib/ledger-types";
 
 import { CollapseItem } from "@/components/ui/Collapse";
+import { CheckIcon } from "lucide-react";
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -101,7 +100,7 @@ export function TaskSubtaskList({
               {rowBusy(item.id) ? (
                 <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
               ) : item.done ? (
-                <FontAwesomeIcon icon={faCheck} className="size-[11px] shrink-0" aria-hidden />
+                <CheckIcon className="size-[11px] shrink-0" aria-hidden />
               ) : null}
             </button>
             {!toggleOnly && editingId === item.id ? (

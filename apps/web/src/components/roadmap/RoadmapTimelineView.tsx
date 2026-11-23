@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCompress, faExpand, faCaretLeft, faCaretRight, faFlag, faLocationDot, faPen } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_BAR_CLASS, formatRange, milestoneDepthStyle } from "@/lib/roadmap-format";
 import { buildTicks, clampZoomLevel, computeNaturalRange, fitZoomToRange, ZOOM_LEVELS, type Tick } from "@/lib/roadmap-axis";
 import { ZoomLevelSwitch } from "@/components/roadmap/ZoomLevelSwitch";
 import type { GoalRow, MilestoneRow } from "@/lib/ledger-types";
 import { Collapse, CollapseRows } from "@/components/ui/Collapse";
+import { ChevronLeftIcon, ChevronRightIcon, FlagIcon, MapPinIcon, MaximizeIcon, MinimizeIcon, PencilIcon } from "lucide-react";
 
 type TimelineRow = { milestone: MilestoneRow; depth: number };
 
@@ -200,8 +199,7 @@ function GoalTimelineCard({
             onClick={() => setIsExpanded((v) => !v)}
             aria-label={isExpanded ? "Collapse all milestones" : "Expand all milestones"}
           >
-            <FontAwesomeIcon
-              icon={faCaretRight}
+            <ChevronRightIcon
               className={`size-3.5 transition-transform duration-150 ${isExpanded ? "rotate-90" : ""}`}
             />
           </button>
@@ -227,7 +225,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate((c) => c - axisSpan / 2)}
               aria-label="Earlier"
             >
-              <FontAwesomeIcon icon={faCaretLeft} className="size-4" />
+              <ChevronLeftIcon className="size-4" />
             </button>
             <button
               type="button"
@@ -242,7 +240,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate(new Date().getTime())}
               aria-label="Jump to today"
             >
-              <FontAwesomeIcon icon={faLocationDot} className="size-3.5" />
+              <MapPinIcon className="size-3.5" />
               Today
             </button>
             <button
@@ -251,7 +249,7 @@ function GoalTimelineCard({
               onClick={() => setCenterDate((c) => c + axisSpan / 2)}
               aria-label="Later"
             >
-              <FontAwesomeIcon icon={faCaretRight} className="size-4" />
+              <ChevronRightIcon className="size-4" />
             </button>
           </div>
           <button
@@ -260,7 +258,7 @@ function GoalTimelineCard({
             onClick={() => setFocusMode((f) => !f)}
             aria-label={focusMode ? "Exit full screen" : "Full screen"}
           >
-            {focusMode ? <FontAwesomeIcon icon={faCompress} className="size-4" /> : <FontAwesomeIcon icon={faExpand} className="size-4" />}
+            {focusMode ? <MinimizeIcon className="size-4" /> : <MaximizeIcon className="size-4" />}
           </button>
         </div>
       </div>
@@ -285,7 +283,7 @@ function GoalTimelineCard({
                 {ticks.map((t) => (
                   <span
                     key={t.pos}
-                    className="absolute top-0 whitespace-nowrap text-[12px] font-medium text-[var(--muted)]"
+                    className="absolute top-0 whitespace-nowrap text-xs font-medium text-[var(--muted)]"
                     style={{ left: `${t.pos}%` }}
                   >
                     {t.label}
@@ -350,8 +348,7 @@ function GoalTimelineCard({
                               }}
                               aria-label={isOpen ? `Collapse ${milestone.title}` : `Expand ${milestone.title}`}
                             >
-                              <FontAwesomeIcon
-                                icon={faCaretRight}
+                              <ChevronRightIcon
                                 className={`size-3 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                               />
                             </button>
@@ -372,7 +369,7 @@ function GoalTimelineCard({
                         aria-label={`Edit ${milestone.title}`}
                         title="Edit"
                       >
-                        <FontAwesomeIcon icon={faPen} className="size-3.5" />
+                        <PencilIcon className="size-3.5" />
                       </button>
                     </div>
                   );
@@ -422,7 +419,7 @@ export function RoadmapTimelineView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <FontAwesomeIcon icon={faFlag} className="size-6" />
+          <FlagIcon className="size-6" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>

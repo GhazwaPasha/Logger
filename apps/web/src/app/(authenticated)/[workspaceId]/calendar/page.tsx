@@ -212,7 +212,7 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Calendar</h1>
+          <h1 className="page-title">Calendar</h1>
           <p className="mt-0.5 text-sm text-[var(--muted)]">Tasks by due date. Click any task to open its detail panel.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export default function CalendarPage() {
           <div className="min-w-[280px]">
             <div className="grid grid-cols-7 border-b border-[var(--border-subtle)]">
               {DAY_NAMES.map((d, i) => (
-                <div key={d} className="px-1 py-2 text-center text-[12px] font-semibold text-[var(--muted)] sm:px-2">
+                <div key={d} className="px-1 py-2 text-center text-xs font-semibold text-[var(--muted)] sm:px-2">
                   <span className="hidden sm:inline">{d}</span>
                   <span className="sm:hidden">{DAY_NAMES_SHORT[i]}</span>
                 </div>
@@ -324,7 +324,7 @@ export default function CalendarPage() {
                     >
                       {day && (
                         <>
-                          <div className={`mb-1 flex size-5 items-center justify-center rounded-full text-[10px] font-semibold sm:size-6 sm:text-xs ${isToday ? "bg-[var(--accent)] text-[var(--on-accent)]" : "text-[var(--muted)]"}`}>
+                          <div className={`mb-1 flex size-5 items-center justify-center rounded-full text-2xs font-semibold sm:size-6 sm:text-xs ${isToday ? "bg-[var(--accent)] text-[var(--on-accent)]" : "text-[var(--muted)]"}`}>
                             {day}
                           </div>
                           <div className="space-y-0.5">
@@ -335,7 +335,7 @@ export default function CalendarPage() {
                                   key={t.id}
                                   type="button"
                                   onClick={() => openTask(t.id)}
-                                  className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] leading-tight text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""} ${idx >= 1 ? "hidden sm:flex" : ""}`}
+                                  className={`flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-caption leading-tight text-[var(--fg)] transition-colors hover:opacity-80 ${STATUS_CHIP[col] ?? ""} ${idx >= 1 ? "hidden sm:flex" : ""}`}
                                 >
                                   <span className={`size-1.5 shrink-0 rounded-full ${PRIORITY_DOT[t.priority ?? "medium"] ?? "bg-[var(--ink-2)]"}`} aria-hidden />
                                   <span className="min-w-0 truncate">{t.title}</span>
@@ -343,10 +343,10 @@ export default function CalendarPage() {
                               );
                             })}
                             {dayTasks.length > 3 && (
-                              <p className="hidden px-1 text-[10px] text-[var(--muted)] sm:block">+{dayTasks.length - 3} more</p>
+                              <p className="hidden px-1 text-2xs text-[var(--muted)] sm:block">+{dayTasks.length - 3} more</p>
                             )}
                             {dayTasks.length > 1 && (
-                              <p className="px-1 text-[10px] text-[var(--muted)] sm:hidden">+{dayTasks.length - 1}</p>
+                              <p className="px-1 text-2xs text-[var(--muted)] sm:hidden">+{dayTasks.length - 1}</p>
                             )}
                           </div>
                         </>
@@ -383,7 +383,7 @@ export default function CalendarPage() {
                   );
                 })}
                 {noDateTasks.length > 30 && (
-                  <li className="px-2 text-[10px] text-[var(--muted)]">+{noDateTasks.length - 30} more</li>
+                  <li className="px-2 text-2xs text-[var(--muted)]">+{noDateTasks.length - 30} more</li>
                 )}
               </ul>
             </div>

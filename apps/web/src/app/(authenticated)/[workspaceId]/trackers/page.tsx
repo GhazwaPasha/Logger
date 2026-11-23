@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 
-import { faBullseye } from "@fortawesome/free-solid-svg-icons";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
 import { useApiSession } from "@/hooks/useApiSession";
@@ -18,6 +17,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { NewButton } from "@/components/ui/NewButton";
 import { PACE_LABEL } from "@/components/trackers/tracker-format";
 import { TRACKER_TEMPLATES } from "@/components/trackers/tracker-templates";
+import { TargetIcon } from "lucide-react";
 
 type Filter = "active" | "mine" | "archived";
 
@@ -135,7 +135,7 @@ export default function TrackersPage() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-outfit text-[30px] font-bold tracking-[-0.03em]">Trackers</h1>
+        <h1 className="page-title">Trackers</h1>
         {canManage && hasAny && (
           <div className="flex items-center gap-2">
             <NewButton label="New tracker" onClick={() => go({ new: "1", edit: null })} />
@@ -193,7 +193,7 @@ export default function TrackersPage() {
                         .map((m) => (
                           <span
                             key={m.key}
-                            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--muted)]"
+                            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2 py-0.5 text-caption font-semibold text-[var(--muted)]"
                           >
                             {m.name}
                           </span>
@@ -205,7 +205,7 @@ export default function TrackersPage() {
             </div>
           ) : (
             <EmptyState
-              icon={faBullseye}
+              icon={TargetIcon}
               className="py-20"
               title="No trackers assigned to you"
               description="When a manager gives you a target to track, it shows up here."
@@ -216,7 +216,7 @@ export default function TrackersPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           {/* Left: tracker list, in its own card like the other two columns; the open tracker is a raised row that slides. */}
           <div className="w-full rounded-[20px] bg-[var(--card)] p-2 shadow-card lg:w-72 lg:shrink-0">
-            <h3 className="px-3 pb-1.5 pt-2 text-[12.5px] font-semibold text-[var(--muted)]">
+            <h3 className="px-3 pb-1.5 pt-2 text-xs font-semibold text-[var(--muted)]">
               Trackers <span className="tabular-nums">· {rows.length}</span>
             </h3>
             <ul className="space-y-0.5">
@@ -278,11 +278,11 @@ export default function TrackersPage() {
                         email={m?.email}
                         image={m?.image}
                         size="size-8"
-                        className="relative shrink-0 bg-[var(--fill-2)] text-[11px] font-semibold text-[var(--fg)]"
+                        className="relative shrink-0 bg-[var(--fill-2)] text-caption font-semibold text-[var(--fg)]"
                       />
                       <span className="relative min-w-0 flex-1 space-y-1.5">
                         <span className="flex items-baseline gap-2">
-                          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--fg)]">
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--fg)]">
                             {t.name}
                           </span>
                           {st?.target != null && (
@@ -302,7 +302,7 @@ export default function TrackersPage() {
                             {personName(t.assigneeId)} · {t.checkIn}
                           </span>
                           <span
-                            className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-semibold ${pill}`}
+                            className={`inline-flex h-5 shrink-0 items-center rounded-full px-2 text-caption font-semibold ${pill}`}
                           >
                             {missed
                               ? `${t.stats.missedCount} missed`

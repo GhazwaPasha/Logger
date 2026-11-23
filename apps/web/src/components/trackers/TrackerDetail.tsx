@@ -127,9 +127,9 @@ export function TrackerDetail({
       <div className="min-w-0 flex-1 space-y-5 rounded-[20px] bg-[var(--card)] p-5 shadow-card sm:p-6">
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+            <p className="flex items-center gap-2 text-footnote text-[var(--muted)]">
               {assignee ? (
-                <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size="size-5" className="bg-[var(--fill-2)] text-[9px] font-semibold text-[var(--fg)]" />
+                <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size="size-5" className="bg-[var(--fill-2)] text-2xs font-semibold text-[var(--fg)]" />
               ) : (
                 <span className="size-5 shrink-0 rounded-full shadow-[inset_0_0_0_1px_var(--line-strong)]" />
               )}
@@ -138,16 +138,16 @@ export function TrackerDetail({
                 {detail.reminderTime ? ` · reminder ${detail.reminderTime}` : ""}
               </span>
             </p>
-            <h1 className="font-outfit mt-1 text-[26px] font-bold leading-tight tracking-[-0.025em] text-[var(--fg)]">{detail.name}</h1>
+            <h1 className="page-title mt-1 text-[var(--fg)]">{detail.name}</h1>
           </div>
-          <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-3 text-[12.5px] font-semibold ${PACE_PILL[paceKey]}`}>
+          <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-semibold ${PACE_PILL[paceKey]}`}>
             {missedFirst ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
           </span>
           {detail.canManage && (
             <button
               type="button"
               onClick={onEdit}
-              className="pressable inline-flex h-7 shrink-0 items-center rounded-[9px] bg-[var(--fill-2)] px-3 text-[12.5px] font-semibold text-[var(--fg)] hover:bg-[var(--fill-3)]"
+              className="pressable inline-flex h-7 shrink-0 items-center rounded-[9px] bg-[var(--fill-2)] px-3 text-xs font-semibold text-[var(--fg)] hover:bg-[var(--fill-3)]"
             >
               Edit
             </button>
@@ -158,7 +158,7 @@ export function TrackerDetail({
         <TrackerChart detail={detail} mode={chartMode} onModeChange={setChartMode} />
 
         {/* Period: one quiet line under the chart. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12.5px]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           <span className="font-semibold text-[var(--muted)]">Period</span>
           <span className="font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</span>
           <div className="h-1.5 min-w-[80px] flex-1 overflow-hidden rounded-full bg-[var(--fill-2)]">
@@ -179,7 +179,7 @@ export function TrackerDetail({
                 className="min-w-0 rounded-2xl px-4 py-3.5"
                 style={{ background: m.kind === "formula" ? "var(--fill)" : TILE_TINTS[i % TILE_TINTS.length] }}
               >
-                <p className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--muted)]">
+                <p className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
                   <span className="truncate" title={m.name}>{m.name}</span>
                   {m.kind === "formula" && (
                     <Calculator className="ml-auto size-3.5 shrink-0 opacity-70" aria-label="Calculated" role="img">
@@ -191,10 +191,10 @@ export function TrackerDetail({
                   <SpringNumber
                     value={st.value}
                     format={(v) => metricValue(m, v)}
-                    className="font-outfit text-[26px] font-bold leading-none tracking-[-0.03em] text-[var(--fg)]"
+                    className="font-outfit text-2xl font-semibold leading-none tracking-[-0.03em] text-[var(--fg)]"
                   />
                   {st.target != null && (
-                    <span className="text-[12.5px] text-[var(--muted)]">
+                    <span className="text-xs text-[var(--muted)]">
                       / {m.direction === "at_most" ? "≤ " : m.kind === "formula" ? "≥ " : ""}
                       {metricValue(m, st.target)}
                     </span>
@@ -214,7 +214,7 @@ export function TrackerDetail({
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between">
             <h3 className="font-outfit text-base font-semibold text-[var(--fg)]">Check-ins</h3>
-            <span className="text-[12.5px] text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
+            <span className="text-xs text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
           </div>
           <CheckInStrip detail={detail} onPick={canLog ? (key) => setPicked(key) : undefined} selected={canLog ? logDate : null} />
           <p className="flex gap-4 text-xs text-[var(--muted)]">
@@ -229,7 +229,7 @@ export function TrackerDetail({
       <aside className="w-full space-y-4 xl:sticky xl:top-4 xl:w-80 xl:shrink-0">
         <div className="space-y-4 rounded-[20px] bg-[var(--card)] p-5 shadow-card">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="font-outfit text-[17px] font-semibold text-[var(--fg)]">Log progress</h3>
+            <h3 className="font-outfit text-lg font-semibold text-[var(--fg)]">Log progress</h3>
             {stats.dueKey && !stats.dueLogged && canLog ? (
               <span className="inline-flex h-6 items-center rounded-full bg-[var(--status-progress-bg)] px-2.5 text-xs font-semibold text-[var(--status-progress-ink)]">Due</span>
             ) : null}
@@ -249,7 +249,7 @@ export function TrackerDetail({
         </div>
 
         <RecentLogs count={detail.entries.length}>
-            <div className="text-[13px]">
+            <div className="text-footnote">
               {stats.dueKey && !stats.dueLogged && (
                 <Row label={dayLabel(stats.dueKey, stats.today)} value="Not logged yet" tone="muted" />
               )}
@@ -283,8 +283,8 @@ function RecentLogs({ count, children }: { count: number; children: React.ReactN
         aria-expanded={open}
         className="pressable flex w-full items-center gap-2 rounded-[20px] px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
       >
-        <span className="font-outfit text-[15px] font-semibold text-[var(--fg)]">Recent logs</span>
-        <span className="text-[12.5px] tabular-nums text-[var(--muted)]">{count}</span>
+        <span className="font-outfit text-subhead font-semibold text-[var(--fg)]">Recent logs</span>
+        <span className="text-xs tabular-nums text-[var(--muted)]">{count}</span>
         <ChevronDown
           className={`ml-auto size-4 text-[var(--muted)] transition-transform duration-300 ease-[var(--motion-respond)] ${open ? "rotate-180" : ""}`}
           aria-hidden
@@ -511,9 +511,9 @@ function TrackerChart({
 
       {/* Readout: follows the scrub, like the dashboard chart. */}
       <div className="mt-3 min-h-[58px]" aria-live="polite">
-        <p className="text-[12px] font-semibold text-[var(--muted)]">{caption}</p>
+        <p className="text-xs font-semibold text-[var(--muted)]">{caption}</p>
         <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="font-outfit text-[34px] font-bold leading-none tracking-[-0.035em] tabular-nums">
+          <span className="font-outfit text-4xl font-semibold leading-none tracking-[-0.035em] tabular-nums">
             {shownValue == null ? "—" : metricValue(metric, shownValue)}
           </span>
           {goalNow != null ? (
@@ -561,7 +561,7 @@ function TrackerChart({
         )}
       </div>
       {isFormula && metric.formula ? (
-        <p className="mt-2 text-[12px] text-[var(--muted)]">{formulaText(metric, detail.metrics)}</p>
+        <p className="mt-2 text-xs text-[var(--muted)]">{formulaText(metric, detail.metrics)}</p>
       ) : null}
     </div>
   );
@@ -689,15 +689,15 @@ function CheckInForm({
       />
       <div className="flex items-center justify-end gap-3 pt-1">
         {error ? (
-          <span className="mr-auto text-[13px] text-[var(--danger)] dark:text-[var(--danger)]">{error}</span>
+          <span className="mr-auto text-footnote text-[var(--danger)] dark:text-[var(--danger)]">{error}</span>
         ) : saved ? (
-          <span className="mr-auto text-[13px] text-[var(--success)] dark:text-[var(--success)]">Saved</span>
+          <span className="mr-auto text-footnote text-[var(--success)] dark:text-[var(--success)]">Saved</span>
         ) : null}
         <button
           type="button"
           onClick={submit}
           disabled={saving}
-          className="rounded-lg bg-[var(--accent)] px-3.5 py-1.5 text-[13px] font-medium text-[var(--bg)] transition-transform duration-100 active:scale-[0.97] disabled:opacity-60"
+          className="rounded-lg bg-[var(--accent)] px-3.5 py-1.5 text-footnote font-medium text-[var(--bg)] transition-transform duration-100 active:scale-[0.97] disabled:opacity-60"
         >
           {saving ? "Saving…" : entry ? "Update log" : "Save log"}
         </button>

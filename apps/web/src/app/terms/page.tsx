@@ -20,7 +20,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
   return (
     <section id={id} className="scroll-mt-24">
       <h2 className="text-xl font-semibold tracking-tight text-[var(--fg)]">{title}</h2>
-      <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-[var(--muted)]">{children}</div>
+      <div className="mt-3 space-y-3 text-subhead leading-relaxed text-[var(--muted)]">{children}</div>
     </section>
   );
 }
@@ -35,7 +35,7 @@ export default function TermsOfServicePage() {
             className={`flex items-center gap-2.5 rounded-lg outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${wordmark.className}`}
           >
             <LogBaseMark variant="marketing" decorative className="shrink-0" />
-            <span className="text-xl font-bold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
+            <span className="text-xl font-semibold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
           </Link>
           <Link href="/" className="text-sm text-[var(--muted)] transition-colors hover:text-[var(--fg)]">
             ← Back home
@@ -44,10 +44,10 @@ export default function TermsOfServicePage() {
 
         <div className="mt-6 rounded-2xl bg-[var(--card)] shadow-card p-6 sm:p-10">
           <p className="text-xs font-semibold text-[var(--accent)]">Legal</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl">Terms of Service</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg)] sm:text-4xl">Terms of Service</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">Last updated: {LAST_UPDATED}</p>
 
-          <p className="mt-6 text-[15px] leading-relaxed text-[var(--muted)]">
+          <p className="mt-6 text-subhead leading-relaxed text-[var(--muted)]">
             These Terms of Service (&ldquo;Terms&rdquo;) govern your access to and use of LogBase (the
             &ldquo;Service&rdquo;). By creating an account or otherwise using LogBase, you agree to these Terms. If
             you are using LogBase on behalf of an organization, you are agreeing on that organization&apos;s behalf

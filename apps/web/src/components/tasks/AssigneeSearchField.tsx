@@ -165,7 +165,7 @@ export function AssigneeSearchField({ members, assigneeIds, onToggleAssignee }: 
           )}
         </AnimatePresence>
       </div>
-      <p className="text-[11px] text-[var(--muted)]">
+      <p className="text-caption text-[var(--muted)]">
         Pick from the list to assign. Already assigned people are hidden until removed.
       </p>
     </div>

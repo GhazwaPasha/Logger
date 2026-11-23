@@ -4,7 +4,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { liveIsland } from "@/components/app/live-island";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useRecentActivity } from "@/hooks/useOrgActivityFeed";
@@ -17,12 +16,13 @@ import type { OrgActivityLedgerRow } from "@/lib/ledger-types";
 import { isLedgerEntryNotifiableToUser } from "@work-ledger/contracts";
 import { formatLogTimestamp } from "@/lib/task-activity-log";
 import { subscribeWebPush } from "@/lib/web-push-client";
+import { CircleCheckIcon } from "lucide-react";
 
 const NOTIF_PANEL_HEADER_ROW =
   "-mx-6 flex flex-col gap-2 border-b border-[var(--border-subtle)] px-6 pb-3 pt-0 sm:min-h-10 sm:flex-row sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-0";
 
 const NOTIF_PANEL_HEADER_TITLE =
-  "min-w-0 truncate text-sm font-semibold leading-tight tracking-tight text-[var(--fg)] sm:min-w-[6rem] sm:flex-1";
+  "min-w-0 truncate text-sm font-semibold leading-tight text-[var(--fg)] sm:min-w-[6rem] sm:flex-1";
 
 const NOTIF_PANEL_HEADER_RIGHT =
   "flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:shrink-0 sm:flex-nowrap sm:gap-2";
@@ -323,7 +323,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                     {(activityQuery.error as Error).message || "Could not load notifications"}
                   </p>
                 ) : panelEntries.length === 0 ? (
-                  <EmptyState icon={faCircleCheck} title="You are all caught up" />
+                  <EmptyState icon={CircleCheckIcon} title="You are all caught up" />
                 ) : (
                   <ul className="space-y-3">
                     {panelEntries.map((e) => {
@@ -337,7 +337,7 @@ export function WorkspaceNotificationsProvider({ children }: { children: ReactNo
                             onClick={() => setPanelOpen(false)}
                           >
                             <p className="text-xs font-medium text-[var(--fg)]">{title}</p>
-                            <p className="mt-1 font-mono-ledger text-[12px] leading-snug text-[var(--fg)]">
+                            <p className="mt-1 font-mono-ledger text-xs leading-snug text-[var(--fg)]">
                               <span className="text-[var(--muted)]">{formatLogTimestamp(e.createdAt, timeZone)}</span>
                               <span className="text-[var(--muted)]"> · </span>
                               <LedgerLineDescription

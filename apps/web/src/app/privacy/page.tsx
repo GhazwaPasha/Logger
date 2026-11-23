@@ -20,7 +20,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
   return (
     <section id={id} className="scroll-mt-24">
       <h2 className="text-xl font-semibold tracking-tight text-[var(--fg)]">{title}</h2>
-      <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-[var(--muted)]">{children}</div>
+      <div className="mt-3 space-y-3 text-subhead leading-relaxed text-[var(--muted)]">{children}</div>
     </section>
   );
 }
@@ -35,7 +35,7 @@ export default function PrivacyPolicyPage() {
             className={`flex items-center gap-2.5 rounded-lg outline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${wordmark.className}`}
           >
             <LogBaseMark variant="marketing" decorative className="shrink-0" />
-            <span className="text-xl font-bold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
+            <span className="text-xl font-semibold tracking-[-0.04em] text-[var(--fg)]">LogBase</span>
           </Link>
           <Link href="/" className="text-sm text-[var(--muted)] transition-colors hover:text-[var(--fg)]">
             ← Back home
@@ -44,10 +44,10 @@ export default function PrivacyPolicyPage() {
 
         <div className="mt-6 rounded-2xl bg-[var(--card)] shadow-card p-6 sm:p-10">
           <p className="text-xs font-semibold text-[var(--accent)]">Legal</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[var(--fg)] sm:text-4xl">Privacy Policy</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--fg)] sm:text-4xl">Privacy Policy</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">Last updated: {LAST_UPDATED}</p>
 
-          <p className="mt-6 text-[15px] leading-relaxed text-[var(--muted)]">
+          <p className="mt-6 text-subhead leading-relaxed text-[var(--muted)]">
             This Privacy Policy explains what information LogBase (&ldquo;LogBase,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) collects when
             you use the LogBase application (the &ldquo;Service&rdquo;), how we use it, who we share it with, and the
             choices you have. By using LogBase, you agree to the collection and use of information described here.

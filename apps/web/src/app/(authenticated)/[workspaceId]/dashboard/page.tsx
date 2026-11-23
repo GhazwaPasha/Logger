@@ -1,7 +1,5 @@
 "use client";
 
-import { faChartPie, faTerminal } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { useWorkspaceRoute } from "@/components/app/workspace-route-context";
 import { useWorkspaceData } from "@/components/app/WorkspaceDataProvider";
@@ -13,13 +11,14 @@ import { Segmented } from "@/components/ui/Segmented";
 import { useApiSession } from "@/hooks/useApiSession";
 import { useActivityFeedPages } from "@/hooks/useOrgActivityFeed";
 import { setLastWorkspaceId } from "@/lib/workspace-storage";
+import { ChartPieIcon, TerminalIcon } from "lucide-react";
 
 type DashboardView = "overview" | "activity";
 
 const VIEWS = [
-  { value: "overview", label: "Overview", icon: faChartPie },
+  { value: "overview", label: "Overview", icon: ChartPieIcon },
   // A terminal, because that's where it takes you: the workspace's activity log.
-  { value: "activity", label: "Activity log", icon: faTerminal },
+  { value: "activity", label: "Activity log", icon: TerminalIcon },
 ] as const;
 
 function partOfDay(d = new Date()) {
@@ -49,7 +48,7 @@ export default function WorkspaceDashboardPage() {
     <div className="mx-auto w-full max-w-[min(100%,104rem)] space-y-4">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
       <Seq index={0} className="flex items-center gap-3">
-        <h1 className="min-w-0 flex-1 truncate font-outfit text-2xl font-bold tracking-tight">
+        <h1 className="page-title min-w-0 flex-1 truncate">
           {partOfDay()}, {firstName}
         </h1>
         <Segmented
@@ -59,7 +58,7 @@ export default function WorkspaceDashboardPage() {
           options={VIEWS.map((v) => ({
             value: v.value,
             label: v.label,
-            icon: <FontAwesomeIcon icon={v.icon} className="size-3.5" />,
+            icon: <v.icon className="size-3.5" />,
           }))}
         />
       </Seq>

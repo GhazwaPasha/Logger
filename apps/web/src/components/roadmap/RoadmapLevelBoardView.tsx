@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFlag } from "@fortawesome/free-solid-svg-icons";
 import { STATUS_DOT_CLASS, STATUS_LABELS } from "@/lib/roadmap-format";
 import { NODE_LABELS } from "@/lib/nodes";
 import type { Dept, GoalRow, MilestoneRow } from "@/lib/ledger-types";
+import { FlagIcon } from "lucide-react";
 
 const ORG_WIDE_KEY = "__org__";
 
@@ -30,7 +29,7 @@ function MilestoneCard({
     >
       <div className="flex items-center gap-1.5">
         {goalTitle && (
-          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11.5px] font-medium text-[var(--muted)]">
+          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-caption font-medium text-[var(--muted)]">
             {goalTitle}
           </span>
         )}
@@ -89,7 +88,7 @@ export function RoadmapLevelBoardView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <FontAwesomeIcon icon={faFlag} className="size-6" />
+          <FlagIcon className="size-6" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>

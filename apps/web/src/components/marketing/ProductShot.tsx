@@ -48,9 +48,9 @@ export function ProductShot() {
           </div>
           {channels.map(([dept, list]) => (
             <div key={dept} className="flex flex-col gap-0.5">
-              <span className="px-2.5 text-[13px] font-bold">{dept}</span>
+              <span className="px-2.5 text-footnote font-semibold">{dept}</span>
               {list.map((c, j) => (
-                <span key={c} className={`px-2.5 py-1 text-[13px] ${j === 0 ? "font-semibold text-[var(--ink)]" : "text-[var(--ink-2)]"}`}>
+                <span key={c} className={`px-2.5 py-1 text-footnote ${j === 0 ? "font-semibold text-[var(--ink)]" : "text-[var(--ink-2)]"}`}>
                   <span className="text-[var(--ink-3)]"># </span>
                   {c}
                 </span>
@@ -59,15 +59,15 @@ export function ProductShot() {
           ))}
         </div>
         <div className="flex flex-1 flex-col gap-4 rounded-tl-3xl bg-[var(--sheet)] p-8 shadow-sheet">
-          <div className="font-outfit text-[30px] font-bold tracking-tight">Up late, Jordan</div>
+          <div className="font-outfit text-3xl font-semibold tracking-tight">Up late, Jordan</div>
           <div className="grid grid-cols-4 gap-3">
             {kpis.map((k) => (
               <div key={k.label} className="flex h-[132px] flex-col rounded-[18px] bg-[var(--card)] p-4 shadow-card">
-                <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--ink-2)]">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]">
                   <span className="size-2.5 rounded-full" style={{ background: k.color }} />
                   {k.label}
                 </span>
-                <span className="mt-3 font-outfit text-[38px] font-semibold leading-none tracking-tight">{k.value}</span>
+                <span className="mt-3 font-outfit text-4xl font-semibold leading-none tracking-tight">{k.value}</span>
                 <span className="mt-auto text-xs text-[var(--ink-2)]">{k.note}</span>
               </div>
             ))}
@@ -96,10 +96,10 @@ export function ProductShot() {
                 <path d="M 143 28 A 84 84 0 0 1 181 92" fill="none" strokeWidth="10" strokeLinecap="round" style={{ stroke: "var(--status-progress)" }} />
                 <path d="M 181 108 A 84 84 0 0 1 60 175" fill="none" strokeWidth="10" strokeLinecap="round" style={{ stroke: "var(--priority-medium)" }} />
                 <path d="M 46 166 A 84 84 0 0 1 19 108" fill="none" strokeWidth="10" strokeLinecap="round" style={{ stroke: "var(--priority-high)" }} />
-                <text x="100" y="96" textAnchor="middle" className="font-outfit" style={{ fill: "var(--ink)", fontSize: 30, fontWeight: 700 }}>66</text>
-                <text x="100" y="126" textAnchor="middle" style={{ fill: "var(--ink)", fontSize: 30, fontWeight: 700 }}>56</text>
+                <text x="100" y="96" textAnchor="middle" className="font-outfit" style={{ fill: "var(--ink)", fontSize: 30, fontWeight: 600 }}>66</text>
+                <text x="100" y="126" textAnchor="middle" style={{ fill: "var(--ink)", fontSize: 30, fontWeight: 600 }}>56</text>
               </svg>
-              <div className="flex flex-col gap-2 text-[13px]">
+              <div className="flex flex-col gap-2 text-footnote">
                 {[
                   ["Pending", "43", "var(--status-pending)"],
                   ["In progress", "13", "var(--status-progress)"],
