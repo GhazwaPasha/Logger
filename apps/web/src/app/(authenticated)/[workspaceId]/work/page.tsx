@@ -2710,7 +2710,7 @@ function WorkItemsInner() {
         createPortal(
           <AnimatePresence>
             {viewTaskId && (
-              <div className="fixed bottom-0 left-0 top-14 z-[60] overflow-hidden md:left-72 md:rounded-tl-3xl" style={{ right: "var(--ask-pane-w, 0px)" }}>
+              <div className="fixed bottom-0 left-0 top-12 z-[60] overflow-hidden md:left-72 md:rounded-tl-3xl" style={{ right: "var(--ask-pane-w, 0px)" }}>
                 <motion.div
                   className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[2px]"
                   aria-hidden

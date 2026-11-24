@@ -66,9 +66,9 @@ function IconSettings({ className }: { className?: string }) {
   );
 }
 
-/* size-5 (20px) matches the online-teammate avatars in OnlineMembersAvatars. */
+/* size-6 (24px) matches the online-teammate avatars in OnlineMembersAvatars; it sits in a 36px slot like the icon buttons. */
 const profileShell =
-  "flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-2xs font-semibold uppercase text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-[var(--bg-header)]";
+  "flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border-subtle)] bg-[var(--accent-muted)] text-2xs font-semibold uppercase text-[var(--fg)] ring-offset-2 transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--surface-hover)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-[var(--bg-header)]";
 
 const iconBtn =
   "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--muted)] transition-[background-color,transform,color] duration-200 ease-out hover:bg-[var(--fill)] hover:text-[var(--fg)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-header)]";
@@ -116,7 +116,7 @@ export function AppHeader({
 
   return (
     <header className={`ui-app-header safe-top sticky top-0 z-40 border-b border-[var(--border-subtle)] bg-[var(--bg-header)] supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--bg-header)_88%,transparent)] supports-[backdrop-filter]:backdrop-blur-md supports-[backdrop-filter]:backdrop-saturate-150${joinedToSidebar ? " md:border-b-0" : ""}`}>
-      <div className="grid h-14 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-5">
+      <div className="grid h-12 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:pr-5">
         <div className="flex min-w-0 items-center gap-3 justify-self-start">
           {onMenuToggle && (
             <button
@@ -132,8 +132,9 @@ export function AppHeader({
             href={brandHref}
             className="group flex min-h-9 items-center gap-2 rounded-lg font-outfit font-semibold tracking-tight text-[var(--fg)] transition-[opacity,transform] duration-200 ease-out hover:opacity-90 active:scale-[0.98]"
           >
-            <LogBaseMark variant="chrome" decorative />
-            <span className="hidden text-lg leading-none sm:inline">LogBase</span>
+            {/* 28px slot: the landscape mark draws about 28x19 next to the 16px wordmark in the 48px header. */}
+            <LogBaseMark size={28} decorative />
+            <span className="hidden text-base leading-none sm:inline">LogBase</span>
           </Link>
         </div>
         <div className="pointer-events-none z-50 flex max-w-[min(100vw-7rem,32rem)] justify-center justify-self-center px-1 sm:max-w-[min(100vw-9rem,38rem)]">
@@ -179,7 +180,7 @@ export function AppHeader({
             </Link>
           )}
           {user && (
-            <div className="relative ml-1.5" ref={accountMenuRef}>
+            <div className="relative flex size-9 shrink-0 items-center justify-center" ref={accountMenuRef}>
               <div className="relative">
                 <button
                   type="button"

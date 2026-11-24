@@ -596,7 +596,7 @@ export function AskPane() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: reduceMotion ? 0 : 0.18, ease: curve.respond }}
-            className="fixed inset-x-0 bottom-0 top-14 z-[70] flex flex-col bg-[var(--surface-base)]"
+            className="fixed inset-x-0 bottom-0 top-12 z-[70] flex flex-col bg-[var(--surface-base)]"
           >
             <AskChrome compact />
           </motion.aside>

@@ -904,7 +904,8 @@ html[data-theme="light"] img.brand-logo-mark-for-dark-theme {
   transition:
     width 0.38s cubic-bezier(0.32, 0.72, 0, 1),
     box-shadow 0.3s ease;
-  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  /* 6px top and bottom keeps the two-line pill (about 46px) inside the 48px header. */
+  padding: 0.375rem 0.5rem 0.375rem 0.75rem;
   text-align: left;
 }
 

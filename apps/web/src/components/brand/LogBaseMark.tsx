@@ -16,7 +16,7 @@ type LogBaseMarkProps = {
 };
 
 const VARIANT_PX: Record<LogBaseMarkVariant, number> = {
-  /** App shell header (`h-14`): visually matches `text-sm` wordmark + size-9 controls */
+  /** Marketing nav and product shot (`h-14`): visually matches `text-sm` wordmark + size-9 controls. The app header passes its own size. */
   chrome: 34,
   /** Marketing nav: pairs with `text-xl` / `text-2xl` without overpowering */
   marketing: 44,
