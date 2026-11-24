@@ -176,7 +176,7 @@ function KpiCard({
 }
 
 const KpiLabel = ({ icon: Icon, tint, children }: { icon: LucideIcon; tint: string; children: ReactNode }) => (
-  <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--muted)]">
+  <p className="flex items-center gap-1.5 text-footnote font-semibold text-[var(--muted)]">
     <Icon aria-hidden className="size-3.5" strokeWidth={2.4} style={{ color: tint }} />
     {children}
   </p>
@@ -262,7 +262,7 @@ export function DashboardOverview({
             ].map(({ label, value }) => (
               <div key={label} className="flex min-w-0 flex-col-reverse">
                 <dt className="truncate text-caption text-[var(--muted)]">{label}</dt>
-                <dd className="font-outfit text-2xl font-semibold leading-tight tracking-[-0.02em] tabular-nums">
+                <dd className="font-outfit text-3xl font-semibold leading-tight tracking-[-0.02em] tabular-nums">
                   {loading ? (
                     <span className="my-0.5 block h-5 w-6 animate-pulse rounded-md bg-[var(--surface-muted)] motion-reduce:animate-none" />
                   ) : (

@@ -209,7 +209,7 @@ export function GlobalSearch() {
                         className={`flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors ${i === highlighted ? "bg-[var(--surface-hover)]" : ""}`}
                       >
                         <span
-                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-caption font-semibold ${STATUS_COLORS[result.status] ?? ""}`}
+                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[result.status] ?? ""}`}
                         >
                           {STATUS_LABELS[result.status] ?? result.status}
                         </span>

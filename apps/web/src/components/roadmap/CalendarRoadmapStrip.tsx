@@ -40,7 +40,7 @@ export function CalendarRoadmapStrip({ year, month }: { year: number; month: num
           title={`${m.title} — ${STATUS_LABELS[m.status]}, ${m.progress.pct}% done`}
         >
           {goalTitleById.get(m.goalId) && (
-            <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-caption font-medium text-[var(--muted)]">
+            <span className="max-w-[6rem] shrink-0 truncate rounded-full bg-[var(--surface-muted)] px-1.5 py-0.5 text-xs font-medium text-[var(--muted)]">
               {goalTitleById.get(m.goalId)}
             </span>
           )}

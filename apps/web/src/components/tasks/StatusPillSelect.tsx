@@ -98,7 +98,7 @@ export function StatusPillSelect({
               role="option"
               aria-selected={s === value}
               className={cn(
-                "flex w-full min-w-[9rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-semibold leading-snug text-ink outline-none transition-colors focus-visible:bg-fill-2",
+                "flex w-full min-w-[9rem] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-footnote font-semibold leading-snug text-ink outline-none transition-colors focus-visible:bg-fill-2",
                 s === value ? "bg-fill-2" : "hover:bg-fill",
               )}
               onClick={() => {

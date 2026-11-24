@@ -216,7 +216,7 @@ export default function TrackersPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           {/* Left: tracker list, in its own card like the other two columns; the open tracker is a raised row that slides. */}
           <div className="w-full rounded-[20px] bg-[var(--card)] p-2 shadow-card lg:w-72 lg:shrink-0">
-            <h3 className="px-3 pb-1.5 pt-2 text-xs font-semibold text-[var(--muted)]">
+            <h3 className="px-3 pb-1.5 pt-2 text-footnote font-semibold text-[var(--muted)]">
               Trackers <span className="tabular-nums">· {rows.length}</span>
             </h3>
             <ul className="space-y-0.5">

@@ -29,7 +29,7 @@ function MilestoneCard({
     >
       <div className="flex items-center gap-1.5">
         {goalTitle && (
-          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-caption font-medium text-[var(--muted)]">
+          <span className="min-w-0 truncate rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-medium text-[var(--muted)]">
             {goalTitle}
           </span>
         )}

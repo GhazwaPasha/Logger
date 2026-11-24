@@ -54,7 +54,7 @@ type Props = {
 
 function LateBadge() {
   return (
-    <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-1.5 py-0.5 text-caption font-semibold text-[var(--danger)] dark:text-[var(--danger)]">
+    <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-1.5 py-0.5 text-xs font-semibold text-[var(--danger)] dark:text-[var(--danger)]">
       Late
     </span>
   );

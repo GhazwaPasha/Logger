@@ -55,9 +55,9 @@ export function AssigneeBubbles({
     <section className="flex min-w-0 flex-col rounded-[18px] bg-[var(--card)] p-5 shadow-card">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="font-outfit text-base font-semibold">{title}</h2>
-        <span className="text-xs text-[var(--muted)]">{total}</span>
+        <span className="text-footnote text-[var(--muted)]">{total}</span>
       </div>
-      <p className="mt-0.5 text-xs text-[var(--muted)]">Bubble size shows how much each person has open</p>
+      <p className="mt-0.5 text-footnote text-[var(--muted)]">Bubble size shows how much each person has open</p>
 
       <div className="relative mt-4 h-[236px]">
         {loading ? (
@@ -76,7 +76,7 @@ export function AssigneeBubbles({
                 <span className="font-semibold leading-none tracking-tight tabular-nums" style={{ fontSize: Math.round(14 + size / 9) }}>
                   {p.value}
                 </span>
-                <span className="max-w-[90%] truncate text-caption text-[var(--muted)]">{firstName}</span>
+                <span className="max-w-[90%] truncate text-xs text-[var(--muted)]">{firstName}</span>
               </>
             );
             const style = { background: TINTS[k], boxShadow: `inset 0 0 0 1.5px ${HUES[k]}` };

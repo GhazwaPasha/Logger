@@ -265,7 +265,7 @@ export function StatusPriorityRing({
             ) : focus && focused ? (
               <>
                 <span className="mb-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: focused.color }} />
-                <span className="text-figure font-semibold leading-none tracking-tight tabular-nums">{focused.value}</span>
+                <span className="text-5xl font-semibold leading-none tracking-tight tabular-nums">{focused.value}</span>
                 <span className="mt-1 text-sm font-medium">{focused.label}</span>
                 <span className="text-xs tabular-nums text-[var(--muted)]">
                   {pct(focused.value, sum(focus.half === "top" ? top : bottom))}% of{" "}
@@ -336,7 +336,7 @@ function LegendGroup({
 }) {
   return (
     <div>
-      <p className="px-1.5 pb-1 text-caption font-semibold text-[var(--muted)]">
+      <p className="px-1.5 pb-1 text-xs font-semibold text-[var(--muted)]">
         {half === "top" ? "▲" : "▼"} {title}
       </p>
       <ul className={across ? "grid grid-cols-2 gap-x-1 @[24rem]:grid-cols-4" : undefined}>

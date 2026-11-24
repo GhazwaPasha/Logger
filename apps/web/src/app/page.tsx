@@ -19,7 +19,7 @@ function Check({ className = "" }: { className?: string }) {
   );
 }
 
-const mono = "font-mono-ledger text-xs text-[var(--ink-2)]";
+const mono = "font-mono-ledger text-footnote text-[var(--ink-2)]";
 
 /** The five states of one task, shown on the pinned card as the story scrolls past. */
 const STORY = [
@@ -55,7 +55,7 @@ function StoryCard({ step }: { step: number }) {
             </svg>
             1 of 3
           </div>
-          <ul className="flex flex-col gap-2 pl-8 text-sm">
+          <ul className="flex flex-col gap-2 pl-8 text-subhead">
             <li className="flex items-center gap-2.5 text-[var(--ink-2)] line-through">
               <span className="grid size-4 place-items-center rounded-[5px] bg-[var(--dept-3)] text-white"><Check className="size-2.5" /></span>
               Report sales in Chiniot
@@ -70,7 +70,7 @@ function StoryCard({ step }: { step: number }) {
           <div className="flex items-center gap-3">
             {open}
             {title}
-            <span className="flex items-center gap-1.5 rounded-full bg-[var(--status-progress-bg)] px-2.5 py-1 text-xs font-medium text-[var(--status-progress-ink)]">
+            <span className="flex items-center gap-1.5 rounded-full bg-[var(--status-progress-bg)] px-2.5 py-1 text-footnote font-medium text-[var(--status-progress-ink)]">
               <span className="size-1.5 rounded-full bg-[var(--status-progress)]" />
               In progress
             </span>
@@ -136,7 +136,7 @@ export default async function Home() {
             </nav>
             <span className="flex-1" />
             <Link href={LOGIN} className="text-sm text-white/70 transition-colors hover:text-white">Log in</Link>
-            <Link href={SIGNUP} className="pressable rounded-full bg-[#f5f5f7] px-4 py-1.5 text-footnote font-semibold text-black hover:opacity-90">
+            <Link href={SIGNUP} className="pressable rounded-full bg-[#f5f5f7] px-4 py-1.5 text-sm font-semibold text-black hover:opacity-90">
               Get started
             </Link>
           </div>
@@ -156,10 +156,10 @@ export default async function Home() {
             export you can hand to anyone.
           </p>
           <div className="landing-rise mt-2 flex flex-wrap items-center justify-center gap-4" style={{ "--i": 2 } as React.CSSProperties}>
-            <Link href={SIGNUP} className="pressable inline-flex h-12 items-center rounded-full bg-[#f5f5f7] px-6 text-subhead font-semibold text-black hover:opacity-90">
+            <Link href={SIGNUP} className="pressable inline-flex h-12 items-center rounded-full bg-[#f5f5f7] px-6 text-base font-semibold text-black hover:opacity-90">
               Start logging free
             </Link>
-            <Link href={LOGIN} className="pressable inline-flex h-12 items-center gap-1.5 px-2 text-subhead font-semibold text-[#f5f5f7]">
+            <Link href={LOGIN} className="pressable inline-flex h-12 items-center gap-1.5 px-2 text-base font-semibold text-[#f5f5f7]">
               Log in <ChevronRight className="size-4" aria-hidden />
             </Link>
           </div>
@@ -229,7 +229,7 @@ export default async function Home() {
             <h3 className="font-outfit text-2xl font-semibold tracking-tight">A dashboard that answers “how are we doing?”</h3>
             <p className="text-base leading-relaxed text-[var(--ink-2)]">Overdue work, load per person and progress by department, at a glance.</p>
             <div className="mt-auto flex h-[120px] gap-1.5 rounded-2xl bg-[var(--card)] p-2.5 shadow-card">
-              <div className="flex-[30] rounded-[10px] bg-[var(--dept-3-tint)] p-2.5 text-xs font-semibold">Operations<br /><span className="font-outfit text-xl font-semibold">30</span></div>
+              <div className="flex-[30] rounded-[10px] bg-[var(--dept-3-tint)] p-2.5 text-xs font-semibold">Operations<br /><span className="font-outfit text-2xl font-semibold">30</span></div>
               <div className="flex flex-[26] flex-col gap-1.5">
                 <div className="flex-[15] rounded-[10px] bg-[var(--dept-1-tint)] px-2.5 py-2 text-xs font-semibold">Finance 15</div>
                 <div className="flex-[11] rounded-[10px] bg-[var(--dept-4-tint)] px-2.5 py-2 text-xs font-semibold">Supply 11</div>
@@ -255,10 +255,10 @@ export default async function Home() {
             Start in minutes. Keep a trail that still makes sense six months from now.
           </p>
           <div className="mt-1 flex flex-wrap items-center justify-center gap-4">
-            <Link href={SIGNUP} className="pressable inline-flex h-12 items-center rounded-full bg-[#f5f5f7] px-6 text-subhead font-semibold text-black hover:opacity-90">
+            <Link href={SIGNUP} className="pressable inline-flex h-12 items-center rounded-full bg-[#f5f5f7] px-6 text-base font-semibold text-black hover:opacity-90">
               Start logging free
             </Link>
-            <Link href={LOGIN} className="pressable inline-flex h-12 items-center gap-1.5 px-2 text-subhead font-semibold text-[#f5f5f7]">
+            <Link href={LOGIN} className="pressable inline-flex h-12 items-center gap-1.5 px-2 text-base font-semibold text-[#f5f5f7]">
               Log in <ChevronRight className="size-4" aria-hidden />
             </Link>
           </div>
@@ -272,9 +272,9 @@ export default async function Home() {
               <LogBaseMark variant="footer" decorative />
               <span className="font-outfit text-base font-semibold">LogBase</span>
             </span>
-            <span className="text-footnote leading-relaxed text-[var(--ink-2)]">Accountability-first activity logging for teams that answer to stakeholders.</span>
+            <span className="text-sm leading-relaxed text-[var(--ink-2)]">Accountability-first activity logging for teams that answer to stakeholders.</span>
           </div>
-          <div className="flex flex-wrap gap-14 text-footnote text-[var(--ink-2)]">
+          <div className="flex flex-wrap gap-14 text-sm text-[var(--ink-2)]">
             <div className="flex flex-col gap-2.5">
               <span className="font-semibold text-[var(--ink)]">Product</span>
               <a href="#story" className="hover:text-[var(--ink)]">How it works</a>
@@ -293,7 +293,7 @@ export default async function Home() {
             </div>
           </div>
         </div>
-        <div className="mx-auto max-w-[1180px] px-6 pb-10 text-xs text-[var(--ink-2)] sm:px-8">© {year} LogBase</div>
+        <div className="mx-auto max-w-[1180px] px-6 pb-10 text-footnote text-[var(--ink-2)] sm:px-8">© {year} LogBase</div>
       </footer>
     </main>
   );

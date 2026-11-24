@@ -63,11 +63,11 @@ export function ProductShot() {
           <div className="grid grid-cols-4 gap-3">
             {kpis.map((k) => (
               <div key={k.label} className="flex h-[132px] flex-col rounded-[18px] bg-[var(--card)] p-4 shadow-card">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]">
+                <span className="flex items-center gap-1.5 text-footnote font-semibold text-[var(--ink-2)]">
                   <span className="size-2.5 rounded-full" style={{ background: k.color }} />
                   {k.label}
                 </span>
-                <span className="mt-3 font-outfit text-4xl font-semibold leading-none tracking-tight">{k.value}</span>
+                <span className="mt-3 font-outfit text-figure font-semibold leading-none tracking-tight">{k.value}</span>
                 <span className="mt-auto text-xs text-[var(--ink-2)]">{k.note}</span>
               </div>
             ))}

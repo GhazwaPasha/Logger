@@ -1801,7 +1801,7 @@ function WorkItemsInner() {
                 type="button"
                 onClick={() => toggleListRowExpand(task.id)}
                 aria-expanded={expanded}
-                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-footnote font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
               >
                 {Array.isArray(subtasksState) ? (
                   <>
@@ -1819,7 +1819,7 @@ function WorkItemsInner() {
               <button
                 type="button"
                 onClick={() => openViewTask(task.id)}
-                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-footnote font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                 title="Add subtasks"
                 aria-label="Add subtasks"
               >
@@ -2142,7 +2142,7 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-footnote font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="View subtasks"
                   aria-label="View subtasks"
                 >
@@ -2161,7 +2161,7 @@ function WorkItemsInner() {
                 <button
                   type="button"
                   onClick={() => openViewTask(task.id)}
-                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-xs font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
+                  className="pressable -ml-1 flex h-7 items-center gap-1.5 rounded-lg px-1 text-footnote font-medium text-[var(--muted)] transition-colors hover:bg-[var(--fill)] hover:text-[var(--fg)]"
                   title="Add subtasks"
                   aria-label="Add subtasks"
                 >
@@ -2526,7 +2526,7 @@ function WorkItemsInner() {
                 exit="hidden"
                 transition={{ duration: reducedDuration(0.18, prefersReduced), ease: curve.respond }}
               >
-                <p className="px-3 pb-2 text-caption font-medium text-[var(--muted)]">Sort by</p>
+                <p className="px-3 pb-2 text-xs font-medium text-[var(--muted)]">Sort by</p>
                 <ul className="max-h-[min(280px,70vh)] space-y-0.5 overflow-y-auto px-1.5 pb-1">
                   {SORT_OPTIONS.map((opt) => (
                     <li key={opt.value}>

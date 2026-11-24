@@ -103,10 +103,10 @@ export function DepartmentTreemap({
     <section className="flex min-w-0 flex-col rounded-[18px] bg-[var(--card)] p-5 shadow-card">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="font-outfit text-base font-semibold">{title}</h2>
-        <span className="text-xs tabular-nums text-[var(--muted)]">{total}</span>
+        <span className="text-footnote tabular-nums text-[var(--muted)]">{total}</span>
       </div>
       {none.length > 0 && live.length > 0 ? (
-        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+        <p className="mt-0.5 truncate text-footnote text-[var(--muted)]">
           {none.map((n) => n.label).join(", ")} {none.length === 1 ? "has" : "have"} nothing open
         </p>
       ) : null}
@@ -140,7 +140,7 @@ export function DepartmentTreemap({
                 </span>
                 <span className="flex items-baseline gap-1.5">
                   <span className={cn("font-semibold leading-none tracking-tight tabular-nums", big ? "text-4xl" : "text-2xl")}>{value}</span>
-                  <span className="text-xs tabular-nums text-[var(--muted)]">{pct}%</span>
+                  <span className="text-footnote tabular-nums text-[var(--muted)]">{pct}%</span>
                 </span>
               </>
             );

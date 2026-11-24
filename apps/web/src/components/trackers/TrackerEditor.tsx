@@ -59,7 +59,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const SPRING = { type: "spring", bounce: 0, duration: 0.3 } as const;
 
 /* The task page's visual language, so both editors read as one app. */
-const SECTION_LABEL = "mb-2 block text-xs font-semibold text-[var(--muted)]";
+const SECTION_LABEL = "mb-2 block text-footnote font-semibold text-[var(--muted)]";
 const CARD_MAIN = "rounded-[20px] bg-[var(--card)] p-6 shadow-card";
 const CARD_SIDE = "rounded-[20px] bg-[var(--card)] p-5 shadow-card";
 const CHIP =
@@ -430,7 +430,7 @@ export function TrackerEditor({
             <ArrowLeftIcon className="size-4" />
             Back
           </button>
-          <span className="font-outfit text-xl font-semibold tracking-[-0.025em] text-[var(--fg)]">
+          <span className="font-outfit text-2xl font-semibold tracking-[-0.025em] text-[var(--fg)]">
             {editing ? "Tracker" : "New tracker"}
           </span>
         </div>
@@ -486,7 +486,7 @@ export function TrackerEditor({
                 placeholder="e.g. Sales · Q4"
                 maxLength={120}
                 aria-required
-                className="input h-[52px] rounded-[14px] font-outfit text-xl font-semibold tracking-[-0.02em] placeholder:text-[var(--ink-3)]"
+                className="input h-[52px] rounded-[14px] font-outfit text-2xl font-semibold tracking-[-0.02em] placeholder:text-[var(--ink-3)]"
               />
             </div>
 

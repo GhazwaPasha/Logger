@@ -1038,7 +1038,7 @@ function ProposalCard({
                 {/* A task the card would create doesn't exist until it's approved, so it isn't a link before then. */}
                 {proposal.kind === "create" && proposal.status !== "applied" && !res?.ok ? (
                   <span className="min-w-0 flex-1 truncate text-footnote text-[var(--fg)]">
-                    <span className="mr-1 text-caption font-semibold text-[var(--info-ink)] dark:text-[var(--info-ink)]">New</span>
+                    <span className="mr-1 text-xs font-semibold text-[var(--info-ink)] dark:text-[var(--info-ink)]">New</span>
                     {it.title}
                   </span>
                 ) : (
@@ -1295,7 +1295,7 @@ function TaskMatches({
 }) {
   return (
     <div className="flex h-full flex-col justify-end">
-      <p className="mb-1.5 px-2 text-caption font-semibold text-[var(--muted)]">Jump to a task</p>
+      <p className="mb-1.5 px-2 text-xs font-semibold text-[var(--muted)]">Jump to a task</p>
       {rows.length === 0 && loading ? (
         <p className="px-2 text-xs text-[var(--muted)]">Searching…</p>
       ) : (
@@ -1386,7 +1386,7 @@ function HistoryList({ organizationId, timeZone }: { organizationId: string; tim
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3">
       {groups.map((g) => (
         <section key={g.label} className="mb-4">
-          <p className="mb-1 px-2.5 text-caption font-semibold text-[var(--muted)]">{g.label}</p>
+          <p className="mb-1 px-2.5 text-xs font-semibold text-[var(--muted)]">{g.label}</p>
           <ul>
             {g.threads.map((t) => (
               <li

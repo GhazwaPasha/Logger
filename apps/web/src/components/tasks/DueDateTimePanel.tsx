@@ -109,7 +109,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
 
   const timeInputValue = selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "";
 
-  const labelClass = `block font-medium text-[var(--muted)] ${compact ? "text-caption " : "text-xs"}`;
+  const labelClass = `block font-medium text-[var(--muted)] ${compact ? "text-xs " : "text-xs"}`;
   const sectionGap = compact ? "mt-2 space-y-1 pt-2" : "mt-3 space-y-1.5 pt-3";
 
   return (
@@ -160,7 +160,7 @@ export function DueDateTimePanel({ value, onChange, onClear, onSave, compact, du
       )}
 
       <div className={compact ? "space-y-1" : "space-y-2 p-2 sm:p-3"}>
-        <p className="text-caption font-medium text-[var(--muted)]">Due date</p>
+        <p className="text-xs font-medium text-[var(--muted)]">Due date</p>
         <input
           type="date"
           className={`${DUE_DATE_INPUT_CLASS} mt-1`}

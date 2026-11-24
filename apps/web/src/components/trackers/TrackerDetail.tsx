@@ -140,14 +140,14 @@ export function TrackerDetail({
             </p>
             <h1 className="page-title mt-1 text-[var(--fg)]">{detail.name}</h1>
           </div>
-          <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-3 text-xs font-semibold ${PACE_PILL[paceKey]}`}>
+          <span className={`inline-flex h-7 shrink-0 items-center rounded-full px-3 text-footnote font-semibold ${PACE_PILL[paceKey]}`}>
             {missedFirst ? `${stats.missedCount} missed` : PACE_LABEL[stats.pace]}
           </span>
           {detail.canManage && (
             <button
               type="button"
               onClick={onEdit}
-              className="pressable inline-flex h-7 shrink-0 items-center rounded-[9px] bg-[var(--fill-2)] px-3 text-xs font-semibold text-[var(--fg)] hover:bg-[var(--fill-3)]"
+              className="pressable inline-flex h-7 shrink-0 items-center rounded-[9px] bg-[var(--fill-2)] px-3 text-footnote font-semibold text-[var(--fg)] hover:bg-[var(--fill-3)]"
             >
               Edit
             </button>
@@ -158,7 +158,7 @@ export function TrackerDetail({
         <TrackerChart detail={detail} mode={chartMode} onModeChange={setChartMode} />
 
         {/* Period: one quiet line under the chart. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-footnote">
           <span className="font-semibold text-[var(--muted)]">Period</span>
           <span className="font-semibold text-[var(--fg)]">{periodLabel(detail.periodStart, detail.periodEnd)}</span>
           <div className="h-1.5 min-w-[80px] flex-1 overflow-hidden rounded-full bg-[var(--fill-2)]">
@@ -179,7 +179,7 @@ export function TrackerDetail({
                 className="min-w-0 rounded-2xl px-4 py-3.5"
                 style={{ background: m.kind === "formula" ? "var(--fill)" : TILE_TINTS[i % TILE_TINTS.length] }}
               >
-                <p className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
+                <p className="flex items-center gap-2 text-footnote font-semibold text-[var(--muted)]">
                   <span className="truncate" title={m.name}>{m.name}</span>
                   {m.kind === "formula" && (
                     <Calculator className="ml-auto size-3.5 shrink-0 opacity-70" aria-label="Calculated" role="img">
@@ -191,10 +191,10 @@ export function TrackerDetail({
                   <SpringNumber
                     value={st.value}
                     format={(v) => metricValue(m, v)}
-                    className="font-outfit text-2xl font-semibold leading-none tracking-[-0.03em] text-[var(--fg)]"
+                    className="font-outfit text-3xl font-semibold leading-none tracking-[-0.03em] text-[var(--fg)]"
                   />
                   {st.target != null && (
-                    <span className="text-xs text-[var(--muted)]">
+                    <span className="text-footnote text-[var(--muted)]">
                       / {m.direction === "at_most" ? "≤ " : m.kind === "formula" ? "≥ " : ""}
                       {metricValue(m, st.target)}
                     </span>
@@ -214,7 +214,7 @@ export function TrackerDetail({
         <div className="space-y-2.5">
           <div className="flex items-baseline justify-between">
             <h3 className="font-outfit text-base font-semibold text-[var(--fg)]">Check-ins</h3>
-            <span className="text-xs text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
+            <span className="text-footnote text-[var(--muted)]">{stats.missedCount ? `${stats.missedCount} missed` : "No misses"}</span>
           </div>
           <CheckInStrip detail={detail} onPick={canLog ? (key) => setPicked(key) : undefined} selected={canLog ? logDate : null} />
           <p className="flex gap-4 text-xs text-[var(--muted)]">
@@ -284,7 +284,7 @@ function RecentLogs({ count, children }: { count: number; children: React.ReactN
         className="pressable flex w-full items-center gap-2 rounded-[20px] px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
       >
         <span className="font-outfit text-subhead font-semibold text-[var(--fg)]">Recent logs</span>
-        <span className="text-xs tabular-nums text-[var(--muted)]">{count}</span>
+        <span className="text-footnote tabular-nums text-[var(--muted)]">{count}</span>
         <ChevronDown
           className={`ml-auto size-4 text-[var(--muted)] transition-transform duration-300 ease-[var(--motion-respond)] ${open ? "rotate-180" : ""}`}
           aria-hidden

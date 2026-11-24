@@ -24,7 +24,7 @@ function complianceSegments(fulfilled: number, required: number) {
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-[var(--surface-muted)] px-2.5 py-1.5">
-      <p className="text-caption font-medium text-[var(--muted)]">{label}</p>
+      <p className="text-xs font-medium text-[var(--muted)]">{label}</p>
       <p className="text-lg font-semibold tabular-nums leading-tight text-[var(--fg)]">{value}</p>
     </div>
   );
