@@ -51,7 +51,7 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5 py-1 text-sm text-[var(--fg)]">
             {selected.isPrivate && (
-              <LockIcon className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
+              <LockIcon className="size-3.5 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
             )}
             <span className="min-w-0 truncate">#{selected.name}</span>
             <button
@@ -121,7 +121,7 @@ export function DiscordChannelSearchField({ channels, value, onChange }: Discord
                     >
                       <span className="font-medium text-[var(--fg)]">#{c.name}</span>
                       {c.isPrivate && (
-                        <LockIcon className="size-3 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
+                        <LockIcon className="size-3.5 shrink-0 text-[var(--muted)]" aria-label="Private channel" />
                       )}
                     </button>
                   </li>

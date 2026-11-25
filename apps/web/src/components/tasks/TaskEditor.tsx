@@ -290,7 +290,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--fg)]"
             onClick={requestLeave}
           >
-            <ArrowLeftIcon className="size-4" />
+            <ArrowLeftIcon className="size-5" />
             Back
           </button>
           <span className="rounded-lg bg-[var(--card)] shadow-card px-3 py-1.5 text-sm font-medium text-[var(--fg)]">
@@ -416,11 +416,11 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                         : "text-[var(--muted)]";
                   const icon =
                     form.priority === "high" ? (
-                      <ChevronsUpIcon className="size-3.5" />
+                      <ChevronsUpIcon className="size-4" />
                     ) : form.priority === "low" ? (
-                      <ChevronsDownIcon className="size-3.5" />
+                      <ChevronsDownIcon className="size-4" />
                     ) : (
-                      <ArrowUpIcon className="size-3.5" />
+                      <ArrowUpIcon className="size-4" />
                     );
                   if (!caps.canEditFields) {
                     return (

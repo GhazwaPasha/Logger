@@ -58,7 +58,7 @@ export default function WorkspaceDashboardPage() {
           options={VIEWS.map((v) => ({
             value: v.value,
             label: v.label,
-            icon: <v.icon className="size-3.5" />,
+            icon: <v.icon className="size-4" />,
           }))}
         />
       </Seq>

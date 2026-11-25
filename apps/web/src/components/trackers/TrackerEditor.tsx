@@ -40,7 +40,7 @@ const UNIT_OPTIONS: SelectOption<TrackerMetricUnit>[] = [
   { value: "currency", label: "Money" },
   { value: "percent", label: "Percent" },
 ];
-const OP_GLYPH_CLASS = "size-2.5";
+const OP_GLYPH_CLASS = "size-3";
 const OP_ICON = {
   div: <DivideIcon className={OP_GLYPH_CLASS} />,
   mul: <XIcon className={OP_GLYPH_CLASS} />,
@@ -136,7 +136,7 @@ function fromTemplate(t: TrackerTemplate): MetricDraft[] {
 }
 
 function Chevron() {
-  return <ChevronDownIcon className="size-2.5 text-[var(--muted)]" />;
+  return <ChevronDownIcon className="size-3 text-[var(--muted)]" />;
 }
 
 function Pick<T extends string>({
@@ -202,7 +202,7 @@ function PickerChip({
           else el?.focus();
         }}
       >
-        <Icon className="size-3 text-[var(--muted)]" />
+        <Icon className="size-3.5 text-[var(--muted)]" />
         <span className="tabular-nums">{label}</span>
       </button>
       <input
@@ -427,7 +427,7 @@ export function TrackerEditor({
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button type="button" onClick={() => void done()} className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}>
-            <ArrowLeftIcon className="size-4" />
+            <ArrowLeftIcon className="size-5" />
             Back
           </button>
           <span className="font-outfit text-2xl font-semibold tracking-[-0.025em] text-[var(--fg)]">
@@ -625,7 +625,7 @@ export function TrackerEditor({
                             aria-label={`Remove ${m.name || "metric"}`}
                             className="inline-flex size-8 items-center justify-center rounded-lg text-[var(--muted)] opacity-0 transition-[opacity,background-color,transform] duration-150 hover:bg-[var(--fill-2)] hover:text-[var(--fg)] focus:opacity-100 active:scale-[0.94] group-hover:opacity-100"
                           >
-                            <XIcon className="size-3" />
+                            <XIcon className="size-3.5" />
                           </button>
                         ) : (
                           <span />
@@ -639,7 +639,7 @@ export function TrackerEditor({
 
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="button" onClick={() => addMetric("input")} className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}>
-                <PlusIcon className="size-3" />
+                <PlusIcon className="size-3.5" />
                 Add metric
               </button>
               <button
@@ -648,7 +648,7 @@ export function TrackerEditor({
                 title="Worked out from two others, like revenue ÷ orders"
                 className={`${GHOST_BTN} text-[var(--muted)] hover:text-[var(--fg)]`}
               >
-                <CalculatorIcon className="size-3" />
+                <CalculatorIcon className="size-3.5" />
                 Add calculated
               </button>
             </div>

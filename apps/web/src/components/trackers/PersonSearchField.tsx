@@ -71,7 +71,7 @@ export function PersonSearchField({
     <div ref={wrapRef} className="relative">
       {open ? (
         <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-muted)] px-2.5">
-          <SearchIcon className="size-3 text-[var(--muted)]" />
+          <SearchIcon className="size-3.5 text-[var(--muted)]" />
           <input
             ref={inputRef}
             value={query}
@@ -121,7 +121,7 @@ export function PersonSearchField({
               className="bg-[var(--accent-muted)] text-2xs font-semibold text-[var(--fg)]"
             />
           ) : (
-            <SearchIcon className="size-3" />
+            <SearchIcon className="size-3.5" />
           )}
           <span className="truncate">{selected ? label(selected) : allowNone ? "Unassigned" : "Search for a person"}</span>
         </button>
@@ -194,7 +194,7 @@ export function PersonSearchField({
                           <span className="block truncate text-xs text-[var(--muted)]">{email}</span>
                         ) : null}
                       </span>
-                      {on && <CheckIcon className="size-3 shrink-0 text-[var(--fg)]" />}
+                      {on && <CheckIcon className="size-3.5 shrink-0 text-[var(--fg)]" />}
                     </button>
                   </li>
                 );

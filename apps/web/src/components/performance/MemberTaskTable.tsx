@@ -225,7 +225,7 @@ export function MemberTaskTable({
                         className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[var(--surface-hover)] px-1.5 py-0.5 text-2xs font-medium text-[var(--muted)]"
                         title="Recurring task — completed occurrences grouped together"
                       >
-                        <RepeatIcon className="size-2.5" aria-hidden />
+                        <RepeatIcon className="size-3" aria-hidden />
                         ×{t.occurrenceCount}
                       </span>
                     )}

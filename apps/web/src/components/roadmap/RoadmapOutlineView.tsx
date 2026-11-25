@@ -46,7 +46,7 @@ function MilestoneRowItem({
         >
           {hasChildren ? (
             <ChevronRightIcon
-              className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+              className={`size-4 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
             />
           ) : null}
         </button>
@@ -82,7 +82,7 @@ function MilestoneRowItem({
           onClick={() => onAddChild(milestone)}
           aria-label={`Add sub-milestone under ${milestone.title}`}
         >
-          <PlusIcon className="size-3.5" />
+          <PlusIcon className="size-4" />
         </button>
       </div>
 
@@ -151,7 +151,7 @@ function GoalSection({
           aria-label={hasMilestones ? (isOpen ? "Collapse" : "Expand") : undefined}
         >
           {hasMilestones ? (
-            <ChevronRightIcon className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`} />
+            <ChevronRightIcon className={`size-4 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`} />
           ) : null}
         </button>
 
@@ -192,7 +192,7 @@ function GoalSection({
           onClick={() => onAddMilestone(goal)}
           aria-label={`Add milestone under ${goal.title}`}
         >
-          <PlusIcon className="size-3.5" />
+          <PlusIcon className="size-4" />
         </button>
       </div>
 
@@ -266,7 +266,7 @@ export function RoadmapOutlineView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <FlagIcon className="size-6" />
+          <FlagIcon className="size-7" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No goals yet</p>

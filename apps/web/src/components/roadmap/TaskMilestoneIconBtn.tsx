@@ -29,7 +29,7 @@ export function TaskMilestoneIconBtn({ taskId }: { taskId: string }) {
       aria-label={`Linked to roadmap milestone: ${label}`}
       className="inline-flex size-6 shrink-0 items-center justify-center rounded text-[var(--muted)] opacity-70 transition-[opacity,colors] hover:bg-[var(--surface-hover)] hover:text-[var(--fg)] hover:opacity-100"
     >
-      <FlagIcon className="size-[15px]" aria-hidden />
+      <FlagIcon className="size-4.5" aria-hidden />
     </button>
   );
 }

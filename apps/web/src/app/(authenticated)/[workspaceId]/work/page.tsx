@@ -308,7 +308,7 @@ function tasksToolbarIconButtonClasses(active: boolean) {
   ].join(" ");
 }
 
-const TASKS_TOOLBAR_ICON_CLASS = "size-4 pointer-events-none";
+const TASKS_TOOLBAR_ICON_CLASS = "size-5 pointer-events-none";
 
 /** Statuses grouped into one RecurringSeriesCard in list view (kanban groups per-column instead). */
 const DONE_CANCELLED_STATUSES = ["done", "cancelled"] as const;
@@ -593,7 +593,7 @@ function KanbanBoard({
             aria-label="Scroll columns left"
             className="absolute left-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
-            <ChevronLeftIcon className="size-3" aria-hidden />
+            <ChevronLeftIcon className="size-3.5" aria-hidden />
           </button>
         )}
         {canScrollRight && (
@@ -603,7 +603,7 @@ function KanbanBoard({
             aria-label="Scroll columns right"
             className="absolute right-0 top-[14px] z-20 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--card)] shadow-card text-[var(--fg)] shadow-md transition-colors hover:bg-[var(--surface-hover)]"
           >
-            <ChevronRightIcon className="size-3" aria-hidden />
+            <ChevronRightIcon className="size-3.5" aria-hidden />
           </button>
         )}
         <div
@@ -1758,7 +1758,7 @@ function WorkItemsInner() {
             {taskPatchSyncing ? (
               <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
             ) : checklistDone ? (
-              <CheckIcon className="size-[10px] shrink-0" aria-hidden />
+              <CheckIcon className="size-3 shrink-0" aria-hidden />
             ) : null}
           </button>
 
@@ -1788,7 +1788,7 @@ function WorkItemsInner() {
               title="Edit task"
               aria-label={`More options — edit: ${task.title}`}
             >
-              <EllipsisVerticalIcon className="size-4" aria-hidden />
+              <EllipsisVerticalIcon className="size-5" aria-hidden />
             </button>
           </div>
         </div>
@@ -1813,7 +1813,7 @@ function WorkItemsInner() {
                 ) : (
                   "Subtasks"
                 )}
-                <IconChevron open={expanded} className="size-3 opacity-70" />
+                <IconChevron open={expanded} className="size-3.5 opacity-70" />
               </button>
             ) : (
               <button
@@ -1824,7 +1824,7 @@ function WorkItemsInner() {
                 aria-label="Add subtasks"
               >
                 Subtasks
-                <PlusIcon className="size-4 opacity-60" aria-hidden />
+                <PlusIcon className="size-5 opacity-60" aria-hidden />
               </button>
             )}
             <div className="flex-1" />
@@ -1858,7 +1858,7 @@ function WorkItemsInner() {
                       {subPending ? (
                         <InlineSpinner className="size-3 animate-spin motion-reduce:animate-none" />
                       ) : s.done ? (
-                        <CheckIcon className="size-[8px] shrink-0" aria-hidden />
+                        <CheckIcon className="size-2.5 shrink-0" aria-hidden />
                       ) : null}
                     </button>
                     <span className={`min-w-0 flex-1 ${s.done ? "text-[var(--muted)] line-through decoration-[var(--muted)]" : "text-[var(--fg)]"}`}>
@@ -1922,11 +1922,11 @@ function WorkItemsInner() {
           : "text-[var(--priority-medium)]";
     const icon =
       p === "high" ? (
-        <ChevronsUpIcon className="size-4" aria-hidden />
+        <ChevronsUpIcon className="size-5" aria-hidden />
       ) : p === "low" ? (
-        <ChevronsDownIcon className="size-4" aria-hidden />
+        <ChevronsDownIcon className="size-5" aria-hidden />
       ) : (
-        <ArrowUpIcon className="size-4" aria-hidden />
+        <ArrowUpIcon className="size-5" aria-hidden />
       );
 
     if (!canEdit) {
@@ -1975,11 +1975,11 @@ function WorkItemsInner() {
         className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-2 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)] ${color}`}
       >
         {isLate ? (
-          <BellIcon className="size-4 shrink-0" aria-hidden />
+          <BellIcon className="size-5 shrink-0" aria-hidden />
         ) : hasDue ? (
-          <TimerIcon className="size-4 shrink-0" aria-hidden />
+          <TimerIcon className="size-5 shrink-0" aria-hidden />
         ) : (
-          <CalendarPlusIcon className="size-4 shrink-0" aria-hidden />
+          <CalendarPlusIcon className="size-5 shrink-0" aria-hidden />
         )}
         {dueSummary ? (
           <span className="whitespace-nowrap text-xs font-medium leading-none tabular-nums">{dueSummary}</span>
@@ -2009,7 +2009,7 @@ function WorkItemsInner() {
             className="bg-[var(--fill-2)] text-2xs font-semibold leading-none tabular-nums text-[var(--fg)]"
           />
         ) : (
-          <UserPlusIcon className="size-4 text-[var(--muted)] opacity-80" aria-hidden />
+          <UserPlusIcon className="size-5 text-[var(--muted)] opacity-80" aria-hidden />
         )}
       </button>
     );
@@ -2024,7 +2024,7 @@ function WorkItemsInner() {
         aria-label="Comments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <MessageCircleIcon className="size-4" aria-hidden />
+        <MessageCircleIcon className="size-5" aria-hidden />
       </button>
     );
   }
@@ -2038,7 +2038,7 @@ function WorkItemsInner() {
         aria-label="Attachments"
         className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
       >
-        <PaperclipIcon className="size-4" aria-hidden />
+        <PaperclipIcon className="size-5" aria-hidden />
       </button>
     );
   }
@@ -2126,7 +2126,7 @@ function WorkItemsInner() {
                 title="Edit task"
                 aria-label={`More options — edit: ${task.title}`}
               >
-                <EllipsisVerticalIcon className="size-4" aria-hidden />
+                <EllipsisVerticalIcon className="size-5" aria-hidden />
               </button>
             </div>
           </div>
@@ -2468,7 +2468,7 @@ function WorkItemsInner() {
                                 {formatCustomDueChip(dueFrom)}
                               </span>
                             ) : (
-                              <CalendarIcon className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                              <CalendarIcon className="pointer-events-none size-3.5 text-[var(--muted)]" aria-hidden />
                             )}
                             <input
                               type="date"
@@ -2479,14 +2479,14 @@ function WorkItemsInner() {
                               title={dueFrom ? formatCustomDueChip(dueFrom) : "Due from"}
                             />
                           </div>
-                          <ArrowRightIcon className="size-3 shrink-0 text-[var(--muted)]" aria-hidden />
+                          <ArrowRightIcon className="size-3.5 shrink-0 text-[var(--muted)]" aria-hidden />
                           <div className="relative flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 transition-colors hover:bg-[var(--surface-hover)]">
                             {dueTo ? (
                               <span className="pointer-events-none whitespace-nowrap text-caption font-medium leading-none text-[var(--fg)]">
                                 {formatCustomDueChip(dueTo)}
                               </span>
                             ) : (
-                              <CalendarIcon className="pointer-events-none size-3 text-[var(--muted)]" aria-hidden />
+                              <CalendarIcon className="pointer-events-none size-3.5 text-[var(--muted)]" aria-hidden />
                             )}
                             <input
                               type="date"

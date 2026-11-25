@@ -34,7 +34,7 @@ export function SettingsCard({
               : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)]"
           }
         >
-          <Icon className="size-4" aria-hidden />
+          <Icon className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1 pt-0.5">
           <h2 className={isDanger ? "text-sm font-semibold text-[var(--danger)] dark:text-[var(--danger)]" : "text-sm font-semibold"}>
@@ -126,7 +126,7 @@ export function EditableField({
               className="btn-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
               onClick={onEdit}
             >
-              <PencilIcon className="size-3" aria-hidden />
+              <PencilIcon className="size-3.5" aria-hidden />
               Edit
             </button>
           )}

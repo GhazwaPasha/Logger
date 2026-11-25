@@ -201,7 +201,7 @@ function CommentInput({ taskId, token, members, parentCommentId, initialBody, on
         className="mb-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-[var(--ink-2)] hover:bg-[var(--ink-2)] disabled:opacity-30 transition-colors"
         aria-label="Send"
       >
-        <SendIcon className="size-[15px]" color="white" />
+        <SendIcon className="size-4.5" color="white" />
       </button>
     </div>
   );
@@ -292,7 +292,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                   className="ml-0.5 opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--fg)] transition-opacity"
                   aria-label="Edit"
                 >
-                  <PencilIcon className="size-[11px]" />
+                  <PencilIcon className="size-3.5" />
                 </button>
               )}
               {(isOwn || isOrgOwner) && !comment.deletedAt && !viewOnly && (
@@ -302,7 +302,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
                   className="opacity-0 group-hover:opacity-100 text-[var(--muted)] hover:text-[var(--danger)] transition-opacity"
                   aria-label="Delete"
                 >
-                  <Trash2Icon className="size-[11px]" />
+                  <Trash2Icon className="size-3.5" />
                 </button>
               )}
             </div>
@@ -445,7 +445,7 @@ export function CommentThread({ taskId, token, userId, members, viewOnly }: Prop
               onClick={() => setShowInput(true)}
               className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--surface-muted)] transition-colors"
             >
-              <MessageCircleIcon className="size-4" />
+              <MessageCircleIcon className="size-5" />
               <span>Add a comment…</span>
             </button>
           )}

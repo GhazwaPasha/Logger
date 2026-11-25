@@ -238,7 +238,7 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate((c) => c - axisSpan / 2)}
               aria-label="Earlier"
             >
-              <ChevronLeftIcon className="size-4" />
+              <ChevronLeftIcon className="size-5" />
             </button>
             <button
               type="button"
@@ -253,7 +253,7 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate(new Date().getTime())}
               aria-label="Jump to today"
             >
-              <MapPinIcon className="size-3.5" />
+              <MapPinIcon className="size-4" />
               Today
             </button>
             <button
@@ -262,7 +262,7 @@ export function RoadmapGrandView({
               onClick={() => setCenterDate((c) => c + axisSpan / 2)}
               aria-label="Later"
             >
-              <ChevronRightIcon className="size-4" />
+              <ChevronRightIcon className="size-5" />
             </button>
           </div>
           <button
@@ -273,11 +273,11 @@ export function RoadmapGrandView({
           >
             {focusMode ? (
               <>
-                <MinimizeIcon className="size-4" />
+                <MinimizeIcon className="size-5" />
                 Exit full screen
               </>
             ) : (
-              <MaximizeIcon className="size-4" />
+              <MaximizeIcon className="size-5" />
             )}
           </button>
         </div>
@@ -286,7 +286,7 @@ export function RoadmapGrandView({
       {!hasAnyGoals && !loading ? (
         <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
           <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-            <FlagIcon className="size-6" />
+            <FlagIcon className="size-7" />
           </span>
           <div>
             <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
@@ -352,7 +352,7 @@ export function RoadmapGrandView({
                             aria-label={isOpen ? `Collapse ${row.goal.title}` : `Expand ${row.goal.title}`}
                           >
                             <ChevronRightIcon
-                              className={`size-3.5 shrink-0 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+                              className={`size-4 shrink-0 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                             />
                             <span className="truncate text-xs font-semibold text-[var(--fg)]">
                               {row.goal.title}
@@ -370,7 +370,7 @@ export function RoadmapGrandView({
                           aria-label={`Edit ${row.goal.title}`}
                           title="Edit goal"
                         >
-                          <PencilIcon className="size-3.5" />
+                          <PencilIcon className="size-4" />
                         </button>
                       </div>
                     );
@@ -426,7 +426,7 @@ export function RoadmapGrandView({
                               aria-label={isOpen ? `Collapse ${milestone.title}` : `Expand ${milestone.title}`}
                             >
                               <ChevronRightIcon
-                                className={`size-3 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+                                className={`size-3.5 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
                               />
                             </button>
                           )}
@@ -445,7 +445,7 @@ export function RoadmapGrandView({
                             aria-label={`Collapse ${goal.title}`}
                             title={goal.title}
                           >
-                            <ChevronRightIcon className="size-3.5 shrink-0 rotate-90 transition-transform duration-150" />
+                            <ChevronRightIcon className="size-4 shrink-0 rotate-90 transition-transform duration-150" />
                             <span className="truncate text-xs font-semibold text-[var(--fg)]">
                               {goal.title}
                             </span>
@@ -463,7 +463,7 @@ export function RoadmapGrandView({
                         aria-label={`Edit ${milestone.title}`}
                         title="Edit"
                       >
-                        <PencilIcon className="size-3.5" />
+                        <PencilIcon className="size-4" />
                       </button>
                     </div>
                   );

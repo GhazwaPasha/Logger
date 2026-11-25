@@ -200,7 +200,7 @@ export function DiscordSubmissionZone({
         className="rounded-full text-[#5865F2] transition-colors hover:text-[#4752c4] disabled:cursor-default disabled:hover:text-[#5865F2]"
       >
         <CloudUploadIcon
-          className={`size-5 ${submitting ? "animate-pulse motion-reduce:animate-none" : ""}`}
+          className={`size-6 ${submitting ? "animate-pulse motion-reduce:animate-none" : ""}`}
           aria-hidden
         />
       </button>
@@ -229,13 +229,13 @@ export function DiscordSubmissionZone({
         <li key={item.id} className="flex items-center gap-2 text-xs">
           {item.status === "uploading" || item.status === "pending" ? (
             <LoaderCircleIcon
-              className="size-3 shrink-0 animate-spin text-[#5865F2] motion-reduce:animate-none"
+              className="size-3.5 shrink-0 animate-spin text-[#5865F2] motion-reduce:animate-none"
               aria-hidden
             />
           ) : item.status === "success" ? (
-            <CheckIcon className="size-3 shrink-0 text-[var(--success)] dark:text-[var(--success)]" aria-hidden />
+            <CheckIcon className="size-3.5 shrink-0 text-[var(--success)] dark:text-[var(--success)]" aria-hidden />
           ) : (
-            <CircleAlertIcon className="size-3 shrink-0 text-[var(--danger)] dark:text-[var(--danger)]" aria-hidden />
+            <CircleAlertIcon className="size-3.5 shrink-0 text-[var(--danger)] dark:text-[var(--danger)]" aria-hidden />
           )}
           <span className="min-w-0 flex-1 truncate font-medium text-[var(--fg)]" title={item.file.name}>
             {item.file.name}

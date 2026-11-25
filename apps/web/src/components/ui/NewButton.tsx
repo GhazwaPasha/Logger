@@ -40,7 +40,7 @@ export function NewButton({
       {busy ? (
         <InlineSpinner className="size-4 animate-spin motion-reduce:animate-none" />
       ) : (
-        <PlusIcon className="size-4" aria-hidden />
+        <PlusIcon className="size-5" aria-hidden />
       )}
     </button>
   );

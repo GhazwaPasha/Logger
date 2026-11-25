@@ -105,7 +105,7 @@ export function GoalEditor({
             onClick={onClose}
             aria-label="Close"
           >
-            <XIcon className="size-4" />
+            <XIcon className="size-5" />
           </button>
         </div>
 

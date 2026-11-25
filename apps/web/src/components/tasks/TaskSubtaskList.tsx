@@ -100,7 +100,7 @@ export function TaskSubtaskList({
               {rowBusy(item.id) ? (
                 <InlineSpinner className="size-2.5 animate-spin motion-reduce:animate-none" />
               ) : item.done ? (
-                <CheckIcon className="size-[11px] shrink-0" aria-hidden />
+                <CheckIcon className="size-3.5 shrink-0" aria-hidden />
               ) : null}
             </button>
             {!toggleOnly && editingId === item.id ? (

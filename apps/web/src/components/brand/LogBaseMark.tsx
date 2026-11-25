@@ -27,8 +27,22 @@ const VARIANT_PX: Record<LogBaseMarkVariant, number> = {
 };
 
 /**
+ * Pre-scaled copies of each mark (public/Logos/logbase-<theme>-<width>.png) next to the 1270px
+ * original. The browser picks the smallest one that covers size × device pixel ratio, so it never
+ * has to shrink the full-size file 40×+ on first paint, which Chrome draws blurry until a repaint.
+ */
+const LOGO_WIDTHS = [64, 128, 256, 512] as const;
+
+function logoSrcSet(theme: "light" | "dark") {
+  return [
+    ...LOGO_WIDTHS.map((w) => `/Logos/logbase-${theme}-${w}.png ${w}w`),
+    `/Logos/logbase-${theme}.png 1270w`,
+  ].join(", ");
+}
+
+/**
  * Light UI → `logbase-light.png`; dark UI → `logbase-dark.png`.
- * Square slot + `object-fit: contain` (assets are portrait ~824×924).
+ * Square slot + `object-fit: contain` (assets are landscape, 1270×850).
  */
 export function LogBaseMark({
   variant = "chrome",
@@ -39,6 +53,7 @@ export function LogBaseMark({
   const size = sizeOverride ?? VARIANT_PX[variant];
   const dim = Math.round(size * 2);
   const boxStyle = { width: size, height: size } satisfies CSSProperties;
+  const sizes = `${size}px`;
 
   return (
     <span
@@ -47,20 +62,22 @@ export function LogBaseMark({
       {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": "LogBase" })}
     >
       <img
-        src="/Logos/logbase-light.png"
+        src="/Logos/logbase-light-256.png"
+        srcSet={logoSrcSet("light")}
+        sizes={sizes}
         alt=""
         width={dim}
         height={dim}
-        decoding="async"
         draggable={false}
         className="brand-logo-mark-for-light-theme"
       />
       <img
-        src="/Logos/logbase-dark.png"
+        src="/Logos/logbase-dark-256.png"
+        srcSet={logoSrcSet("dark")}
+        sizes={sizes}
         alt=""
         width={dim}
         height={dim}
-        decoding="async"
         draggable={false}
         className="brand-logo-mark-for-dark-theme"
       />

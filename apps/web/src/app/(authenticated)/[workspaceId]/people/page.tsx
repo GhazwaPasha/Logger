@@ -205,7 +205,7 @@ export default function PeoplePage() {
 
       <div className="flex items-center gap-2 pt-2">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-muted)] text-[var(--accent)]">
-          <UsersIcon className="size-3.5" aria-hidden />
+          <UsersIcon className="size-4" aria-hidden />
         </span>
         <h2 className="text-sm font-semibold">Members</h2>
         <span className="text-xs text-[var(--muted)]">
@@ -354,7 +354,7 @@ export default function PeoplePage() {
                       className="btn-secondary inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs"
                       onClick={() => startEdit(m)}
                     >
-                      <PencilIcon className="size-3" aria-hidden />
+                      <PencilIcon className="size-3.5" aria-hidden />
                       Edit
                     </button>
                     <button
@@ -362,7 +362,7 @@ export default function PeoplePage() {
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] dark:text-[var(--danger)]"
                       onClick={() => setDeleteConfirm(m.userId)}
                     >
-                      <Trash2Icon className="size-3" aria-hidden />
+                      <Trash2Icon className="size-3.5" aria-hidden />
                       Remove
                     </button>
                   </div>

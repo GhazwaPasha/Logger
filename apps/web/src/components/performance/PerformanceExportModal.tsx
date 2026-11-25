@@ -128,7 +128,7 @@ export function PerformanceExportModal({
                 disabled={busy}
                 aria-label="Close"
               >
-                <XIcon className="size-4" />
+                <XIcon className="size-5" />
               </button>
             </div>
 

@@ -81,7 +81,7 @@ export function AttachmentZone({ taskId, token, userId, viewOnly }: Props) {
             title="Attachments are disabled"
             className="inline-flex size-6 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--muted)] opacity-50"
           >
-            <LockIcon className="size-3" />
+            <LockIcon className="size-3.5" />
           </button>
         )}
       </div>

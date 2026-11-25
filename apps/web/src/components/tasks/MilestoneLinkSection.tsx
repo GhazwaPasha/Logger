@@ -57,7 +57,7 @@ export function MilestoneLinkSection({ taskId, token }: { taskId: string; token:
             onClick={() => router.push(`/${workspaceSlug}/roadmap`)}
             title="Open Roadmap"
           >
-            <FlagIcon className="size-3" />
+            <FlagIcon className="size-3.5" />
             {m.title}
             <span
               role="button"

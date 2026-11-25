@@ -63,7 +63,7 @@ function CompletionLine({ t, members, timeZone }: { t: CompletionLike; members: 
         <>
           {" "}
           <TimingIcon
-            className={`h-[0.7em] w-[0.7em] align-[1px] ${
+            className={`h-[0.85em] w-[0.85em] align-[-1px] ${
               timing.late ? "text-[var(--danger)] dark:text-[var(--danger)]" : "text-[var(--success)] dark:text-[var(--success)]"
             }`}
           />{" "}

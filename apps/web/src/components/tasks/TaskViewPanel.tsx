@@ -59,10 +59,10 @@ function formatDueDate(iso: string | null | undefined, timeZone: string): string
 function AutosaveIndicator({ status, error }: { status: TaskSyncStatus; error: string | null }) {
   const cfg =
     status === "error"
-      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-[var(--danger)] dark:text-[var(--danger)]", icon: <CircleAlertIcon className="size-3" aria-hidden /> }
+      ? { label: "Not saved", title: error ?? "Could not save", cls: "text-[var(--danger)] dark:text-[var(--danger)]", icon: <CircleAlertIcon className="size-3.5" aria-hidden /> }
       : status === "saving" || status === "pending"
-        ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <LoaderCircleIcon className="size-3 animate-spin motion-reduce:animate-none" aria-hidden /> }
-        : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <CheckIcon className="size-3" aria-hidden /> };
+        ? { label: "Saving…", title: "Saving your changes", cls: "text-[var(--muted)]", icon: <LoaderCircleIcon className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden /> }
+        : { label: "Saved", title: "Changes save automatically", cls: "text-[var(--muted)]", icon: <CheckIcon className="size-3.5" aria-hidden /> };
   return (
     <span
       role="status"
@@ -258,11 +258,11 @@ export function TaskViewPanel({
                   : "text-[var(--muted)]";
             const icon =
               form.priority === "high" ? (
-                <ChevronsUpIcon className="size-3" />
+                <ChevronsUpIcon className="size-3.5" />
               ) : form.priority === "low" ? (
-                <ChevronsDownIcon className="size-3" />
+                <ChevronsDownIcon className="size-3.5" />
               ) : (
-                <ArrowUpIcon className="size-3" />
+                <ArrowUpIcon className="size-3.5" />
               );
             return (
               <SelectPopover
@@ -297,7 +297,7 @@ export function TaskViewPanel({
                 : "text-[var(--muted)]";
             return (
               <span className={`inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-[var(--fill)] px-3 text-xs font-semibold ${color}`}>
-                {p === "high" ? <ChevronsUpIcon className="size-3" /> : p === "low" ? <ChevronsDownIcon className="size-3" /> : <ArrowUpIcon className="size-3" />}
+                {p === "high" ? <ChevronsUpIcon className="size-3.5" /> : p === "low" ? <ChevronsDownIcon className="size-3.5" /> : <ArrowUpIcon className="size-3.5" />}
                 {PRIORITY_LABELS[p] ?? "Medium"}
               </span>
             );

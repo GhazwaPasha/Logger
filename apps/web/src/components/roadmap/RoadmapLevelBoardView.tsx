@@ -88,7 +88,7 @@ export function RoadmapLevelBoardView({
     return (
       <div className="surface-elevated ui-elevated-panel flex flex-col items-center gap-3 rounded-2xl border border-[var(--border-subtle)] px-6 py-12 text-center">
         <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[var(--accent-muted)] text-[var(--accent)]" aria-hidden>
-          <FlagIcon className="size-6" />
+          <FlagIcon className="size-7" />
         </span>
         <div>
           <p className="text-sm font-medium text-[var(--fg)]">No milestones yet</p>
