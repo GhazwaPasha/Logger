@@ -452,7 +452,7 @@ export function TrackerEditor({
           </AnimatePresence>
           {/* Say what blocks saving in words, not only in the indicator's tooltip. */}
           {problem && sync !== "saving" ? (
-            <span className="hidden text-xs font-medium text-[var(--status-progress)] sm:inline dark:text-[var(--status-progress)]">{problem}</span>
+            <span className="hidden text-xs font-medium text-[var(--warning)] sm:inline dark:text-[var(--warning)]">{problem}</span>
           ) : null}
           <TaskFormSyncIndicator status={sync} error={syncError} hint={problem && sync !== "saving" ? problem : null} />
           <button
@@ -556,7 +556,7 @@ export function TrackerEditor({
                             maxLength={80}
                             aria-label="Metric name"
                             aria-invalid={!m.name.trim()}
-                            className={`${FIELD} font-semibold ${m.name.trim() ? "" : "!border-[color-mix(in_srgb,var(--status-progress)_60%,transparent)]"}`}
+                            className={`${FIELD} font-semibold ${m.name.trim() ? "" : "!border-[color-mix(in_srgb,var(--warning)_60%,transparent)]"}`}
                           />
                           {m.kind === "formula" && m.formula ? (
                             <div className="flex items-center gap-0.5 pl-2.5 text-xs text-[var(--muted)]">

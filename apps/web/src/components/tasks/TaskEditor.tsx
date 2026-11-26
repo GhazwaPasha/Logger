@@ -410,7 +410,7 @@ export function TaskEditor({ taskId }: TaskEditorProps) {
                 {(() => {
                   const color =
                     form.priority === "high"
-                      ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
+                      ? "text-[var(--warning)] dark:text-[var(--warning)]"
                       : form.priority === "low"
                         ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                         : "text-[var(--muted)]";

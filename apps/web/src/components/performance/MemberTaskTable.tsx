@@ -117,7 +117,7 @@ function priorityDotClass(p: string | undefined): string {
   const pr = (p ?? "medium") as TaskPriority;
   if (pr === "high") return "bg-[var(--danger)]";
   if (pr === "low") return "bg-[var(--ink-2)]";
-  return "bg-[var(--status-progress)]";
+  return "bg-[var(--priority-medium)]";
 }
 
 export function MemberTaskTable({

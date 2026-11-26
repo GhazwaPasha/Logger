@@ -971,7 +971,7 @@ function Chip({ label, title, icon, onRemove }: { label: string; title: string; 
 const PROPOSAL_STATE: Record<AgentProposal["status"], { label: string; tone: string }> = {
   pending: { label: "Needs your approval", tone: "text-[var(--info-ink)] dark:text-[var(--info-ink)]" },
   applied: { label: "Applied", tone: "text-[var(--success)] dark:text-[var(--success)]" },
-  partial: { label: "Partly applied", tone: "text-[var(--status-progress)] dark:text-[var(--status-progress)]" },
+  partial: { label: "Partly applied", tone: "text-[var(--warning)] dark:text-[var(--warning)]" },
   failed: { label: "Couldn't apply", tone: "text-[var(--danger)] dark:text-[var(--danger)]" },
   rejected: { label: "Rejected", tone: "text-[var(--muted)]" },
   expired: { label: "Expired", tone: "text-[var(--muted)]" },

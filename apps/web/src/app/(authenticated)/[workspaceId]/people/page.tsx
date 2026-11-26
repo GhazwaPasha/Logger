@@ -23,7 +23,7 @@ type EditState = {
 };
 
 const ROLE_BADGE: Record<string, string> = {
-  owner: "bg-[var(--status-progress)] text-[var(--status-progress)] dark:bg-[color-mix(in_srgb,var(--status-progress)_30%,transparent)] dark:text-[var(--status-progress)]",
+  owner: "bg-[var(--warning)] text-[var(--warning)] dark:bg-[color-mix(in_srgb,var(--warning)_30%,transparent)] dark:text-[var(--warning)]",
   manager: "bg-[var(--info-ink)] text-[var(--info-ink)] dark:bg-[color-mix(in_srgb,var(--info-ink)_30%,transparent)] dark:text-[var(--info-ink)]",
   member: "bg-[var(--surface-muted)] text-[var(--fg-muted,var(--muted))]",
 };

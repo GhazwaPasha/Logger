@@ -314,8 +314,8 @@ export default function UserSettingsPage() {
         description="Long-lived credentials for connecting external tools and AI agents (via the MCP endpoint) to your account."
       >
         {createdKey && (
-          <div className="mb-4 rounded-xl border border-[color-mix(in_srgb,var(--status-progress)_50%,transparent)] bg-[var(--status-progress)] p-4 dark:bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)]">
-            <p className="text-sm font-semibold text-[var(--status-progress)] dark:text-[var(--status-progress)]">
+          <div className="mb-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_50%,transparent)] bg-[var(--warning)] p-4 dark:bg-[color-mix(in_srgb,var(--warning)_20%,transparent)]">
+            <p className="text-sm font-semibold text-[var(--warning)] dark:text-[var(--warning)]">
               Save this key now — it won’t be shown again.
             </p>
             <div className="mt-2 flex items-center gap-2">
@@ -337,7 +337,7 @@ export default function UserSettingsPage() {
             <button
               type="button"
               onClick={() => setCreatedKey(null)}
-              className="mt-2 text-xs text-[var(--status-progress)] underline dark:text-[var(--status-progress)]"
+              className="mt-2 text-xs text-[var(--warning)] underline dark:text-[var(--warning)]"
             >
               I’ve saved it, dismiss
             </button>

@@ -17,7 +17,7 @@ const DAY_NAMES_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
 const PRIORITY_DOT: Record<string, string> = {
   high: "bg-[var(--danger)]",
-  medium: "bg-[var(--status-progress)]",
+  medium: "bg-[var(--priority-medium)]",
   low: "bg-[var(--success)]",
 };
 

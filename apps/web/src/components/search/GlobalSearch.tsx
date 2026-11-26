@@ -15,10 +15,11 @@ type SearchResult = {
   listId: string;
 };
 
+/** Same status chips as the board (lib/task-board), so search results match. */
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-[color-mix(in_srgb,var(--status-progress)_20%,transparent)] text-[var(--status-progress)] dark:text-[var(--status-progress)]",
-  in_progress: "bg-[color-mix(in_srgb,var(--info-ink)_20%,transparent)] text-[var(--info-ink)] dark:text-[var(--info-ink)]",
-  done: "bg-[color-mix(in_srgb,var(--success)_20%,transparent)] text-[var(--success)] dark:text-[var(--success)]",
+  pending: "bg-[var(--status-pending-bg)] text-[var(--status-pending-ink)]",
+  in_progress: "bg-[var(--status-progress-bg)] text-[var(--status-progress-ink)]",
+  done: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
   cancelled: "bg-[var(--muted)]/20 text-[var(--muted)]",
 };
 

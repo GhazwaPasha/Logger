@@ -29,7 +29,7 @@ import {
 /** Pace pill fill + ink. Missed check-ins are amber (needs attention), behind is red. */
 const PACE_PILL: Record<string, string> = {
   behind: "bg-[color-mix(in_srgb,var(--danger)_13%,transparent)] text-[var(--danger)]",
-  missed: "bg-[var(--status-progress-bg)] text-[var(--status-progress-ink)]",
+  missed: "bg-[var(--warning-bg)] text-[var(--warning-ink)]",
   on_pace: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
   ahead: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
   met: "bg-[var(--status-done-bg)] text-[var(--status-done-ink)]",
@@ -220,7 +220,7 @@ export function TrackerDetail({
           <p className="flex gap-4 text-xs text-[var(--muted)]">
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--status-done)]" />Logged</span>
             <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--danger)]" />Missed</span>
-            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--status-progress)]" />Due</span>
+            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-[var(--warning)]" />Due</span>
           </p>
         </div>
       </div>
@@ -231,7 +231,7 @@ export function TrackerDetail({
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-outfit text-lg font-semibold text-[var(--fg)]">Log progress</h3>
             {stats.dueKey && !stats.dueLogged && canLog ? (
-              <span className="inline-flex h-6 items-center rounded-full bg-[var(--status-progress-bg)] px-2.5 text-xs font-semibold text-[var(--status-progress-ink)]">Due</span>
+              <span className="inline-flex h-6 items-center rounded-full bg-[var(--warning-bg)] px-2.5 text-xs font-semibold text-[var(--warning-ink)]">Due</span>
             ) : null}
           </div>
           {canLog && stats.phase !== "upcoming" && logDate ? (
@@ -362,7 +362,7 @@ function CheckInStrip({
               ? "bg-[var(--status-done)]"
               : s.state === "missed"
                 ? "bg-[var(--danger)]"
-                : "bg-[var(--status-progress)]"
+                : "bg-[var(--warning)]"
           } ${selected === s.key ? "ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--card)]" : ""}`}
         />
       ))}

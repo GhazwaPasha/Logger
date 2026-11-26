@@ -249,7 +249,7 @@ export default function TrackersPage() {
                 const missed =
                   t.stats.missedCount > 0 && t.stats.pace !== "behind";
                 const pill = missed
-                  ? "bg-[var(--status-progress-bg)] text-[var(--status-progress-ink)]"
+                  ? "bg-[var(--warning-bg)] text-[var(--warning-ink)]"
                   : t.stats.pace === "behind"
                     ? "bg-[color-mix(in_srgb,var(--danger)_13%,transparent)] text-[var(--danger)]"
                     : t.stats.pace === "none"

@@ -243,7 +243,7 @@ export function DashboardOverview({
           <KpiNote>Past their due date</KpiNote>
         </KpiCard>
         <KpiCard tone={gold} index={2} href={workHref(basePath, { unassigned: "1" })}>
-          <KpiLabel icon={UserRoundX} tint="var(--status-progress)">Unassigned</KpiLabel>
+          <KpiLabel icon={UserRoundX} tint="var(--warning)">Unassigned</KpiLabel>
           <KpiValue loading={loading} value={stats.unassigned} />
           <KpiNote>Waiting for an owner</KpiNote>
         </KpiCard>

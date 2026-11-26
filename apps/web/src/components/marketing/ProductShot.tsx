@@ -8,7 +8,7 @@ import { LogBaseMark } from "@/components/brand/LogBaseMark";
 export function ProductShot() {
   const kpis = [
     { label: "Overdue", value: "4", note: "Past their due date", color: "var(--danger)" },
-    { label: "Unassigned", value: "48", note: "Waiting for an owner", color: "var(--status-progress)" },
+    { label: "Unassigned", value: "48", note: "Waiting for an owner", color: "var(--warning)" },
     { label: "Assigned to me", value: "2", note: "On your plate", color: "var(--dept-1)" },
     { label: "Workspace", value: "9 · 4 · 11", note: "Members · Departments · Channels", color: "var(--dept-2)" },
   ];

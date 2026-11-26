@@ -236,7 +236,7 @@ export default async function Home() {
               </div>
             </div>
           </div>
-          <div className="flex min-h-[380px] flex-col gap-3 overflow-hidden rounded-[28px] bg-[var(--status-progress-bg)] p-8">
+          <div className="flex min-h-[380px] flex-col gap-3 overflow-hidden rounded-[28px] bg-[var(--warning-bg)] p-8">
             <h3 className="font-outfit text-2xl font-semibold tracking-tight">Works with the tools you have.</h3>
             <p className="text-base leading-relaxed text-[var(--ink-2)]">Discord submissions, webhooks, an API, and a connection for your AI assistant.</p>
             <div className={`mt-auto rounded-2xl bg-[var(--card)] p-4 leading-relaxed shadow-card ${mono}`}>

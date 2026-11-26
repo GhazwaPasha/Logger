@@ -252,7 +252,7 @@ export function TaskViewPanel({
           (() => {
             const color =
               form.priority === "high"
-                ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
+                ? "text-[var(--warning)] dark:text-[var(--warning)]"
                 : form.priority === "low"
                   ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                   : "text-[var(--muted)]";
@@ -291,7 +291,7 @@ export function TaskViewPanel({
           (() => {
             const p = task.priority as TaskPriority;
             const color = p === "high"
-              ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
+              ? "text-[var(--warning)] dark:text-[var(--warning)]"
               : p === "low"
                 ? "text-[var(--info-ink)] dark:text-[var(--info-ink)]"
                 : "text-[var(--muted)]";

@@ -117,7 +117,7 @@ export function TeamScorecardTable({ members, loading }: { members: PerformanceS
                       m.onTimeRate >= 0.8
                         ? "text-[var(--success)] dark:text-[var(--success)]"
                         : m.onTimeRate >= 0.5
-                          ? "text-[var(--status-progress)] dark:text-[var(--status-progress)]"
+                          ? "text-[var(--warning)] dark:text-[var(--warning)]"
                           : "text-[var(--danger)] dark:text-[var(--danger)]"
                     }
                   >

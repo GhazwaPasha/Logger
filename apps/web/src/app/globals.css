@@ -78,13 +78,19 @@ html[data-theme="system"] { color-scheme: light dark; }
 
   /* Status (always shown with a label) */
   --status-pending: light-dark(#8C9AB5, #8A94A8);
-  --status-progress: light-dark(#E09A00, #C98A12);
+  --status-progress: light-dark(#7C5CDB, #9B84EE);
   --status-done: light-dark(#2E9E68, #3A9E70);
   --status-cancelled: light-dark(#C4C4CA, #5E5A56);
   --status-pending-bg: light-dark(#ECEEF3, rgba(255, 255, 255, 0.08));
   --status-pending-ink: light-dark(#4B5466, #E4E4E7);
-  --status-progress-bg: light-dark(#FCF0D2, rgba(201, 138, 18, 0.16));
-  --status-progress-ink: light-dark(#8A5A00, #E7B04A);
+  --status-progress-bg: light-dark(#EEEAFB, rgba(155, 132, 238, 0.16));
+  --status-progress-ink: light-dark(#5A3DB8, #C2B4F8);
+
+  /* Warning amber: notices, validation, "due" and "missed" states, high-priority text.
+     Not a task status, so it stays amber while in progress is purple. */
+  --warning: light-dark(#E09A00, #C98A12);
+  --warning-bg: light-dark(#FCF0D2, rgba(201, 138, 18, 0.16));
+  --warning-ink: light-dark(#8A5A00, #E7B04A);
   --status-done-bg: light-dark(#DFF3E8, rgba(58, 158, 112, 0.16));
   --status-done-ink: light-dark(#1F7A4D, #5CC08F);
 
