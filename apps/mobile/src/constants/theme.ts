@@ -104,8 +104,8 @@ export type Palette = { [K in keyof typeof light]: string };
 const dark: Palette = {
   chrome: '#000000',
   sheet: '#000000',
-  card: '#1C1C1E',
-  cardRaised: '#2C2C2E',
+  card: '#111113',
+  cardRaised: '#1C1C1E',
   scrim: 'rgba(0, 0, 0, 0.5)',
 
   ink: '#F2F2F3',
@@ -169,10 +169,10 @@ const dark: Palette = {
   onAccent: '#000000',
   accentMuted: 'rgba(255, 255, 255, 0.08)',
   surfaceBase: '#000000',
-  surface: '#1C1C1E',
-  surfaceElevated: '#1C1C1E',
-  surfaceMuted: '#2C2C2E',
-  surfaceHover: '#2C2C2E',
+  surface: '#111113',
+  surfaceElevated: '#111113',
+  surfaceMuted: '#1C1C1E',
+  surfaceHover: '#1C1C1E',
   surfaceNav: '#000000',
   bgHeader: '#000000',
 };
