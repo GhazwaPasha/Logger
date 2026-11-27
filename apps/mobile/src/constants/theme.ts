@@ -97,12 +97,15 @@ const light = {
 
 export type Palette = { [K in keyof typeof light]: string };
 
+/**
+ * Dark: a true-black page with gray cards on it (the mobile app's own call — the web does the reverse). Cards
+ * read by their fill, so dark has no shadows or hairline rings at all (see `elevation`).
+ */
 const dark: Palette = {
-  chrome: '#09090B',
-  sheet: '#111113',
-  /** True black cards in dark, like the web. */
-  card: '#000000',
-  cardRaised: '#1A1A1D',
+  chrome: '#000000',
+  sheet: '#000000',
+  card: '#1C1C1E',
+  cardRaised: '#2C2C2E',
   scrim: 'rgba(0, 0, 0, 0.5)',
 
   ink: '#F2F2F3',
@@ -116,7 +119,7 @@ const dark: Palette = {
   fill3: 'rgba(255, 255, 255, 0.12)',
 
   primary: '#F2F2F3',
-  onPrimary: '#111113',
+  onPrimary: '#000000',
 
   dept1: '#5B8BF0',
   dept2: '#D27A2E',
@@ -156,22 +159,22 @@ const dark: Palette = {
   shadeDeep: 'rgba(0, 0, 0, 0.6)',
   hairlineStrong: 'rgba(255, 255, 255, 0.2)',
 
-  bg: '#111113',
+  bg: '#000000',
   fg: '#F2F2F3',
   muted: '#9A9AA0',
   border: 'rgba(255, 255, 255, 0.12)',
   borderSubtle: 'rgba(255, 255, 255, 0.07)',
   accent: '#F2F2F3',
   accentHover: '#FFFFFF',
-  onAccent: '#111113',
+  onAccent: '#000000',
   accentMuted: 'rgba(255, 255, 255, 0.08)',
-  surfaceBase: '#111113',
-  surface: '#151517',
-  surfaceElevated: '#000000',
-  surfaceMuted: '#1B1B1E',
-  surfaceHover: '#1F1F23',
-  surfaceNav: '#09090B',
-  bgHeader: '#09090B',
+  surfaceBase: '#000000',
+  surface: '#1C1C1E',
+  surfaceElevated: '#1C1C1E',
+  surfaceMuted: '#2C2C2E',
+  surfaceHover: '#2C2C2E',
+  surfaceNav: '#000000',
+  bgHeader: '#000000',
 };
 
 export const Colors = { light, dark } as const;
@@ -239,8 +242,12 @@ export const Spacing = { half: 2, one: 4, two: 8, three: 16, four: 24, five: 32,
 /**
  * Elevation, as the web's `--elev-*` box shadows: a hairline ring plus a soft drop, no borders.
  * Spread these into a style (`{ ...elevation(theme, 'card') }`).
+ *
+ * Dark gets none: gray cards on a black page read by their fill, a shadow can't show on black, and the 0.5px
+ * white ring jittered on Android while scrolling (sub-pixel ring snapping between pixels).
  */
 export function elevation(theme: Palette, level: 'card' | 'raised' | 'overlay' = 'card') {
+  if (theme === Colors.dark) return {};
   switch (level) {
     case 'raised':
       return { boxShadow: `0 0 0 1px ${theme.hairlineStrong}, 0 12px 32px ${theme.shadeMid}` };
