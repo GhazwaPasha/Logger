@@ -1,4 +1,4 @@
-import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { XIcon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -145,7 +145,7 @@ export function LevelListSheet({
       <Animated.View pointerEvents="box-none" style={[styles.anchor, sheet]}>
         <Pressable
           onPress={() => {}}
-          style={[styles.sheet, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          style={[styles.sheet, { backgroundColor: theme.cardRaised, borderColor: 'transparent', paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.sheetHead}>
             {stagedDept ? (
               <View style={[styles.chip, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle }]}>
@@ -158,7 +158,7 @@ export function LevelListSheet({
                     setStagedDeptId(null);
                     setQuery('');
                   }}>
-                  <Icon icon={faXmark} size={11} color="muted" />
+                  <Icon icon={XIcon} size={11} color="muted" />
                 </PressableScale>
               </View>
             ) : (

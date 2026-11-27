@@ -242,6 +242,28 @@ export function useClosedTaskCount(orgId: string | undefined, status: 'done' | '
   });
 }
 
+/**
+ * Tasks completed per day for the last `days` days (oldest first, today last), in the workspace's time zone —
+ * the web dashboard's "Tasks completed" chart (`GET /organizations/:id/tasks/completions-by-day`).
+ */
+export function useCompletionsByDay(orgId: string | undefined, days: number, timeZone: string) {
+  const asOf = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+    new Date(),
+  );
+  return useQuery({
+    queryKey: ['completions-by-day', orgId ?? '', days, timeZone, asOf],
+    enabled: !!orgId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const res = await api<{ days: { date: string; count: number }[] }>(
+        `/organizations/${orgId}/tasks/completions-by-day`,
+        { params: { days: String(days), timeZone, asOf } },
+      );
+      return res.days;
+    },
+  });
+}
+
 export function useArchivedTasks(orgId: string | undefined) {
   return useInfiniteQuery({
     queryKey: qk.archived(orgId ?? ''),
@@ -1066,6 +1088,30 @@ export function useRemoveMember(orgId: string | undefined) {
       if (!orgId) return;
       appendToBootstrap(qc, orgId, (old) => ({ ...old, members: old.members.filter((m) => m.userId !== userId) }));
       void invalidateTasks(qc);
+    },
+  });
+}
+
+export type InviteRole = 'member' | 'manager' | 'owner';
+
+/**
+ * Adds someone to the workspace by email, or updates their role if they're already in it (web Team page's
+ * "Invite by email"). Owners only — the API refuses anyone else. The person needs an existing account.
+ */
+export function useInviteMember(orgId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; role: InviteRole; departmentIds?: string[] }) =>
+      api(`/organizations/${orgId}/members`, {
+        method: 'POST',
+        body: {
+          email: input.email.trim(),
+          role: input.role,
+          ...(input.role === 'manager' ? { departmentIds: input.departmentIds ?? [] } : null),
+        },
+      }),
+    onSuccess: () => {
+      if (orgId) void qc.invalidateQueries({ queryKey: qk.bootstrap(orgId) });
     },
   });
 }

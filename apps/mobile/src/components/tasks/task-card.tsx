@@ -1,18 +1,5 @@
+import { ArrowUpIcon, BellIcon, CalendarPlusIcon, CheckIcon, ChevronsDownIcon, ChevronsUpIcon, EllipsisVerticalIcon, PaperclipIcon, PlusIcon, RepeatIcon, TimerIcon, UserPlusIcon } from 'lucide-react-native';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import {
-  faAnglesDown,
-  faAnglesUp,
-  faArrowUp,
-  faBell,
-  faCalendarPlus,
-  faCheck,
-  faEllipsisVertical,
-  faPaperclip,
-  faPlus,
-  faRepeat,
-  faStopwatch,
-  faUserPlus,
-} from '@fortawesome/free-solid-svg-icons';
 import { memo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
@@ -28,7 +15,7 @@ import { StatusPill } from '@/components/tasks/status-pill';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { Duration, cardEnter, listLayout, POP_EASE, revealIn, revealOut, stateTransition } from '@/constants/motion';
-import { alpha, Radius, Tone } from '@/constants/theme';
+import { alpha, elevation, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { formatDueForListPill } from '@/lib/format';
 import { taskEditCaps } from '@/lib/permissions';
@@ -85,7 +72,7 @@ function Checkbox({
         { borderRadius: radius },
         checked
           ? { backgroundColor: theme.accent, borderColor: theme.accent }
-          : { backgroundColor: theme.surfaceBase, borderColor: alpha(theme.fg, dark ? 0.22 : 0.18) },
+          : { backgroundColor: theme.card, borderColor: alpha(theme.fg, dark ? 0.28 : 0.22) },
         disabled && !checked && { opacity: 0.4 },
         stateTransition,
       ]}>
@@ -93,7 +80,7 @@ function Checkbox({
         <ActivityIndicator size="small" color={checked ? theme.onAccent : theme.muted} style={{ transform: [{ scale: 0.55 }] }} />
       ) : checked ? (
         <Animated.View entering={ZoomIn.duration(Duration.micro).easing(POP_EASE)}>
-          <Icon icon={faCheck} size={iconSize} color={theme.onAccent} />
+          <Icon icon={CheckIcon} size={iconSize} color={theme.onAccent} />
         </Animated.View>
       ) : null}
     </PressableScale>
@@ -118,7 +105,7 @@ function SubtaskRows({
           <View style={{ marginTop: 1 }}>
             <Checkbox
               checked={s.done}
-              radius={Radius.md}
+              radius={5}
               iconSize={9}
               label={s.done ? 'Mark subtask not done' : 'Mark subtask done'}
               onPress={() => setSubtaskDone(task.id, s.id, !s.done)}
@@ -181,25 +168,25 @@ function TaskCardImpl({
 
   const titleColor = cancelled || done ? 'muted' : 'fg';
   const titleDecoration = cancelled
-    ? ({ textDecorationLine: 'line-through', textDecorationColor: Tone.red500 } as const)
+    ? ({ textDecorationLine: 'line-through', textDecorationColor: theme.danger } as const)
     : done
       ? ({ textDecorationLine: 'line-through', textDecorationColor: theme.muted } as const)
       : null;
 
-  const PriorityIcon = priority === 'high' ? faAnglesUp : priority === 'low' ? faAnglesDown : faArrowUp;
+  const PriorityIcon = priority === 'high' ? ChevronsUpIcon : priority === 'low' ? ChevronsDownIcon : ArrowUpIcon;
   const pColor = priorityColor(priority, dark, theme);
   const dueLabel = task.dueAt ? formatDueForListPill(task.dueAt, timeZone) : null;
 
   return (
     <Animated.View
-      layout={listLayout}
+      // In the list, the FlatList's itemLayoutAnimation moves rows; a second layout animation here could park a
+      // row at a stale offset (cards overlapping). The kanban column is a plain stack, so it animates here.
+      layout={kanban ? listLayout : undefined}
       entering={enterIndex === undefined ? undefined : cardEnter(enterIndex)}
       style={[
         styles.card,
-        {
-          backgroundColor: theme.surfaceElevated,
-          borderColor: syncing ? alpha(theme.accent, 0.26) : theme.borderSubtle,
-        },
+        // Web card: card fill + hairline/soft shadow, no border; a syncing card lifts to the raised shadow.
+        { backgroundColor: syncing ? theme.cardRaised : theme.card, ...elevation(theme, syncing ? 'raised' : 'card') },
       ]}>
       {syncing ? <SyncRibbon /> : null}
       <View style={kanban ? styles.kanbanBody : undefined}>
@@ -210,7 +197,7 @@ function TaskCardImpl({
               checked={done}
               busy={syncing}
               disabled={cancelled || (!done && advanceTo == null)}
-              radius={Radius.base}
+              radius={6}
               label={
                 cancelled
                   ? 'Task cancelled'
@@ -233,10 +220,10 @@ function TaskCardImpl({
             onPress={() => openTask(task.id)}
             accessibilityRole="link">
             <Text
-              size={kanban ? '15' : 'sm'}
-              lh={kanban ? 21 : 19}
-              weight={kanban ? 'semibold' : 'medium'}
-              tracking={kanban ? -0.3 : undefined}
+              size="15"
+              lh={20}
+              weight="semibold"
+              tracking={-0.3}
               color={titleColor}
               numberOfLines={kanban ? 3 : 2}
               style={titleDecoration}>
@@ -247,7 +234,7 @@ function TaskCardImpl({
           <View style={styles.headerRight}>
             {task.dueRepeat ? (
               <View accessible accessibilityLabel={`Repeats ${task.dueRepeat}`} style={styles.repeatMark}>
-                <Icon icon={faRepeat} size={12} color="muted" />
+                <Icon icon={RepeatIcon} size={12} color="muted" />
               </View>
             ) : null}
             <StatusPill
@@ -262,7 +249,7 @@ function TaskCardImpl({
               hitSlop={6}
               onPress={() => openTask(task.id)}
               style={styles.overflow}>
-              <Icon icon={faEllipsisVertical} size={16} color="muted" style={{ opacity: 0.5 }} />
+              <Icon icon={EllipsisVerticalIcon} size={16} color="muted" style={{ opacity: 0.5 }} />
             </PressableScale>
           </View>
         </View>
@@ -270,9 +257,7 @@ function TaskCardImpl({
         {/* Subtasks + meta row */}
         <View
           style={[
-            styles.meta,
-            { borderTopColor: alpha(theme.borderSubtle, 0.4) },
-            kanban ? { paddingTop: 10 } : { paddingHorizontal: 12, paddingTop: 11, paddingBottom: 12 },
+            kanban ? { paddingTop: 4 } : { paddingHorizontal: 14, paddingTop: 2, paddingBottom: 12 },
           ]}>
           <View style={styles.metaRow}>
             <PressableScale scaleTo={0.92}
@@ -285,14 +270,14 @@ function TaskCardImpl({
                 Subtasks
               </Text>
               {subtasks.length > 0 ? (
-                <Text size="13" color={alpha(theme.muted, 0.8)} tabular>
+                <Text size="13" color="ink3" tabular>
                   ({subtasks.length})
                 </Text>
               ) : null}
               {subtasks.length > 0 && !kanban ? (
                 <RotatingChevron open={expanded} size={11} />
               ) : subtasks.length === 0 ? (
-                <Icon icon={faPlus} size={14} color="muted" style={{ opacity: 0.6 }} />
+                <Icon icon={PlusIcon} size={14} color="muted" style={{ opacity: 0.6 }} />
               ) : null}
             </PressableScale>
 
@@ -305,9 +290,9 @@ function TaskCardImpl({
                 onPress={() => openTask(task.id)}
                 style={styles.iconSlot}>
                 {assignee ? (
-                  <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size={20} tint={alpha(Tone.sky500, 0.2)} />
+                  <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size={20} tint={theme.infoBg} />
                 ) : (
-                  <Icon icon={faUserPlus} size={16} color="muted" style={{ opacity: 0.8 }} />
+                  <Icon icon={UserPlusIcon} size={16} color="muted" style={{ opacity: 0.8 }} />
                 )}
               </PressableScale>
 
@@ -316,7 +301,7 @@ function TaskCardImpl({
                 hitSlop={6}
                 onPress={() => openTask(task.id)}
                 style={[styles.dueChip, { backgroundColor: due.bg, borderColor: due.border }]}>
-                <Icon icon={late ? faBell : task.dueAt ? faStopwatch : faCalendarPlus} size={14} color={due.fg} />
+                <Icon icon={late ? BellIcon : task.dueAt ? TimerIcon : CalendarPlusIcon} size={14} color={due.fg} />
                 {dueLabel ? (
                   <Text size="xs" weight="medium" color={due.fg} tabular lh={12} numberOfLines={1} style={{ flexShrink: 1 }}>
                     {dueLabel}
@@ -334,7 +319,7 @@ function TaskCardImpl({
               </PressableScale>
 
               <PressableScale scaleTo={0.92} accessibilityLabel="Attachments" hitSlop={6} onPress={() => openTask(task.id)} style={styles.iconSlot}>
-                <Icon icon={faPaperclip} size={16} color="muted" />
+                <Icon icon={PaperclipIcon} size={16} color="muted" />
               </PressableScale>
 
               {task.discordChannelId ? (
@@ -364,7 +349,7 @@ function TaskCardImpl({
         options={PRIORITIES.map((p) => ({
           value: p,
           label: PRIORITY_LABELS[p],
-          icon: p === 'high' ? faAnglesUp : p === 'low' ? faAnglesDown : faArrowUp,
+          icon: p === 'high' ? ChevronsUpIcon : p === 'low' ? ChevronsDownIcon : ArrowUpIcon,
           iconColor: priorityColor(p, dark, theme),
         }))}
         onSelect={(p) => p !== priority && patchTask(task.id, { priority: p })}
@@ -380,25 +365,24 @@ export const TaskCard = memo(TaskCardImpl);
 export function TaskCardSkeleton() {
   const theme = useTheme();
   return (
-    <Pulse style={[styles.card, styles.skeleton, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-      <View style={{ height: 12, width: '75%', borderRadius: 3, backgroundColor: theme.surfaceHover }} />
-      <View style={{ height: 10, width: '50%', borderRadius: 3, backgroundColor: theme.surfaceHover, marginTop: 10 }} />
+    <Pulse style={[styles.card, styles.skeleton, { backgroundColor: theme.card, ...elevation(theme, 'card') }]}>
+      <View style={{ height: 12, width: '75%', borderRadius: 4, backgroundColor: theme.fill2 }} />
+      <View style={{ height: 10, width: '50%', borderRadius: 4, backgroundColor: theme.fill2, marginTop: 10 }} />
     </Pulse>
   );
 }
 
 const styles = StyleSheet.create({
   repeatMark: { marginRight: 2 },
-  card: { borderRadius: Radius.xl, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: Radius.xl, overflow: 'hidden' },
   skeleton: { paddingHorizontal: 12, paddingVertical: 16, opacity: 0.7 },
-  kanbanBody: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12, gap: 8 },
+  kanbanBody: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, gap: 6 },
   header: { flexDirection: 'row', alignItems: 'center' },
-  headerList: { gap: 8, paddingHorizontal: 12, paddingTop: 16, paddingBottom: 12 },
+  headerList: { gap: 10, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 },
   headerKanban: { gap: 6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   overflow: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.base },
-  checkbox: { width: 18, height: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  meta: { borderTopWidth: StyleSheet.hairlineWidth * 2 },
+  checkbox: { width: 18, height: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   subtasksToggle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
@@ -410,7 +394,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     borderRadius: Radius.full,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     flexShrink: 1,
   },
   subtasks: { marginTop: 6, gap: 4 },

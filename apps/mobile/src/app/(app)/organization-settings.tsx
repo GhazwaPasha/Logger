@@ -96,7 +96,7 @@ export default function OrganizationSettingsScreen() {
           accessibilityRole="button"
           disabled={!isOwner}
           onPress={() => setZoneOpen(true)}
-          style={[styles.select, { backgroundColor: theme.surfaceElevated, borderColor: theme.border }]}>
+          style={[styles.select, { backgroundColor: theme.fill, borderColor: theme.line }]}>
           <Text size="sm">{org?.timeZone ?? '—'}</Text>
         </PressableScale>
       </Panel>

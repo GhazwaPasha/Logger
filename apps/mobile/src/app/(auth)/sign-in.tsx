@@ -1,13 +1,12 @@
+import { ArrowLeftIcon, EyeIcon, EyeOffIcon, LockIcon, MailIcon } from 'lucide-react-native';
 import { faDiscord, faGoogle } from '@fortawesome/free-brands-svg-icons';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faArrowLeft, faEnvelope, faEye, faEyeSlash, faLock } from '@fortawesome/free-solid-svg-icons';
 import { useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectingStep } from '@/components/auth/connecting-step';
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { LogoMark } from '@/components/logo-mark';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
@@ -41,7 +40,7 @@ function BigLogo({ size, text }: { size: number; text: number }) {
 }
 
 /** A rounded field row: leading icon, the input, an optional trailing control; the border lights up on focus. */
-function Field({ label, icon, focused, children }: { label: string; icon: IconDefinition; focused: boolean; children: ReactNode }) {
+function Field({ label, icon, focused, children }: { label: string; icon: IconType; focused: boolean; children: ReactNode }) {
   const theme = useTheme();
   return (
     <View style={{ gap: 6 }}>
@@ -51,7 +50,7 @@ function Field({ label, icon, focused, children }: { label: string; icon: IconDe
       <View
         style={[
           styles.field,
-          { backgroundColor: theme.surfaceElevated, borderColor: focused ? theme.accent : theme.borderSubtle },
+          { backgroundColor: theme.fill, borderColor: focused ? theme.hairlineStrong : theme.line },
           stateTransition,
         ]}>
         <Icon icon={icon} size={15} color={focused ? 'fg' : 'muted'} />
@@ -163,7 +162,7 @@ export default function SignIn() {
                           backgroundColor: pressed ? theme.surfaceHover : theme.surfaceBase,
                         },
                       ]}>
-                      <Icon icon={faEnvelope} size={20} color={theme.accent} />
+                      <Icon icon={MailIcon} size={20} color={theme.accent} />
                       <Text size="base" weight="medium">
                         Continue with Email
                       </Text>
@@ -191,7 +190,7 @@ export default function SignIn() {
                       setStep('hub');
                     }}
                     style={styles.backInner}>
-                    <Icon icon={faArrowLeft} size={13} color="fg" />
+                    <Icon icon={ArrowLeftIcon} size={13} color="fg" />
                     <Text size="sm" weight="medium">
                       Back
                     </Text>
@@ -215,7 +214,7 @@ export default function SignIn() {
                   </View>
 
                   <View style={{ gap: 14 }}>
-                    <Field label="Email" icon={faEnvelope} focused={focus === 'email'}>
+                    <Field label="Email" icon={MailIcon} focused={focus === 'email'}>
                       <TextInput
                         style={[styles.fieldInput, { color: theme.fg }]}
                         placeholder="you@company.com"
@@ -233,7 +232,7 @@ export default function SignIn() {
                         returnKeyType="next"
                       />
                     </Field>
-                    <Field label="Password" icon={faLock} focused={focus === 'password'}>
+                    <Field label="Password" icon={LockIcon} focused={focus === 'password'}>
                       <TextInput
                         style={[styles.fieldInput, { color: theme.fg }]}
                         placeholder="Your password"
@@ -255,7 +254,7 @@ export default function SignIn() {
                         accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                         onPress={() => setShowPassword((v) => !v)}
                         hitSlop={10}>
-                        <Icon icon={showPassword ? faEyeSlash : faEye} size={15} color="muted" />
+                        <Icon icon={showPassword ? EyeOffIcon : EyeIcon} size={15} color="muted" />
                       </PressableScale>
                     </Field>
                   </View>

@@ -1,4 +1,4 @@
-import { faLayerGroup, faListUl, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { LayersIcon, ListIcon, PlusIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
@@ -225,7 +225,7 @@ export function ChannelTree() {
   } else if (depts.length === 0 && !addingLevel) {
     body = (
       <EmptyState
-        icon={faLayerGroup}
+        icon={LayersIcon}
         title={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet`}
         description={
           canEditStructure
@@ -271,7 +271,7 @@ export function ChannelTree() {
           {open ? (
             <Animated.View entering={revealIn} exiting={revealOut}>
               {levelLists.length === 0 && addListFor !== d.id ? (
-                <EmptyState compact icon={faListUl} title={`No ${NODE_LABELS.listPlural.toLowerCase()} yet`} />
+                <EmptyState compact icon={ListIcon} title={`No ${NODE_LABELS.listPlural.toLowerCase()} yet`} />
               ) : (
                 levelLists.map((l) => {
                   const hasUnread = unread.hasUnread(l.id);
@@ -376,7 +376,7 @@ export function ChannelTree() {
             scaleTo={0.98}
             onPress={() => setAddingLevel(true)}
             style={({ pressed }) => [styles.addLevel, { backgroundColor: pressed ? theme.surfaceHover : 'transparent' }]}>
-            <Icon icon={faPlus} size={12} color="muted" />
+            <Icon icon={PlusIcon} size={12} color="muted" />
             <Text size="sm" weight="medium" color="muted">
               Add {NODE_LABELS.level.toLowerCase()}
             </Text>

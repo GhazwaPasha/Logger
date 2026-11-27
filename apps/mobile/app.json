@@ -4,7 +4,7 @@
     "slug": "logbase",
     "owner": "ghazwa_irshad",
     "scheme": "logbase",
-    "version": "1.6.3",
+    "version": "1.7.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

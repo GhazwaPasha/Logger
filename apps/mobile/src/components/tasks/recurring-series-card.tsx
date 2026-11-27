@@ -1,5 +1,5 @@
+import { BellIcon, CheckIcon, ChevronDownIcon, ClockIcon } from 'lucide-react-native';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import { faBell, faCheck, faChevronDown, faClock } from '@fortawesome/free-solid-svg-icons';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -11,8 +11,8 @@ import { RotatingChevron } from '@/components/motion/rotating-chevron';
 import { useBoardActions } from '@/components/tasks/board-context';
 import { Text } from '@/components/text';
 import { cardEnter, listLayout, revealIn, revealOut } from '@/constants/motion';
-import { alpha, Radius, Tone } from '@/constants/theme';
-import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { alpha, elevation, Radius } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { formatDateOnly, formatLogTimestamp } from '@/lib/format';
 import { useSeriesOccurrences, type SeriesSummaryRow } from '@/lib/queries';
 import type { MemberRow, TaskRow } from '@/lib/types';
@@ -37,7 +37,7 @@ function assigneeNames(members: MemberRow[], ids: string[] | undefined): string 
 
 /** "{completedAt}, {assignee} completed this task [icon] in time/late". */
 function CompletionLine({ t, members, timeZone }: { t: CompletionLike; members: MemberRow[]; timeZone: string }) {
-  const dark = useIsDark();
+  const theme = useTheme();
   if (!t.completedAt) return null;
   const late = t.dueAt ? new Date(t.completedAt).getTime() > new Date(t.dueAt).getTime() : null;
   return (
@@ -47,7 +47,7 @@ function CompletionLine({ t, members, timeZone }: { t: CompletionLike; members: 
       </Text>
       {late !== null ? (
         <>
-          <Icon icon={late ? faBell : faCheck} size={10} color={late ? (dark ? Tone.red400 : Tone.red500) : Tone.emerald500} />
+          <Icon icon={late ? BellIcon : CheckIcon} size={10} color={late ? theme.danger : theme.success} />
           <Text font="mono" size="11" color="muted">
             {late ? 'late' : 'in time'}
           </Text>
@@ -120,7 +120,7 @@ export function RecurringSeriesCard({
     <Animated.View
       layout={listLayout}
       entering={enterIndex === undefined ? undefined : cardEnter(enterIndex)}
-      style={[styles.card, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+      style={[styles.card, { backgroundColor: theme.card, ...elevation(theme, 'card') }]}>
       {/* Series header row */}
       <View style={styles.header}>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -136,7 +136,7 @@ export function RecurringSeriesCard({
 
           <View style={styles.metaRow}>
             <View style={[styles.pill, { backgroundColor: theme.surfaceHover }]}>
-              <Icon icon={faClock} size={8} color="muted" />
+              <Icon icon={ClockIcon} size={8} color="muted" />
               <Text size="10" weight="semibold" color="muted" uppercase tracking={0.2}>
                 Recurring · {summary.count} {summary.count === 1 ? 'completion' : 'completions'}
               </Text>
@@ -159,7 +159,7 @@ export function RecurringSeriesCard({
           hitSlop={6}
           onPress={() => setExpanded((x) => !x)}
           style={styles.chevronBtn}>
-          <RotatingChevron open={expanded} icon={faChevronDown} openDeg={180} size={14} />
+          <RotatingChevron open={expanded} icon={ChevronDownIcon} openDeg={180} size={14} />
         </PressableScale>
       </View>
 
@@ -213,10 +213,10 @@ export function RecurringSeriesCard({
               disabled={loadingMore}
               style={[
                 styles.loadMoreBtn,
-                { borderColor: loadMoreError ? alpha(Tone.red500, 0.4) : theme.borderSubtle },
+                { borderColor: loadMoreError ? alpha(theme.danger, 0.4) : theme.borderSubtle },
                 loadingMore && { opacity: 0.6 },
               ]}>
-              <Text size="11" weight="medium" color={loadMoreError ? Tone.red500 : 'muted'}>
+              <Text size="11" weight="medium" color={loadMoreError ? theme.danger : 'muted'}>
                 {loadMoreError ? "Couldn't load more · retry" : loadingMore ? 'Loading…' : 'Load older occurrences'}
               </Text>
             </PressableScale>
@@ -233,7 +233,7 @@ export function RecurringSeriesCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.xl, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: Radius.xl, overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 },
   chevronBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.base, marginTop: 2 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 },

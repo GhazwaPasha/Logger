@@ -1,4 +1,4 @@
-import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { CheckIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -68,7 +68,7 @@ export function AssigneeFieldCard({
                 </Text>
                 {canEdit ? (
                   <PressableScale hitSlop={6} accessibilityLabel={`Remove ${name}`} onPress={() => onToggle(id)}>
-                    <Icon icon={faXmark} size={12} color="muted" />
+                    <Icon icon={XIcon} size={12} color="muted" />
                   </PressableScale>
                 ) : null}
               </Animated.View>
@@ -81,7 +81,7 @@ export function AssigneeFieldCard({
             accessibilityLabel="Add assignee"
             style={[styles.addChip, { borderColor: theme.borderSubtle }]}
             onPress={() => setOpen(true)}>
-            <Icon icon={faPlus} size={10} color="muted" />
+            <Icon icon={PlusIcon} size={10} color="muted" />
             <Text size="xs" weight="medium" color="muted">
               {assigneeIds.length === 0 ? 'Add assignee' : 'Add'}
             </Text>
@@ -143,7 +143,7 @@ export function AssigneeSheet({
             style={[
               styles.sheet,
               {
-                backgroundColor: theme.surfaceElevated,
+                backgroundColor: theme.cardRaised,
                 borderColor: theme.borderSubtle,
                 paddingBottom: Math.max(insets.bottom, 12),
                 maxHeight: height * 0.7,
@@ -191,7 +191,7 @@ export function AssigneeSheet({
                           </Text>
                         ) : null}
                       </View>
-                      {selected ? <Icon icon={faCheck} size={13} color="fg" /> : null}
+                      {selected ? <Icon icon={CheckIcon} size={13} color="fg" /> : null}
                     </PressableScale>
                   );
                 })

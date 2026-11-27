@@ -1,4 +1,3 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
@@ -10,7 +9,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { LogoMark } from '@/components/logo-mark';
 import { sequenceEnter } from '@/constants/motion';
 import { alpha } from '@/constants/theme';
@@ -63,7 +62,7 @@ function Dot({ clock, delay, color }: { clock: SharedValue<number>; delay: numbe
   return <Animated.View style={[styles.dot, { backgroundColor: color }, style]} />;
 }
 
-export function ConnectingStep({ label, icon, color }: { label: string; icon: IconDefinition; color: string }) {
+export function ConnectingStep({ label, icon, color }: { label: string; icon: IconType; color: string }) {
   const theme = useTheme();
   const clock = useSharedValue(0);
 

@@ -1,5 +1,4 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { CircleAlertIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import Animated from 'react-native-reanimated';
 import {
@@ -14,12 +13,12 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Text } from '@/components/text';
 import { emptyEnter, stateTransition } from '@/constants/motion';
-import { alpha, Fonts, Radius, Tone } from '@/constants/theme';
-import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { alpha, elevation, Fonts, Radius } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { nameInitials } from '@/lib/format';
 import type { HapticKind } from '@/lib/haptics';
 
@@ -31,7 +30,7 @@ type ButtonProps = {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
-  icon?: IconDefinition;
+  icon?: IconType;
   loading?: boolean;
   disabled?: boolean;
   compact?: boolean;
@@ -65,8 +64,8 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         compact && styles.buttonCompact,
-        variant === 'primary' && { backgroundColor: theme.accent, borderColor: theme.accent },
-        variant === 'secondary' && { backgroundColor: theme.surfaceElevated, borderColor: theme.border },
+        variant === 'primary' && { backgroundColor: theme.primary, borderColor: 'transparent' },
+        variant === 'secondary' && { backgroundColor: theme.fill2, borderColor: 'transparent' },
         variant === 'ghost' && { backgroundColor: 'transparent', borderColor: 'transparent' },
         { opacity: off ? 0.55 : pressed ? 0.85 : 1 },
         stateTransition,
@@ -99,7 +98,7 @@ export function IconButton({
   style,
 }: {
   /** FontAwesome icon; omit and pass `children` to draw a custom glyph instead. */
-  icon?: IconDefinition;
+  icon?: IconType;
   children?: ReactNode;
   onPress: () => void;
   label: string;
@@ -121,17 +120,19 @@ export function IconButton({
         {
           width: size,
           height: size,
-          borderRadius: Radius.lg,
+          borderRadius: 10,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: active ? theme.fg : pressed ? theme.surfaceHover : 'transparent',
+          // Selected = a neutral card thumb, never an inverted or accent fill (web Segmented).
+          backgroundColor: active ? theme.cardRaised : pressed ? theme.fill2 : 'transparent',
+          ...(active ? elevation(theme, 'card') : null),
         },
         stateTransition,
         style as object,
       ]}>
       {children ??
         (icon ? (
-          <Icon icon={icon} size={iconSize} color={active ? theme.surfaceBase : tone === 'fg' ? theme.fg : theme.muted} />
+          <Icon icon={icon} size={iconSize} color={active || tone === 'fg' ? theme.fg : theme.muted} />
         ) : null)}
     </PressableScale>
   );
@@ -148,7 +149,7 @@ export function Chip({
   label: string;
   selected?: boolean;
   onPress: () => void;
-  icon?: IconDefinition;
+  icon?: IconType;
   iconColor?: string;
 }) {
   const theme = useTheme();
@@ -161,8 +162,8 @@ export function Chip({
       style={[
         styles.chip,
         selected
-          ? { backgroundColor: theme.accent, borderColor: theme.accent }
-          : { backgroundColor: theme.surfaceElevated, borderColor: theme.border },
+          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+          : { backgroundColor: theme.fill, borderColor: 'transparent' },
         stateTransition,
       ]}>
       {icon ? <Icon icon={icon} size={12} color={selected ? theme.onAccent : (iconColor ?? theme.muted)} /> : null}
@@ -196,8 +197,8 @@ export function Input({ style, onFocus, onBlur, ...rest }: TextInputProps) {
       style={[
         styles.input,
         {
-          backgroundColor: theme.surfaceElevated,
-          borderColor: focused ? theme.accent : theme.border,
+          backgroundColor: theme.fill,
+          borderColor: focused ? theme.hairlineStrong : theme.line,
           color: theme.fg,
           fontFamily: Fonts.sans.regular,
         },
@@ -279,7 +280,7 @@ export function EmptyState({
   compact,
   action,
 }: {
-  icon: IconDefinition;
+  icon: IconType;
   title: string;
   description?: string;
   compact?: boolean;
@@ -296,7 +297,7 @@ export function EmptyState({
           borderRadius: badge / 2,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: theme.surfaceMuted,
+          backgroundColor: theme.fill2,
         }}>
         <Icon icon={icon} size={compact ? 14 : 16} color="muted" />
       </View>
@@ -315,21 +316,18 @@ export function EmptyState({
 
 /** `ErrorBanner` — red tinted alert with an optional retry. */
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  const dark = useIsDark();
+  const theme = useTheme();
   return (
     <View
       accessibilityRole="alert"
-      style={[
-        styles.banner,
-        { backgroundColor: alpha(Tone.red500, 0.1), borderColor: alpha(Tone.red500, 0.25) },
-      ]}>
-      <Icon icon={faCircleExclamation} size={14} color={dark ? Tone.red400 : Tone.red600} style={{ marginTop: 3 }} />
-      <Text size="sm" color={dark ? '#fecaca' : '#991b1b'} style={{ flex: 1 }}>
+      style={[styles.banner, { backgroundColor: alpha(theme.danger, 0.1), borderColor: alpha(theme.danger, 0.22) }]}>
+      <Icon icon={CircleAlertIcon} size={14} color={theme.danger} style={{ marginTop: 3 }} />
+      <Text size="sm" color="fg" style={{ flex: 1 }}>
         {message}
       </Text>
       {onRetry ? (
         <Pressable onPress={onRetry} hitSlop={8}>
-          <Text size="xs" weight="medium" color={dark ? Tone.red400 : Tone.red600}>
+          <Text size="xs" weight="semibold" color={theme.danger}>
             Retry
           </Text>
         </Pressable>
@@ -345,7 +343,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -353,7 +351,7 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 32, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.lg },
   input: {
     minHeight: 44,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -376,7 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     borderRadius: Radius.xl,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },

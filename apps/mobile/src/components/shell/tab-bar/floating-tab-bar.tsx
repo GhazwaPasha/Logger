@@ -1,17 +1,4 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import {
-  faBullseye,
-  faCalendarDays,
-  faChevronLeft,
-  faChevronRight,
-  faChevronUp,
-  faCircleXmark,
-  faHashtag,
-  faHouse,
-  faListCheck,
-  faMagnifyingGlass,
-  faRoute,
-} from '@fortawesome/free-solid-svg-icons';
+import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, CircleXIcon, HashIcon, HouseIcon, ListChecksIcon, MilestoneIcon, SearchIcon, TargetIcon } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import { useTabTrigger } from 'expo-router/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -30,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { AiIcon } from '@/components/agent/ai-icon';
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { barShadow, BarSurface } from '@/components/shell/tab-bar/bar-surface';
 import { TAB_BAR_GAP, TAB_BAR_HEIGHT, useTabBar } from '@/components/shell/tab-bar/tab-bar-context';
@@ -41,20 +28,20 @@ import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
 
 export type TabName = 'dashboard' | 'my-tasks' | 'trackers' | 'channels' | 'calendar' | 'roadmap' | 'search';
-type TabDef = { name: TabName; label: string; icon: IconDefinition };
+type TabDef = { name: TabName; label: string; icon: IconType };
 
 /** Always in the bar. */
 const MAIN: TabDef[] = [
-  { name: 'dashboard', label: 'Home', icon: faHouse },
-  { name: 'my-tasks', label: 'My tasks', icon: faListCheck },
-  { name: 'channels', label: 'Channels', icon: faHashtag },
-  { name: 'search', label: 'Search', icon: faMagnifyingGlass },
+  { name: 'dashboard', label: 'Home', icon: HouseIcon },
+  { name: 'my-tasks', label: 'My tasks', icon: ListChecksIcon },
+  { name: 'channels', label: 'Channels', icon: HashIcon },
+  { name: 'search', label: 'Search', icon: SearchIcon },
 ];
 /** Revealed when the bar expands. */
 const MORE: TabDef[] = [
-  { name: 'calendar', label: 'Calendar', icon: faCalendarDays },
-  { name: 'roadmap', label: 'Roadmap', icon: faRoute },
-  { name: 'trackers', label: 'Trackers', icon: faBullseye },
+  { name: 'calendar', label: 'Calendar', icon: CalendarDaysIcon },
+  { name: 'roadmap', label: 'Roadmap', icon: MilestoneIcon },
+  { name: 'trackers', label: 'Trackers', icon: TargetIcon },
 ];
 const ALL: TabDef[] = [...MAIN, ...MORE];
 
@@ -307,7 +294,7 @@ export function FloatingTabBar() {
                 <Icon icon={focusedDef.icon} size={17} color={theme.fg} />
               ) : (
                 <Animated.View style={chevron}>
-                  <Icon icon={faChevronUp} size={15} color={theme.muted} />
+                  <Icon icon={ChevronUpIcon} size={15} color={theme.muted} />
                 </Animated.View>
               )}
             </PressableScale>
@@ -323,7 +310,7 @@ export function FloatingTabBar() {
               style={styles.compact}>
               <Icon icon={focusedDef.icon} size={19} color={theme.fg} />
               {/* Tapping widens the pill back into the full bar, so the hint points the way it grows. */}
-              <Icon icon={faChevronRight} size={11} color={theme.muted} />
+              <Icon icon={ChevronRightIcon} size={11} color={theme.muted} />
             </PressableScale>
           </Animated.View>
 
@@ -336,7 +323,7 @@ export function FloatingTabBar() {
               hitSlop={6}
               onPress={leaveSearch}
               style={styles.searchIconBtn}>
-              <Icon icon={faChevronLeft} size={16} color={theme.fg} />
+              <Icon icon={ChevronLeftIcon} size={16} color={theme.fg} />
             </PressableScale>
             <TextInput
               ref={inputRef}
@@ -359,7 +346,7 @@ export function FloatingTabBar() {
                 hitSlop={6}
                 onPress={() => setSearchQuery('')}
                 style={styles.searchIconBtn}>
-                <Icon icon={faCircleXmark} size={16} color={theme.muted} />
+                <Icon icon={CircleXIcon} size={16} color={theme.muted} />
               </PressableScale>
             ) : null}
           </Animated.View>

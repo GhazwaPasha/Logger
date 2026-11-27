@@ -68,10 +68,10 @@ function PulseLine() {
 
 /** Red "Late" pill — the web's `LateBadge`, as a trailing sibling since RN can't inline a View in Text. */
 function LateBadge() {
-  const dark = useIsDark();
+  const theme = useTheme();
   return (
-    <View style={[styles.lateBadge, { backgroundColor: alpha(Tone.red500, 0.15) }]}>
-      <Text size="10" weight="semibold" uppercase tracking={0.4} color={dark ? Tone.red400 : Tone.red600}>
+    <View style={[styles.lateBadge, { backgroundColor: alpha(theme.danger, 0.15) }]}>
+      <Text size="10" weight="semibold" uppercase tracking={0.4} color={theme.danger}>
         Late
       </Text>
     </View>

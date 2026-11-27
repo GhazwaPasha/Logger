@@ -1,4 +1,4 @@
-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -9,7 +9,7 @@ import { TabHeader } from '@/components/shell/screen-header';
 import { StatusPill } from '@/components/tasks/status-pill';
 import { Text } from '@/components/text';
 import { IconButton } from '@/components/ui';
-import { alpha, Radius, Tone } from '@/constants/theme';
+import { alpha, elevation, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { useActiveTasks } from '@/lib/queries';
 import { formatDueForListPill } from '@/lib/format';
@@ -62,11 +62,11 @@ export default function CalendarScreen() {
 
       <Panel style={{ gap: 8 }}>
         <View style={styles.monthRow}>
-          <IconButton icon={faChevronLeft} label="Previous month" onPress={() => shift(-1)} size={36} iconSize={14} />
+          <IconButton icon={ChevronLeftIcon} label="Previous month" onPress={() => shift(-1)} size={36} iconSize={14} />
           <Text size="sm" weight="semibold">
             {monthLabel}
           </Text>
-          <IconButton icon={faChevronRight} label="Next month" onPress={() => shift(1)} size={36} iconSize={14} />
+          <IconButton icon={ChevronRightIcon} label="Next month" onPress={() => shift(1)} size={36} iconSize={14} />
         </View>
 
         <View style={styles.grid}>
@@ -118,7 +118,7 @@ export default function CalendarScreen() {
             <PressableScale scaleTo={0.97}
               key={t.id}
               onPress={() => router.push({ pathname: '/task/[id]', params: { id: t.id } })}
-              style={[styles.task, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+              style={[styles.task, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Text size="sm" weight="medium" numberOfLines={2}>
                   {t.title}

@@ -1,21 +1,11 @@
-import {
-  faBell,
-  faBoxArchive,
-  faBuilding,
-  faChevronDown,
-  faChevronLeft,
-  faGear,
-  faRightFromBracket,
-  faUsers,
-  type IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
+import { ArchiveIcon, BellIcon, Building2Icon, ChevronDownIcon, ChevronLeftIcon, LogOutIcon, SettingsIcon, UsersIcon } from 'lucide-react-native';
 import { router, type Href } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, useAnimatedStyle, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
@@ -26,8 +16,8 @@ import { Text } from '@/components/text';
 import { Avatar, IconButton } from '@/components/ui';
 import { Pulse } from '@/components/motion/pulse';
 import { Duration, POP_EASE } from '@/constants/motion';
-import { alpha, Radius, Tone } from '@/constants/theme';
-import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { alpha, elevation } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/auth-client';
 import { signOut } from '@/lib/sign-out';
 import { useWorkspace } from '@/lib/workspace';
@@ -71,7 +61,7 @@ export function TabHeader({ title, children }: { title?: string; children?: Reac
             {/* Its own glass capsule, like the pill it sits in. */}
             <BarSurface radius={ITEM / 2} nested />
             <IconButton
-              icon={faBell}
+              icon={BellIcon}
               label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
               onPress={openPanel}
               size={ITEM}
@@ -124,7 +114,7 @@ function OnlineStack() {
           entering={ZoomIn.duration(Duration.pop).easing(POP_EASE)}
           exiting={ZoomOut.duration(Duration.micro)}
           layout={PILL_LAYOUT}
-          style={[styles.stackItem, { marginLeft: i === 0 ? 0 : -STACK_OVERLAP, borderColor: theme.surfaceElevated }]}>
+          style={[styles.stackItem, { marginLeft: i === 0 ? 0 : -STACK_OVERLAP, borderColor: theme.cardRaised }]}>
           <Avatar name={m.name} email={m.email} image={m.image} size={STACK_AVATAR} />
         </Animated.View>
       ))}
@@ -137,7 +127,7 @@ function OnlineStack() {
           style={[
             styles.stackItem,
             styles.stackMore,
-            { marginLeft: -STACK_OVERLAP, borderColor: theme.surfaceElevated, backgroundColor: theme.accent },
+            { marginLeft: -STACK_OVERLAP, borderColor: theme.cardRaised, backgroundColor: theme.accent },
           ]}>
           <Text size="10" weight="bold" color={theme.onAccent} tabular>
             {`+${more}`}
@@ -148,7 +138,37 @@ function OnlineStack() {
   );
 }
 
-/** Header of a screen pushed on top of the tabs: back chevron, title and an optional subtitle. */
+/**
+ * A round header control on a pushed screen (back, more…): the same 44dp floating capsule as the tab headers'
+ * workspace switcher and bell + avatar pill, so the chevron sits on the same surface, size and 12dp edge as
+ * every other header control instead of floating bare.
+ */
+export function HeaderButton({
+  icon,
+  label,
+  onPress,
+  children,
+}: {
+  icon?: IconType;
+  label: string;
+  onPress: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      scaleTo={0.94}
+      hitSlop={6}
+      style={styles.headerButton}>
+      <BarSurface radius={CONTROL_H / 2} />
+      {children ?? (icon ? <Icon icon={icon} size={20} color="fg" strokeWidth={2.25} /> : null)}
+    </PressableScale>
+  );
+}
+
+/** Header of a screen pushed on top of the tabs: back capsule, title and an optional subtitle. */
 export function StackHeader({
   title,
   subtitle,
@@ -166,7 +186,7 @@ export function StackHeader({
   return (
     <View style={{ paddingTop: insets.top }}>
       <View style={[styles.row, styles.stackRow]}>
-        <IconButton icon={faChevronLeft} label="Back" onPress={back} size={40} iconSize={18} tone="fg" style={styles.back} />
+        <HeaderButton icon={ChevronLeftIcon} label="Back" onPress={back} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text font="outfit" size="base" weight="semibold" numberOfLines={1}>
             {title}
@@ -223,13 +243,13 @@ export function WorkspaceSwitcher() {
             scaleTo={0.97}
             haptic="select"
             onPress={() => setOpen(true)}
-            style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: alpha(theme.fg, 0.06) }]}>
+            style={({ pressed }) => [styles.switcherInner, pressed && { backgroundColor: theme.fill }]}>
             <Animated.View key={org.id} entering={FadeIn.duration(Duration.base)} style={styles.switcherContent}>
               <OrgMark key={org.avatarUrl ?? org.id} name={org.name} avatarUrl={org.avatarUrl} />
               <Text font="outfit" size="sm" weight="semibold" numberOfLines={1} style={{ flexShrink: 1 }}>
                 {org.name}
               </Text>
-              <Icon icon={faChevronDown} size={11} color="muted" />
+              <Icon icon={ChevronDownIcon} size={11} color="muted" />
             </Animated.View>
           </PressableScale>
         ) : (
@@ -254,13 +274,13 @@ export function WorkspaceSwitcher() {
   );
 }
 
-type MenuLink = { href: Href; label: string; icon: IconDefinition };
+type MenuLink = { href: Href; label: string; icon: IconType };
 
 const LINKS: MenuLink[] = [
-  { href: '/archived', label: 'Archived', icon: faBoxArchive },
-  { href: '/people', label: 'Team', icon: faUsers },
-  { href: '/settings', label: 'Your settings', icon: faGear },
-  { href: '/organization-settings', label: 'Organization settings', icon: faBuilding },
+  { href: '/archived', label: 'Archived', icon: ArchiveIcon },
+  { href: '/people', label: 'Team', icon: UsersIcon },
+  { href: '/settings', label: 'Your settings', icon: SettingsIcon },
+  { href: '/organization-settings', label: 'Organization settings', icon: Building2Icon },
 ];
 
 /** Avatar + account menu: the secondary destinations and sign out. */
@@ -269,7 +289,6 @@ function AccountButton() {
   const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
   const user = session?.user;
-  const dark = useIsDark();
   const { height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   // Bottom sheet: springs up over a fading scrim, eases back down (same feel as the app's other sheets).
@@ -319,7 +338,7 @@ function AccountButton() {
           <Animated.View
             style={[
               styles.sheet,
-              { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle, paddingBottom: insets.bottom + 12 },
+              { backgroundColor: theme.cardRaised, ...elevation(theme, 'overlay'), paddingBottom: insets.bottom + 12 },
               sheet,
             ]}>
             <View style={[styles.handle, { backgroundColor: alpha(theme.fg, 0.18) }]} />
@@ -336,14 +355,14 @@ function AccountButton() {
               </View>
             </View>
 
-            <View style={[styles.sheetGroup, { backgroundColor: alpha(theme.fg, dark ? 0.04 : 0.03) }]}>
+            <View style={[styles.sheetGroup, { backgroundColor: theme.fill }]}>
               {LINKS.map((l) => (
                 <MenuRow key={l.label} label={l.label} icon={l.icon} onPress={() => go(l.href)} />
               ))}
             </View>
 
-            <View style={[styles.sheetGroup, { backgroundColor: alpha(theme.fg, dark ? 0.04 : 0.03) }]}>
-              <MenuRow label="Sign out" icon={faRightFromBracket} destructive onPress={onSignOut} />
+            <View style={[styles.sheetGroup, { backgroundColor: theme.fill }]}>
+              <MenuRow label="Sign out" icon={LogOutIcon} destructive onPress={onSignOut} />
             </View>
           </Animated.View>
         </View>
@@ -361,7 +380,7 @@ function MenuRow({
   onPress,
 }: {
   label: string;
-  icon?: IconDefinition;
+  icon?: IconType;
   selected?: boolean;
   right?: ReactNode;
   /** Red, for sign out. */
@@ -369,8 +388,7 @@ function MenuRow({
   onPress: () => void;
 }) {
   const theme = useTheme();
-  const dark = useIsDark();
-  const tint = destructive ? (dark ? Tone.red400 : Tone.red600) : undefined;
+  const tint = destructive ? theme.danger : undefined;
   return (
     <Pressable
       accessibilityRole="menuitem"
@@ -378,7 +396,7 @@ function MenuRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuItem,
-        { backgroundColor: selected ? theme.accentMuted : pressed ? theme.surfaceHover : 'transparent' },
+        { backgroundColor: selected ? theme.fill2 : pressed ? theme.fill2 : 'transparent' },
       ]}>
       {icon ? <Icon icon={icon} size={15} color={tint ?? 'muted'} /> : null}
       <Text size="15" weight={selected ? 'semibold' : 'medium'} color={tint ?? 'fg'} numberOfLines={1} style={{ flex: 1 }}>
@@ -392,8 +410,9 @@ function MenuRow({
 const styles = StyleSheet.create({
   // Same 12dp gutter as the page content, so the header pills and the cards below share one edge.
   row: { height: HEADER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
-  stackRow: { paddingHorizontal: 8, gap: 4 },
-  back: { marginRight: 2 },
+  stackRow: { gap: 12 },
+  // Icon nudged 1dp left: a chevron's visual centre sits right of its box centre.
+  headerButton: { width: CONTROL_H, height: CONTROL_H, borderRadius: CONTROL_H / 2, alignItems: 'center', justifyContent: 'center', paddingRight: 2 },
   titleWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
   // A two-item pill in the Apple style: roomier left/right than top/bottom, with the items spaced apart.
   controlPill: {
@@ -439,7 +458,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Tone.red600,
+    backgroundColor: '#E5484D',
   },
   // Sits on the avatar's lower-right edge.
   presence: {
@@ -449,7 +468,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Tone.green500,
+    backgroundColor: '#22C55E',
   },
   sheetAnchor: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
@@ -458,7 +477,6 @@ const styles = StyleSheet.create({
     gap: 10,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth * 2,
   },
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, marginBottom: 4 },
   sheetProfile: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 6, paddingVertical: 6 },
@@ -469,6 +487,6 @@ const styles = StyleSheet.create({
     gap: 14,
     minHeight: 50,
     paddingHorizontal: 14,
-    borderRadius: Radius.xxxl,
+    borderRadius: 16,
   },
 });

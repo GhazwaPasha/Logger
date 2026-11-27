@@ -1,19 +1,4 @@
-import {
-  faBell,
-  faCalculator,
-  faCalendarDays,
-  faChevronRight,
-  faDivide,
-  faHashtag,
-  faPlus,
-  faRepeat,
-  faScaleBalanced,
-  faSliders,
-  faTrash,
-  faUser,
-  faXmark,
-  type IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
+import { BellIcon, CalculatorIcon, CalendarDaysIcon, ChevronRightIcon, DivideIcon, HashIcon, PlusIcon, RepeatIcon, ScaleIcon, SlidersHorizontalIcon, Trash2Icon, UserIcon, XIcon } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import {
   TRACKER_TEMPLATES,
@@ -31,7 +16,7 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, 
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
@@ -40,7 +25,7 @@ import { AssigneeSheet } from '@/components/tasks/detail/assignee-field';
 import { Text } from '@/components/text';
 import { Avatar, CenteredSpinner, ErrorBanner } from '@/components/ui';
 import { Duration, POP_EASE, sequenceEnter } from '@/constants/motion';
-import { alpha, Fonts, Radius, Tone } from '@/constants/theme';
+import { alpha, elevation, Fonts, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
 import { useTrackerDetail, useTrackerWrites, type TrackerDetailResponse } from '@/lib/trackers';
@@ -239,7 +224,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
       ...ms,
       {
         id: uuid(),
-        name: '',
+        // Calculated metrics start named after their formula, so adding one never blocks autosave.
+        name: kind === 'formula' ? `${inputs[inputs.length - 1]!.name.trim() || 'First'} ÷ ${inputs[0]!.name.trim() || 'Second'}` : '',
         kind,
         unit: kind === 'formula' ? 'number' : 'count',
         target: '',
@@ -348,8 +334,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
         ? 'Not saved'
         : sync === 'saved'
           ? 'Saved'
-          : problem && !savedIdRef.current
-            ? 'Draft'
+          : problem
+            ? 'Not saved'
             : '';
 
   /* ───────────── pickers ───────────── */
@@ -384,7 +370,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
         right={
           <View style={styles.headerRight}>
             {status ? (
-              <Text size="xs" color={sync === 'error' ? Tone.red500 : 'muted'} numberOfLines={1}>
+              <Text size="xs" color={sync === 'error' ? theme.danger : 'muted'} numberOfLines={1}>
                 {status}
               </Text>
             ) : null}
@@ -413,8 +399,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                 maxLength={120}
                 style={[styles.titleInput, { color: theme.fg }]}
               />
-              <Text size="xs" color="muted">
-                {problem && !savedIdRef.current ? problem : 'One person, one set of targets. Changes save as you go.'}
+              <Text size="xs" color={problem ? theme.warning : 'muted'}>
+                {problem ?? 'One person, one set of targets. Changes save as you go.'}
               </Text>
             </Animated.View>
 
@@ -442,8 +428,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
             ) : null}
 
             {/* Details — same grouped rows as the task screen. */}
-            <Animated.View entering={sequenceEnter(3, 8)} style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-              <Row icon={faUser} label="Assigned to" onPress={() => setSheet({ kind: 'assignee' })}>
+            <Animated.View entering={sequenceEnter(3, 8)} style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
+              <Row icon={UserIcon} label="Assigned to" onPress={() => setSheet({ kind: 'assignee' })}>
                 {assignee ? <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size={20} /> : null}
                 <Text size="sm" weight="medium" color={assignee ? 'fg' : 'muted'} numberOfLines={1} style={{ flexShrink: 1 }}>
                   {assignee ? (assignee.name ?? '').trim() || assignee.email : 'Unassigned'}
@@ -494,9 +480,9 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                     entering={FadeIn.duration(Duration.base)}
                     exiting={FadeOut.duration(Duration.micro)}
                     layout={layout}
-                    style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+                    style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
                     <View style={styles.row}>
-                      <Icon icon={m.kind === 'formula' ? faCalculator : faHashtag} size={13} color="muted" style={{ width: 16 }} />
+                      <Icon icon={m.kind === 'formula' ? CalculatorIcon : HashIcon} size={13} color="muted" style={{ width: 16 }} />
                       <TextInput
                         value={m.name}
                         onChangeText={(v) => patch(m.id, { name: v })}
@@ -505,9 +491,14 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                         maxLength={80}
                         style={[styles.metricName, { color: theme.fg }]}
                       />
+                      {!m.name.trim() ? (
+                        <Text size="11" color={theme.warning}>
+                          Needs a name
+                        </Text>
+                      ) : null}
                       {metrics.length > 1 ? (
                         <PressableScale scaleTo={0.9} onPress={() => removeMetric(m.id)} accessibilityLabel={`Remove ${m.name || 'metric'}`} style={styles.iconBtn}>
-                          <Icon icon={faXmark} size={12} color="muted" />
+                          <Icon icon={XIcon} size={12} color="muted" />
                         </PressableScale>
                       ) : null}
                     </View>
@@ -515,7 +506,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                     {m.kind === 'formula' && m.formula ? (
                       <>
                         <View style={styles.row}>
-                          <Icon icon={faDivide} size={13} color="muted" style={{ width: 16 }} />
+                          <Icon icon={DivideIcon} size={13} color="muted" style={{ width: 16 }} />
                           <Text size="sm" color="muted" style={styles.label}>
                             Formula
                           </Text>
@@ -526,7 +517,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                           </View>
                         </View>
                         <Divider color={divider} />
-                        <Row icon={faScaleBalanced} label="Target">
+                        <Row icon={ScaleIcon} label="Target">
                           <Text size="sm" weight="semibold" tabular>
                             {t != null ? `${compact(t)}${m.formula.percent ? '%' : ''}` : '–'}
                           </Text>
@@ -537,14 +528,14 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                       </>
                     ) : (
                       <>
-                        <Row icon={faSliders} label="Measured as" onPress={() => setSheet({ kind: 'unit', id: m.id })}>
+                        <Row icon={SlidersHorizontalIcon} label="Measured as" onPress={() => setSheet({ kind: 'unit', id: m.id })}>
                           <Text size="sm" weight="medium">
                             {UNIT_LABEL[m.unit]}
                           </Text>
                         </Row>
                         <Divider color={divider} />
                         <View style={styles.row}>
-                          <Icon icon={faScaleBalanced} size={13} color="muted" style={{ width: 16 }} />
+                          <Icon icon={ScaleIcon} size={13} color="muted" style={{ width: 16 }} />
                           <PressableScale haptic="select" onPress={() => setSheet({ kind: 'direction', id: m.id })} style={styles.labelBtn}>
                             <Text size="sm" color="muted">
                               {m.direction === 'at_most' ? 'At most' : 'At least'}
@@ -572,14 +563,14 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                 );
               })}
               <View style={styles.addRow}>
-                <PressableScale onPress={() => addMetric('input')} style={[styles.addBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceElevated }]}>
-                  <Icon icon={faPlus} size={11} color="muted" />
+                <PressableScale onPress={() => addMetric('input')} style={[styles.addBtn, { borderColor: 'transparent', backgroundColor: theme.fill }]}>
+                  <Icon icon={PlusIcon} size={11} color="muted" />
                   <Text size="13" weight="medium" color="muted">
                     Add metric
                   </Text>
                 </PressableScale>
-                <PressableScale onPress={() => addMetric('formula')} style={[styles.addBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceElevated }]}>
-                  <Icon icon={faCalculator} size={11} color="muted" />
+                <PressableScale onPress={() => addMetric('formula')} style={[styles.addBtn, { borderColor: 'transparent', backgroundColor: theme.fill }]}>
+                  <Icon icon={CalculatorIcon} size={11} color="muted" />
                   <Text size="13" weight="medium" color="muted">
                     Add calculated
                   </Text>
@@ -588,14 +579,14 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
             </Animated.View>
 
             {/* Rhythm */}
-            <Animated.View entering={sequenceEnter(5, 8)} style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-              <Row icon={faRepeat} label="Target split" onPress={() => setSheet({ kind: 'split' })}>
+            <Animated.View entering={sequenceEnter(5, 8)} style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
+              <Row icon={RepeatIcon} label="Target split" onPress={() => setSheet({ kind: 'split' })}>
                 <Text size="sm" weight="medium">
                   {split === 'week' ? 'Per week' : 'Per working day'}
                 </Text>
               </Row>
               <Divider color={divider} />
-              <Row icon={faCalendarDays} label="Logs" onPress={() => setSheet({ kind: 'logs' })}>
+              <Row icon={CalendarDaysIcon} label="Logs" onPress={() => setSheet({ kind: 'logs' })}>
                 <Text size="sm" weight="medium">
                   {checkIn === 'weekly' ? 'Once a week' : 'Every day'}
                 </Text>
@@ -625,7 +616,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
               </View>
               <Divider color={divider} />
               <View style={styles.row}>
-                <Icon icon={faBell} size={13} color="muted" style={{ width: 16 }} />
+                <Icon icon={BellIcon} size={13} color="muted" style={{ width: 16 }} />
                 <Text size="sm" color="muted" style={styles.label}>
                   Reminder
                 </Text>
@@ -673,7 +664,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                       .then(() => router.back())
                       .catch((e: Error) => Alert.alert("Couldn't update the tracker", e.message))
                   }
-                  style={[styles.actionBtn, { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceElevated }]}>
+                  style={[styles.actionBtn, { borderColor: 'transparent', backgroundColor: theme.fill }]}>
                   <Text size="sm" weight="medium" color="muted">
                     {editing.archivedAt ? 'Unarchive tracker' : 'Archive tracker'}
                   </Text>
@@ -694,8 +685,8 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
                     ])
                   }
                   style={styles.actionBtn}>
-                  <Icon icon={faTrash} size={12} color={Tone.red500} />
-                  <Text size="sm" weight="medium" color={Tone.red500}>
+                  <Icon icon={Trash2Icon} size={12} color={theme.danger} />
+                  <Text size="sm" weight="medium" color={theme.danger}>
                     Delete tracker
                   </Text>
                 </PressableScale>
@@ -803,7 +794,7 @@ function Editor({ editing, template }: { editing: TrackerDetailResponse | null; 
 
 /* ───────────── rows, matching the task screen's property rows ───────────── */
 
-function Row({ icon, label, onPress, children }: { icon: IconDefinition; label: string; onPress?: () => void; children: ReactNode }) {
+function Row({ icon, label, onPress, children }: { icon: IconType; label: string; onPress?: () => void; children: ReactNode }) {
   const theme = useTheme();
   return (
     <PressableScale
@@ -819,7 +810,7 @@ function Row({ icon, label, onPress, children }: { icon: IconDefinition; label: 
         {label}
       </Text>
       <View style={styles.value}>{children}</View>
-      {onPress ? <Icon icon={faChevronRight} size={10} color="muted" style={{ opacity: 0.6 }} /> : null}
+      {onPress ? <Icon icon={ChevronRightIcon} size={10} color="muted" style={{ opacity: 0.6 }} /> : null}
     </PressableScale>
   );
 }
@@ -828,7 +819,7 @@ function DateRow({ label, value, onPress, onIos }: { label: string; value: strin
   if (Platform.OS === 'ios') {
     return (
       <View style={styles.row}>
-        <Icon icon={faCalendarDays} size={13} color="muted" style={{ width: 16 }} />
+        <Icon icon={CalendarDaysIcon} size={13} color="muted" style={{ width: 16 }} />
         <Text size="sm" color="muted" style={styles.label}>
           {label}
         </Text>
@@ -839,7 +830,7 @@ function DateRow({ label, value, onPress, onIos }: { label: string; value: strin
     );
   }
   return (
-    <Row icon={faCalendarDays} label={label} onPress={onPress}>
+    <Row icon={CalendarDaysIcon} label={label} onPress={onPress}>
       <Text size="sm" weight="medium" tabular>
         {shortDate(value)}
       </Text>
@@ -870,7 +861,7 @@ const styles = StyleSheet.create({
   templateChip: { borderWidth: 1, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 7 },
   section: { gap: 8 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 },
-  group: { borderRadius: Radius.xxl, borderWidth: 1, overflow: 'hidden' },
+  group: { borderRadius: Radius.card, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingHorizontal: 14 },
   label: { width: 96 },
   labelBtn: { width: 96, paddingVertical: 8 },

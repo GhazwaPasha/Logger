@@ -1,12 +1,14 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { RefreshControl, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+
+import { Icon, type IconType } from '@/components/icon';
 
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { useCollapseOnScroll, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { Text } from '@/components/text';
-import { pageEnter, sequenceEnter, stateTransition } from '@/constants/motion';
-import { Radius } from '@/constants/theme';
+import { pageEnter, sequenceEnter } from '@/constants/motion';
+import { cardSurface, elevation, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -66,7 +68,7 @@ export function PageEnter({ children, enabled = true }: { children: ReactNode; e
   );
 }
 
-/** Elevated panel (`surface-elevated ui-elevated-panel rounded-2xl border border-subtle p-2.5`). */
+/** A card on the sheet (the web's `rounded-[18px] bg-card p-5 shadow-card`): no border, a hairline + soft shadow. */
 export function Panel({
   children,
   style,
@@ -81,65 +83,102 @@ export function Panel({
   return (
     <Animated.View
       entering={enterIndex === undefined ? undefined : sequenceEnter(enterIndex, 8)}
-      style={[
-        {
-          backgroundColor: theme.surfaceElevated,
-          borderColor: theme.borderSubtle,
-          borderWidth: 1,
-          borderRadius: Radius.xxl,
-          padding: 10,
-        },
-        style,
-      ]}>
+      style={[cardSurface(theme, Radius.card), { padding: 16 }, style]}>
       {children}
     </Animated.View>
   );
 }
 
-/** Small uppercase label (`text-xs font-semibold uppercase tracking-wide text-muted`). */
+/** Section heading inside a card (the web's `font-outfit text-base font-semibold`). */
 export function SectionLabel({ children, size = 'xs' }: { children: ReactNode; size?: 'xs' | '10' }) {
   return (
-    <Text size={size} weight="semibold" color="muted" uppercase tracking={0.5}>
+    <Text font="outfit" size={size === '10' ? 'sm' : 'base'} weight="semibold" tracking={-0.2}>
       {children}
     </Text>
   );
 }
 
-/** Page title (`text-xl font-semibold tracking-tight`). */
+/** Page title (the web's `page-title`: Outfit, tight tracking). */
 export function PageTitle({ children }: { children: ReactNode }) {
   return (
-    <Text size="xl" weight="semibold" tracking={-0.4}>
+    <Text font="outfit" size="2xl" weight="semibold" tracking={-0.6}>
       {children}
     </Text>
   );
 }
 
-/** Pill-group switcher (`rounded-xl bg-surface-elevated p-0.5` with `rounded-lg px-3 py-2 text-xs` buttons). */
+/**
+ * THE filter / view switch (web `ui/Segmented`): a soft fill track with a card-coloured thumb that slides to
+ * the selected option on a spring. No accent colour, no outline. `sm` is the in-card size.
+ */
 export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  size = 'md',
+  stretch,
 }: {
   value: T;
-  options: { value: T; label: string }[];
+  /** An icon-only option passes `label: ''` and names itself with `a11y`. */
+  options: { value: T; label: string; icon?: IconType; a11y?: string }[];
   onChange: (v: T) => void;
+  size?: 'sm' | 'md';
+  /** Fill the row, splitting it evenly between options. */
+  stretch?: boolean;
 }) {
   const theme = useTheme();
+  const sm = size === 'sm';
+  const [frames, setFrames] = useState<Record<string, { x: number; w: number }>>({});
+  const f = frames[value];
+  const h = sm ? 26 : 36;
+  const r = sm ? 8 : 10;
+
   return (
-    <View style={[styles.segmented, { backgroundColor: theme.surfaceElevated }]}>
+    <View
+      accessibilityRole="radiogroup"
+      style={[
+        styles.segmented,
+        { backgroundColor: theme.fill, padding: sm ? 2 : 3, borderRadius: sm ? 10 : 13 },
+        stretch ? { alignSelf: 'stretch' } : null,
+      ]}>
+      {/* Plain left/width from the measured segment; the layout transition springs it from one option to the next. */}
+      {f ? (
+        <Animated.View
+          pointerEvents="none"
+          layout={SEG_LAYOUT}
+          style={[styles.thumb, { top: sm ? 2 : 3, height: h, left: f.x, width: f.w }]}>
+          <View style={{ flex: 1, borderRadius: r, backgroundColor: theme.cardRaised, ...elevation(theme, 'card') }} />
+        </Animated.View>
+      ) : null}
       {options.map((o) => {
         const active = o.value === value;
         return (
           <PressableScale
             key={o.value}
-            accessibilityRole="button"
+            accessibilityRole="radio"
+            accessibilityLabel={o.a11y ?? o.label}
             accessibilityState={{ selected: active }}
             onPress={() => onChange(o.value)}
             haptic="select"
-            style={[styles.segment, { backgroundColor: active ? theme.accentMuted : 'transparent' }, stateTransition]}>
-            <Text size="xs" weight="medium" color={active ? 'fg' : 'muted'}>
-              {o.label}
-            </Text>
+            scaleTo={0.96}
+            onLayout={(e) => {
+              const { x: fx, width } = e.nativeEvent.layout;
+              setFrames((prev) =>
+                prev[o.value]?.x === fx && prev[o.value]?.w === width ? prev : { ...prev, [o.value]: { x: fx, w: width } },
+              );
+            }}
+            style={[
+              styles.segment,
+              { height: h, borderRadius: r, paddingHorizontal: o.icon && !o.label ? 0 : sm ? 10 : 14 },
+              o.icon && !o.label ? { width: sm ? 28 : 44 } : null,
+              stretch ? { flex: 1 } : null,
+            ]}>
+            {o.icon ? <Icon icon={o.icon} size={sm ? 13 : 15} color={active ? 'fg' : 'muted'} /> : null}
+            {o.label ? (
+              <Text size={sm ? 'xs' : '13'} weight="semibold" color={active ? 'fg' : 'muted'} numberOfLines={1}>
+                {o.label}
+              </Text>
+            ) : null}
           </PressableScale>
         );
       })}
@@ -147,8 +186,11 @@ export function Segmented<T extends string>({
   );
 }
 
+const SEG_LAYOUT = LinearTransition.springify().damping(30).stiffness(380).mass(0.8);
+
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  segmented: { flexDirection: 'row', alignSelf: 'flex-start', padding: 2, borderRadius: Radius.xl },
-  segment: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.lg },
+  segmented: { flexDirection: 'row', alignSelf: 'flex-start', gap: 2 },
+  thumb: { position: 'absolute' },
+  segment: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
 });

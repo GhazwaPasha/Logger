@@ -1,20 +1,19 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import { Modal, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
 import { Text } from '@/components/text';
 import { stateTransition } from '@/constants/motion';
-import { Radius, Tone } from '@/constants/theme';
-import { useIsDark, useTheme } from '@/hooks/use-theme';
+import { Radius } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type ActionMenuItem = {
   id: string;
   label: string;
-  icon?: IconDefinition;
+  icon?: IconType;
   /** Styled in red, for a destructive action like delete. */
   destructive?: boolean;
   onSelect: () => void;
@@ -38,7 +37,6 @@ export function ActionMenu({
   onClose: () => void;
 }) {
   const theme = useTheme();
-  const dark = useIsDark();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const { mounted, progress } = usePresence(visible, { spring: true });
@@ -60,7 +58,7 @@ export function ActionMenu({
           style={[
             styles.sheet,
             {
-              backgroundColor: theme.surfaceElevated,
+              backgroundColor: theme.cardRaised,
               borderColor: theme.borderSubtle,
               paddingBottom: Math.max(insets.bottom, 12),
             },
@@ -71,7 +69,7 @@ export function ActionMenu({
             </Text>
           ) : null}
           {items.map((item) => {
-            const tint = item.destructive ? (dark ? Tone.red400 : Tone.red600) : undefined;
+            const tint = item.destructive ? theme.danger : undefined;
             return (
               <PressableScale
                 key={item.id}

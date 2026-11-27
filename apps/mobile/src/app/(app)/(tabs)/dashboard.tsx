@@ -1,4 +1,13 @@
-import { faBullseye, faChartPie, faChevronRight, faTerminal } from '@fortawesome/free-solid-svg-icons';
+import {
+  Building2Icon,
+  ChartPieIcon,
+  ChevronRightIcon,
+  CircleUserRoundIcon,
+  Clock4Icon,
+  SquareTerminalIcon,
+  TargetIcon,
+  UserRoundXIcon,
+} from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -6,18 +15,20 @@ import Animated, { FadeIn, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { ActivityTerminal } from '@/components/activity/activity-terminal';
-import { HBarChart } from '@/components/dashboard/hbar-chart';
+import { AssigneeBubbles } from '@/components/dashboard/assignee-bubbles';
+import { CompletionsChart } from '@/components/dashboard/completions-chart';
+import { DepartmentTreemap } from '@/components/dashboard/department-treemap';
 import { StatusPriorityRing } from '@/components/dashboard/status-priority-ring';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { Pulse } from '@/components/motion/pulse';
 import { Page } from '@/components/page';
 import { BarSurface } from '@/components/shell/tab-bar/bar-surface';
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { TabHeader, WorkspaceSwitcher } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { ErrorBanner } from '@/components/ui';
 import { fadeOut, sequenceEnter, stateTransition } from '@/constants/motion';
-import { alpha, Radius, Tone } from '@/constants/theme';
+import { alpha, cardSurface, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NODE_LABELS } from '@/lib/labels';
 import { DASHBOARD_WINDOW_DAYS } from '@work-ledger/contracts';
@@ -38,18 +49,6 @@ const KPI_TONES = {
 } as const;
 type KpiTone = keyof typeof KPI_TONES;
 
-/** Ring chunk colours: the web chart's hues at full strength, so the meter reads at a glance. */
-const STATUS_COLOR = {
-  pending: Tone.slate400,
-  in_progress: Tone.violet500,
-  done: Tone.emerald500,
-  cancelled: Tone.neutral500,
-} as const;
-const PRIORITY_COLOR: Record<TaskPriority, string> = {
-  high: '#f43f5e',
-  medium: Tone.amber500,
-  low: '#94a3b8',
-};
 const PRIORITY_ORDER: TaskPriority[] = ['high', 'medium', 'low'];
 
 // Stable query inputs (they are part of the query keys).
@@ -81,9 +80,8 @@ function KpiCard({
         scaleTo={0.98}
         style={[
           styles.kpi,
-          dark
-            ? { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }
-            : { backgroundColor: t.bg, borderColor: t.border },
+          cardSurface(theme, Radius.card),
+          dark ? null : { backgroundColor: t.bg },
         ]}>
         {!dark ? (
           <View style={styles.wave} pointerEvents="none">
@@ -99,20 +97,25 @@ function KpiCard({
   );
 }
 
-function KpiLabel({ children }: { children: ReactNode }) {
+/** Card label with its tinted icon (web `KpiLabel`: footnote, semibold, muted). */
+function KpiLabel({ icon, tint, children }: { icon: IconType; tint: string; children: ReactNode }) {
   return (
-    <Text size="11" weight="medium" color="muted" uppercase tracking={0.5}>
-      {children}
-    </Text>
+    <View style={styles.kpiLabel}>
+      <Icon icon={icon} size={14} color={tint} strokeWidth={2.4} />
+      <Text size="13" weight="semibold" color="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+        {children}
+      </Text>
+    </View>
   );
 }
+/** KPI figure: Outfit, tight tracking (web `text-figure`). */
 const KpiValue = ({ children, color, loading }: { children: ReactNode; color?: string; loading?: boolean }) =>
   loading ? (
-    <Pulse style={{ width: 44, height: 32, borderRadius: 8, marginTop: 6, marginBottom: 2, backgroundColor: 'rgba(120,120,120,0.18)' }} />
+    <Pulse style={{ width: 48, height: 36, borderRadius: 9, marginTop: 10, marginBottom: 2, backgroundColor: 'rgba(120,120,120,0.18)' }} />
   ) : (
-  <Text size="3xl" lh={36} weight="semibold" tabular tracking={-0.6} color={color ?? 'fg'} style={{ fontSize: 36, marginTop: 2 }}>
-    {children}
-  </Text>
+    <Text font="outfit" weight="semibold" tabular tracking={-1.2} color={color ?? 'fg'} style={styles.kpiFigure}>
+      {children}
+    </Text>
   );
 
 /** How often the greeting's fact line rotates. */
@@ -165,10 +168,10 @@ function Greeting({ facts, loading }: { facts: (string | null)[]; loading: boole
   );
 }
 
-const VIEWS: { value: View_; label: string; icon: typeof faChartPie }[] = [
-  { value: 'overview', label: 'Overview', icon: faChartPie },
+const VIEWS: { value: View_; label: string; icon: typeof ChartPieIcon }[] = [
+  { value: 'overview', label: 'Overview', icon: ChartPieIcon },
   // A terminal, because that's where it takes you: the workspace's activity log.
-  { value: 'activity', label: 'Activity log', icon: faTerminal },
+  { value: 'activity', label: 'Activity log', icon: SquareTerminalIcon },
 ];
 
 /**
@@ -201,13 +204,25 @@ function ViewChip({ value, onChange }: { value: View_; onChange: (v: View_) => v
 }
 
 const KpiNote = ({ children }: { children: ReactNode }) => (
-  <Text size="11" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
+  <Text size="xs" color="muted" numberOfLines={1} style={{ marginTop: 6 }}>
     {children}
   </Text>
 );
 
 export default function DashboardScreen() {
-  const dark = useIsDark();
+  const theme = useTheme();
+  /** Ring colours: the web's status / priority tokens. */
+  const STATUS_COLOR = {
+    pending: theme.statusPending,
+    in_progress: theme.statusProgress,
+    done: theme.statusDone,
+    cancelled: theme.statusCancelled,
+  } as const;
+  const PRIORITY_COLOR: Record<TaskPriority, string> = {
+    high: theme.priorityHigh,
+    medium: theme.priorityMedium,
+    low: theme.priorityLow,
+  };
   const { org, depts, lists, members, userId, scope, isLoading: workspaceLoading } = useWorkspace();
   const active = useActiveTasks(org?.id);
   /** The work links open the last channel's board (or the channel list when there is none yet). */
@@ -255,7 +270,7 @@ export default function DashboardScreen() {
     cancelled: cancelledCount.data ?? 0,
   };
   const names = useMemo(() => new Map(members.map((m) => [m.userId, m.name || m.email])), [members]);
-  const topAssignees = [...stats.byAssignee.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topAssignees = [...stats.byAssignee.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
   const memberById = new Map(members.map((m) => [m.userId, m]));
 
   return (
@@ -315,24 +330,32 @@ export default function DashboardScreen() {
         <Animated.View key="overview" exiting={fadeOut} style={styles.overview}>
       <View style={styles.kpiGrid}>
               <KpiCard tone="rose" index={1} onPress={() => openBoard()}>
-                <KpiLabel>Overdue</KpiLabel>
-                <KpiValue loading={loading} color={stats.overdue > 0 ? (dark ? Tone.red400 : Tone.red600) : undefined}>
+                <KpiLabel icon={Clock4Icon} tint={theme.danger}>
+                  Overdue
+                </KpiLabel>
+                <KpiValue loading={loading} color={stats.overdue > 0 ? theme.danger : undefined}>
                   {stats.overdue}
                 </KpiValue>
                 <KpiNote>Past their due date</KpiNote>
               </KpiCard>
               <KpiCard tone="amber" index={2} onPress={() => openBoard()}>
-                <KpiLabel>Unassigned</KpiLabel>
+                <KpiLabel icon={UserRoundXIcon} tint={theme.warning}>
+                  Unassigned
+                </KpiLabel>
                 <KpiValue loading={loading}>{stats.unassigned}</KpiValue>
                 <KpiNote>Waiting for an owner</KpiNote>
               </KpiCard>
               <KpiCard tone="blue" index={3} onPress={() => router.navigate('/my-tasks')}>
-                <KpiLabel>Assigned to me</KpiLabel>
+                <KpiLabel icon={CircleUserRoundIcon} tint={theme.dept1}>
+                  Assigned to me
+                </KpiLabel>
                 <KpiValue loading={loading}>{stats.mine}</KpiValue>
                 <KpiNote>On your plate</KpiNote>
               </KpiCard>
               <KpiCard tone="peach" index={4}>
-                <KpiLabel>Workspace</KpiLabel>
+                <KpiLabel icon={Building2Icon} tint={theme.dept2}>
+                  Workspace
+                </KpiLabel>
                 <View style={styles.workspaceRow}>
                   {[
                     { label: 'Members', n: members.length },
@@ -343,11 +366,11 @@ export default function DashboardScreen() {
                       {loading ? (
                         <Pulse style={{ width: 24, height: 18, borderRadius: 5, marginVertical: 2, backgroundColor: 'rgba(120,120,120,0.18)' }} />
                       ) : (
-                        <Text size="xl" lh={22} weight="semibold" tabular>
+                        <Text font="outfit" size="2xl" lh={28} weight="semibold" tabular tracking={-0.5}>
                           {x.n}
                         </Text>
                       )}
-                      <Text size="10" color="muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                      <Text size="11" color="muted" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {x.label}
                       </Text>
                     </View>
@@ -356,51 +379,62 @@ export default function DashboardScreen() {
               </KpiCard>
             </View>
   
-            <StatusPriorityRing
-              topTitle="Status"
-              bottomTitle="Priority"
-              topLabel="tasks"
-              bottomLabel="open"
-              enterIndex={5}
-              loading={loading}
-              top={TASK_FLOW_ORDER.map((st) => ({
-                key: st,
-                label: st === 'done' || st === 'cancelled' ? `${FLOW_COLUMN_LABELS[st]} · ${DASHBOARD_WINDOW_DAYS}d` : FLOW_COLUMN_LABELS[st],
-                value: workflow[st],
-                color: STATUS_COLOR[st],
-              }))}
-              bottom={PRIORITY_ORDER.map((p) => ({
-                key: p,
-                label: PRIORITY_LABELS[p],
-                value: stats.priority[p],
-                color: PRIORITY_COLOR[p],
-              }))}
-            />
-  
-            <HBarChart
-              title={`By ${NODE_LABELS.level.toLowerCase()}`}
+            <Animated.View entering={sequenceEnter(5)}>
+              <CompletionsChart orgId={org?.id} timeZone={org?.timeZone ?? 'UTC'} />
+            </Animated.View>
+
+            <View style={[cardSurface(theme), styles.ringCard]}>
+              <StatusPriorityRing
+                topTitle={`Status · closed ${DASHBOARD_WINDOW_DAYS}d`}
+                bottomTitle="Priority"
+                topLabel="tasks"
+                bottomLabel="open"
+                enterIndex={6}
+                loading={loading}
+                top={TASK_FLOW_ORDER.map((st) => ({
+                  key: st,
+                  label: FLOW_COLUMN_LABELS[st],
+                  value: workflow[st],
+                  color: STATUS_COLOR[st],
+                }))}
+                bottom={PRIORITY_ORDER.map((p) => ({
+                  key: p,
+                  label: PRIORITY_LABELS[p],
+                  value: stats.priority[p],
+                  color: PRIORITY_COLOR[p],
+                }))}
+              />
+            </View>
+
+            <DepartmentTreemap
+              title={`Open by ${NODE_LABELS.level.toLowerCase()}`}
               total={`${tasks.length} open`}
-              color={Tone.violet500}
               emptyLabel={`No ${NODE_LABELS.levelPlural.toLowerCase()} yet.`}
-              enterIndex={6}
-              loading={loading}
-              rows={depts.map((d) => ({ key: d.id, label: d.name, value: stats.byDept.get(d.id) ?? 0 }))}
-            />
-  
-            <HBarChart
-              title="Assignee load"
-              total="open tasks"
-              color={Tone.sky500}
-              emptyLabel="Nobody is assigned yet."
               enterIndex={7}
               loading={loading}
-              rows={topAssignees.map(([id, n]) => {
+              items={depts.map((d, i) => ({
+                key: d.id,
+                label: d.name,
+                value: stats.byDept.get(d.id) ?? 0,
+                colorIndex: i,
+                onPress: () => router.navigate('/channels'),
+              }))}
+            />
+
+            <AssigneeBubbles
+              title="Assignee load"
+              total="open tasks"
+              emptyLabel="Nobody is assigned yet."
+              enterIndex={8}
+              loading={loading}
+              items={topAssignees.map(([id, n]) => {
                 const m = memberById.get(id);
                 return {
                   key: id,
                   label: names.get(id) ?? 'Someone',
                   value: n,
                   avatar: { name: m?.name, email: m?.email, image: m?.image },
+                  onPress: id === userId ? () => router.navigate('/my-tasks') : undefined,
                 };
               })}
             />
@@ -439,14 +473,15 @@ const styles = StyleSheet.create({
   kpiOuter: { flexGrow: 1, flexBasis: '46%' },
   kpi: {
     flex: 1,
-    minHeight: 104,
-    borderRadius: Radius.xxxl - 3,
-    borderWidth: 1,
-    padding: 10,
+    minHeight: 118,
+    padding: 12,
     overflow: 'hidden',
   },
+  kpiLabel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kpiFigure: { fontSize: 40, lineHeight: 42, marginTop: 8 },
+  ringCard: { padding: 16 },
   wave: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 76, overflow: 'hidden' },
-  workspaceRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
+  workspaceRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
 });
 
 /** A quiet line on Home when a tracker is waiting for today's numbers; hidden otherwise. */
@@ -462,11 +497,11 @@ function TrackersDue({ orgId }: { orgId: string | undefined }) {
         scaleTo={0.99}
         onPress={() => router.push('/trackers')}
         style={[styles.trackersDue, { borderColor: theme.borderSubtle }]}>
-        <Icon icon={faBullseye} size={14} color="muted" />
+        <Icon icon={TargetIcon} size={14} color="muted" />
         <Text size="13" style={{ flex: 1 }}>
           {`${due} tracker${due === 1 ? '' : 's'} to update today`}
         </Text>
-        <Icon icon={faChevronRight} size={11} color="muted" />
+        <Icon icon={ChevronRightIcon} size={11} color="muted" />
       </PressableScale>
     </Animated.View>
   );

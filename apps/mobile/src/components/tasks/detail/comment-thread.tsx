@@ -1,4 +1,4 @@
-import { faComment, faPaperPlane, faPen, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { MessageCircleIcon, PencilIcon, SendIcon, Trash2Icon } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -8,7 +8,7 @@ import { PressableScale } from '@/components/motion/pressable-scale';
 import { Text } from '@/components/text';
 import { Avatar, EmptyState } from '@/components/ui';
 import { listLayout, revealIn, revealOut } from '@/constants/motion';
-import { Radius, Tone } from '@/constants/theme';
+import { elevation, Radius, Tone } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { timeAgo } from '@/lib/format';
 import {
@@ -50,7 +50,7 @@ function MentionPicker({ members, filter, onPick }: { members: MemberRow[]; filt
   const matches = members.filter((m) => memberLabel(m).toLowerCase().includes(filter.toLowerCase())).slice(0, 6);
   if (matches.length === 0) return null;
   return (
-    <View style={[styles.mentionList, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+    <View style={[styles.mentionList, { backgroundColor: theme.cardRaised, borderColor: theme.line, ...elevation(theme, 'overlay') }]}>
       {matches.map((m) => (
         <PressableScale key={m.userId} style={styles.mentionRow} onPress={() => onPick(m)}>
           <Avatar name={m.name} email={m.email} image={m.image} size={20} />
@@ -117,7 +117,7 @@ function Composer({
           disabled={!body.trim() || post.isPending}
           onPress={submit}
           style={[styles.sendBtn, { backgroundColor: theme.accent, opacity: !body.trim() || post.isPending ? 0.4 : 1 }]}>
-          <Icon icon={faPaperPlane} size={14} color={theme.onAccent} />
+          <Icon icon={SendIcon} size={14} color={theme.onAccent} />
         </PressableScale>
       </View>
     </View>
@@ -157,7 +157,7 @@ function CommentItem({
 
   return (
     <Animated.View layout={listLayout}>
-      <View style={[styles.commentRow, { backgroundColor: theme.surfaceElevated }]}>
+      <View style={[styles.commentRow, { backgroundColor: theme.fill }]}>
         <Avatar name={comment.authorName} email={comment.authorEmail} image={comment.authorImage} size={28} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.commentHead}>
@@ -175,12 +175,12 @@ function CommentItem({
                   setEditing(true);
                   setEditBody(comment.body ?? '');
                 }}>
-                <Icon icon={faPen} size={10} color="muted" />
+                <Icon icon={PencilIcon} size={10} color="muted" />
               </PressableScale>
             ) : null}
             {(isOwn || isOrgOwner) && !comment.deletedAt ? (
               <PressableScale hitSlop={6} onPress={() => deleteComment.mutate(comment.id)}>
-                <Icon icon={faTrashCan} size={10} color="muted" />
+                <Icon icon={Trash2Icon} size={10} color="muted" />
               </PressableScale>
             ) : null}
           </View>
@@ -312,7 +312,7 @@ export function CommentThreadCard({
 
       <View style={{ gap: 8, paddingHorizontal: 12 }}>
         {roots.length === 0 ? (
-          <EmptyState compact icon={faComment} title="No comments yet" description="Be the first to comment." />
+          <EmptyState compact icon={MessageCircleIcon} title="No comments yet" description="Be the first to comment." />
         ) : (
           roots.map((c) => (
             <CommentItem
@@ -348,7 +348,7 @@ export function CommentThreadCard({
           <Composer taskId={taskId} members={members} onDone={() => setShowInput(false)} />
         ) : (
           <PressableScale style={styles.addCommentBtn} onPress={() => setShowInput(true)}>
-            <Icon icon={faComment} size={14} color="muted" />
+            <Icon icon={MessageCircleIcon} size={14} color="muted" />
             <Text size="sm" color="muted">
               Add a comment…
             </Text>
@@ -360,7 +360,7 @@ export function CommentThreadCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.xxl, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: Radius.card, borderWidth: 1, overflow: 'hidden' },
   cardTitle: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 8 },
   commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: Radius.xl, paddingHorizontal: 10, paddingVertical: 8 },
   commentHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },

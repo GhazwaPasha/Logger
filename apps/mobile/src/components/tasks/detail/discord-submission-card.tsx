@@ -1,13 +1,5 @@
+import { CheckIcon, ChevronDownIcon, CircleAlertIcon, PaperclipIcon, RotateCwIcon, Trash2Icon, XIcon } from 'lucide-react-native';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import {
-  faCheck,
-  faChevronDown,
-  faCircleExclamation,
-  faPaperclip,
-  faRotateRight,
-  faTrashCan,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useEffect, useState } from 'react';
 import { Alert, Linking, StyleSheet, Switch, View } from 'react-native';
@@ -198,7 +190,7 @@ export function DiscordSubmissionCard({
                   Linked channel
                 </Text>
               )}
-              {canConfigure ? <Icon icon={faChevronDown} size={9} color={BLURPLE} /> : null}
+              {canConfigure ? <Icon icon={ChevronDownIcon} size={9} color={BLURPLE} /> : null}
             </PressableScale>
           </View>
           {canEditFields ? (
@@ -224,7 +216,7 @@ export function DiscordSubmissionCard({
               layout={listLayout}
               style={[styles.fileRow, { backgroundColor: alpha(GREEN, dark ? 0.1 : 0.07), borderColor: alpha(GREEN, 0.25) }]}>
               <View style={[styles.fileIcon, { backgroundColor: alpha(GREEN, 0.18) }]}>
-                <Icon icon={faCheck} size={11} color={GREEN} />
+                <Icon icon={CheckIcon} size={11} color={GREEN} />
               </View>
               <PressableScale
                 style={{ flex: 1, minWidth: 0 }}
@@ -257,7 +249,7 @@ export function DiscordSubmissionCard({
                       ],
                     )
                   }>
-                  <Icon icon={faTrashCan} size={12} color="muted" />
+                  <Icon icon={Trash2Icon} size={12} color="muted" />
                 </PressableScale>
               ) : null}
             </Animated.View>
@@ -273,13 +265,13 @@ export function DiscordSubmissionCard({
                 styles.fileRow,
                 styles.sendingRow,
                 {
-                  backgroundColor: theme.surfaceElevated,
+                  backgroundColor: theme.fill,
                   borderColor: s.phase === 'error' ? alpha(RED, 0.35) : theme.borderSubtle,
                 },
               ]}>
               <View style={styles.sendingHead}>
                 <Icon
-                  icon={s.phase === 'error' ? faCircleExclamation : faPaperclip}
+                  icon={s.phase === 'error' ? CircleAlertIcon : PaperclipIcon}
                   size={12}
                   color={s.phase === 'error' ? RED : 'muted'}
                 />
@@ -289,13 +281,13 @@ export function DiscordSubmissionCard({
                 {s.phase === 'error' ? (
                   <>
                     <PressableScale hitSlop={8} accessibilityLabel={`Retry ${s.name}`} onPress={() => void send(s)}>
-                      <Icon icon={faRotateRight} size={12} color={BLURPLE} />
+                      <Icon icon={RotateCwIcon} size={12} color={BLURPLE} />
                     </PressableScale>
                     <PressableScale
                       hitSlop={8}
                       accessibilityLabel={`Dismiss ${s.name}`}
                       onPress={() => setSending((prev) => prev.filter((x) => x.id !== s.id))}>
-                      <Icon icon={faXmark} size={13} color="muted" />
+                      <Icon icon={XIcon} size={13} color="muted" />
                     </PressableScale>
                   </>
                 ) : (
@@ -327,7 +319,7 @@ export function DiscordSubmissionCard({
               accessibilityRole="button"
               accessibilityLabel="Attach a file to send to Discord"
               style={[styles.attach, { backgroundColor: BLURPLE }]}>
-              <Icon icon={faPaperclip} size={13} color="#fff" />
+              <Icon icon={PaperclipIcon} size={13} color="#fff" />
               <Text size="sm" weight="semibold" color="#fff">
                 {busy || sent.length ? 'Attach another file' : 'Attach a file'}
               </Text>
@@ -386,7 +378,7 @@ function ProgressBar({ progress }: { progress: number | null }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Radius.xxl, borderWidth: 1, padding: 14, gap: 10 },
+  card: { borderRadius: Radius.card, borderWidth: 1, padding: 14, gap: 10 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   logo: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },

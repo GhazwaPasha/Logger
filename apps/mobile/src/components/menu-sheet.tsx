@@ -1,11 +1,10 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faCheck, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { CheckIcon, SearchIcon } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { usePresence } from '@/components/motion/use-presence';
 import { Text } from '@/components/text';
@@ -16,7 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 export type MenuOption<T extends string = string> = {
   value: T;
   label: string;
-  icon?: IconDefinition;
+  icon?: IconType;
   iconColor?: string;
 };
 
@@ -79,7 +78,7 @@ export function MenuSheet<T extends string>({
           style={[
             styles.sheet,
             {
-              backgroundColor: theme.surfaceElevated,
+              backgroundColor: theme.cardRaised,
               borderColor: theme.borderSubtle,
               paddingBottom: Math.max(insets.bottom, 12),
               maxHeight: height * MAX_HEIGHT_SHARE,
@@ -93,7 +92,7 @@ export function MenuSheet<T extends string>({
           ) : null}
           {searchable ? (
             <View style={[styles.search, { backgroundColor: theme.surfaceMuted, borderColor: theme.borderSubtle }]}>
-              <Icon icon={faMagnifyingGlass} size={12} color="muted" />
+              <Icon icon={SearchIcon} size={12} color="muted" />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
@@ -133,7 +132,7 @@ export function MenuSheet<T extends string>({
                   <Text size="sm" weight="semibold" tracking={-0.1} numberOfLines={1} style={{ flex: 1 }}>
                     {o.label}
                   </Text>
-                  {selected ? <Icon icon={faCheck} size={13} color="fg" /> : null}
+                  {selected ? <Icon icon={CheckIcon} size={13} color="fg" /> : null}
                 </PressableScale>
               );
             })}

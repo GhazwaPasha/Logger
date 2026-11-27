@@ -1,7 +1,6 @@
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { StyleSheet, View } from 'react-native';
 
-import { alpha } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 
 /** Evaluated once: whether this build and OS can draw Apple's Liquid Glass (iOS 26+, Xcode 26 build). */
@@ -37,9 +36,7 @@ export function BarSurface({ radius, nested }: { radius: number; nested?: boolea
           StyleSheet.absoluteFill,
           {
             borderRadius: radius,
-            backgroundColor: alpha(theme.fg, dark ? 0.08 : 0.06),
-            borderColor: alpha(theme.fg, dark ? 0.1 : 0.07),
-            borderWidth: StyleSheet.hairlineWidth * 2,
+            backgroundColor: theme.fill2,
           },
         ]}
       />
@@ -53,11 +50,11 @@ export function BarSurface({ radius, nested }: { radius: number; nested?: boolea
         StyleSheet.absoluteFill,
         {
           borderRadius: radius,
-          // Opaque: any translucency lets page text bleed through the tabs and the panel. In dark mode it sits a
-          // step above the page so the floating bar still reads as a separate layer.
-          backgroundColor: dark ? theme.surfaceMuted : theme.surfaceElevated,
-          borderColor: alpha(theme.fg, dark ? 0.1 : 0.07),
-          borderWidth: StyleSheet.hairlineWidth * 2,
+          // Opaque: any translucency lets page text bleed through the tabs and the panel. It's the web's raised
+          // card (white in light, a step above the sheet in dark) with a hairline edge; the shadow sits on the parent.
+          backgroundColor: theme.cardRaised,
+          borderColor: theme.lineStrong,
+          borderWidth: StyleSheet.hairlineWidth,
         },
       ]}
     />
@@ -68,11 +65,11 @@ export function BarSurface({ radius, nested }: { radius: number; nested?: boolea
 export const barShadow = GLASS
   ? null
   : {
-      elevation: 10,
+      elevation: 8,
       shadowColor: '#000',
-      shadowOpacity: 0.16,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.12,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
     };
 
 export const hasLiquidGlass = GLASS;

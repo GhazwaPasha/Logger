@@ -1,9 +1,8 @@
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { ChevronRightIcon } from 'lucide-react-native';
 import { useEffect } from 'react';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { Duration, POP_EASE } from '@/constants/motion';
 import type { ThemeColor } from '@/constants/theme';
 
@@ -16,13 +15,13 @@ export function RotatingChevron({
   open,
   size = 12,
   color = 'muted',
-  icon = faChevronRight,
+  icon = ChevronRightIcon,
   openDeg = 90,
 }: {
   open: boolean;
   size?: number;
   color?: ThemeColor | (string & {});
-  icon?: IconDefinition;
+  icon?: IconType;
   openDeg?: number;
 }) {
   const turn = useSharedValue(open ? 1 : 0);

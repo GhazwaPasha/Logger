@@ -1,4 +1,4 @@
-import { faClock, faSquareCheck, faSquareXmark, faUserClock } from '@fortawesome/free-solid-svg-icons';
+import { ClockIcon, HourglassIcon, SquareCheckIcon, SquareXIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -17,10 +17,10 @@ import {
 } from '@/lib/task-board';
 
 export const STATUS_ICONS = {
-  pending: faClock,
-  in_progress: faUserClock,
-  done: faSquareCheck,
-  cancelled: faSquareXmark,
+  pending: ClockIcon,
+  in_progress: HourglassIcon,
+  done: SquareCheckIcon,
+  cancelled: SquareXIcon,
 } as const;
 
 /** The compact stage pill on task cards (`KanbanStatusPill` / `StatusPillSelect` on the web): 24px tall, 4px radius. */
@@ -56,7 +56,7 @@ export function StatusPill({
         {pending ? (
           <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.7 }] }} />
         ) : (
-          <Text size="xs" weight="semibold" color={colors.fg} tracking={-0.2} lh={16} numberOfLines={1}>
+          <Text size="xs" weight="semibold" color={colors.fg} lh={16}>
             {FLOW_COLUMN_LABELS[manual]}
           </Text>
         )}
@@ -81,7 +81,7 @@ export function ColumnHeader({ status, count }: { status: ManualTaskStatus; coun
   const dark = useIsDark();
   const colors = statusPillColors(status, dark, theme);
   return (
-    <View style={[styles.column, { backgroundColor: colors.bg, borderColor: theme.borderSubtle }]}>
+    <View style={[styles.column, { backgroundColor: colors.bg }]}>
       <Text size="11" weight="semibold" color={colors.fg} tracking={-0.2} lh={11}>
         {FLOW_COLUMN_LABELS[status]}
       </Text>
@@ -95,9 +95,8 @@ export function ColumnHeader({ status, count }: { status: ManualTaskStatus; coun
 const styles = StyleSheet.create({
   pill: {
     height: 24,
-    minWidth: 88,
     paddingHorizontal: 10,
-    borderRadius: Radius.base,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -107,7 +106,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderRadius: Radius.full,
   },
 });

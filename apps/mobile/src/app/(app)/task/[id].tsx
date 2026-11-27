@@ -1,4 +1,4 @@
-import { faBoxArchive, faChevronLeft, faEllipsis, faRotateLeft, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { ArchiveIcon, ChevronLeftIcon, EllipsisIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getZonedParts } from '@work-ledger/contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,9 +16,9 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { HeaderButton } from '@/components/shell/screen-header';
 import { AiIcon } from '@/components/agent/ai-icon';
 import { MenuSheet } from '@/components/menu-sheet';
-import { PressableScale } from '@/components/motion/pressable-scale';
 import { PageEnter } from '@/components/page';
 import { AttachmentsCard } from '@/components/tasks/detail/attachments-card';
 import { CommentThreadCard } from '@/components/tasks/detail/comment-thread';
@@ -31,7 +31,7 @@ import { TimeTrackingCard } from '@/components/tasks/detail/time-tracking-card';
 import { Text } from '@/components/text';
 import { Button, CenteredSpinner, ErrorBanner } from '@/components/ui';
 import { revealIn, sequenceEnter } from '@/constants/motion';
-import { alpha, Fonts, Radius } from '@/constants/theme';
+import { alpha, elevation, Fonts, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { isDefaultTitle } from '@/lib/draft-task';
 import { formatDateOnly } from '@/lib/format';
@@ -149,20 +149,12 @@ function TaskScreen() {
 
   const topBar = (
     <View style={[styles.topBar, { paddingTop: insets.top + 4 }]}>
-      <PressableScale scaleTo={0.94} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8} onPress={close} style={styles.iconBtn}>
-        <Icon icon={faChevronLeft} size={18} color="fg" />
-      </PressableScale>
+      <HeaderButton icon={ChevronLeftIcon} label="Back" onPress={close} />
       <View style={{ flex: 1 }} />
       {id && id !== 'new' ? (
-        <PressableScale
-          scaleTo={0.94}
-          accessibilityRole="button"
-          accessibilityLabel="Ask LogBase about this task"
-          hitSlop={8}
-          onPress={() => router.push({ pathname: '/ask', params: { taskId: id } })}
-          style={styles.iconBtn}>
+        <HeaderButton label="Ask LogBase about this task" onPress={() => router.push({ pathname: '/ask', params: { taskId: id } })}>
           <AiIcon size={19} />
-        </PressableScale>
+        </HeaderButton>
       ) : null}
       {saving ? (
         <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(250)} style={styles.saving}>
@@ -173,15 +165,7 @@ function TaskScreen() {
         </Animated.View>
       ) : null}
       {canArchive || canRestore ? (
-        <PressableScale
-          scaleTo={0.94}
-          accessibilityRole="button"
-          accessibilityLabel="More actions"
-          hitSlop={8}
-          onPress={() => setMenuOpen(true)}
-          style={styles.iconBtn}>
-          <Icon icon={faEllipsis} size={18} color="fg" />
-        </PressableScale>
+        <HeaderButton icon={EllipsisIcon} label="More actions" onPress={() => setMenuOpen(true)} />
       ) : null}
     </View>
   );
@@ -265,8 +249,8 @@ function TaskScreen() {
           {archived ? (
             <Animated.View
               entering={revealIn}
-              style={[styles.archivedBanner, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-              <Icon icon={faBoxArchive} size={14} color="muted" />
+              style={[styles.archivedBanner, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
+              <Icon icon={ArchiveIcon} size={14} color="muted" />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text size="sm" weight="semibold">
                   Archived
@@ -410,9 +394,9 @@ function TaskScreen() {
         visible={menuOpen}
         title="Task"
         options={[
-          ...(canArchive ? [{ value: 'archive' as const, label: 'Archive task', icon: faBoxArchive }] : []),
-          ...(canRestore ? [{ value: 'restore' as const, label: 'Restore task', icon: faRotateLeft }] : []),
-          ...(canPurge ? [{ value: 'purge' as const, label: 'Delete permanently', icon: faTrash }] : []),
+          ...(canArchive ? [{ value: 'archive' as const, label: 'Archive task', icon: ArchiveIcon }] : []),
+          ...(canRestore ? [{ value: 'restore' as const, label: 'Restore task', icon: RotateCcwIcon }] : []),
+          ...(canPurge ? [{ value: 'purge' as const, label: 'Delete permanently', icon: Trash2Icon }] : []),
         ]}
         onSelect={(action) => {
           setMenuOpen(false);
@@ -517,7 +501,7 @@ function zonedLocal(iso: string, timeZone: string): string {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingBottom: 4 },
+  topBar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 8 },
   iconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   saving: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6 },
   content: { paddingHorizontal: 16, paddingTop: 4, gap: 16 },

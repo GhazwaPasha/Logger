@@ -100,27 +100,52 @@ export function taskShowsLateFooter(task: TaskRow, now: Date = new Date()): bool
 // Colours
 // ---------------------------------------------------------------------------------------------
 
-/** Tinted status-pill background (light mode uses slightly stronger fills, like the web). */
-export function statusPillColors(st: BoardTaskStatus, dark: boolean, theme: Palette): { bg: string; fg: string } {
-  const a = dark ? 0.15 : 0.22;
+/** Status pill colours (web `statusPillPaletteClasses`): the status tokens' tinted fill + ink. */
+export function statusPillColors(st: BoardTaskStatus, _dark: boolean, theme: Palette): { bg: string; fg: string } {
   switch (st) {
     case 'pending':
-      return { bg: alpha(Tone.slate500, a), fg: theme.fg };
+      return { bg: theme.statusPendingBg, fg: theme.statusPendingInk };
     case 'assigned':
-      return { bg: alpha(Tone.sky500, a), fg: theme.fg };
+      return { bg: theme.infoBg, fg: theme.infoInk };
     case 'in_progress':
-      return { bg: alpha(Tone.violet500, a), fg: theme.fg };
+      return { bg: theme.statusProgressBg, fg: theme.statusProgressInk };
     case 'late':
-      return { bg: alpha(Tone.orange500, dark ? 0.15 : 0.24), fg: theme.fg };
+      return { bg: alpha(theme.danger, 0.14), fg: theme.danger };
     case 'done':
-      return { bg: alpha(Tone.emerald500, a), fg: theme.fg };
+      return { bg: theme.statusDoneBg, fg: theme.statusDoneInk };
     default:
-      return { bg: alpha(Tone.neutral500, 0.15), fg: theme.muted };
+      return { bg: theme.fill, fg: theme.ink2 };
+  }
+}
+
+/** Solid status hue for dots, rings and legends (web `statusDotColor`). */
+export function statusDotColor(st: BoardTaskStatus, theme: Palette): string {
+  switch (st) {
+    case 'pending':
+      return theme.statusPending;
+    case 'assigned':
+      return theme.infoInk;
+    case 'in_progress':
+      return theme.statusProgress;
+    case 'late':
+      return theme.danger;
+    case 'done':
+      return theme.statusDone;
+    default:
+      return theme.statusCancelled;
   }
 }
 
 /** Semantic text color for an inline status label in the activity log (web's `statusLabelTextClasses`). */
-export function statusLabelColor(st: BoardTaskStatus, dark: boolean): string {
+export function statusLabelColor(st: BoardTaskStatus, dark: boolean, theme?: Palette): string {
+  if (theme) {
+    if (st === 'pending') return theme.statusPendingInk;
+    if (st === 'assigned') return theme.infoInk;
+    if (st === 'in_progress') return theme.statusProgressInk;
+    if (st === 'late') return theme.danger;
+    if (st === 'done') return theme.statusDoneInk;
+    return theme.ink2;
+  }
   switch (st) {
     case 'pending':
       return dark ? Tone.slate400 : Tone.slate600;
@@ -149,15 +174,16 @@ export function dueChipColors(
     fg: text,
   });
   if (taskShowsLateFooter(task)) return tint(Tone.red500, dark ? Tone.red400 : Tone.red600);
-  if (!task.dueAt) return { bg: theme.surfaceMuted, border: theme.borderSubtle, fg: theme.muted };
+  if (!task.dueAt) return { bg: theme.fill, border: theme.line, fg: theme.muted };
   if (taskFlowColumn(task) === 'in_progress') return tint(Tone.green500, dark ? Tone.green400 : Tone.green600);
   return tint(Tone.blue500, dark ? Tone.blue400 : Tone.blue600);
 }
 
-export function priorityColor(p: TaskPriority, dark: boolean, theme: Palette): string {
-  if (p === 'high') return dark ? Tone.amber400 : Tone.amber500;
-  if (p === 'low') return dark ? Tone.sky400 : Tone.sky500;
-  return theme.muted;
+/** Priority hue (web `--priority-*`). */
+export function priorityColor(p: TaskPriority, _dark: boolean, theme: Palette): string {
+  if (p === 'high') return theme.priorityHigh;
+  if (p === 'low') return theme.priorityLow;
+  return theme.priorityMedium;
 }
 
 // ---------------------------------------------------------------------------------------------

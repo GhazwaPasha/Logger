@@ -1,5 +1,5 @@
+import { Trash2Icon } from 'lucide-react-native';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import { faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
@@ -90,7 +90,7 @@ export function AttachmentsCard({
                   { text: 'Delete', style: 'destructive', onPress: () => onDelete(a.id) },
                 ])
               }>
-              <Icon icon={faTrashCan} size={13} color="muted" />
+              <Icon icon={Trash2Icon} size={13} color="muted" />
             </PressableScale>
           ) : null}
         </Animated.View>

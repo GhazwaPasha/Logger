@@ -1,13 +1,4 @@
-import {
-  faArrowRight,
-  faArrowUp,
-  faClockRotateLeft,
-  faEye,
-  faPen,
-  faThumbtack,
-  faTrashCan,
-  faXmark,
-} from '@fortawesome/free-solid-svg-icons';
+import { ArrowRightIcon, ArrowUpIcon, EyeIcon, HistoryIcon, PencilIcon, PinIcon, Trash2Icon, XIcon } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   formatZonedDateKey,
@@ -31,7 +22,7 @@ import { Pulse } from '@/components/motion/pulse';
 import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { IconButton } from '@/components/ui';
-import { Fonts, Radius } from '@/constants/theme';
+import { elevation, Fonts, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { agentKeys, streamAsk } from '@/lib/agent';
 import { getAskTaskForm } from '@/lib/agent-task-form';
@@ -87,12 +78,12 @@ function ContextBadges({
   const theme = useTheme();
   const showView = !!view && !hideView;
   if (!taskLabel && !showView) return null;
-  const badge = { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle };
+  const badge = { backgroundColor: theme.cardRaised, borderColor: theme.line };
   return (
     <View style={styles.badges}>
       {taskLabel ? (
         <View style={[styles.badge, badge]}>
-          <Icon icon={faPen} size={10} color="muted" />
+          <Icon icon={PencilIcon} size={10} color="muted" />
           <Text size="11" numberOfLines={1} style={styles.badgeLabel}>
             {taskLabel}
           </Text>
@@ -100,7 +91,7 @@ function ContextBadges({
       ) : null}
       {showView && !scopeOff ? (
         <View style={[styles.badge, badge]}>
-          <Icon icon={faEye} size={10} color="muted" />
+          <Icon icon={EyeIcon} size={10} color="muted" />
           <Text size="11" numberOfLines={1} style={styles.badgeLabel}>
             {view.label}
           </Text>
@@ -110,7 +101,7 @@ function ContextBadges({
             accessibilityRole="button"
             accessibilityLabel={`Stop using ${view.label}, ask about the whole workspace`}
             onPress={() => onScopeOff(true)}>
-            <Icon icon={faXmark} size={11} color="muted" />
+            <Icon icon={XIcon} size={11} color="muted" />
           </PressableScale>
         </View>
       ) : null}
@@ -307,9 +298,9 @@ export default function AskScreen() {
         title={view === 'history' ? 'History' : (title ?? 'Ask LogBase')}
         right={
           <View style={{ flexDirection: 'row' }}>
-            <IconButton icon={faPen} label="New conversation" onPress={() => { reset(); setTaskId(params.taskId ?? null); }} iconSize={15} />
+            <IconButton icon={PencilIcon} label="New conversation" onPress={() => { reset(); setTaskId(params.taskId ?? null); }} iconSize={15} />
             <IconButton
-              icon={faClockRotateLeft}
+              icon={HistoryIcon}
               label={view === 'history' ? 'Back to conversation' : 'History'}
               active={view === 'history'}
               onPress={() => setView((v) => (v === 'history' ? 'chat' : 'history'))}
@@ -363,11 +354,11 @@ export default function AskScreen() {
                         haptic="select"
                         accessibilityRole="button"
                         onPress={() => void send(s)}
-                        style={[styles.suggestion, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+                        style={[styles.suggestion, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
                         <Text size="sm" weight="medium" numberOfLines={1} style={{ flex: 1 }}>
                           {s}
                         </Text>
-                        <Icon icon={faArrowRight} size={12} color="muted" />
+                        <Icon icon={ArrowRightIcon} size={12} color="muted" />
                       </PressableScale>
                     </Animated.View>
                   ))}
@@ -379,7 +370,7 @@ export default function AskScreen() {
                   <Animated.View
                     key={m.id}
                     entering={FadeInDown.duration(200)}
-                    style={[styles.bubble, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+                    style={[styles.bubble, { backgroundColor: theme.fill2, borderColor: 'transparent' }]}>
                     <Text size="15" lh={22} selectable>
                       {m.content}
                     </Text>
@@ -444,7 +435,7 @@ export default function AskScreen() {
               hideView={canFill}
               onScopeOff={setScopeOff}
             />
-            <View style={[styles.inputWrap, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+            <View style={[styles.inputWrap, { backgroundColor: theme.cardRaised, borderColor: theme.line }]}>
               <TextInput
                 value={input}
                 onChangeText={setInput}
@@ -478,7 +469,7 @@ export default function AskScreen() {
                     styles.sendBtn,
                     input.trim() ? { backgroundColor: theme.fg } : { backgroundColor: theme.surfaceMuted },
                   ]}>
-                  <Icon icon={faArrowUp} size={14} color={input.trim() ? theme.surfaceBase : theme.muted} />
+                  <Icon icon={ArrowUpIcon} size={14} color={input.trim() ? theme.surfaceBase : theme.muted} />
                 </PressableScale>
               )}
             </View>
@@ -544,7 +535,7 @@ function ProposalCard({ proposal, onDecide }: { proposal: AgentProposal; onDecid
               {it.title}
             </Text>
             {proposal.kind === 'comment' ? (
-              <Text size="13" style={[styles.commentPreview, { backgroundColor: theme.surfaceElevated }]}>
+              <Text size="13" style={[styles.commentPreview, { backgroundColor: theme.fill }]}>
                 {it.to}
               </Text>
             ) : it.from == null || it.to.includes('\n') ? (
@@ -668,7 +659,7 @@ function History({
           <Text size="xs" weight="semibold" color="muted" uppercase tracking={0.6} style={{ paddingHorizontal: 4 }}>
             {g.label}
           </Text>
-          <View style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+          <View style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
             {g.threads.map((t, i) => (
               <View
                 key={t.id}
@@ -679,7 +670,7 @@ function History({
                   </Text>
                 </Pressable>
                 <IconButton
-                  icon={faThumbtack}
+                  icon={PinIcon}
                   label={t.pinned ? 'Unpin' : 'Pin'}
                   tone={t.pinned ? 'fg' : 'muted'}
                   size={36}
@@ -690,7 +681,7 @@ function History({
                   }}
                 />
                 <IconButton
-                  icon={faTrashCan}
+                  icon={Trash2Icon}
                   label="Delete conversation"
                   size={36}
                   iconSize={13}
@@ -766,10 +757,10 @@ const styles = StyleSheet.create({
   thinking: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 22 },
   thinkingDot: { width: 8, height: 8, borderRadius: 4 },
   footnote: { textAlign: 'center', paddingHorizontal: 4 },
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Radius.xxxl, paddingHorizontal: 12, paddingVertical: 10 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: Radius.card, paddingHorizontal: 12, paddingVertical: 10 },
   errorDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' },
   stopGlyph: { width: 10, height: 10, borderRadius: 2 },
-  proposal: { borderWidth: 1, borderRadius: Radius.xxxl, overflow: 'hidden' },
+  proposal: { borderWidth: 1, borderRadius: Radius.card, overflow: 'hidden' },
   proposalHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth * 2 },
   proposalRow: { paddingHorizontal: 12, paddingVertical: 9, gap: 3 },
   commentPreview: { marginTop: 4, borderRadius: Radius.xl, paddingHorizontal: 10, paddingVertical: 7 },
@@ -801,6 +792,6 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 16, lineHeight: 22, maxHeight: 140, paddingTop: 7, paddingBottom: 7 },
   sendBtn: { width: 36, height: 36, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
-  group: { borderRadius: Radius.xxxl + 4, borderWidth: 1, overflow: 'hidden' },
+  group: { borderRadius: Radius.card, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4 },
 });

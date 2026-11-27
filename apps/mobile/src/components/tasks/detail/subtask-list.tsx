@@ -1,4 +1,4 @@
-import { faCheck, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { CheckIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -74,7 +74,7 @@ export function SubtaskListCard({
             {creating ? (
               <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.6 }] }} />
             ) : (
-              <Icon icon={faPlus} size={11} color="muted" />
+              <Icon icon={PlusIcon} size={11} color="muted" />
             )}
           </View>
           <TextInput
@@ -153,7 +153,7 @@ function SubtaskLine({
         {busy ? (
           <ActivityIndicator size="small" color={theme.muted} style={{ transform: [{ scale: 0.55 }] }} />
         ) : item.done ? (
-          <Icon icon={faCheck} size={10} color={theme.onAccent} />
+          <Icon icon={CheckIcon} size={10} color={theme.onAccent} />
         ) : null}
       </PressableScale>
 
@@ -184,7 +184,7 @@ function SubtaskLine({
           hitSlop={10}
           accessibilityLabel={`Remove ${item.title}`}
           onPress={() => onDelete(item.id)}>
-          <Icon icon={faXmark} size={13} color="muted" />
+          <Icon icon={XIcon} size={13} color="muted" />
         </PressableScale>
       ) : null}
     </Animated.View>

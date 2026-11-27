@@ -1,20 +1,9 @@
-import {
-  faAnglesDown,
-  faAnglesUp,
-  faArrowUp,
-  faCalendarDays,
-  faChevronRight,
-  faCircleHalfStroke,
-  faFlag,
-  faLayerGroup,
-  faUser,
-  type IconDefinition,
-} from '@fortawesome/free-solid-svg-icons';
+import { ArrowUpIcon, CalendarDaysIcon, ChevronRightIcon, ChevronsDownIcon, ChevronsUpIcon, ContrastIcon, FlagIcon, LayersIcon, UserIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Icon } from '@/components/icon';
+import { Icon, type IconType } from '@/components/icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
 import { STATUS_ICONS } from '@/components/tasks/status-pill';
@@ -24,7 +13,7 @@ import { LevelListSheet } from '@/components/tasks/detail/level-list-field';
 import { Text } from '@/components/text';
 import { Avatar } from '@/components/ui';
 import { sequenceEnter } from '@/constants/motion';
-import { alpha, Radius } from '@/constants/theme';
+import { alpha, elevation, Radius } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { NODE_LABELS } from '@/lib/labels';
 import {
@@ -38,7 +27,7 @@ import {
 } from '@/lib/task-board';
 import type { Dept, ListRow, MemberRow, TaskDueRepeat } from '@/lib/types';
 
-const PRIORITY_ICON = { high: faAnglesUp, medium: faArrowUp, low: faAnglesDown } as const;
+const PRIORITY_ICON = { high: ChevronsUpIcon, medium: ArrowUpIcon, low: ChevronsDownIcon } as const;
 
 function formatDue(d: Date): string {
   const sameYear = d.getFullYear() === new Date().getFullYear();
@@ -119,8 +108,8 @@ export function TaskProperties({
   return (
     <Animated.View
       entering={sequenceEnter(enterIndex, 8)}
-      style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
-      <Row icon={faCircleHalfStroke} label="Status" onPress={canChangeStatus ? () => setOpen('status') : undefined}>
+      style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
+      <Row icon={ContrastIcon} label="Status" onPress={canChangeStatus ? () => setOpen('status') : undefined}>
         <View style={[styles.statusPill, { backgroundColor: statusColors.bg }]}>
           {statusPending ? (
             <ActivityIndicator size="small" color={statusColors.fg} style={{ transform: [{ scale: 0.6 }] }} />
@@ -133,14 +122,14 @@ export function TaskProperties({
         </View>
       </Row>
       <Divider color={divider} />
-      <Row icon={faFlag} label="Priority" onPress={canEdit ? () => setOpen('priority') : undefined}>
+      <Row icon={FlagIcon} label="Priority" onPress={canEdit ? () => setOpen('priority') : undefined}>
         <Icon icon={PRIORITY_ICON[priority]} size={12} color={priorityColor(priority, dark, theme)} />
         <Text size="sm" weight="medium">
           {PRIORITY_LABELS[priority]}
         </Text>
       </Row>
       <Divider color={divider} />
-      <Row icon={faUser} label="Assignee" onPress={canEdit ? () => setOpen('assignee') : undefined}>
+      <Row icon={UserIcon} label="Assignee" onPress={canEdit ? () => setOpen('assignee') : undefined}>
         {assignee ? (
           <>
             <Avatar name={assignee.name} email={assignee.email} image={assignee.image} size={22} />
@@ -160,7 +149,7 @@ export function TaskProperties({
         )}
       </Row>
       <Divider color={divider} />
-      <Row icon={faCalendarDays} label="Due" onPress={canEdit ? () => setOpen('due') : undefined}>
+      <Row icon={CalendarDaysIcon} label="Due" onPress={canEdit ? () => setOpen('due') : undefined}>
         {due ? (
           <>
             <Text size="sm" weight="medium" color={dueColor ?? 'fg'} numberOfLines={1} style={{ flexShrink: 1 }}>
@@ -181,7 +170,7 @@ export function TaskProperties({
         )}
       </Row>
       <Divider color={divider} />
-      <Row icon={faLayerGroup} label={NODE_LABELS.list} onPress={canEdit ? () => setOpen('list') : undefined}>
+      <Row icon={LayersIcon} label={NODE_LABELS.list} onPress={canEdit ? () => setOpen('list') : undefined}>
         {dept ? (
           <Text size="sm" color="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
             {`${dept.name}  ›`}
@@ -259,7 +248,7 @@ function Row({
   onPress,
   children,
 }: {
-  icon: IconDefinition;
+  icon: IconType;
   label: string;
   onPress?: () => void;
   children: ReactNode;
@@ -279,7 +268,7 @@ function Row({
         {label}
       </Text>
       <View style={styles.value}>{children}</View>
-      {onPress ? <Icon icon={faChevronRight} size={10} color="muted" style={{ opacity: 0.6 }} /> : null}
+      {onPress ? <Icon icon={ChevronRightIcon} size={10} color="muted" style={{ opacity: 0.6 }} /> : null}
     </PressableScale>
   );
 }
@@ -287,7 +276,7 @@ function Row({
 const Divider = ({ color }: { color: string }) => <View style={[styles.divider, { backgroundColor: color }]} />;
 
 const styles = StyleSheet.create({
-  group: { borderRadius: Radius.xxl, borderWidth: 1, overflow: 'hidden' },
+  group: { borderRadius: Radius.card, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 50, paddingHorizontal: 14 },
   label: { width: 76 },
   value: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },

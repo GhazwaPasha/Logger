@@ -56,6 +56,6 @@ export function SyncRibbon() {
 }
 
 const styles = StyleSheet.create({
-  track: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 5, overflow: 'hidden' },
+  track: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 5, overflow: 'hidden', borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   thumb: { position: 'absolute', top: 0, left: 0, height: '100%', width: '38%' },
 });

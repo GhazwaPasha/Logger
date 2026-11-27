@@ -1,4 +1,4 @@
-import { faRoute } from '@fortawesome/free-solid-svg-icons';
+import { MilestoneIcon } from 'lucide-react-native';
 import { StyleSheet, View } from 'react-native';
 
 import { Page, Panel } from '@/components/page';
@@ -52,7 +52,7 @@ export default function RoadmapScreen() {
       {q.error ? <ErrorBanner message={q.error.message} onRetry={() => void q.refetch()} /> : null}
       {q.isLoading ? <CenteredSpinner /> : null}
       {!q.isLoading && goals.length === 0 && !q.error ? (
-        <EmptyState icon={faRoute} title="No goals yet" description="Plan goals and milestones on the web app." />
+        <EmptyState icon={MilestoneIcon} title="No goals yet" description="Plan goals and milestones on the web app." />
       ) : null}
 
       {goals.map((g) => {

@@ -1,4 +1,4 @@
-import { faCalendarDays, faClock, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { CalendarDaysIcon, ClockIcon, XIcon } from 'lucide-react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -81,16 +81,16 @@ export function DueDateFieldCard({
       <SectionLabel size="10">Due date</SectionLabel>
       <View style={styles.row}>
         <PressableScale
-          style={[styles.trigger, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}
+          style={[styles.trigger, { backgroundColor: theme.fill, borderColor: theme.line }]}
           onPress={() => setSheetOpen(true)}>
-          <Icon icon={faCalendarDays} size={13} color={dueColor ?? 'muted'} />
+          <Icon icon={CalendarDaysIcon} size={13} color={dueColor ?? 'muted'} />
           <Text size="sm" weight="medium" color={dueColor ?? 'fg'}>
             {formatTrigger(due)}
           </Text>
         </PressableScale>
         {due ? (
           <PressableScale
-            style={[styles.trigger, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle, opacity: dueRepeat ? 1 : 0.6 }]}
+            style={[styles.trigger, { backgroundColor: theme.fill, borderColor: theme.line, opacity: dueRepeat ? 1 : 0.6 }]}
             onPress={() => setSheetOpen(true)}>
             <Text size="sm" weight="medium" color="muted">
               {dueRepeat ? REPEAT_LABEL[dueRepeat] : 'Repeat'}
@@ -170,7 +170,7 @@ export function DueDateSheet({
       <Animated.View pointerEvents="box-none" style={[styles.anchor, sheet]}>
         <Pressable
           onPress={() => {}}
-          style={[styles.sheet, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          style={[styles.sheet, { backgroundColor: theme.cardRaised, borderColor: 'transparent', paddingBottom: Math.max(insets.bottom, 16) }]}>
           <Text size="11" weight="semibold" color="muted" uppercase tracking={0.8} style={{ paddingHorizontal: 4, paddingBottom: 4 }}>
             Due date
           </Text>
@@ -179,7 +179,7 @@ export function DueDateSheet({
             <PressableScale
               style={[styles.field, { backgroundColor: theme.surfaceMuted }]}
               onPress={openAndroidDate}>
-              <Icon icon={faCalendarDays} size={14} color="muted" />
+              <Icon icon={CalendarDaysIcon} size={14} color="muted" />
               <Text size="sm" weight="medium" style={{ flex: 1 }}>
                 {due ? formatFull(due) : 'Tap to choose date & time'}
               </Text>
@@ -189,7 +189,7 @@ export function DueDateSheet({
               <PressableScale
                 style={[styles.field, { backgroundColor: theme.surfaceMuted }]}
                 onPress={() => setIosPicker(iosPicker === 'date' ? null : 'date')}>
-                <Icon icon={faCalendarDays} size={14} color="muted" />
+                <Icon icon={CalendarDaysIcon} size={14} color="muted" />
                 <Text size="sm" weight="medium" style={{ flex: 1 }}>
                   {due ? formatFull(due) : 'Tap to choose date'}
                 </Text>
@@ -210,7 +210,7 @@ export function DueDateSheet({
               <PressableScale
                 style={[styles.field, { backgroundColor: theme.surfaceMuted }]}
                 onPress={() => setIosPicker(iosPicker === 'time' ? null : 'time')}>
-                <Icon icon={faClock} size={14} color="muted" />
+                <Icon icon={ClockIcon} size={14} color="muted" />
                 <Text size="sm" weight="medium" style={{ flex: 1 }}>
                   {due ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(due) : 'Tap to choose time'}
                 </Text>
@@ -239,7 +239,7 @@ export function DueDateSheet({
                 onChangeDueRepeat(null);
                 onClose();
               }}>
-              <Icon icon={faXmark} size={12} color="muted" />
+              <Icon icon={XIcon} size={12} color="muted" />
               <Text size="xs" weight="medium" color="muted">
                 Clear due date
               </Text>
@@ -260,7 +260,7 @@ export function DueDateSheet({
                     styles.repeatOption,
                     active
                       ? { borderColor: theme.accent, backgroundColor: theme.accentMuted }
-                      : { borderColor: theme.borderSubtle, backgroundColor: theme.surfaceElevated },
+                      : { borderColor: 'transparent', backgroundColor: theme.fill },
                     !due && { opacity: 0.4 },
                   ]}
                   onPress={() => onChangeDueRepeat(active ? null : o.value)}>

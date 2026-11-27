@@ -1,4 +1,4 @@
-import { faClockRotateLeft, faHashtag, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
+import { HashIcon, HistoryIcon, SearchIcon } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -11,7 +11,7 @@ import { PageEnter } from '@/components/page';
 import { useCollapseOnScroll, useTabBar, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { Text } from '@/components/text';
 import { Avatar, EmptyState, ErrorBanner } from '@/components/ui';
-import { Radius } from '@/constants/theme';
+import { elevation, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDueForListPill } from '@/lib/format';
 import { statusLabelOf } from '@/lib/labels';
@@ -104,7 +104,7 @@ export default function SearchScreen() {
             recent.length > 0 ? (
               <Section title="Recent">
                 {recent.map((r, i) => (
-                  <Row key={r} first={i === 0} onPress={() => setSearchQuery(r)} icon={<Icon icon={faClockRotateLeft} size={14} color="muted" />}>
+                  <Row key={r} first={i === 0} onPress={() => setSearchQuery(r)} icon={<Icon icon={HistoryIcon} size={14} color="muted" />}>
                     <Text size="sm" numberOfLines={1}>
                       {r}
                     </Text>
@@ -112,7 +112,7 @@ export default function SearchScreen() {
                 ))}
               </Section>
             ) : (
-              <EmptyState icon={faMagnifyingGlass} title="Search your workspace" description="Find tasks, channels and people." />
+              <EmptyState icon={SearchIcon} title="Search your workspace" description="Find tasks, channels and people." />
             )
           ) : null}
 
@@ -149,7 +149,7 @@ export default function SearchScreen() {
                 <Row
                   key={l.id}
                   first={i === 0}
-                  icon={<Icon icon={faHashtag} size={14} color="muted" />}
+                  icon={<Icon icon={HashIcon} size={14} color="muted" />}
                   onPress={() => {
                     remember();
                     router.navigate({ pathname: '/channels/[listId]', params: { listId: l.id } });
@@ -193,7 +193,7 @@ export default function SearchScreen() {
             </Section>
           ) : null}
 
-          {nothing ? <EmptyState icon={faMagnifyingGlass} title={`No results for “${query}”`} /> : null}
+          {nothing ? <EmptyState icon={SearchIcon} title={`No results for “${query}”`} /> : null}
           {needle && query.length < 2 && channelHits.length === 0 && peopleHits.length === 0 ? (
             <Text size="xs" color="muted" style={{ textAlign: 'center' }}>
               Type at least 2 characters to search tasks.
@@ -212,7 +212,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <Text size="xs" weight="semibold" color="muted" uppercase tracking={0.6} style={{ paddingHorizontal: 4 }}>
         {title}
       </Text>
-      <View style={[styles.group, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>{children}</View>
+      <View style={[styles.group, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>{children}</View>
     </View>
   );
 }
@@ -248,6 +248,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   header: { height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   content: { paddingHorizontal: 16, paddingTop: 4, gap: 18 },
-  group: { borderRadius: Radius.xxxl + 4, borderWidth: 1, overflow: 'hidden' },
+  group: { borderRadius: Radius.card, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 14, paddingVertical: 10 },
 });

@@ -1,4 +1,4 @@
-import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { ChevronDownIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -44,7 +44,7 @@ export function HistoryCard({
         <Text size="xs" weight="semibold" color="muted" uppercase tracking={0.5}>
           History
         </Text>
-        <RotatingChevron open={expanded} icon={faChevronDown} openDeg={180} size={13} />
+        <RotatingChevron open={expanded} icon={ChevronDownIcon} openDeg={180} size={13} />
       </PressableScale>
       {expanded ? (
         <Animated.View entering={revealIn} exiting={revealOut} style={{ gap: 6, marginTop: 8 }}>

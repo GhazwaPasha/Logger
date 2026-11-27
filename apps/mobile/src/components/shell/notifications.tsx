@@ -1,4 +1,4 @@
-import { faCircleCheck } from '@fortawesome/free-solid-svg-icons';
+import { CircleCheckIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -179,7 +179,7 @@ function NotificationsPanel({
       <Animated.View
         style={[
           styles.panel,
-          { backgroundColor: theme.surfaceElevated, paddingTop: insets.top + 12, paddingBottom: insets.bottom },
+          { backgroundColor: theme.sheet, paddingTop: insets.top + 12, paddingBottom: insets.bottom },
           slide,
         ]}>
         <View style={[styles.header, { borderBottomColor: theme.borderSubtle }]}>
@@ -198,7 +198,7 @@ function NotificationsPanel({
           ) : error ? (
             <ErrorBanner message={error.message || 'Could not load notifications'} onRetry={onRetry} />
           ) : entries.length === 0 ? (
-            <EmptyState icon={faCircleCheck} title="You are all caught up" />
+            <EmptyState icon={CircleCheckIcon} title="You are all caught up" />
           ) : (
             entries.map((e) => (
               <PressableScale

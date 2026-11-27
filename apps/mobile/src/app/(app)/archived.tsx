@@ -1,4 +1,4 @@
-import { faBoxArchive, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { ArchiveIcon, Trash2Icon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -7,7 +7,7 @@ import { PageEnter } from '@/components/page';
 import { StackHeader } from '@/components/shell/screen-header';
 import { Text } from '@/components/text';
 import { Button, CenteredSpinner, EmptyState, ErrorBanner, IconButton } from '@/components/ui';
-import { Radius } from '@/constants/theme';
+import { elevation, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateOnly } from '@/lib/format';
 import { archivedTaskCaps, isWorkspaceOwner } from '@/lib/permissions';
@@ -85,7 +85,7 @@ function ArchivedScreen() {
       renderItem={({ item }) => {
         const caps = archivedTaskCaps(item, lists, userId, members);
         return (
-        <View style={[styles.card, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderSubtle }]}>
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: 'transparent', ...elevation(theme, 'card') }]}>
           <PressableScale scaleTo={0.985} style={{ flex: 1, minWidth: 0 }} onPress={() => router.push({ pathname: '/task/[id]', params: { id: item.id } })}>
             <Text size="sm" weight="medium" numberOfLines={2}>
               {item.title}
@@ -106,13 +106,13 @@ function ArchivedScreen() {
             />
           ) : null}
           {caps.canPurge ? (
-            <IconButton icon={faTrash} label={`Delete permanently: ${item.title}`} iconSize={14} size={36} onPress={() => confirmPurge(item.id, item.title)} />
+            <IconButton icon={Trash2Icon} label={`Delete permanently: ${item.title}`} iconSize={14} size={36} onPress={() => confirmPurge(item.id, item.title)} />
           ) : null}
         </View>
         );
       }}
       ListEmptyComponent={
-        q.isLoading ? <CenteredSpinner /> : <EmptyState icon={faBoxArchive} title="Nothing archived" description="Archived tasks show up here." />
+        q.isLoading ? <CenteredSpinner /> : <EmptyState icon={ArchiveIcon} title="Nothing archived" description="Archived tasks show up here." />
       }
       onEndReached={() => q.hasNextPage && !q.isFetchingNextPage && void q.fetchNextPage()}
       onEndReachedThreshold={0.5}

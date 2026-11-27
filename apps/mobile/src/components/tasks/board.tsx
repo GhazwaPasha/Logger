@@ -1,11 +1,4 @@
-import {
-  faArrowsUpDown,
-  faCalendarDays,
-  faListUl,
-  faPlus,
-  faTableColumns,
-  faTableList,
-} from '@fortawesome/free-solid-svg-icons';
+import { ArrowUpDownIcon, CalendarDaysIcon, Columns3Icon, ListIcon, PlusIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,7 +14,7 @@ import {
 import { Icon } from '@/components/icon';
 import { MenuSheet } from '@/components/menu-sheet';
 import { PressableScale } from '@/components/motion/pressable-scale';
-import { PageEnter } from '@/components/page';
+import { PageEnter, Segmented } from '@/components/page';
 import { useCollapseOnScroll, useTabBarInset } from '@/components/shell/tab-bar/tab-bar-context';
 import { BoardActionsContext, type BoardActions } from '@/components/tasks/board-context';
 import { RecurringSeriesCard } from '@/components/tasks/recurring-series-card';
@@ -30,7 +23,7 @@ import { TaskCard, TaskCardSkeleton } from '@/components/tasks/task-card';
 import { Text } from '@/components/text';
 import { EmptyState, ErrorBanner, IconButton } from '@/components/ui';
 import { listLayout } from '@/constants/motion';
-import { Radius } from '@/constants/theme';
+import { elevation } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   flattenPages,
@@ -204,31 +197,39 @@ export function Board({
           onPress={() => openNewTask(listId)}
           style={({ pressed }) => [
             styles.newTask,
-            { backgroundColor: theme.accent, borderColor: theme.accent },
+            { backgroundColor: theme.primary, ...elevation(theme, 'card') },
             pressed && { opacity: 0.85 },
           ]}>
-          <Icon icon={faPlus} size={16} color={theme.onAccent} />
+          <Icon icon={PlusIcon} size={20} color={theme.onPrimary} />
         </PressableScale>
 
-        <View style={[styles.toolbar, { backgroundColor: theme.bgHeader, borderColor: theme.borderSubtle }]}>
-          <IconButton icon={faTableList} label="List view" active={viewMode === 'list'} onPress={() => setViewMode('list')} />
-          <IconButton icon={faTableColumns} label="Kanban view" active={viewMode === 'kanban'} onPress={() => setViewMode('kanban')} />
-          <View style={[styles.divider, { backgroundColor: theme.borderSubtle }]} />
+        <Segmented
+          value={viewMode}
+          onChange={setViewMode}
+          options={[
+            { value: 'list', label: '', icon: ListIcon, a11y: 'List view' },
+            { value: 'kanban', label: '', icon: Columns3Icon, a11y: 'Kanban view' },
+          ]}
+        />
+
+        <View style={[styles.toolbar, { backgroundColor: theme.fill }]}>
           <IconButton
-            icon={faArrowsUpDown}
+            size={36}
+            icon={ArrowUpDownIcon}
             label={`Sort tasks: ${SORT_OPTIONS.find((o) => o.value === sortMode)?.label}`}
             active={sortOpen}
             onPress={() => setSortOpen(true)}
           />
           <View>
             <IconButton
-              icon={faCalendarDays}
+              size={36}
+              icon={CalendarDaysIcon}
               label="Due date filter"
               active={dueOpen || dueWindow !== 'all'}
               onPress={() => setDueOpen(true)}
             />
             {dueWindow !== 'all' ? (
-              <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: theme.surfaceBase }]}>
+              <View style={[styles.badge, { backgroundColor: theme.primary, borderColor: theme.sheet }]}>
                 <Text size="10" weight="bold" color={theme.onAccent} lh={10}>
                   {DUE_WINDOW_OPTIONS.find((o) => o.value === dueWindow)?.label}
                 </Text>
@@ -244,7 +245,7 @@ export function Board({
 
   const empty = (
     <EmptyState
-      icon={faListUl}
+      icon={ListIcon}
       title={emptyTitle}
       description={dueWindow !== 'all' ? 'Try a wider due-date window.' : 'Tap + to add one.'}
     />
@@ -340,7 +341,7 @@ export function Board({
                   ))}
                   {q.isFetchingNextPage ? <ActivityIndicator style={{ padding: 12 }} color={theme.muted} /> : null}
                   {rows.length === 0 && seriesForCol.length === 0 && !q.isFetching ? (
-                    <EmptyState compact icon={faListUl} title="No tasks" />
+                    <EmptyState compact icon={ListIcon} title="No tasks" />
                   ) : null}
                 </ScrollView>
               </View>
@@ -387,28 +388,21 @@ const styles = StyleSheet.create({
   headerWrap: { gap: 12, paddingBottom: 12 },
   kanbanHead: { paddingHorizontal: 12, paddingTop: 4 },
   toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  // Web NewButton: a 40px primary square, leftmost in the toolbar.
   newTask: {
     width: 40,
     height: 40,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
   },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    padding: 6,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
+    padding: 3,
+    borderRadius: 13,
   },
-  divider: { width: StyleSheet.hairlineWidth * 2, height: 32, marginHorizontal: 4 },
   badge: {
     position: 'absolute',
     right: -4,
