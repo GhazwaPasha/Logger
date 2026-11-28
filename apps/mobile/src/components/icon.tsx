@@ -24,6 +24,13 @@ function strokeFor(size: number) {
   return size <= 12 ? 2.5 : size <= 15 ? 2.25 : 2;
 }
 
+/**
+ * Lucide draws inside a 24-unit box with ~2 units of margin, while the FontAwesome glyphs these sizes were
+ * picked for fill their box edge to edge — so at the same number a lucide icon looked a size too small.
+ * Every lucide icon is drawn this much larger to match the visual size the app was designed around.
+ */
+const LUCIDE_SCALE = 1.2;
+
 /** An icon tinted from the theme (`color` is a theme token or any raw colour). */
 export function Icon({
   icon,
@@ -47,9 +54,10 @@ export function Icon({
     return <FontAwesomeIcon icon={icon} size={size} color={resolved} style={style as never} />;
   }
   const Lucide = icon;
+  const drawn = Math.round(size * LUCIDE_SCALE);
   return (
     <Lucide
-      size={size}
+      size={drawn}
       color={resolved}
       strokeWidth={strokeWidth ?? strokeFor(size)}
       fill={fill ?? 'none'}

@@ -101,7 +101,7 @@ import {
   taskPriority,
   taskShowsLateFooter,
 } from "@/lib/task-board";
-import { ArrowRightIcon, ArrowUpDownIcon, ArrowUpIcon, BellIcon, CalendarDaysIcon, CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsDownIcon, ChevronsUpIcon, Columns3Icon, EllipsisVerticalIcon, LayersIcon, ListIcon, MessageCircleIcon, PaperclipIcon, PlusIcon, TimerIcon, UserPlusIcon } from "lucide-react";
+import { ArrowRightIcon, ArrowUpDownIcon, ArrowUpIcon, BellIcon, CalendarDaysIcon, CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsDownIcon, ChevronsUpIcon, Columns3Icon, EllipsisVerticalIcon, LayersIcon, ListIcon, PaperclipIcon, PlusIcon, TimerIcon, UserPlusIcon } from "lucide-react";
 
 /** Docked task-details pane: default width (the old overlay's max-w-xl), drag limits, and remembered width. */
 const TASK_DETAIL_PANE_W = 576;
@@ -1871,7 +1871,7 @@ function WorkItemsInner() {
           </Collapse>
         </div>
 
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={CommentIconBtn({ task })} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact /> : null}
       </div>
     );
   }
@@ -2011,20 +2011,6 @@ function WorkItemsInner() {
         ) : (
           <UserPlusIcon className="size-5 text-[var(--muted)] opacity-80" aria-hidden />
         )}
-      </button>
-    );
-  }
-
-  function CommentIconBtn({ task }: { task: TaskRow }) {
-    return (
-      <button
-        type="button"
-        onClick={() => openViewTask(task.id)}
-        title="Comments"
-        aria-label="Comments"
-        className="flex size-5 shrink-0 items-center justify-center text-[var(--muted)] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--surface-elevated)]"
-      >
-        <MessageCircleIcon className="size-5" aria-hidden />
       </button>
     );
   }
@@ -2232,7 +2218,7 @@ function WorkItemsInner() {
             )}
           </div>
         </div>
-        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact right={CommentIconBtn({ task })} /> : null}
+        {task.lastLedger ? <TaskCardLastActivity entry={task.lastLedger} members={members} taskDueAt={task.dueAt} compact /> : null}
       </li>
     );
   }

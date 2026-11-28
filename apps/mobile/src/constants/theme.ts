@@ -98,13 +98,17 @@ const light = {
 export type Palette = { [K in keyof typeof light]: string };
 
 /**
- * Dark: a true-black page with gray cards on it (the mobile app's own call — the web does the reverse). Cards
- * read by their fill, so dark has no shadows or hairline rings at all (see `elevation`).
+ * Dark: a near-black page with dark gray cards on it (the mobile app's own call — the web does the reverse).
+ * Cards read by their fill, so dark has no shadows or hairline rings at all (see `elevation`).
+ *
+ * The page is #080809, not #000000, on purpose: OLED pixels showing pure black are switched off and take a
+ * moment to turn back on, so cards scrolling over a #000 page leave a dark smear trailing behind them
+ * ("OLED black smear"). Keeping every pixel slightly lit removes the trail and still reads as black.
  */
 const dark: Palette = {
-  chrome: '#000000',
-  sheet: '#000000',
-  card: '#111113',
+  chrome: '#080809',
+  sheet: '#080809',
+  card: '#131315',
   cardRaised: '#1C1C1E',
   scrim: 'rgba(0, 0, 0, 0.5)',
 
@@ -159,7 +163,7 @@ const dark: Palette = {
   shadeDeep: 'rgba(0, 0, 0, 0.6)',
   hairlineStrong: 'rgba(255, 255, 255, 0.2)',
 
-  bg: '#000000',
+  bg: '#080809',
   fg: '#F2F2F3',
   muted: '#9A9AA0',
   border: 'rgba(255, 255, 255, 0.12)',
@@ -168,13 +172,13 @@ const dark: Palette = {
   accentHover: '#FFFFFF',
   onAccent: '#000000',
   accentMuted: 'rgba(255, 255, 255, 0.08)',
-  surfaceBase: '#000000',
-  surface: '#111113',
-  surfaceElevated: '#111113',
+  surfaceBase: '#080809',
+  surface: '#131315',
+  surfaceElevated: '#131315',
   surfaceMuted: '#1C1C1E',
   surfaceHover: '#1C1C1E',
-  surfaceNav: '#000000',
-  bgHeader: '#000000',
+  surfaceNav: '#080809',
+  bgHeader: '#080809',
 };
 
 export const Colors = { light, dark } as const;
